@@ -1,0 +1,25 @@
+{
+  "name": "orkestria",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema web de planejamento visual de rotinas operacionais, ocupação de jornada e ociosidade prevista/realizada (ASG/serviços gerais).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.0.0",
+    "googleapis": "^144.0.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "swr": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}

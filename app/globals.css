@@ -1,0 +1,388 @@
+/* ════════════════════════════════════════════════════════════════════
+   ORKESTRIA — design system "Partitura"
+   Marfim de papel de partitura + tinta evergreen + vinho amaranto.
+   Serif expressiva nos títulos, pauta na agenda, rótulos mono em caixa
+   alta: a rotina da equipe lida como um programa de concerto.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* superfícies (marfim de partitura) */
+  --papel: #f5f1e6;
+  --papel-2: #ece6d4;
+  --papel-3: #e2dac4;
+  --cartao: #fcfaf3;
+  --linha: #d9d2bc;
+  --grade: #e8e2d0;
+
+  /* tinta (evergreen) */
+  --tinta: #223127;
+  --tinta-2: #4a584e;
+  --tinta-3: #8a958c;
+
+  /* sinalização */
+  --acento: #9c0d38;        /* vinho amaranto — ação primária e marca */
+  --azul: #2f5d9e;          /* planejada */
+  --verde: #2e7d52;         /* realizada / adequado */
+  --amarelo: #d9a40a;       /* alta ocupação */
+  --vermelho: #c73a2b;      /* sobrecarga / conflito */
+  --laranja: #d97c26;       /* pendente / atenção */
+  --cinza-bloco: #b7bfb4;   /* horário livre */
+  --intervalo: #223127;     /* intervalo bloqueado */
+
+  --sombra: 4px 4px 0 rgba(34, 49, 39, 0.9);
+  --sombra-leve: 2px 2px 0 rgba(34, 49, 39, 0.82);
+  --borda: 2px solid var(--tinta);
+  --raio: 4px;
+
+  --fonte-display: var(--font-display), Georgia, serif;
+  --fonte-corpo: var(--font-body), "Segoe UI", sans-serif;
+  --fonte-mono: var(--font-mono), "Consolas", monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--fonte-corpo);
+  color: var(--tinta);
+  background-color: var(--papel);
+  /* papel quadriculado */
+  background-image:
+    linear-gradient(var(--grade) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grade) 1px, transparent 1px);
+  background-size: 28px 28px;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--fonte-display);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+a { color: inherit; }
+
+button { font-family: inherit; cursor: pointer; }
+
+input, select, textarea { font-family: inherit; font-size: 14px; }
+
+::selection { background: var(--acento); color: #fff; }
+
+/* ── rótulos técnicos ─────────────────────────────────────────────── */
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--tinta-2);
+}
+
+.num {
+  font-family: var(--fonte-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── botões ───────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  font-family: var(--fonte-corpo);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--tinta);
+  background: var(--cartao);
+  border: var(--borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-leve);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  white-space: nowrap;
+}
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 rgba(34,49,39,0.82); }
+.btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.btn:disabled { opacity: 0.45; pointer-events: none; }
+
+.btn-primario { background: var(--acento); color: #fff; }
+.btn-perigo { background: var(--vermelho); color: #fff; }
+.btn-fantasma { box-shadow: none; background: transparent; border-color: var(--tinta-3); }
+.btn-mini { padding: 4px 10px; font-size: 11px; }
+
+/* ── formulários ──────────────────────────────────────────────────── */
+.campo { display: flex; flex-direction: column; gap: 4px; }
+.campo input, .campo select, .campo textarea {
+  padding: 8px 10px;
+  background: var(--cartao);
+  border: 1.5px solid var(--tinta);
+  border-radius: var(--raio);
+  color: var(--tinta);
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: 1px;
+}
+.campo textarea { resize: vertical; min-height: 64px; }
+
+/* ── cartões e painéis ────────────────────────────────────────────── */
+.painel {
+  background: var(--cartao);
+  border: var(--borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--tinta);
+  background: var(--papel-2);
+  border-radius: var(--raio) var(--raio) 0 0;
+}
+
+/* ── tabelas ──────────────────────────────────────────────────────── */
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--tinta);
+  background: var(--papel-2);
+}
+.tabela td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--linha);
+  vertical-align: middle;
+}
+.tabela tbody tr:hover { background: var(--papel-2); }
+
+/* ── selos/badges ─────────────────────────────────────────────────── */
+.selo {
+  display: inline-block;
+  padding: 2px 8px;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1.5px solid var(--tinta);
+  border-radius: 3px;
+  background: var(--cartao);
+}
+.selo-azul { background: var(--azul); color: #fff; border-color: var(--azul); }
+.selo-verde { background: var(--verde); color: #fff; border-color: var(--verde); }
+.selo-amarelo { background: var(--amarelo); color: var(--tinta); border-color: var(--tinta); }
+.selo-vermelho { background: var(--vermelho); color: #fff; border-color: var(--vermelho); }
+.selo-laranja { background: var(--laranja); color: #fff; border-color: var(--laranja); }
+.selo-cinza { background: var(--papel-3); color: var(--tinta-2); }
+
+/* ── modal ────────────────────────────────────────────────────────── */
+.modal-fundo {
+  position: fixed;
+  inset: 0;
+  background: rgba(34, 49, 39, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+.modal-caixa {
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--cartao);
+  border: var(--borda);
+  border-radius: var(--raio);
+  box-shadow: 8px 8px 0 rgba(34, 49, 39, 0.9);
+  animation: modal-entra 0.16s ease-out backwards;
+}
+
+/* título + fechar sempre visíveis ao rolar formulários longos */
+.modal-caixa .painel-cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+@keyframes modal-entra {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── alertas ──────────────────────────────────────────────────────── */
+.alerta {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border: 1.5px solid var(--tinta);
+  border-left-width: 6px;
+  border-radius: 3px;
+  background: var(--cartao);
+  font-size: 13px;
+}
+.alerta-erro { border-left-color: var(--vermelho); background: #f8e8e3; }
+.alerta-aviso { border-left-color: var(--amarelo); background: #f6efd8; }
+.alerta-ok { border-left-color: var(--verde); background: #e7f1e9; }
+
+/* ── barra de progresso de ocupação ───────────────────────────────── */
+.barra-trilho {
+  height: 14px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--papel-2),
+    var(--papel-2) 4px,
+    var(--papel-3) 4px,
+    var(--papel-3) 8px
+  );
+  overflow: hidden;
+}
+.barra-preenchimento { height: 100%; transition: width 0.3s ease; }
+
+/* ── agenda ───────────────────────────────────────────────────────── */
+.agenda-card-tarefa {
+  border: 1.5px solid var(--tinta);
+  border-radius: 3px;
+  box-shadow: var(--sombra-leve);
+  cursor: grab;
+  user-select: none;
+}
+.agenda-card-tarefa:active { cursor: grabbing; }
+
+/* hachura do intervalo */
+.celula-intervalo {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--intervalo),
+    var(--intervalo) 5px,
+    #35463b 5px,
+    #35463b 10px
+  );
+}
+
+.celula-fora-jornada {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(34, 49, 39, 0.05) 6px,
+    rgba(34, 49, 39, 0.05) 12px
+  );
+}
+
+/* ── responsividade ───────────────────────────────────────────────
+   Alvo principal: notebooks ~1366×768. Abaixo de 1000px a tela de
+   rotina empilha os painéis; abaixo de 720px tabelas viram cards. */
+
+.linha-rotina {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.paleta-tarefas {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 160px);
+}
+
+.resumo-lateral {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.form-grade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.so-mobile { display: none; }
+
+@media (max-width: 1000px) {
+  .linha-rotina { flex-direction: column; }
+  .paleta-tarefas,
+  .resumo-lateral {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+  .paleta-tarefas > div:last-child { max-height: 300px; }
+}
+
+@media (max-width: 720px) {
+  .so-desktop { display: none !important; }
+  .so-mobile { display: block; }
+}
+
+@media (max-width: 560px) {
+  .form-grade { grid-template-columns: 1fr; }
+}
+
+/* ── animação de entrada da página ───────────────────────────────── */
+@keyframes sobe-suave {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* "backwards" (não "both"): após a animação o transform some — um transform
+   residual viraria containing block e quebraria position:fixed dos modais. */
+.entra { animation: sobe-suave 0.25s ease-out backwards; }
+.entra-2 { animation: sobe-suave 0.25s 0.06s ease-out backwards; }
+.entra-3 { animation: sobe-suave 0.25s 0.12s ease-out backwards; }
+
+/* ── impressão (fichas de rotina) ────────────────────────────────── */
+@media print {
+  .nao-imprimir { display: none !important; }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  main { padding: 0 !important; }
+  .ficha-impressao {
+    box-shadow: none !important;
+    page-break-after: always;
+    break-after: page;
+  }
+  .ficha-impressao:last-child { page-break-after: auto; }
+}
+
+/* ── scrollbar discreta ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--papel-2); }
+::-webkit-scrollbar-thumb {
+  background: var(--tinta-3);
+  border: 2px solid var(--papel-2);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--tinta-2); }
