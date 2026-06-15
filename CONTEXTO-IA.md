@@ -16,8 +16,13 @@
 - **Usuários:** supervisores e coordenadores (quem planeja) e gerência (quem
   analisa). **Os ASGs não usam o sistema** — recebem a rotina em fichas de
   papel impressas pelo próprio sistema.
-- **Status:** MVP + Fase 2 concluídos e funcionais; Fase 3 (banco definitivo
-  Firebase) implementada aguardando o projeto Firebase real.
+- **Status:** **Em produção.** MVP + Fase 2 concluídos; banco definitivo
+  **Firebase Firestore ativo** (dados reais persistindo) e sistema publicado
+  na web (Vercel: https://orkestria-christus.vercel.app).
+- **Identidade visual:** design system "Partitura" — marfim de papel de
+  partitura, tinta evergreen, vinho amaranto como acento; fontes Fraunces
+  (títulos), Albert Sans (corpo), Spline Sans Mono (números). Nome e logo
+  remetem à orquestração de rotinas.
 
 ## 2. O problema que resolve
 
@@ -118,32 +123,44 @@ padrão**, não para vigiar pessoas.
 
 ## 7. Estado atual e roadmap
 
-**Concluído e verificado (MVP + Fase 2 completa):** tudo descrito na seção 4,
-com build de produção limpo e testes funcionais de API e interface.
+**Em produção e verificado:** tudo na seção 4, mais — banco **Firebase
+Firestore ativo** (`DATA_SOURCE=firebase`, dados migrados e operações de
+escrita/leitura/validação testadas contra o banco real), **publicado na
+Vercel** (deploy automático a cada push no GitHub: `napa14-design/Orkestria`),
+**responsivo** (otimizado para notebook ~1366×768; em telas pequenas a tela de
+rotina empilha e o Acompanhamento vira cards; montar rotina por arrasto é
+desktop), e **paginação de funcionários** na agenda (8 por página + busca por
+nome) para sedes grandes (de 8 a 50+ ASGs).
 
-**Implementado aguardando ambiente real (Fase 3):** `FirebaseDataSource` e o
-endpoint de migração estão prontos, mas nunca foram exercitados contra um
-projeto Firestore real (faltam as credenciais). Passo a passo em
-`docs/07-migracao-firebase.md` (5 passos, ~30 minutos).
-
-**Próximos passos planejados:**
-1. Criar o projeto Firebase, migrar os dados e virar `DATA_SOURCE=firebase`.
-2. Firebase Authentication (senha individual por usuário).
-3. Com volume de dados: consultas indexadas por data/sede.
-4. Fase 4 (futuro distante, após meses de dados): app/QR Code/ponto — hoje
+**Próximos passos planejados (em ordem de prioridade):**
+1. **Firebase Authentication** (senha individual por usuário) — hoje o acesso
+   ainda usa uma senha única compartilhada definida em variável de ambiente;
+   é o principal item de segurança pendente.
+2. Regras de segurança do Firestore + `COOKIE_SECURE=true` em produção.
+3. Testes automatizados dos cálculos/validações (funções puras).
+4. Com volume de dados: consultas indexadas por data/sede; arquivamento do
+   histórico.
+5. Visão gerencial comparando sedes + relatório PDF para a diretoria.
+6. Fase futura (após meses de dados): app/QR Code/ponto — hoje
    intencionalmente fora do escopo.
 
-## 8. Como rodar
+## 8. Como acessar / rodar
 
+**Em produção (uso real):** https://orkestria-christus.vercel.app — roda sobre
+o Firebase, com os dados reais. O deploy é automático: todo push no
+repositório `napa14-design/Orkestria` gera uma nova versão no ar.
+
+**Localmente (desenvolvimento):**
 ```bash
 npm install
-copy .env.example .env   # DATA_SOURCE=memory já é o padrão
+copy .env.example .env   # DATA_SOURCE=memory roda sem credenciais (modo demo)
 npm run dev              # http://localhost:3000
 ```
 
-Login demo: `admin@empresa.com` (administrador),
-`supervisor.aldeota@empresa.com` (supervisor da Sede Aldeota) ou
-`gerencia@empresa.com` (visualizador) — senha `mudar123`.
+Perfis de acesso (no modo demo): `admin@empresa.com` (administrador),
+`supervisor.aldeota@empresa.com` (supervisor de uma sede) ou
+`gerencia@empresa.com` (visualizador, só leitura). Em produção, os usuários e a
+senha de acesso são definidos pelo administrador.
 
 ## 9. Mapa de arquivos para quem for mexer no código
 
@@ -160,5 +177,6 @@ Login demo: `admin@empresa.com` (administrador),
 > Sistema web em que supervisores de serviços gerais montam visualmente a
 > rotina diária da equipe (arrastar tarefas em blocos de 30min), enxergam na
 > hora ocupação/ociosidade/sobrecarga de cada funcionário, registram o que foi
-> realizado e usam os desvios para calibrar os tempos padrão — começando em
-> Google Sheets e migrando para Firebase sem reescrever nada.
+> realizado e usam os desvios para calibrar os tempos padrão — em produção
+> sobre Firebase, com a camada de dados desacoplada (já passou por memória e
+> Google Sheets sem reescrever o sistema).
