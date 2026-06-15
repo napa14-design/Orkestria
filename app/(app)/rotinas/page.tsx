@@ -20,6 +20,7 @@ import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
 import {
+  blocosOcupados,
   funcionarioNoDia,
   jornadaDoDia,
   PARAMETROS_PADRAO,
@@ -27,7 +28,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
-import { hhmmParaMin, hojeISO, somarDias } from "@/lib/dateUtils";
+import { hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
 import { temErro, validarAlocacao } from "@/lib/validations";
 import type {
   AlertaValidacao,
@@ -269,17 +270,49 @@ export default function PaginaRotinas() {
       }
       forcar = true;
     }
+    // Card aparece na hora (otimista); o servidor valida em 2º plano e a
+    // resposta substitui o provisório. Se o servidor recusar, reverte sozinho.
+    const visual = tempoVisualMin(previsto, blocoMin);
+    const iniMin = hhmmParaMin(inicio);
+    const otimista: RotinaPlanejada = {
+      id: crypto.randomUUID(),
+      data,
+      funcionario_id: funcionarioId,
+      sede_id: tarefa.sede_id,
+      tarefa_id: tarefaId,
+      local_id: tarefa.local_id,
+      inicio_planejado: inicio,
+      fim_planejado: minParaHHMM(iniMin + visual),
+      tempo_previsto_min: previsto,
+      tempo_visual_min: visual,
+      blocos_ocupados: blocosOcupados(previsto, blocoMin),
+      status: "planejada",
+      observacao: forcar ? "[Autorizado manualmente]" : "",
+      supervisor_id: "",
+      criado_em: "",
+      atualizado_em: "",
+    };
+    setSelecionado(funcionarioId);
     try {
-      const res = await apiPost<RespostaRotina>("/api/rotinas", {
-        data,
-        funcionario_id: funcionarioId,
-        tarefa_id: tarefaId,
-        inicio_planejado: inicio,
-        forcar,
-      });
-      await mutateRotinas();
-      setSelecionado(funcionarioId);
-      setAlertas(res.alertas ?? []);
+      await mutateRotinas(
+        async (cur) => {
+          const res = await apiPost<RespostaRotina>("/api/rotinas", {
+            data,
+            funcionario_id: funcionarioId,
+            tarefa_id: tarefaId,
+            inicio_planejado: inicio,
+            forcar,
+          });
+          setAlertas(res.alertas ?? []);
+          return [...(cur ?? []).filter((r) => r.id !== otimista.id), res.rotina];
+        },
+        {
+          optimisticData: (cur) => [...(cur ?? []), otimista],
+          rollbackOnError: true,
+          revalidate: false,
+          populateCache: true,
+        },
+      );
     } catch (err) {
       mostrarErro(err);
     }
@@ -307,15 +340,27 @@ export default function PaginaRotinas() {
       }
       forcar = true;
     }
+    const fim = minParaHHMM(hhmmParaMin(inicio) + rotina.tempo_visual_min);
+    const otimista = { ...rotina, funcionario_id: funcionarioId, inicio_planejado: inicio, fim_planejado: fim };
+    setSelecionado(funcionarioId);
     try {
-      const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
-        funcionario_id: funcionarioId,
-        inicio_planejado: inicio,
-        forcar,
-      });
-      await mutateRotinas();
-      setSelecionado(funcionarioId);
-      setAlertas(res.alertas ?? []);
+      await mutateRotinas(
+        async (cur) => {
+          const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
+            funcionario_id: funcionarioId,
+            inicio_planejado: inicio,
+            forcar,
+          });
+          setAlertas(res.alertas ?? []);
+          return (cur ?? []).map((r) => (r.id === rotinaId ? res.rotina : r));
+        },
+        {
+          optimisticData: (cur) => (cur ?? []).map((r) => (r.id === rotinaId ? otimista : r)),
+          rollbackOnError: true,
+          revalidate: false,
+          populateCache: true,
+        },
+      );
     } catch (err) {
       mostrarErro(err);
     }
@@ -323,20 +368,41 @@ export default function PaginaRotinas() {
 
   /** Redimensionamento pela alça do card; conflitos podem ser autorizados. */
   async function redimensionar(rotinaId: string, novoTempoMin: number) {
-    const corpo = { tempo_previsto_min: novoTempoMin };
+    const visual = tempoVisualMin(novoTempoMin, blocoMin);
+    const aplicar = (forcar: boolean) =>
+      mutateRotinas(
+        async (cur) => {
+          const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
+            tempo_previsto_min: novoTempoMin,
+            forcar,
+          });
+          setAlertas(res.alertas ?? []);
+          return (cur ?? []).map((r) => (r.id === rotinaId ? res.rotina : r));
+        },
+        {
+          optimisticData: (cur) =>
+            (cur ?? []).map((r) =>
+              r.id === rotinaId
+                ? {
+                    ...r,
+                    tempo_previsto_min: novoTempoMin,
+                    tempo_visual_min: visual,
+                    blocos_ocupados: blocosOcupados(novoTempoMin, blocoMin),
+                    fim_planejado: minParaHHMM(hhmmParaMin(r.inicio_planejado) + visual),
+                  }
+                : r,
+            ),
+          rollbackOnError: true,
+          revalidate: false,
+          populateCache: true,
+        },
+      );
     try {
-      const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, corpo);
-      await mutateRotinas();
-      setAlertas(res.alertas ?? []);
+      await aplicar(false);
     } catch (err) {
       if (err instanceof ErroApi && pedirAutorizacao(err.alertas)) {
         try {
-          const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
-            ...corpo,
-            forcar: true,
-          });
-          await mutateRotinas();
-          setAlertas(res.alertas ?? []);
+          await aplicar(true);
         } catch (err2) {
           mostrarErro(err2);
         }
@@ -348,8 +414,18 @@ export default function PaginaRotinas() {
 
   async function remover(rotinaId: string) {
     try {
-      await apiDelete(`/api/rotinas/${rotinaId}`);
-      await mutateRotinas();
+      await mutateRotinas(
+        async (cur) => {
+          await apiDelete(`/api/rotinas/${rotinaId}`);
+          return (cur ?? []).filter((r) => r.id !== rotinaId);
+        },
+        {
+          optimisticData: (cur) => (cur ?? []).filter((r) => r.id !== rotinaId),
+          rollbackOnError: true,
+          revalidate: false,
+          populateCache: true,
+        },
+      );
     } catch (err) {
       mostrarErro(err);
     }

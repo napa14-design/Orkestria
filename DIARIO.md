@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-06-12 — Agenda instantânea (otimista) + alerta de cota Firestore
+
+**O que mudou:** soltar/mover/redimensionar/remover tarefa na agenda agora é
+**otimista** — o card aparece/muda na hora (SWR `optimisticData`), o servidor
+valida em 2º plano, a resposta substitui o provisório (sem rebuscar a lista) e,
+se o servidor recusar, `rollbackOnError` reverte. Antes: ~3-4s (esperava o POST
++ uma rebusca da coleção inteira). Agora instantâneo e com **menos leituras**.
+
+**⚠️ Observação importante (cota):** durante os testes de hoje o **limite
+gratuito de leituras do Firestore (50k/dia) foi esgotado** (RESOURCE_EXHAUSTED)
+— porque cada carregamento lê coleções inteiras (`listar` + filtro em memória).
+Reseta à meia-noite (Pacífico). Reforça a pendência de **consultas indexadas
+por data/sede** (reduzir leituras por carga) e/ou avaliar o plano Blaze. A
+mudança otimista já ajuda (remove a rebusca por ação). Verificação ao vivo do
+otimista ficou pendente por causa da cota; build/typecheck OK.
+
+**Arquivos:** `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-12 — Agenda: faixa "fora do turno" com mais destaque
 
 **O que mudou:** as células fora do horário do funcionário (ex.: manhã de
