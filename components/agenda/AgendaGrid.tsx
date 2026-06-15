@@ -190,7 +190,7 @@ export default function AgendaGrid({
         </div>
 
         {/* colunas dos funcionários */}
-        {funcionarios.map((f) => {
+        {funcionarios.map((f, idxCol) => {
           const rotinasDoFunc = rotinas.filter((r) => r.funcionario_id === f.id);
           const entradaF = hhmmParaMin(f.entrada);
           const saidaF = hhmmParaMin(f.saida);
@@ -202,7 +202,15 @@ export default function AgendaGrid({
           return (
             <div
               key={f.id}
-              style={{ width: 190, flexShrink: 0, borderRight: "1px solid var(--linha)" }}
+              className="col-agenda"
+              style={
+                {
+                  width: 190,
+                  flexShrink: 0,
+                  borderRight: "1px solid var(--linha)",
+                  "--d": `${Math.min(idxCol, 8) * 0.05}s`,
+                } as React.CSSProperties
+              }
             >
               {/* cabeçalho da coluna */}
               <button
@@ -363,7 +371,7 @@ export default function AgendaGrid({
                   return (
                     <div
                       key={r.id}
-                      className="agenda-card-tarefa"
+                      className="agenda-card-tarefa pop-card"
                       draggable={!emResize}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(

@@ -268,6 +268,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   user-select: none;
 }
 .agenda-card-tarefa:active { cursor: grabbing; }
+/* leve elevação no hover dos cards da paleta (afinidade de "arraste-me") */
+.paleta-tarefas .agenda-card-tarefa {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.paleta-tarefas .agenda-card-tarefa:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: 4px 5px 0 rgba(34, 49, 39, 0.22);
+}
 
 /* hachura do intervalo */
 .celula-intervalo {
@@ -476,14 +484,29 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 /* ── animação de entrada da página ───────────────────────────────── */
 @keyframes sobe-suave {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-/* "backwards" (não "both"): após a animação o transform some — um transform
+/* easing macio (desacelera no fim) para a entrada não parecer "seca".
+   "backwards" (não "both"): após a animação o transform some — um transform
    residual viraria containing block e quebraria position:fixed dos modais. */
-.entra { animation: sobe-suave 0.25s ease-out backwards; }
-.entra-2 { animation: sobe-suave 0.25s 0.06s ease-out backwards; }
-.entra-3 { animation: sobe-suave 0.25s 0.12s ease-out backwards; }
+.entra { animation: sobe-suave 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) backwards; }
+.entra-2 { animation: sobe-suave 0.42s 0.09s cubic-bezier(0.22, 0.61, 0.36, 1) backwards; }
+.entra-3 { animation: sobe-suave 0.42s 0.18s cubic-bezier(0.22, 0.61, 0.36, 1) backwards; }
+.entra-4 { animation: sobe-suave 0.42s 0.27s cubic-bezier(0.22, 0.61, 0.36, 1) backwards; }
+
+/* colunas de funcionário surgindo em cascata na agenda (delay via --d) */
+.col-agenda {
+  animation: sobe-suave 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation-delay: var(--d, 0s);
+}
+
+/* card de rotina "nascendo" ao ser solto/criado */
+@keyframes pop-card {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.pop-card { animation: pop-card 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) backwards; }
 
 /* ── impressão (fichas de rotina) ────────────────────────────────── */
 @media print {

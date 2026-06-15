@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-12 — Animações mais suaves na Rotina do dia
+
+**O que mudou (feedback "tá muito seco"):** entrada da página mais macia e
+viva, sem atrapalhar o uso. (1) `.entra*` com easing cubic-bezier suave e
+0,42s (antes 0,25s ease-out), + `.entra-4`. (2) Colunas de funcionário
+surgem em **cascata** na agenda (`.col-agenda`, delay via `--d` por índice,
+limitado a 8). (3) Cards da paleta com **leve elevação no hover** (afinidade
+de arraste). (4) Cards de rotina **nascem com pop** ao serem criados/soltos
+(`.pop-card`; só anima no mount, não a cada re-render). Mantido `backwards`
+em tudo (não quebra os modais). Verificado: cascata 0/0,05/0,1s, pop nos 3
+cards de 12/06, 0 erros.
+
+**Arquivos:** `app/globals.css`, `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-12 — Brilho animado nos blocos da partitura (login)
 
 **O que mudou:** os blocos da partitura, além de entrarem em sequência,
