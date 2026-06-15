@@ -350,6 +350,107 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .form-grade { grid-template-columns: 1fr; }
 }
 
+/* ── tela de login (split: palco + formulário) ───────────────────── */
+.login-split {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+}
+
+.login-palco {
+  position: relative;
+  overflow: hidden;
+  background: var(--tinta);
+  color: var(--papel);
+  padding: 52px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 36px;
+  border-right: 3px solid var(--acento);
+}
+/* grade tênue, como a do app */
+.login-palco::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(245, 241, 230, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 241, 230, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  pointer-events: none;
+}
+
+.login-painel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 36px;
+}
+.login-form {
+  width: 100%;
+  max-width: 360px;
+}
+
+/* partitura: pautas horizontais com blocos (tarefas) */
+.login-partitura {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  z-index: 1;
+}
+.login-pauta {
+  position: relative;
+  height: 26px;
+  border-bottom: 1.5px solid rgba(245, 241, 230, 0.13);
+}
+.login-bloco {
+  position: absolute;
+  top: 2px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(20, 26, 22, 0.45);
+  box-shadow: 2px 2px 0 rgba(20, 26, 22, 0.4);
+  opacity: 0;
+  animation: bloco-entra 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes bloco-entra {
+  from { opacity: 0; transform: translateY(10px) scaleX(0.85); transform-origin: left; }
+  to { opacity: 1; transform: none; }
+}
+
+.login-divisor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--tinta-3);
+}
+.login-divisor::before,
+.login-divisor::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--linha);
+}
+
+.btn-google {
+  width: 100%;
+  justify-content: center;
+  background: #fff;
+  border-color: var(--tinta);
+}
+
+@media (max-width: 880px) {
+  .login-split { grid-template-columns: 1fr; min-height: 100vh; }
+  .login-palco {
+    padding: 28px 24px;
+    gap: 18px;
+    border-right: none;
+    border-bottom: 3px solid var(--acento);
+  }
+  .login-partitura { display: none; }
+}
+
 /* ── animação de entrada da página ───────────────────────────────── */
 @keyframes sobe-suave {
   from { opacity: 0; transform: translateY(8px); }

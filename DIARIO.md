@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-12 — Tela de login redesenhada (split + Google)
+
+**O que mudou:** login virou split-screen. Esquerda = "palco" evergreen com a
+logo (versão marfim), headline "A rotina da sua equipe, orquestrada." e uma
+**partitura animada** (blocos de agenda azul/verde/amarelo/vinho sobre pautas,
+revelados em sequência) — amarra o nome à função. Direita = formulário limpo
+(e-mail/senha, Entrar) + divisor "ou" + **botão "Entrar com Google"** com o G
+oficial. Responsivo: <880px empilha e esconde a partitura. Verificado:
+2 colunas no desktop, 1 no mobile, sem estouro, 0 erros de console.
+
+**Importante:** o botão do Google é **só visual por enquanto** — ao clicar
+mostra aviso "será habilitado em breve". Tornar funcional = item de Firebase
+Authentication (verificar ID token no servidor + casar com a tabela usuarios).
+
+**Arquivos:** `app/login/page.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-06-12 — Correção: fichas saíam 2 por página na impressão
 
 **O que mudou (bug reportado):** ao imprimir, duas fichas caíam na mesma
