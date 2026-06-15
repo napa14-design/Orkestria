@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-12 — Deploy na Vercel + correção da logo (middleware 307)
+
+**O que mudou:** sistema publicado em https://orkestria-christus.vercel.app
+(repositório renomeado para `napa14-design/Orkestria`; remote atualizado).
+- **Bug corrigido**: o `matcher` do middleware não excluía arquivos da pasta
+  `public/`, então requisições de imagens por usuário deslogado (a logo na
+  própria tela de login) eram redirecionadas para `/login` com HTTP 307 em
+  vez de servir o PNG. Adicionadas extensões estáticas (png/jpg/svg/…/woff)
+  à exceção do matcher. Verificado no ar: todos os assets agora HTTP 200.
+- **Lembrete de produção**: na Vercel as variáveis do `.env` são cadastradas
+  uma a uma (Environment Variables); `FIREBASE_PRIVATE_KEY` com `\n` literais
+  e sem aspas; `COOKIE_SECURE=true` (HTTPS).
+
+**Arquivos:** `middleware.ts`.
+
+---
+
 ## 2026-06-12 — Correção: modal colado no menu superior
 
 **O que mudou (bug reportado pelo usuário):** os modais abriam "colados" no
