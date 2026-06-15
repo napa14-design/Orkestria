@@ -30,8 +30,22 @@ export default function PaginaUsuarios() {
       textoNovo="+ Novo usuário"
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
-        { key: "email", rotulo: "E-mail", tipo: "texto", obrigatorio: true, ajuda: "Usado no login" },
-        { key: "perfil", rotulo: "Perfil", tipo: "select", obrigatorio: true, opcoes: PERFIS },
+        {
+          key: "email",
+          rotulo: "E-mail",
+          tipo: "texto",
+          obrigatorio: true,
+          ajuda: "Usado no login",
+          dica: "O e-mail com que a pessoa entra no sistema. É também por ele que o histórico registra quem fez cada alteração.",
+        },
+        {
+          key: "perfil",
+          rotulo: "Perfil",
+          tipo: "select",
+          obrigatorio: true,
+          opcoes: PERFIS,
+          dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • SUPERVISOR: monta rotinas e cadastra, mas só na própria sede. • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
+        },
         {
           key: "sede_id",
           rotulo: "Sede",
@@ -42,6 +56,7 @@ export default function PaginaUsuarios() {
             { valor: "geral", rotulo: "Geral (todas as sedes)" },
             ...(sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
           ],
+          dica: "A qual sede o usuário pertence. Para supervisor, limita o que ele enxerga e edita àquela sede. Administrador e gerência costumam usar \"Geral\" (todas as sedes).",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
       ]}

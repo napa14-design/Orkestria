@@ -24,7 +24,9 @@ export interface CampoForm {
   padrao?: unknown;
   inteira?: boolean; // ocupa a linha toda do formulário
   passo?: string; // step para campos numéricos
-  ajuda?: string;
+  ajuda?: string; // dica curta exibida abaixo do campo
+  /** Explicação completa, mostrada ao clicar no (?) ao lado do rótulo. */
+  dica?: string;
 }
 
 export interface ColunaTabela<T> {
@@ -61,6 +63,7 @@ export default function CrudManager<T extends Registro>({
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [dicaAberta, setDicaAberta] = useState<string | null>(null);
 
   const itens = useMemo(() => {
     if (!data) return [];
@@ -80,6 +83,7 @@ export default function CrudManager<T extends Registro>({
     setForm(inicial);
     setEditando(null);
     setErro("");
+    setDicaAberta(null);
     setAberto(true);
   }
 
@@ -89,6 +93,7 @@ export default function CrudManager<T extends Registro>({
     setForm(inicial);
     setEditando(item);
     setErro("");
+    setDicaAberta(null);
     setAberto(true);
   }
 
@@ -221,10 +226,58 @@ export default function CrudManager<T extends Registro>({
               className="campo"
               style={{ gridColumn: c.inteira ? "1 / -1" : undefined }}
             >
-              <span className="rotulo">
-                {c.rotulo}
-                {c.obrigatorio ? " *" : ""}
+              <span className="rotulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>
+                  {c.rotulo}
+                  {c.obrigatorio ? " *" : ""}
+                </span>
+                {c.dica && (
+                  <button
+                    type="button"
+                    aria-label={`O que é "${c.rotulo}"?`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setDicaAberta((atual) => (atual === c.key ? null : c.key));
+                    }}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: "1.5px solid var(--acento)",
+                      background: dicaAberta === c.key ? "var(--acento)" : "transparent",
+                      color: dicaAberta === c.key ? "#fff" : "var(--acento)",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    ?
+                  </button>
+                )}
               </span>
+              {c.dica && dicaAberta === c.key && (
+                <span
+                  className="entra"
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    color: "var(--tinta-2)",
+                    background: "var(--papel-2)",
+                    border: "1px solid var(--linha)",
+                    borderLeft: "3px solid var(--acento)",
+                    borderRadius: 3,
+                    padding: "6px 9px",
+                    marginBottom: 2,
+                  }}
+                >
+                  {c.dica}
+                </span>
+              )}
               {c.tipo === "select" ? (
                 <select
                   value={String(form[c.key] ?? "")}

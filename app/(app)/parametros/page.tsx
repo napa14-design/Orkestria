@@ -24,9 +24,29 @@ export default function PaginaParametros() {
       endpoint="/api/parametros"
       textoNovo="+ Novo parâmetro"
       campos={[
-        { key: "chave", rotulo: "Chave", tipo: "texto", obrigatorio: true, ajuda: "Ex.: ocupacao_baixa, bloco_agenda_min" },
-        { key: "valor", rotulo: "Valor", tipo: "texto", obrigatorio: true },
-        { key: "tipo", rotulo: "Tipo", tipo: "select", obrigatorio: true, opcoes: TIPOS },
+        {
+          key: "chave",
+          rotulo: "Chave",
+          tipo: "texto",
+          obrigatorio: true,
+          ajuda: "Ex.: ocupacao_baixa, bloco_agenda_min",
+          dica: "O identificador interno do parâmetro (sem espaços, sem acento). É por ele que o sistema reconhece a configuração. Os principais já vêm prontos — em geral você só edita o VALOR, não cria chaves novas. Ex.: ocupacao_adequada, desvio_justificativa_percentual.",
+        },
+        {
+          key: "valor",
+          rotulo: "Valor",
+          tipo: "texto",
+          obrigatorio: true,
+          dica: "O número/valor da configuração. É o que normalmente se ajusta. Ex.: na chave \"ocupacao_adequada\" o valor 85 significa que até 85% de ocupação a equipe é considerada \"adequada\".",
+        },
+        {
+          key: "tipo",
+          rotulo: "Tipo",
+          tipo: "select",
+          obrigatorio: true,
+          opcoes: TIPOS,
+          dica: "Só indica como o valor deve ser lido: número, percentual (%), minutos por m², ou texto. Serve para exibição — não muda o cálculo.",
+        },
         {
           key: "sede_id",
           rotulo: "Escopo",
@@ -37,10 +57,29 @@ export default function PaginaParametros() {
             { valor: "geral", rotulo: "Geral (todas as sedes)" },
             ...(sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
           ],
+          dica: "Onde este parâmetro vale. \"Geral\" aplica a todas as sedes; escolher uma sede cria uma exceção só para ela (que tem prioridade sobre o geral). Ex.: tempo padrão de limpeza diferente numa sede específica.",
         },
-        { key: "descricao", rotulo: "Descrição", tipo: "textarea", inteira: true },
-        { key: "editavel_por_supervisor", rotulo: "Editável por supervisor", tipo: "checkbox", padrao: true },
-        { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+        {
+          key: "descricao",
+          rotulo: "Descrição",
+          tipo: "textarea",
+          inteira: true,
+          dica: "Texto livre explicando para que serve o parâmetro — aparece na lista para qualquer pessoa entender sem precisar decorar a chave.",
+        },
+        {
+          key: "editavel_por_supervisor",
+          rotulo: "Editável por supervisor",
+          tipo: "checkbox",
+          padrao: true,
+          dica: "Se marcado, supervisores podem alterar este parâmetro. Desmarcado, só administradores. Útil para travar configurações sensíveis.",
+        },
+        {
+          key: "ativo",
+          rotulo: "Ativo",
+          tipo: "checkbox",
+          padrao: true,
+          dica: "Liga/desliga o parâmetro sem precisar apagá-lo. Inativo, o sistema usa o valor padrão de fábrica.",
+        },
       ]}
       colunas={[
         { key: "chave", rotulo: "Chave", render: (p) => <code className="num">{p.chave}</code> },

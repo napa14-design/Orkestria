@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-12 — Ajuda contextual (?) nos campos dos modais
+
+**O que mudou (pedido do usuário, foco em leigos):** todo campo de cadastro
+pode ter uma `dica` que aparece como um botão **(?)** ao lado do rótulo;
+clicar abre/fecha uma caixa com a explicação em linguagem simples. Mecanismo
+único no `CrudManager` (vale para todos os modais). Dicas escritas para os
+campos com jargão: Tarefas (regra de cálculo, tempo base, quantidade,
+frequência, restrição de gênero, etc.), Funcionários (jornada/intervalo),
+Locais (metragem/tipo), Parâmetros (chave/valor/escopo) e Usuários (perfil).
+Reseta ao abrir/trocar registro. Verificado: 9 campos com (?) no modal de
+tarefa, explicação expande ao clicar.
+
+**Arquivos:** `components/CrudManager.tsx`, `app/(app)/tarefas/page.tsx`,
+`app/(app)/funcionarios/page.tsx`, `app/(app)/locais/page.tsx`,
+`app/(app)/parametros/page.tsx`, `app/(app)/usuarios/page.tsx`.
+
+---
+
 ## 2026-06-12 — PDF de apresentação para a diretoria
 
 **O que mudou:** gerado `Orkestria-Contexto.pdf` (na raiz) — versão formatada
