@@ -9,10 +9,15 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+import os
+import sys
 from reportlab.platypus import (
     BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, Table, TableStyle,
-    ListFlowable, ListItem, HRFlowable, KeepTogether,
+    ListFlowable, ListItem, HRFlowable, KeepTogether, Image,
 )
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOGO = os.path.join(BASE, "public", "logo-fundo-claro.png")
 from reportlab.graphics.shapes import Drawing, Ellipse, Polygon, Circle
 from reportlab.graphics import renderPDF
 
@@ -121,8 +126,9 @@ def caixa(flow, cor=VINHO, fundo_cor=colors.white):
     return t
 
 
+SAIDA = sys.argv[1] if len(sys.argv) > 1 else "Orkestria-Contexto.pdf"
 doc = BaseDocTemplate(
-    "Orkestria-Contexto.pdf", pagesize=A4,
+    SAIDA, pagesize=A4,
     leftMargin=20*mm, rightMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm,
     title="Orkestria — Contexto do Sistema", author="Orkestria",
 )
@@ -134,21 +140,17 @@ doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=fundo)])
 E = []  # story
 
 # ── Capa ──────────────────────────────────────────────────────────
-E.append(Spacer(1, 40*mm))
-E.append(simbolo(90))
-E.append(Spacer(1, 8*mm))
-E.append(Paragraph("Orkestria", st_titulo))
-E.append(Spacer(1, 3*mm))
-E.append(Paragraph("PLANEJE &nbsp;·&nbsp; DISTRIBUA &nbsp;·&nbsp; OTIMIZE &nbsp;·&nbsp; EVOLUA",
-                   S("tag", fontName="Helvetica-Bold", fontSize=9, alignment=TA_CENTER,
-                     textColor=VINHO, leading=12)))
-E.append(Spacer(1, 10*mm))
+E.append(Spacer(1, 30*mm))
+logo = Image(LOGO, width=112*mm, height=112*mm)  # arte oficial (símbolo + nome + tagline)
+logo.hAlign = "CENTER"
+E.append(logo)
+E.append(Spacer(1, 4*mm))
 E.append(Paragraph("Contexto do Sistema", S("c2", fontName="Helvetica", fontSize=16,
                    alignment=TA_CENTER, textColor=TINTA2)))
 E.append(Spacer(1, 4*mm))
 E.append(Paragraph("Planejamento visual de rotinas operacionais para equipes de "
                    "serviços gerais (ASG)", st_sub))
-E.append(Spacer(1, 30*mm))
+E.append(Spacer(1, 24*mm))
 E.append(Paragraph("Documento de apresentação · junho/2026", st_sub))
 
 from reportlab.platypus import PageBreak
@@ -292,4 +294,4 @@ E.append(Spacer(1, 6*mm))
 E.append(Paragraph("Sistema no ar: https://orkestria-christus.vercel.app", st_nota))
 
 doc.build(E)
-print("PDF gerado: Orkestria-Contexto.pdf")
+print("PDF gerado:", SAIDA)
