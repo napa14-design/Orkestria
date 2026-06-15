@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-12 — Correção: filtros da paleta estouravam a caixa
+
+**O que mudou:** os `<select>` de Andar/Tipo/Prioridade na paleta de tarefas
+vazavam para fora do painel. Causa: colunas `1fr 1fr` têm `min-width:auto`,
+então o select (que não encolhe abaixo da maior opção) empurrava a coluna.
+Corrigido com `minmax(0,1fr)` nas colunas e `width:100%/minWidth:0/
+box-sizing:border-box` nos selects e no input. Verificado: nenhum elemento
+ultrapassa a borda da paleta (260px).
+
+**Arquivos:** `components/agenda/TaskPalette.tsx`.
+
+---
+
 ## 2026-06-12 — Deploy na Vercel + correção da logo (middleware 307)
 
 **O que mudou:** sistema publicado em https://orkestria-christus.vercel.app

@@ -73,16 +73,16 @@ export default function TaskPalette({
           placeholder="Buscar tarefa/local…"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          style={{ padding: "6px 8px", border: "1.5px solid var(--tinta)", borderRadius: 3, background: "var(--cartao)", fontSize: 13 }}
+          style={{ padding: "6px 8px", border: "1.5px solid var(--tinta)", borderRadius: 3, background: "var(--cartao)", fontSize: 13, width: "100%", boxSizing: "border-box" }}
         />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          <select value={filtroAndar} onChange={(e) => setFiltroAndar(e.target.value)} style={{ fontSize: 12, padding: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 6 }}>
+          <select value={filtroAndar} onChange={(e) => setFiltroAndar(e.target.value)} style={{ fontSize: 12, padding: 4, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <option value="">Andar: todos</option>
             {andares.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
-          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={{ fontSize: 12, padding: 4 }}>
+          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={{ fontSize: 12, padding: 4, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <option value="">Tipo: todos</option>
             {tipos.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -91,7 +91,7 @@ export default function TaskPalette({
           <select
             value={filtroPrioridade}
             onChange={(e) => setFiltroPrioridade(e.target.value)}
-            style={{ fontSize: 12, padding: 4, gridColumn: "1 / -1" }}
+            style={{ fontSize: 12, padding: 4, gridColumn: "1 / -1", width: "100%", minWidth: 0, boxSizing: "border-box" }}
           >
             <option value="">Prioridade: todas</option>
             <option value="alta">Alta</option>
