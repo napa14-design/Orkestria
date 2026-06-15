@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-06-12 — PDF de apresentação para a diretoria
+
+**O que mudou:** gerado `Orkestria-Contexto.pdf` (na raiz) — versão formatada
+do contexto do sistema para o diretor, com a identidade visual (capa com o
+símbolo vetorial, cores vinho/evergreen sobre marfim, tabelas e caixas).
+Conteúdo fiel ao `CONTEXTO-IA.md`, em linguagem de gestão. Gerador
+reproduzível em `scripts/gerar-pdf-contexto.py` (reportlab) — basta rodar
+`python scripts/gerar-pdf-contexto.py` para regenerar quando o sistema evoluir.
+Cuidado registrado: fonte Helvetica não tem `→`/`−` (usar `›`/`-`) e o texto
+de cabeçalho de tabela precisa de cor clara (senão some no fundo verde).
+
+**Arquivos:** `scripts/gerar-pdf-contexto.py`, `Orkestria-Contexto.pdf`.
+
+---
+
 ## 2026-06-12 — Restrição de gênero por tarefa (ex.: banheiro feminino)
 
 **O que mudou (pedido do usuário):** tarefas podem exigir gênero específico do
