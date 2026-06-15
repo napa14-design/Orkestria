@@ -29,5 +29,10 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclui assets do Next E arquivos estáticos da pasta public/ (logos,
+  // favicon, fontes) — senão o redirect de login engole as imagens quando
+  // o usuário está deslogado (ex.: a própria tela de login).
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff|woff2)$).*)",
+  ],
 };
