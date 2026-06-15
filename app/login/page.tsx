@@ -62,17 +62,22 @@ export default function PaginaLogin() {
   return (
     <main className="login-split">
       {/* ── palco (marca + partitura) ── */}
-      <section className="login-palco">
-        <div className="entra">
+      <section className="login-palco" style={{ alignItems: "center", textAlign: "center" }}>
+        <div className="entra" style={{ width: "100%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-fundo-escuro.png"
             alt="Orkestria"
-            style={{ width: 230, height: "auto", margin: "-40px 0 -46px -10px", display: "block" }}
+            style={{
+              width: "min(420px, 78%)",
+              height: "auto",
+              margin: "-48px auto -54px",
+              display: "block",
+            }}
           />
         </div>
 
-        <div className="entra-2" style={{ maxWidth: 460 }}>
+        <div className="entra-2" style={{ maxWidth: 480, marginInline: "auto" }}>
           <h1
             style={{
               fontFamily: "var(--fonte-display)",
@@ -92,7 +97,7 @@ export default function PaginaLogin() {
           </p>
 
           {/* partitura / agenda */}
-          <div className="login-partitura" style={{ marginTop: 28 }}>
+          <div className="login-partitura" style={{ marginTop: 28, maxWidth: 380, marginInline: "auto" }}>
             {PAUTAS.map((blocos, i) => (
               <div className="login-pauta" key={i}>
                 {blocos.map((b, j) => (

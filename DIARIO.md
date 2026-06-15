@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-12 — Login: logo maior e centralizada no palco
+
+**O que mudou:** a logo do palco estava pequena e encostada no canto. Agora o
+palco é centralizado (alignItems/textAlign center), a logo cresceu para
+`min(420px, 78%)` e ficou centralizada no topo, com headline, partitura e
+rótulo também centralizados — presença "onipotente" pedida pelo usuário.
+
+**Arquivos:** `app/login/page.tsx`.
+
+---
+
 ## 2026-06-12 — Jornada por escala (sábado de 4h / 44h) + loaders espalhados
 
 **Jornada variável:** funcionário agora tem `escala` (seg_sex / seg_sab /
