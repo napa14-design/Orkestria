@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-06-12 — Correção: fichas saíam 2 por página na impressão
+
+**O que mudou (bug reportado):** ao imprimir, duas fichas caíam na mesma
+página. O `page-break-after: always` não era respeitado de forma consistente.
+Trocado pelo padrão confiável de "um por página": `page-break-before: always`
+em cada ficha após a primeira (`.ficha-impressao + .ficha-impressao`) +
+`break-inside: avoid` para não partir uma ficha no meio. Também adicionado
+`print-color-adjust: exact` para as faixas coloridas do cabeçalho saírem na
+impressão. Verificar via Ctrl+P (mudança só em @media print).
+
+**Arquivos:** `app/globals.css`.
+
+---
+
 ## 2026-06-12 — Balão de ajuda no estilo "Partitura"
 
 **O que mudou:** o balão flutuante do (?) ganhou a identidade do sistema —

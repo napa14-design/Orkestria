@@ -367,14 +367,22 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   body {
     background: #fff !important;
     background-image: none !important;
+    /* faz o navegador imprimir as faixas/cores de fundo das fichas */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   main { padding: 0 !important; }
+  /* uma ficha por página: cada ficha após a primeira começa em página nova,
+     e nenhuma ficha é partida no meio (padrão mais confiável que break-after) */
   .ficha-impressao {
     box-shadow: none !important;
-    page-break-after: always;
-    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
-  .ficha-impressao:last-child { page-break-after: auto; }
+  .ficha-impressao + .ficha-impressao {
+    page-break-before: always;
+    break-before: page;
+  }
 }
 
 /* ── scrollbar discreta ──────────────────────────────────────────── */
