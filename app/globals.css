@@ -418,6 +418,29 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   from { opacity: 0; transform: translateY(10px) scaleX(0.85); transform-origin: left; }
   to { opacity: 1; transform: none; }
 }
+/* brilho que varre os blocos em cascata, como uma batuta sobre a partitura */
+@media (prefers-reduced-motion: no-preference) {
+  .login-bloco { overflow: hidden; }
+  .login-bloco::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 38%,
+      rgba(245, 241, 230, 0.45) 50%,
+      transparent 62%
+    );
+    transform: translateX(-130%);
+    animation: bloco-brilho 5.5s ease-in-out infinite;
+    animation-delay: var(--brilho-delay, 0s);
+  }
+}
+@keyframes bloco-brilho {
+  0% { transform: translateX(-130%); }
+  26% { transform: translateX(130%); }
+  100% { transform: translateX(130%); }
+}
 
 .login-divisor {
   display: flex;

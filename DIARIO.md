@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-12 — Brilho animado nos blocos da partitura (login)
+
+**O que mudou:** os blocos da partitura, além de entrarem em sequência,
+agora têm um brilho suave que os varre em cascata (loop lento de 5,5s,
+delays escalonados via `--brilho-delay` inline) — como uma batuta passando
+pela partitura. Implementado com `::after` + `overflow:hidden`, dentro de
+`@media (prefers-reduced-motion: no-preference)` para respeitar quem prefere
+menos animação. Verificado: ::after com `bloco-brilho`, delays 1,2s→3,9s.
+
+**Arquivos:** `app/globals.css`, `app/login/page.tsx`.
+
+---
+
 ## 2026-06-12 — Tela de login redesenhada (split + Google)
 
 **O que mudou:** login virou split-screen. Esquerda = "palco" evergreen com a

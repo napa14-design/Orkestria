@@ -99,12 +99,16 @@ export default function PaginaLogin() {
                   <span
                     key={j}
                     className="login-bloco"
-                    style={{
-                      left: b.left,
-                      width: b.width,
-                      background: b.cor,
-                      animationDelay: `${b.delay}s`,
-                    }}
+                    style={
+                      {
+                        left: b.left,
+                        width: b.width,
+                        background: b.cor,
+                        animationDelay: `${b.delay}s`,
+                        // brilho começa após a entrada e cascateia bloco a bloco
+                        "--brilho-delay": `${1.2 + (i * 2 + j) * 0.45}s`,
+                      } as React.CSSProperties
+                    }
                   />
                 ))}
               </div>
