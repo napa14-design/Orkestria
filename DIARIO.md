@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-06-12 — Ajuda (?) virou balão flutuante no hover
+
+**O que mudou (preferência do usuário):** a ajuda dos campos deixou de
+expandir uma caixa inline (que empurrava o formulário) e passou a ser um
+**balão flutuante** que aparece ao passar o mouse (ou focar pelo teclado) no
+(?). Renderizado em portal no `<body>` com posição fixed calculada a partir
+do ícone (centralizado, com flip para cima quando perto do rodapé), z-index
+alto e `pointer-events:none` — nunca é cortado pelo modal. Some ao tirar o
+mouse/foco. Conteúdo das dicas inalterado.
+
+**Arquivos:** `components/CrudManager.tsx`.
+
+---
+
 ## 2026-06-12 — Ajuda contextual (?) nos campos dos modais
 
 **O que mudou (pedido do usuário, foco em leigos):** todo campo de cadastro

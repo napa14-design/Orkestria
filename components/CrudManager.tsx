@@ -6,6 +6,7 @@
  * declara campos e colunas — o comportamento é todo daqui.
  */
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import Modal from "./Modal";
@@ -63,7 +64,21 @@ export default function CrudManager<T extends Registro>({
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [dicaAberta, setDicaAberta] = useState<string | null>(null);
+  // Balão de ajuda flutuante (hover/foco no "?"). Posição em coordenadas
+  // de tela, renderizado em portal para nunca ser cortado pelo modal.
+  const [tip, setTip] = useState<{ texto: string; x: number; y: number; acima: boolean } | null>(null);
+
+  function mostrarDica(el: HTMLElement, texto: string) {
+    const r = el.getBoundingClientRect();
+    const acima = r.bottom + 130 > window.innerHeight;
+    setTip({
+      texto,
+      x: Math.min(Math.max(r.left + r.width / 2, 140), window.innerWidth - 140),
+      y: acima ? r.top - 8 : r.bottom + 8,
+      acima,
+    });
+  }
+  const esconderDica = () => setTip(null);
 
   const itens = useMemo(() => {
     if (!data) return [];
@@ -83,7 +98,7 @@ export default function CrudManager<T extends Registro>({
     setForm(inicial);
     setEditando(null);
     setErro("");
-    setDicaAberta(null);
+    setTip(null);
     setAberto(true);
   }
 
@@ -93,7 +108,7 @@ export default function CrudManager<T extends Registro>({
     setForm(inicial);
     setEditando(item);
     setErro("");
-    setDicaAberta(null);
+    setTip(null);
     setAberto(true);
   }
 
@@ -234,25 +249,26 @@ export default function CrudManager<T extends Registro>({
                 {c.dica && (
                   <button
                     type="button"
-                    aria-label={`O que é "${c.rotulo}"?`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setDicaAberta((atual) => (atual === c.key ? null : c.key));
-                    }}
+                    aria-label={`Ajuda: ${c.rotulo}`}
+                    onMouseEnter={(e) => mostrarDica(e.currentTarget, c.dica!)}
+                    onMouseLeave={esconderDica}
+                    onFocus={(e) => mostrarDica(e.currentTarget, c.dica!)}
+                    onBlur={esconderDica}
+                    onClick={(e) => e.preventDefault()}
                     style={{
                       width: 16,
                       height: 16,
                       borderRadius: "50%",
                       border: "1.5px solid var(--acento)",
-                      background: dicaAberta === c.key ? "var(--acento)" : "transparent",
-                      color: dicaAberta === c.key ? "#fff" : "var(--acento)",
+                      background: "transparent",
+                      color: "var(--acento)",
                       fontSize: 10,
                       fontWeight: 700,
                       lineHeight: 1,
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      cursor: "pointer",
+                      cursor: "help",
                       padding: 0,
                     }}
                   >
@@ -260,24 +276,6 @@ export default function CrudManager<T extends Registro>({
                   </button>
                 )}
               </span>
-              {c.dica && dicaAberta === c.key && (
-                <span
-                  className="entra"
-                  style={{
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                    color: "var(--tinta-2)",
-                    background: "var(--papel-2)",
-                    border: "1px solid var(--linha)",
-                    borderLeft: "3px solid var(--acento)",
-                    borderRadius: 3,
-                    padding: "6px 9px",
-                    marginBottom: 2,
-                  }}
-                >
-                  {c.dica}
-                </span>
-              )}
               {c.tipo === "select" ? (
                 <select
                   value={String(form[c.key] ?? "")}
@@ -345,6 +343,33 @@ export default function CrudManager<T extends Registro>({
           </div>
         </form>
       </Modal>
+
+      {tip &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{
+              position: "fixed",
+              left: tip.x,
+              top: tip.y,
+              transform: `translate(-50%, ${tip.acima ? "-100%" : "0"})`,
+              maxWidth: 260,
+              background: "var(--tinta)",
+              color: "var(--papel)",
+              fontSize: 12,
+              lineHeight: 1.5,
+              padding: "8px 11px",
+              borderRadius: 6,
+              boxShadow: "var(--sombra)",
+              zIndex: 9999,
+              pointerEvents: "none",
+            }}
+          >
+            {tip.texto}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
