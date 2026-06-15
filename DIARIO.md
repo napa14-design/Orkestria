@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-12 — Agenda: faixa "fora do turno" com mais destaque
+
+**O que mudou:** as células fora do horário do funcionário (ex.: manhã de
+quem trabalha à tarde) estavam quase invisíveis (hachura rgba 0,05). Agora têm
+fundo acinzentado leve (0,06) + hachura mais marcada (0,13) — claramente
+"indisponível", mas ainda mais suave que o intervalo (verde-escuro), mantendo
+a hierarquia visual. Verificado na coluna da Ana (13:00–22:00).
+
+**Arquivos:** `app/globals.css`.
+
+---
+
 ## 2026-06-12 — Ajuste: blocos do login sumiam / caíam rápido demais
 
 **O que mudou (bug do efeito anterior):** (1) "Sumindo" — o `forwards` só

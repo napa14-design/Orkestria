@@ -289,12 +289,15 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 
 .celula-fora-jornada {
-  background: repeating-linear-gradient(
+  /* fora do turno do funcionário: tom acinzentado + hachura mais visível
+     (mais leve que o intervalo, pois é "indisponível", não bloqueio rígido) */
+  background-color: rgba(34, 49, 39, 0.06);
+  background-image: repeating-linear-gradient(
     -45deg,
     transparent,
-    transparent 6px,
-    rgba(34, 49, 39, 0.05) 6px,
-    rgba(34, 49, 39, 0.05) 12px
+    transparent 5px,
+    rgba(34, 49, 39, 0.13) 5px,
+    rgba(34, 49, 39, 0.13) 10px
   );
 }
 
