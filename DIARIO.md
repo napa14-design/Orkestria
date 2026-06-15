@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-12 — Balão de ajuda no estilo "Partitura"
+
+**O que mudou:** o balão flutuante do (?) ganhou a identidade do sistema —
+fundo marfim (--cartao), borda firme em tinta evergreen, barra vinho de 5px à
+esquerda (assinatura dos alertas) e sombra dura (offset 4px sem blur), no
+lugar do balão escuro genérico. Verificado via estilos computados.
+
+**Arquivos:** `components/CrudManager.tsx`.
+
+---
+
 ## 2026-06-12 — Ajuda (?) virou balão flutuante no hover
 
 **O que mudou (preferência do usuário):** a ajuda dos campos deixou de
