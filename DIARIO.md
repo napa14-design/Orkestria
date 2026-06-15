@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-06-12 — Ajuste: blocos do login sumiam / caíam rápido demais
+
+**O que mudou (bug do efeito anterior):** (1) "Sumindo" — o `forwards` só
+preserva propriedades declaradas no quadro 100%, e eu só pus `transform` lá;
+a opacidade revertia ao base (0). Corrigido fixando `opacity: 1` de 40% a
+100%. (2) "Rápido demais" — duração 0,95s → **1,5s** e cascata mais espaçada
+(delays 0,15s → 1,6s); brilho passa a iniciar em 3,4s+ (após assentarem).
+Confirmado forçando a animação ao fim no preview: todos terminam em opacity 1
+e posição final (o preview headless pausa animações, por isso parecia sumir lá).
+
+**Arquivos:** `app/globals.css`, `app/login/page.tsx`.
+
+---
+
 ## 2026-06-12 — Login: blocos caem com gravidade e quicam (Tetris)
 
 **O que mudou (pedido fru-fru do usuário):** os blocos da partitura agora

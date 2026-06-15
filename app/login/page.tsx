@@ -7,15 +7,15 @@ import { apiPost, ErroApi } from "@/lib/clientApi";
 /** Blocos da "partitura" do palco — evocam a agenda (tarefas em horários). */
 const PAUTAS = [
   [
-    { left: "0%", width: "46%", cor: "var(--azul)", delay: 0.1 },
-    { left: "52%", width: "30%", cor: "var(--verde)", delay: 0.25 },
+    { left: "0%", width: "46%", cor: "var(--azul)", delay: 0.15 },
+    { left: "52%", width: "30%", cor: "var(--verde)", delay: 0.45 },
   ],
-  [{ left: "12%", width: "60%", cor: "var(--amarelo)", delay: 0.35 }],
+  [{ left: "12%", width: "60%", cor: "var(--amarelo)", delay: 0.75 }],
   [
-    { left: "0%", width: "26%", cor: "var(--verde)", delay: 0.45 },
-    { left: "32%", width: "50%", cor: "var(--azul)", delay: 0.55 },
+    { left: "0%", width: "26%", cor: "var(--verde)", delay: 1.05 },
+    { left: "32%", width: "50%", cor: "var(--azul)", delay: 1.3 },
   ],
-  [{ left: "8%", width: "38%", cor: "var(--acento)", delay: 0.65 }],
+  [{ left: "8%", width: "38%", cor: "var(--acento)", delay: 1.6 }],
 ];
 
 function GoogleG() {
@@ -110,8 +110,8 @@ export default function PaginaLogin() {
                         width: b.width,
                         background: b.cor,
                         animationDelay: `${b.delay}s`,
-                        // brilho começa após a entrada e cascateia bloco a bloco
-                        "--brilho-delay": `${1.2 + (i * 2 + j) * 0.45}s`,
+                        // brilho começa após todos assentarem e cascateia
+                        "--brilho-delay": `${3.4 + (i * 2 + j) * 0.45}s`,
                       } as React.CSSProperties
                     }
                   />

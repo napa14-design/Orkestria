@@ -426,20 +426,21 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 @keyframes bloco-aparece {
   to { opacity: 1; transform: none; }
 }
-/* queda com gravidade + 2 quiques ao bater na pauta (estilo Tetris) */
+/* queda com gravidade + 2 quiques ao bater na pauta (estilo Tetris).
+   opacity precisa estar no quadro 100% senão "forwards" a reverte p/ 0. */
 @keyframes bloco-cai {
-  0% { opacity: 0; transform: translateY(-220px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
-  50% { opacity: 1; transform: translateY(0); animation-timing-function: ease-out; }
-  66% { transform: translateY(-14px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
-  80% { transform: translateY(0); animation-timing-function: ease-out; }
-  90% { transform: translateY(-5px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
-  100% { transform: translateY(0); }
+  0% { opacity: 0; transform: translateY(-220px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.55); }
+  40% { opacity: 1; transform: translateY(0); animation-timing-function: ease-out; }
+  60% { opacity: 1; transform: translateY(-16px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.55); }
+  76% { opacity: 1; transform: translateY(0); animation-timing-function: ease-out; }
+  88% { opacity: 1; transform: translateY(-6px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.55); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 /* brilho que varre os blocos em cascata, como uma batuta sobre a partitura */
 @media (prefers-reduced-motion: no-preference) {
   .login-bloco {
     overflow: hidden;
-    animation: bloco-cai 0.95s forwards;
+    animation: bloco-cai 1.5s forwards;
   }
   .login-bloco::after {
     content: "";
