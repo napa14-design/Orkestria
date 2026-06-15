@@ -1,4 +1,10 @@
-import type { Auditoria, Frequencia, Prioridade, RegraCalculo } from "./comum";
+import type {
+  Auditoria,
+  Frequencia,
+  Prioridade,
+  RegraCalculo,
+  RestricaoGenero,
+} from "./comum";
 
 export interface Tarefa extends Auditoria {
   id: string;
@@ -20,6 +26,12 @@ export interface Tarefa extends Auditoria {
   quantidade: number;
   frequencia: Frequencia;
   prioridade: Prioridade;
+  /**
+   * Restrição de gênero do executante (ex.: banheiro feminino → "feminino").
+   * "" / ausente = qualquer funcionário pode executar. Opcional para
+   * compatibilidade com tarefas cadastradas antes deste campo existir.
+   */
+  restricao_genero?: RestricaoGenero;
   ativo: boolean;
   observacoes: string;
 }

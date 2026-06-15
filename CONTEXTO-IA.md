@@ -96,8 +96,11 @@ padrão**, não para vigiar pessoas.
 2. Todo funcionário pertence a uma sede; rotina exige funcionário+tarefa+local+sede+data+hora.
 3. A agenda **bloqueia**: sobreposição de tarefas, alocação no intervalo,
    fora do expediente, funcionário ausente, tarefa sem tempo previsto,
-   funcionário sem jornada. Intervalo e sobreposição podem ser **autorizados
-   manualmente** (com confirmação; a rotina fica marcada "[Autorizado manualmente]").
+   funcionário sem jornada, e **restrição de gênero** (tarefa marcada como
+   "apenas mulheres"/"apenas homens" só pode ir para ASG do gênero
+   correspondente — ex.: banheiro feminino). Intervalo e sobreposição podem ser
+   **autorizados manualmente** (com confirmação; a rotina fica marcada
+   "[Autorizado manualmente]"); a restrição de gênero é bloqueio rígido.
 4. Sobrecarga (>100%) e local sem metragem **alertam mas não bloqueiam**.
 5. Toda validação roda duas vezes: no navegador (feedback imediato) e no
    servidor (definitiva) — o servidor recalcula todos os tempos e nunca confia

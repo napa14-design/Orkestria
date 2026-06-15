@@ -28,6 +28,9 @@ export type Frequencia =
 
 export type Prioridade = "alta" | "media" | "baixa";
 
+/** Restrição de gênero de uma tarefa. "" = sem restrição. */
+export type RestricaoGenero = "" | "feminino" | "masculino";
+
 export type StatusRotina =
   | "planejada"
   | "realizada"

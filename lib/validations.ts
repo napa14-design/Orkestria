@@ -87,6 +87,20 @@ export function validarAlocacao(args: {
     });
   }
 
+  // Restrição de gênero (ex.: banheiro feminino só por ASG mulher).
+  if (
+    args.tarefa?.restricao_genero &&
+    f.genero !== args.tarefa.restricao_genero
+  ) {
+    alertas.push({
+      nivel: "erro",
+      codigo: "RESTRICAO_GENERO",
+      mensagem: `"${args.tarefa.nome_tarefa}" é restrita a ASG ${
+        args.tarefa.restricao_genero === "feminino" ? "mulheres" : "homens"
+      } — ${f.nome} não pode executá-la.`,
+    });
+  }
+
   if (
     args.tarefa?.regra_calculo === "por_m2" &&
     (!args.local || args.local.metragem <= 0)

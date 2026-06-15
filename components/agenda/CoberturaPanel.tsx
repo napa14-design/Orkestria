@@ -104,11 +104,17 @@ export default function CoberturaPanel({
                 style={{ fontSize: 12, padding: 4 }}
               >
                 <option value="">— remanejar para —</option>
-                {candidatos.map(({ funcionario, resumo }) => (
-                  <option key={funcionario.id} value={funcionario.id}>
-                    {funcionario.nome} (livre: {formatarDuracao(resumo.ociosidade_prevista_min)})
-                  </option>
-                ))}
+                {candidatos
+                  .filter(
+                    ({ funcionario }) =>
+                      !tarefa?.restricao_genero ||
+                      funcionario.genero === tarefa.restricao_genero,
+                  )
+                  .map(({ funcionario, resumo }) => (
+                    <option key={funcionario.id} value={funcionario.id}>
+                      {funcionario.nome} (livre: {formatarDuracao(resumo.ociosidade_prevista_min)})
+                    </option>
+                  ))}
               </select>
               <button
                 className="btn btn-mini btn-primario"

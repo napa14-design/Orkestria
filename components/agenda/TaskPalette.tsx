@@ -128,7 +128,17 @@ export default function TaskPalette({
               style={{ background: "var(--cartao)", padding: "8px 10px", borderLeft: `5px solid ${COR_PRIORIDADE[t.prioridade] ?? "var(--cinza-bloco)"}` }}
               title="Arraste para a agenda de um funcionário"
             >
-              <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.25 }}>{t.nome_tarefa}</div>
+              <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.25 }}>
+                {t.nome_tarefa}
+                {t.restricao_genero && (
+                  <span
+                    title={`Restrita a ASG ${t.restricao_genero === "feminino" ? "mulheres" : "homens"}`}
+                    style={{ marginLeft: 5, color: t.restricao_genero === "feminino" ? "var(--vermelho)" : "var(--azul)", fontWeight: 700 }}
+                  >
+                    {t.restricao_genero === "feminino" ? "♀" : "♂"}
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: "var(--tinta-2)", marginTop: 2 }}>
                 {local ? `${local.nome_local} · ${local.andar}` : "local?"}
               </div>

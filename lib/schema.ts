@@ -107,6 +107,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("quantidade", "number"),
     col("frequencia"),
     col("prioridade"),
+    col("restricao_genero"),
     col("ativo", "boolean"),
     col("observacoes"),
     ...AUDITORIA,

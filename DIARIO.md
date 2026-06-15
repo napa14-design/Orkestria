@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-12 — Restrição de gênero por tarefa (ex.: banheiro feminino)
+
+**O que mudou (pedido do usuário):** tarefas podem exigir gênero específico do
+executante. Campo `restricao_genero` na Tarefa (`""`/`feminino`/`masculino`,
+opcional p/ compatibilidade). A agenda **bloqueia** (erro `RESTRICAO_GENERO`,
+não autorizável) alocar tarefa restrita para funcionário de gênero
+incompatível — no cliente e no servidor (`validarAlocacao`).
+- Tela de Tarefas: select "Restrição de gênero" + coluna/selo (♀/♂).
+- Paleta: marcador ♀/♂ no card da tarefa restrita.
+- Cobertura de ausência: só sugere colegas de gênero compatível.
+- Seed demo: banheiro feminino → mulheres, masculino → homens.
+- Verificado no Firebase real: José (masc.) bloqueado (422), Maria (fem.)
+  permitida (201), campo persistido.
+- **Nota**: tarefas migradas antes deste campo não têm restrição — definir
+  editando a tarefa (ex.: "Higienização de banheiro").
+
+**Arquivos:** `types/comum.ts`, `types/Tarefa.ts`, `lib/schema.ts`,
+`lib/memoryStore.ts`, `lib/validations.ts`, `app/(app)/tarefas/page.tsx`,
+`components/agenda/TaskPalette.tsx`, `components/agenda/CoberturaPanel.tsx`.
+
+---
+
 ## 2026-06-12 — Correção: filtros da paleta estouravam a caixa
 
 **O que mudou:** os `<select>` de Andar/Tipo/Prioridade na paleta de tarefas

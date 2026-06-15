@@ -28,6 +28,12 @@ const PRIORIDADES = [
   { valor: "baixa", rotulo: "Baixa" },
 ];
 
+const RESTRICOES_GENERO = [
+  { valor: "", rotulo: "Sem restrição (qualquer ASG)" },
+  { valor: "feminino", rotulo: "Apenas mulheres" },
+  { valor: "masculino", rotulo: "Apenas homens" },
+];
+
 export default function PaginaTarefas() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
@@ -68,6 +74,14 @@ export default function PaginaTarefas() {
         { key: "quantidade", rotulo: "Quantidade", tipo: "numero", padrao: 1, ajuda: "Usada na regra por unidade" },
         { key: "frequencia", rotulo: "Frequência", tipo: "select", opcoes: FREQUENCIAS, padrao: "diaria" },
         { key: "prioridade", rotulo: "Prioridade", tipo: "select", opcoes: PRIORIDADES, padrao: "media" },
+        {
+          key: "restricao_genero",
+          rotulo: "Restrição de gênero",
+          tipo: "select",
+          padrao: "",
+          opcoes: RESTRICOES_GENERO,
+          ajuda: "Ex.: banheiro feminino → só ASG mulheres podem ser alocadas",
+        },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -107,6 +121,18 @@ export default function PaginaTarefas() {
               {t.prioridade}
             </span>
           ),
+        },
+        {
+          key: "restricao_genero",
+          rotulo: "Gênero",
+          render: (t) =>
+            t.restricao_genero ? (
+              <span className={`selo ${t.restricao_genero === "feminino" ? "selo-vermelho" : "selo-azul"}`}>
+                {t.restricao_genero === "feminino" ? "♀ Mulheres" : "♂ Homens"}
+              </span>
+            ) : (
+              <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
+            ),
         },
         {
           key: "ativo",
