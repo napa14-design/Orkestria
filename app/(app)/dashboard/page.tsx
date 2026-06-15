@@ -3,6 +3,7 @@
 /** Dashboard de indicadores: ocupação, ociosidade, tempo por local/sede. */
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import SugestoesAjuste from "@/components/SugestoesAjuste";
 import {
@@ -260,6 +261,14 @@ export default function PaginaDashboard() {
         ? "var(--vermelho)"
         : "var(--laranja)",
   }));
+
+  if (!rotinas || !funcionarios) {
+    return (
+      <div className="painel entra" style={{ marginTop: 24 }}>
+        <Carregando texto="Carregando indicadores…" style={{ padding: 64 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="entra">

@@ -334,14 +334,20 @@ export default function CrudManager<T extends Registro>({
             </div>
           )}
 
-          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <button type="button" className="btn" onClick={() => setAberto(false)}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn btn-primario" disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar"}
-            </button>
-          </div>
+          {salvando ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Carregando texto="Salvando…" style={{ padding: 8 }} />
+            </div>
+          ) : (
+            <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button type="button" className="btn" onClick={() => setAberto(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primario">
+                Salvar
+              </button>
+            </div>
+          )}
         </form>
       </Modal>
 

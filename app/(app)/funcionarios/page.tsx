@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
-import { jornadaLiquidaMin } from "@/lib/calculations";
+import { cargaSemanalMin, jornadaLiquidaMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type { Funcionario, Sede } from "@/types";
@@ -12,6 +12,12 @@ const TURNOS = [
   { valor: "tarde", rotulo: "Tarde" },
   { valor: "noite", rotulo: "Noite" },
   { valor: "integral", rotulo: "Integral" },
+];
+
+const ESCALAS = [
+  { valor: "seg_sex", rotulo: "Segunda a sexta" },
+  { valor: "seg_sab", rotulo: "Segunda a sábado" },
+  { valor: "todos", rotulo: "Todos os dias" },
 ];
 
 export default function PaginaFuncionarios() {
@@ -83,6 +89,26 @@ export default function PaginaFuncionarios() {
           ajuda: "Descontado da jornada líquida",
           dica: "Duração do intervalo em minutos. É descontado da jornada para chegar na JORNADA LÍQUIDA = (saída − entrada) − intervalo. Ex.: 07:00 às 16:00 com 60 min de almoço = 8 h líquidas, que é a base do cálculo de ocupação e ociosidade.",
         },
+        {
+          key: "escala",
+          rotulo: "Escala (dias)",
+          tipo: "select",
+          padrao: "seg_sex",
+          opcoes: ESCALAS,
+          dica: "Em quais dias o funcionário trabalha. Nos dias fora da escala a agenda mostra \"Folga\" e bloqueia tarefas. Ex.: jornada de 44h costuma ser \"Segunda a sábado\" (sábado mais curto).",
+        },
+        {
+          key: "entrada_sabado",
+          rotulo: "Entrada (sábado)",
+          tipo: "hora",
+          dica: "Horário de entrada SÓ no sábado, quando é diferente dos outros dias (ex.: turno de 4h). Deixe vazio se o sábado tem o mesmo horário dos demais dias (ou se não trabalha sábado).",
+        },
+        {
+          key: "saida_sabado",
+          rotulo: "Saída (sábado)",
+          tipo: "hora",
+          dica: "Horário de saída SÓ no sábado. Ex.: entrada 07:00 e saída 11:00 = 4 h no sábado. No sábado não é descontado intervalo.",
+        },
         { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
@@ -101,22 +127,25 @@ export default function PaginaFuncionarios() {
           render: (f) => (
             <span className="num">
               {f.entrada}–{f.saida}
+              {f.entrada_sabado && f.saida_sabado && (
+                <span style={{ color: "var(--tinta-3)" }}>
+                  {" "}
+                  · sáb {f.entrada_sabado}–{f.saida_sabado}
+                </span>
+              )}
             </span>
           ),
         },
         {
-          key: "intervalo_inicio",
-          rotulo: "Intervalo",
-          render: (f) => (
-            <span className="num">
-              {f.intervalo_inicio}–{f.intervalo_fim}
-            </span>
-          ),
+          key: "escala",
+          rotulo: "Escala",
+          render: (f) =>
+            ESCALAS.find((e) => e.valor === (f.escala || "seg_sex"))?.rotulo ?? "—",
         },
         {
           key: "id",
-          rotulo: "Jornada líquida",
-          render: (f) => <strong className="num">{formatarDuracao(jornadaLiquidaMin(f))}</strong>,
+          rotulo: "Carga semanal",
+          render: (f) => <strong className="num">{formatarDuracao(cargaSemanalMin(f))}</strong>,
         },
         {
           key: "ativo",

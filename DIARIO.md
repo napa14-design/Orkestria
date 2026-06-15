@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-06-12 — Jornada por escala (sábado de 4h / 44h) + loaders espalhados
+
+**Jornada variável:** funcionário agora tem `escala` (seg_sex / seg_sab /
+todos) e horário próprio de sábado (`entrada_sabado`/`saida_sabado`, ex.: turno
+de 4h sem intervalo). `jornadaDoDia(f, data)` resolve o horário efetivo por
+data; `funcionarioNoDia` aplica na agenda/validação; `cargaSemanalMin` mostra
+a carga (ex.: 44h) na tabela. A agenda usa o horário do dia, marca **Folga**
+nos dias fora da escala (coluna bloqueada, como ausência) e o servidor bloqueia
+alocação em folga (`FOLGA`) e valida o expediente do sábado. Padrão p/ dados
+sem escala = seg_sex. **Verificado no Firebase real:** domingo→folga (422),
+sábado 11:30→fora do expediente 07:00–11:00 (422), sábado 08:00→ok.
+*Obs.: o dashboard ainda usa jornada padrão na média (aproximação).*
+
+**Loaders Tetris espalhados:** carregamento inicial da Rotina do dia e do
+Dashboard, e ação de salvar nos modais (CrudManager) agora mostram o
+`<Carregando>` (bloquinhos caindo) em vez de nada/"Salvando…".
+
+**Arquivos:** `types/comum.ts`, `types/Funcionario.ts`, `lib/schema.ts`,
+`lib/memoryStore.ts`, `lib/calculations.ts`, `services/rotinasService.ts`,
+`app/(app)/rotinas/page.tsx`, `app/(app)/funcionarios/page.tsx`,
+`app/(app)/dashboard/page.tsx`, `components/CrudManager.tsx`.
+
+---
+
 ## 2026-06-12 — Loading "Tetris" (bloquinhos caindo) no lugar do spinner
 
 **O que mudou:** componente `Carregando` com bloquinhos coloridos

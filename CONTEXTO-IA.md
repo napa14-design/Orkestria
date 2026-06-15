@@ -63,7 +63,10 @@ padrão**, não para vigiar pessoas.
   registros distintos com tempos distintos). Toda tarefa pertence a um local e
   **herda a sede dele automaticamente**.
 - **Jornada líquida** = saída − entrada − intervalo. Ex.: 07:00–16:00 com 1h
-  de almoço = 8h.
+  de almoço = 8h. A jornada pode variar por dia da semana: o funcionário tem
+  uma **escala** (seg–sex, seg–sáb ou todos os dias) e pode ter horário
+  próprio de sábado (ex.: turno de 4h, escala de 44h). Em dias fora da escala
+  a agenda mostra "Folga" e bloqueia tarefas.
 - **Tempo previsto da tarefa** depende da regra de cálculo: **fixo** (ex.:
   reposição = 15min), **por m²** (ex.: 1 min/m² × 80 m² = 80min), **por
   unidade** (ex.: 20min × nº de banheiros) ou **manual**.

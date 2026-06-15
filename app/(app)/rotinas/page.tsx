@@ -18,7 +18,10 @@ import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
+import Carregando from "@/components/Carregando";
 import {
+  funcionarioNoDia,
+  jornadaDoDia,
   PARAMETROS_PADRAO,
   tempoPrevistoMin,
   tempoVisualMin,
@@ -122,16 +125,16 @@ export default function PaginaRotinas() {
     fetcher,
   );
 
-  const ausentesMap = useMemo(
-    () =>
-      new Map(
-        (ausencias ?? []).map((a) => [
-          a.funcionario_id,
-          ROTULO_AUSENCIA[a.tipo] ?? "Ausente",
-        ]),
-      ),
-    [ausencias],
-  );
+  // ausências do dia + folgas da escala (ambas bloqueiam a coluna na agenda)
+  const ausentesMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of ausencias ?? [])
+      m.set(a.funcionario_id, ROTULO_AUSENCIA[a.tipo] ?? "Ausente");
+    for (const f of funcionarios ?? []) {
+      if (!m.has(f.id) && !jornadaDoDia(f, data).trabalha) m.set(f.id, "Folga");
+    }
+    return m;
+  }, [ausencias, funcionarios, data]);
 
   const params = parametros ?? PARAMETROS_PADRAO;
   const blocoMin = params.bloco_agenda_min || 30;
@@ -164,6 +167,16 @@ export default function PaginaRotinas() {
         (paginaAtual + 1) * FUNC_POR_PAGINA,
       ),
     [funcionariosVisiveis, paginaAtual],
+  );
+
+  // Funcionários com o horário daquela data aplicado (sábado de 4h, etc.).
+  const efetivosPagina = useMemo(
+    () => funcionariosPagina.map((f) => funcionarioNoDia(f, data)),
+    [funcionariosPagina, data],
+  );
+  const efetivosVisiveis = useMemo(
+    () => funcionariosVisiveis.map((f) => funcionarioNoDia(f, data)),
+    [funcionariosVisiveis, data],
   );
 
   /** Seleciona e garante que a coluna do funcionário esteja na página visível. */
@@ -220,7 +233,7 @@ export default function PaginaRotinas() {
     tarefa?: Tarefa,
     ignorarRotinaId?: string,
   ): AlertaValidacao[] {
-    const funcionario = funcionariosVisiveis.find((f) => f.id === funcionarioId);
+    const funcionario = efetivosVisiveis.find((f) => f.id === funcionarioId);
     if (!funcionario)
       return [{ nivel: "erro", codigo: "SEM_FUNCIONARIO", mensagem: "Funcionário não encontrado." }];
     const local = tarefa ? (locais ?? []).find((l) => l.id === tarefa.local_id) : undefined;
@@ -388,10 +401,14 @@ export default function PaginaRotinas() {
             setModo("dia");
           }}
         />
+      ) : !funcionarios || !tarefas || !locais ? (
+        <div className="painel">
+          <Carregando texto="Carregando agenda…" style={{ padding: 64 }} />
+        </div>
       ) : (
         <>
       <CoberturaPanel
-        funcionarios={funcionariosVisiveis}
+        funcionarios={efetivosVisiveis}
         ausencias={ausentesMap}
         rotinas={rotinas ?? []}
         tarefas={tarefas ?? []}
@@ -448,7 +465,7 @@ export default function PaginaRotinas() {
         />
 
         <AgendaGrid
-          funcionarios={funcionariosPagina}
+          funcionarios={efetivosPagina}
           rotinas={rotinas ?? []}
           tarefas={tarefas ?? []}
           locais={locais ?? []}
@@ -466,7 +483,7 @@ export default function PaginaRotinas() {
         />
 
         <OccupancySummary
-          funcionarios={funcionariosVisiveis}
+          funcionarios={efetivosVisiveis}
           rotinas={rotinas ?? []}
           tarefas={tarefas ?? []}
           parametros={params}

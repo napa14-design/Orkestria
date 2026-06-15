@@ -37,11 +37,66 @@ export function mediana(valores: number[]): number {
 }
 
 /** jornada_liquida = saida - entrada - intervalo (em minutos). */
-export function jornadaLiquidaMin(f: Funcionario): number {
+export function jornadaLiquidaMin(
+  f: Pick<Funcionario, "entrada" | "saida" | "intervalo_min">,
+): number {
   const entrada = hhmmParaMin(f.entrada);
   const saida = hhmmParaMin(f.saida);
   if (Number.isNaN(entrada) || Number.isNaN(saida)) return 0;
   return Math.max(0, saida - entrada - (f.intervalo_min || 0));
+}
+
+/** Horário efetivo de um funcionário numa data (trata sábado e folgas). */
+export interface JornadaEfetiva {
+  entrada: string;
+  saida: string;
+  intervalo_min: number;
+  intervalo_inicio: string;
+  intervalo_fim: string;
+  trabalha: boolean;
+}
+
+export function jornadaDoDia(f: Funcionario, dataISO: string): JornadaEfetiva {
+  const dia = new Date(`${dataISO}T12:00:00`).getDay(); // 0=dom … 6=sáb
+  const escala = f.escala || "seg_sex";
+  const trabalha =
+    dia === 0 ? escala === "todos" : dia === 6 ? escala !== "seg_sex" : true;
+
+  // sábado com horário próprio (ex.: turno de 4h, sem intervalo)
+  if (dia === 6 && f.entrada_sabado && f.saida_sabado) {
+    return {
+      entrada: f.entrada_sabado,
+      saida: f.saida_sabado,
+      intervalo_min: 0,
+      intervalo_inicio: "",
+      intervalo_fim: "",
+      trabalha,
+    };
+  }
+  return {
+    entrada: f.entrada,
+    saida: f.saida,
+    intervalo_min: f.intervalo_min,
+    intervalo_inicio: f.intervalo_inicio,
+    intervalo_fim: f.intervalo_fim,
+    trabalha,
+  };
+}
+
+/** Funcionário com o horário daquela data aplicado (para agenda/validação). */
+export function funcionarioNoDia(f: Funcionario, dataISO: string): Funcionario {
+  return { ...f, ...jornadaDoDia(f, dataISO) };
+}
+
+/** Carga horária semanal líquida (soma dos dias trabalhados). */
+export function cargaSemanalMin(f: Funcionario): number {
+  // 2026-06-15 é segunda; varremos uma semana inteira.
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const ef = jornadaDoDia(f, `2026-06-${15 + i}`);
+    if (ef.trabalha) total += jornadaLiquidaMin(ef);
+  }
+  return total;
 }
 
 /**

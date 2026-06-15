@@ -4,6 +4,9 @@ export type Perfil = "administrador" | "supervisor" | "visualizador";
 
 export type Turno = "manha" | "tarde" | "noite" | "integral";
 
+/** Dias trabalhados na semana. seg_sab cobre escalas tipo 44h (sáb 4h). */
+export type Escala = "seg_sex" | "seg_sab" | "todos";
+
 export type TipoLocal =
   | "sala"
   | "banheiro"

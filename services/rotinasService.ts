@@ -7,13 +7,15 @@
  */
 import {
   blocosOcupados,
+  funcionarioNoDia,
+  jornadaDoDia,
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao, validarRotina } from "@/lib/validations";
-import type { AlertaValidacao, RotinaPlanejada, StatusRotina } from "@/types";
+import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -34,6 +36,19 @@ async function exigirPresenca(funcionarioId: string, nome: string, data: string)
         nivel: "erro",
         codigo: "FUNCIONARIO_AUSENTE",
         mensagem: `${nome} está ausente em ${data} (${ROTULO_AUSENCIA[ausencia.tipo] ?? ausencia.tipo}).`,
+      },
+    ]);
+  }
+}
+
+/** Bloqueia alocação em dia de folga (não previsto na escala do funcionário). */
+function exigirEscala(funcionario: Funcionario, data: string) {
+  if (!jornadaDoDia(funcionario, data).trabalha) {
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "FOLGA",
+        mensagem: `${funcionario.nome} não trabalha em ${data} (folga pela escala).`,
       },
     ]);
   }
@@ -108,6 +123,9 @@ export async function createRotina(
   if (!tarefa) throw new Error("Tarefa não encontrada.");
   if (!funcionario) throw new Error("Funcionário não encontrado.");
   await exigirPresenca(funcionario.id, funcionario.nome, entrada.data);
+  exigirEscala(funcionario, entrada.data);
+  // valida contra o horário daquela data (ex.: sábado de 4h)
+  const funcEfetivo = funcionarioNoDia(funcionario, entrada.data);
 
   const [local, parametros, rotinasDoDia] = await Promise.all([
     ds.obter("locais", tarefa.local_id),
@@ -132,7 +150,7 @@ export async function createRotina(
   if (temErro(estruturais)) throw new ErroValidacao(estruturais);
 
   const brutos = validarAlocacao({
-    funcionario,
+    funcionario: funcEfetivo,
     rotinasExistentes: rotinasDoDia.filter(
       (r) => r.funcionario_id === entrada.funcionario_id,
     ),
@@ -231,8 +249,9 @@ export async function updateRotina(
 
   if (mudouPosicao) {
     await exigirPresenca(funcionario.id, funcionario.nome, destinoData);
+    exigirEscala(funcionario, destinoData);
     const brutos = validarAlocacao({
-      funcionario,
+      funcionario: funcionarioNoDia(funcionario, destinoData),
       rotinasExistentes: rotinasDoDia.filter(
         (r) => r.funcionario_id === destinoFuncId && r.id !== id,
       ),

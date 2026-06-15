@@ -33,7 +33,7 @@ function seed(): Banco {
       { id: "sede_centro", nome_sede: "Sede Centro", cidade: "Fortaleza", endereco: "Rua Major Facundo, 500", ativo: true, ...aud },
     ],
     funcionarios: [
-      { id: "f1", nome: "Maria das Graças", genero: "feminino", sede_id: "sede_aldeota", turno: "manha", entrada: "07:00", saida: "16:00", intervalo_min: 60, intervalo_inicio: "12:00", intervalo_fim: "13:00", cargo: "ASG", ativo: true, observacoes: "", ...aud },
+      { id: "f1", nome: "Maria das Graças", genero: "feminino", sede_id: "sede_aldeota", turno: "manha", entrada: "07:00", saida: "16:00", intervalo_min: 60, intervalo_inicio: "12:00", intervalo_fim: "13:00", escala: "seg_sab", entrada_sabado: "07:00", saida_sabado: "11:00", cargo: "ASG", ativo: true, observacoes: "Escala 44h: sáb 4h", ...aud },
       { id: "f2", nome: "José Ribamar", genero: "masculino", sede_id: "sede_aldeota", turno: "manha", entrada: "07:00", saida: "16:00", intervalo_min: 60, intervalo_inicio: "11:00", intervalo_fim: "12:00", cargo: "ASG", ativo: true, observacoes: "", ...aud },
       { id: "f3", nome: "Ana Cleide", genero: "feminino", sede_id: "sede_aldeota", turno: "tarde", entrada: "13:00", saida: "22:00", intervalo_min: 60, intervalo_inicio: "17:00", intervalo_fim: "18:00", cargo: "ASG", ativo: true, observacoes: "", ...aud },
       { id: "f4", nome: "Carlos Henrique", genero: "masculino", sede_id: "sede_dt", turno: "manha", entrada: "07:00", saida: "16:00", intervalo_min: 60, intervalo_inicio: "12:00", intervalo_fim: "13:00", cargo: "ASG", ativo: true, observacoes: "", ...aud },
