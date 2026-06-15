@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
+import Carregando from "./Carregando";
 import Modal from "./Modal";
 
 export interface OpcaoCampo {
@@ -192,8 +193,8 @@ export default function CrudManager<T extends Registro>({
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={colunas.length + 1} style={{ textAlign: "center", padding: 32, color: "var(--tinta-3)" }}>
-                  Carregando…
+                <td colSpan={colunas.length + 1} style={{ padding: 16 }}>
+                  <Carregando />
                 </td>
               </tr>
             )}

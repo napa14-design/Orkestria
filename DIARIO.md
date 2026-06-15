@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-12 — Loading "Tetris" (bloquinhos caindo) no lugar do spinner
+
+**O que mudou:** componente `Carregando` com bloquinhos coloridos
+(azul/amarelo/verde/vinho, estilo tijolo do sistema) que caem com gravidade e
+empilham num loop — remete à agenda de blocos do Orkestria. Substitui o texto
+"Carregando…" no `CrudManager` (vale para todas as listas: funcionários,
+sedes, locais, tarefas, ausências, parâmetros, usuários, histórico). Tem texto
+opcional e um `role=status` oculto p/ leitores de tela. Verificado: keyframe
+`tetris-cai` ativo (1,8s), 4 blocos empilhando (screenshot).
+
+**Reutilizável** em outros loadings (rotinas/dashboard) — basta importar
+`<Carregando />`.
+
+**Arquivos:** `components/Carregando.tsx`, `app/globals.css`,
+`components/CrudManager.tsx`.
+
+---
+
 ## 2026-06-12 — Animações mais suaves na Rotina do dia
 
 **O que mudou (feedback "tá muito seco"):** entrada da página mais macia e
