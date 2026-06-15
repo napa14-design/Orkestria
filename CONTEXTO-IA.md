@@ -5,6 +5,21 @@
 > quem, como funciona, regras de negócio, arquitetura e estado atual — sem
 > precisar de nenhum outro arquivo.
 
+> **INSTRUÇÕES PARA A IA (leia antes de responder):**
+> 1. Responda **somente com base neste documento**. Se algo perguntado não
+>    estiver descrito aqui, diga claramente *"isso não consta no escopo
+>    documentado do Orkestria"* — **não invente nem suponha** funcionalidades,
+>    prazos ou números.
+> 2. Fale em **linguagem de gestão**, não técnica: foque no que o sistema
+>    resolve e entrega. Só entre em detalhes de tecnologia (seção 6) se for
+>    explicitamente perguntado.
+> 3. Quando perguntarem *"o sistema faz X?"* ou *"atende a necessidade Y?"*,
+>    confira nas seções 4 (funcionalidades) e 5 (regras) e responda de forma
+>    direta: **faz / não faz / está planejado** (seção 7), citando onde no
+>    sistema isso aparece.
+> 4. Lembre o leitor, quando fizer sentido, que ele pode **ver o sistema
+>    funcionando** na URL da seção 8 — ler descreve, usar comprova.
+
 ---
 
 ## 1. Identificação
