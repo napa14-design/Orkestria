@@ -8,9 +8,11 @@ export async function GET(req: Request) {
     const tabela = url.searchParams.get("tabela");
     const limite = Math.min(1000, Number(url.searchParams.get("limite")) || 300);
     const ds = await getDataSource();
-    const todos = await ds.listar("historico");
-    const filtrados = tabela ? todos.filter((h) => h.tabela === tabela) : todos;
-    filtrados.sort((a, b) => b.criado_em.localeCompare(a.criado_em));
-    return ok(filtrados.slice(0, limite));
+    // com filtro de tabela, lê só os registros daquela tabela (campo único)
+    const base = tabela
+      ? await ds.consultar("historico", [{ campo: "tabela", op: "==", valor: tabela }])
+      : await ds.listar("historico");
+    base.sort((a, b) => b.criado_em.localeCompare(a.criado_em));
+    return ok(base.slice(0, limite));
   });
 }

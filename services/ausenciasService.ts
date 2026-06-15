@@ -14,9 +14,12 @@ export async function getAusencias(filtro?: {
   sedeId?: string;
 }): Promise<Ausencia[]> {
   const ds = await getDataSource();
-  const todas = await ds.listar("ausencias");
-  return todas.filter((a) => {
-    if (filtro?.sedeId && a.sede_id !== filtro.sedeId) return false;
+  // Quando há sede (caso comum), lê só as ausências da sede; senão, todas.
+  // O recorte por data é em memória (não dá p/ indexar intervalo data_inicio/fim).
+  const base = filtro?.sedeId
+    ? await ds.consultar("ausencias", [{ campo: "sede_id", op: "==", valor: filtro.sedeId }])
+    : await ds.listar("ausencias");
+  return base.filter((a) => {
     if (filtro?.data) return a.data_inicio <= filtro.data && filtro.data <= a.data_fim;
     if (filtro?.de && a.data_fim < filtro.de) return false;
     if (filtro?.ate && a.data_inicio > filtro.ate) return false;
@@ -30,14 +33,12 @@ export async function ausenteEm(
   data: string,
 ): Promise<Ausencia | null> {
   const ds = await getDataSource();
-  const todas = await ds.listar("ausencias");
+  // lê só as ausências DESTE funcionário (campo único); recorte por data em memória
+  const doFunc = await ds.consultar("ausencias", [
+    { campo: "funcionario_id", op: "==", valor: funcionarioId },
+  ]);
   return (
-    todas.find(
-      (a) =>
-        a.funcionario_id === funcionarioId &&
-        a.data_inicio <= data &&
-        data <= a.data_fim,
-    ) ?? null
+    doFunc.find((a) => a.data_inicio <= data && data <= a.data_fim) ?? null
   );
 }
 

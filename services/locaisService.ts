@@ -10,8 +10,9 @@ type DadosLocal = Omit<
 
 export async function getLocais(sedeId?: string): Promise<Local[]> {
   const ds = await getDataSource();
-  const todos = await ds.listar("locais");
-  return sedeId ? todos.filter((l) => l.sede_id === sedeId) : todos;
+  return sedeId
+    ? ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }])
+    : ds.listar("locais");
 }
 
 /** Regra essencial nº 1: não permitir local sem sede. */

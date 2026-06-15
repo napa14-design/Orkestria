@@ -19,10 +19,11 @@ export interface ResumoModelo {
 
 export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
   const ds = await getDataSource();
-  const itens = await ds.listar("modelos_rotina");
+  const itens = sedeId
+    ? await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }])
+    : await ds.listar("modelos_rotina");
   const grupos = new Map<string, ResumoModelo>();
   for (const item of itens) {
-    if (sedeId && item.sede_id !== sedeId) continue;
     const chave = `${item.sede_id}::${item.nome_modelo}`;
     const atual = grupos.get(chave);
     if (atual) atual.itens++;
@@ -96,9 +97,9 @@ export async function aplicarModelo(
   supervisorId: string,
 ): Promise<ResultadoAplicacao> {
   const ds = await getDataSource();
-  const itens = (await ds.listar("modelos_rotina")).filter(
-    (m) => m.nome_modelo === nome && m.sede_id === sedeId,
-  );
+  const itens = (
+    await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }])
+  ).filter((m) => m.nome_modelo === nome);
   if (itens.length === 0)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "MODELO_INEXISTENTE", mensagem: `Modelo "${nome}" não encontrado.` },
@@ -132,9 +133,9 @@ export async function aplicarModelo(
 
 export async function excluirModelo(nome: string, sedeId: string): Promise<number> {
   const ds = await getDataSource();
-  const itens = (await ds.listar("modelos_rotina")).filter(
-    (m) => m.nome_modelo === nome && m.sede_id === sedeId,
-  );
+  const itens = (
+    await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }])
+  ).filter((m) => m.nome_modelo === nome);
   for (const item of itens) await ds.excluir("modelos_rotina", item.id);
   return itens.length;
 }

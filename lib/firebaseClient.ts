@@ -11,7 +11,7 @@
  */
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import type { DataSource } from "./datasource";
+import type { CondicaoConsulta, DataSource } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 function obterApp(): App {
@@ -38,6 +38,17 @@ export class FirebaseDataSource implements DataSource {
 
   async listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
     const snap = await this.db.collection(tabela).get();
+    return snap.docs.map((doc) => doc.data() as MapaTabelas[K]);
+  }
+
+  async consultar<K extends NomeTabela>(
+    tabela: K,
+    condicoes: CondicaoConsulta[],
+  ): Promise<MapaTabelas[K][]> {
+    // Condições sobre um único campo → índice automático (sem índice composto).
+    let q: FirebaseFirestore.Query = this.db.collection(tabela);
+    for (const c of condicoes) q = q.where(c.campo, c.op, c.valor);
+    const snap = await q.get();
     return snap.docs.map((doc) => doc.data() as MapaTabelas[K]);
   }
 

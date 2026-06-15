@@ -7,7 +7,7 @@
  * O log é gravado em segundo plano para não atrasar a operação principal.
  */
 import { usuarioAtual } from "./contextoUsuario";
-import type { DataSource } from "./datasource";
+import type { CondicaoConsulta, DataSource } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
@@ -34,6 +34,13 @@ export class HistoricoDataSource implements DataSource {
 
   listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
     return this.interno.listar(tabela);
+  }
+
+  consultar<K extends NomeTabela>(
+    tabela: K,
+    condicoes: CondicaoConsulta[],
+  ): Promise<MapaTabelas[K][]> {
+    return this.interno.consultar(tabela, condicoes);
   }
 
   obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {

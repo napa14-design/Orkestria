@@ -10,8 +10,9 @@ type DadosFuncionario = Omit<
 
 export async function getFuncionarios(sedeId?: string): Promise<Funcionario[]> {
   const ds = await getDataSource();
-  const todos = await ds.listar("funcionarios");
-  return sedeId ? todos.filter((f) => f.sede_id === sedeId) : todos;
+  return sedeId
+    ? ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }])
+    : ds.listar("funcionarios");
 }
 
 export async function createFuncionario(

@@ -75,4 +75,6 @@ bordas firmes, sombras duras e rótulos mono em caixa alta. Fontes: Fraunces
   projeto Firebase real do usuário.
 - `FirebaseDataSource` nunca foi testado contra um Firestore real (sem
   credenciais nesta máquina).
-- Consultas hoje filtram em memória; com volume, indexar por data/sede.
+- Consultas quentes já usam `DataSource.consultar` (Firestore `where` por campo
+  único — índice automático, sem índice composto). A tela de Histórico sem
+  filtro de tabela ainda lê a coleção inteira (ordenar+limitar exigiria índice).

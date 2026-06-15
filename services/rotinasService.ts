@@ -93,10 +93,12 @@ export async function getRotinasByData(
   sedeId?: string,
 ): Promise<RotinaPlanejada[]> {
   const ds = await getDataSource();
-  const todas = await ds.listar("rotinas_planejadas");
-  return todas.filter(
-    (r) => r.data === data && (!sedeId || r.sede_id === sedeId),
-  );
+  // Firestore: lê só as rotinas DESTA data (índice de campo único); a sede é
+  // filtrada em memória sobre esse conjunto já pequeno.
+  const doDia = await ds.consultar("rotinas_planejadas", [
+    { campo: "data", op: "==", valor: data },
+  ]);
+  return sedeId ? doDia.filter((r) => r.sede_id === sedeId) : doDia;
 }
 
 export async function getRotinasPeriodo(
@@ -105,10 +107,12 @@ export async function getRotinasPeriodo(
   sedeId?: string,
 ): Promise<RotinaPlanejada[]> {
   const ds = await getDataSource();
-  const todas = await ds.listar("rotinas_planejadas");
-  return todas.filter(
-    (r) => r.data >= de && r.data <= ate && (!sedeId || r.sede_id === sedeId),
-  );
+  // intervalo sobre o campo `data` (índice de campo único — sem índice composto)
+  const noPeriodo = await ds.consultar("rotinas_planejadas", [
+    { campo: "data", op: ">=", valor: de },
+    { campo: "data", op: "<=", valor: ate },
+  ]);
+  return sedeId ? noPeriodo.filter((r) => r.sede_id === sedeId) : noPeriodo;
 }
 
 export async function createRotina(

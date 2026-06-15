@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-06-12 — Consultas filtradas (corta leituras do Firestore)
+
+**O que mudou:** novo método `DataSource.consultar(tabela, condicoes)` que no
+Firestore vira `where` — sempre por **um único campo** (igualdade ou intervalo
+no mesmo campo), usando só índices automáticos (zero índice composto p/ criar).
+Filtros secundários (ex.: sede além da data) ficam em memória sobre o conjunto
+já reduzido. Aplicado nos caminhos quentes: rotinas por data/período,
+ausências por sede e por funcionário (`ausenteEm`), funcionários/tarefas/locais
+por sede, usuários por e-mail (login), modelos por sede, execuções por período,
+histórico por tabela. Antes cada carga lia coleções **inteiras** (causa do
+estouro de cota); agora lê só o recorte. Memory/Sheets filtram em JS (mesmo
+resultado).
+
+**Verificado** em modo memória (mesma lógica): login, funcionários/tarefas/
+rotinas retornam só o recorte correto da sede/data; agenda renderiza. (Firebase
+ao vivo não testado por causa da cota esgotada hoje — caminho `where` é padrão
+e usa índices automáticos.)
+
+**Arquivos:** `lib/datasource.ts`, `lib/{memoryStore,firebaseClient,googleSheetsClient,historico}.ts`,
+`services/{rotinas,ausencias,funcionarios,tarefas,locais,usuarios,modelos,execucoes}Service.ts`,
+`app/api/historico/route.ts`.
+
+---
+
 ## 2026-06-12 — Agenda instantânea (otimista) + alerta de cota Firestore
 
 **O que mudou:** soltar/mover/redimensionar/remover tarefa na agenda agora é

@@ -10,8 +10,9 @@ type DadosTarefa = Omit<
 
 export async function getTarefas(sedeId?: string): Promise<Tarefa[]> {
   const ds = await getDataSource();
-  const todas = await ds.listar("tarefas");
-  return sedeId ? todas.filter((t) => t.sede_id === sedeId) : todas;
+  return sedeId
+    ? ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }])
+    : ds.listar("tarefas");
 }
 
 /**

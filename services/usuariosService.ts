@@ -7,12 +7,15 @@ export async function getUsuarios(): Promise<Usuario[]> {
 }
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {
-  const usuarios = await getUsuarios();
-  return (
-    usuarios.find(
-      (u) => u.ativo && u.email.toLowerCase() === email.trim().toLowerCase(),
-    ) ?? null
-  );
+  const ds = await getDataSource();
+  // lê só o(s) usuário(s) com este e-mail (campo único) em vez de toda a tabela
+  const alvo = email.trim().toLowerCase();
+  const achados = await ds.consultar("usuarios", [{ campo: "email", op: "==", valor: alvo }]);
+  // tolera cadastros antigos com e-mail em outra caixa
+  const lista = achados.length
+    ? achados
+    : (await ds.listar("usuarios")).filter((u) => u.email.toLowerCase() === alvo);
+  return lista.find((u) => u.ativo) ?? null;
 }
 
 type DadosUsuario = Pick<Usuario, "nome" | "email" | "perfil" | "sede_id" | "ativo">;

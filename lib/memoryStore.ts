@@ -5,7 +5,7 @@
  * do Google. Os dados vivem no processo do servidor — reiniciou, voltou ao
  * seed. Exclusivo para desenvolvimento/demonstração.
  */
-import type { DataSource } from "./datasource";
+import { type CondicaoConsulta, type DataSource, filtrarEmMemoria } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
 
@@ -99,6 +99,16 @@ function banco(): Banco {
 export class MemoryDataSource implements DataSource {
   async listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
     return [...banco()[tabela]] as MapaTabelas[K][];
+  }
+
+  async consultar<K extends NomeTabela>(
+    tabela: K,
+    condicoes: CondicaoConsulta[],
+  ): Promise<MapaTabelas[K][]> {
+    return filtrarEmMemoria(
+      banco()[tabela] as unknown as Array<Record<string, unknown>>,
+      condicoes,
+    ) as unknown as MapaTabelas[K][];
   }
 
   async obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {

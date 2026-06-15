@@ -21,10 +21,13 @@ const STATUS_ROTINA_POR_EXECUCAO: Record<StatusRealizado, StatusRotina> = {
 
 export async function getExecucoes(de?: string, ate?: string): Promise<ExecucaoRealizada[]> {
   const ds = await getDataSource();
-  const todas = await ds.listar("execucoes_realizadas");
-  return todas.filter(
-    (e) => (!de || e.data_execucao >= de) && (!ate || e.data_execucao <= ate),
-  );
+  // intervalo sobre data_execucao (campo único — sem índice composto)
+  const cond = [];
+  if (de) cond.push({ campo: "data_execucao", op: ">=" as const, valor: de });
+  if (ate) cond.push({ campo: "data_execucao", op: "<=" as const, valor: ate });
+  return cond.length
+    ? ds.consultar("execucoes_realizadas", cond)
+    : ds.listar("execucoes_realizadas");
 }
 
 export async function registrarExecucao(
