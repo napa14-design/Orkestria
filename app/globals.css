@@ -420,15 +420,27 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   border: 1.5px solid rgba(20, 26, 22, 0.45);
   box-shadow: 2px 2px 0 rgba(20, 26, 22, 0.4);
   opacity: 0;
-  animation: bloco-entra 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  /* fallback (reduced-motion): só aparece, sem queda */
+  animation: bloco-aparece 0.4s ease-out forwards;
 }
-@keyframes bloco-entra {
-  from { opacity: 0; transform: translateY(10px) scaleX(0.85); transform-origin: left; }
+@keyframes bloco-aparece {
   to { opacity: 1; transform: none; }
+}
+/* queda com gravidade + 2 quiques ao bater na pauta (estilo Tetris) */
+@keyframes bloco-cai {
+  0% { opacity: 0; transform: translateY(-220px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
+  50% { opacity: 1; transform: translateY(0); animation-timing-function: ease-out; }
+  66% { transform: translateY(-14px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
+  80% { transform: translateY(0); animation-timing-function: ease-out; }
+  90% { transform: translateY(-5px); animation-timing-function: cubic-bezier(0.45, 0, 1, 0.5); }
+  100% { transform: translateY(0); }
 }
 /* brilho que varre os blocos em cascata, como uma batuta sobre a partitura */
 @media (prefers-reduced-motion: no-preference) {
-  .login-bloco { overflow: hidden; }
+  .login-bloco {
+    overflow: hidden;
+    animation: bloco-cai 0.95s forwards;
+  }
   .login-bloco::after {
     content: "";
     position: absolute;

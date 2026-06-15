@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-12 — Login: blocos caem com gravidade e quicam (Tetris)
+
+**O que mudou (pedido fru-fru do usuário):** os blocos da partitura agora
+**caem de cima (-220px) com aceleração de gravidade e quicam 2x** ao bater na
+pauta, em cascata — como peças de Tetris assentando perto do texto/logo.
+Keyframe `bloco-cai` (0,95s, timing-functions por segmento p/ gravidade +
+ricochete), gated em `prefers-reduced-motion: no-preference`; fallback é um
+fade simples (`bloco-aparece`). Optei pela queda-com-quique em CSS no lugar de
+colisão física literal (seria pesado/arriscado numa tela de login).
+Verificado: keyframe ativo, delays 0,1–0,65s. (Screenshot trava por causa do
+brilho infinito — limitação do capturador, não do código.)
+
+**Arquivos:** `app/globals.css`.
+
+---
+
 ## 2026-06-12 — Login: logo maior e centralizada no palco
 
 **O que mudou:** a logo do palco estava pequena e encostada no canto. Agora o
