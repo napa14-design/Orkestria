@@ -241,6 +241,13 @@ export async function updateRotina(
   ]);
   if (!funcionario) throw new Error("Funcionário não encontrado.");
 
+  // Conformidade: ao mover (inclusive entre sedes), o destino também é validado.
+  const exigeRequisitos = !!(tarefa?.requisitos ?? "").split(",").filter(Boolean).length;
+  const [requisitosCatalogo, qualificacoesFuncionario] = await Promise.all([
+    exigeRequisitos ? ds.listar("requisitos") : Promise.resolve([]),
+    exigeRequisitos ? getQualificacoesDoFuncionario(destinoFuncId) : Promise.resolve([]),
+  ]);
+
   const local = tarefa ? await ds.obter("locais", tarefa.local_id) : null;
 
   // Redimensionamento: novo tempo previsto recalcula blocos, visual e fim.
@@ -280,6 +287,9 @@ export async function updateRotina(
       local: local ?? undefined,
       parametros,
       tempoPrevistoNovo: novoPrevisto,
+      requisitosCatalogo,
+      qualificacoesFuncionario,
+      data: destinoData,
     });
     const resultado = aplicarAutorizacaoManual(brutos, forcar);
     alertas = resultado.alertas;

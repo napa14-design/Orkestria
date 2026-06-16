@@ -99,7 +99,7 @@ também alimenta o buffer da Fase A (folga por sede).
 |---|---|---|---|
 | **Login individual (Firebase Auth)** | senha por usuário (já pendente de produção) | — | M |
 | **Confirmação pelo funcionário (app/QR)** | ASG confirma "fiz tal atividade" → prova jurídica | Auth individual | G |
-| **Remanejo entre sedes** | visão acima do supervisor; considera deslocamento/jornada/custo | perfil gerência multi-sede | G |
+| **Remanejo entre sedes** ✅ | tela `/remanejo` (admin): órfãs de todas as sedes, candidatos com folga inclusive de outra sede (tag ↗); move valida jornada/conflito/conformidade | perfil gerência multi-sede | G |
 | **Score de produtividade + premiação** ✅ | tela `/produtividade`: aderência previsto×realizado por funcionário + CSV; salvaguardas (sem idade/sexo, não punitivo) | guarda-corpos de risco | M |
 
 ## Sequência recomendada

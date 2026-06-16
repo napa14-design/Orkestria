@@ -13,6 +13,7 @@ const ITENS: Array<{ href: string; rotulo: string; apenasAdmin?: boolean }> = [
   { href: "/produtividade", rotulo: "Produtividade" },
   { href: "/funcionarios", rotulo: "Funcionários" },
   { href: "/ausencias", rotulo: "Ausências" },
+  { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasAdmin: true },
   { href: "/sedes", rotulo: "Sedes" },
   { href: "/locais", rotulo: "Locais" },
   { href: "/tarefas", rotulo: "Tarefas" },

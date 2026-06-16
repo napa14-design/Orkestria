@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-16 — Fase F: remanejo entre sedes + correção de conformidade no "mover"
+
+**O que mudou:**
+- **Tela `/remanejo`** (admin, multi-sede): lista as tarefas órfãs (de
+  funcionários ausentes) de TODAS as sedes e sugere candidatos com folga,
+  inclusive de **outra sede** (tag ↗). A movimentação usa o endpoint de mover
+  existente, que valida jornada/conflito; respeita restrição de gênero no filtro
+  de candidatos. Cruzar sedes é destacado (há deslocamento — combinar transporte).
+- **Correção:** o caminho de "mover" (`updateRotina`) **não checava requisitos
+  de conformidade** (só o `criarRotina` checava). Agora também valida aptidão/
+  treinamento (faltando/vencido) no destino — fecha a brecha e protege o remanejo.
+- Verificado em memória: Maria marcada ausente → r1/r2 órfãs; r1 → Carlos (DT,
+  cross-sede) **200**; r2 (Higienização exige química) → Francisca (sem química)
+  **422 REQUISITO_FALTANDO**; a tela lista a órfã e só oferece candidata feminina
+  de outra sede (↗). Build e console limpos.
+
+**Arquivos:** `services/rotinasService.ts` (conformidade no mover),
+`app/(app)/remanejo/page.tsx` (novo), `components/AppShell.tsx`,
+`docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase F (parcial): score de produtividade por funcionário
 
 **O que mudou:**
