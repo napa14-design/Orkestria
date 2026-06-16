@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SWRConfig } from "swr";
 import type { SessaoUsuario } from "@/lib/permissions";
 
 type Item = { href: string; rotulo: string; apenasAdmin?: boolean };
@@ -98,6 +99,17 @@ export default function AppShell({
   }
 
   return (
+    <SWRConfig
+      value={{
+        // Mantém os dados anteriores enquanto revalida ou ao trocar de chave —
+        // assim a agenda não desmonta (não pisca nem "some") a cada atualização.
+        keepPreviousData: true,
+        // Não refazer toda busca a cada foco/reconexão: evita flicker e
+        // reduz leituras do Firestore. As mutações já mantêm a tela fresca.
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }}
+    >
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header
         className="nao-imprimir"
@@ -193,5 +205,6 @@ export default function AppShell({
         {children}
       </main>
     </div>
+    </SWRConfig>
   );
 }
