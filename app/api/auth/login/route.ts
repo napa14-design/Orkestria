@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { verificarSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
 
 /**
- * Login do MVP: senha única (ACCESS_PASSWORD) + e-mail cadastrado na tabela
- * de usuários, que define perfil e sede da sessão.
+ * Login: e-mail cadastrado + senha. Cada usuário pode ter senha individual
+ * (hash scrypt em `senha_hash`); quem ainda não definiu usa a senha única
+ * (ACCESS_PASSWORD) como bootstrap. Definida a senha individual, só ela vale.
  */
 export async function POST(req: Request) {
   const { email, senha } = (await req.json()) as { email?: string; senha?: string };
@@ -12,9 +14,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "Informe e-mail e senha." }, { status: 400 });
   }
 
-  const senhaCorreta = senha === (process.env.ACCESS_PASSWORD ?? "mudar123");
-  const usuario = senhaCorreta ? await getUsuarioPorEmail(email) : null;
-  if (!usuario) {
+  const usuario = await getUsuarioPorEmail(email);
+  const senhaCorreta = usuario
+    ? usuario.senha_hash
+      ? verificarSenha(senha, usuario.senha_hash)
+      : senha === (process.env.ACCESS_PASSWORD ?? "mudar123")
+    : false;
+  if (!usuario || !senhaCorreta) {
     return NextResponse.json(
       { erro: "E-mail não cadastrado ou senha incorreta." },
       { status: 401 },

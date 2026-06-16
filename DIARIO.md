@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-16 — Fase F: login individual (senha por usuário)
+
+**O que mudou:**
+- **Senha por usuário** (`Usuario.senha_hash`, hash **scrypt** "salt:hash" em
+  `lib/senha.ts`). O login verifica a senha individual; quem ainda não tem cai no
+  `ACCESS_PASSWORD` como **bootstrap** (migração suave, nada quebra). Definida a
+  senha individual, só ela vale.
+- **Admin define** a senha de qualquer usuário (ação "Senha" em `/usuarios` +
+  `POST /api/usuarios/[id]/senha`). **Self-service** em `/conta`
+  (`POST /api/auth/senha`, usa o id da sessão). Link no nome do usuário (cabeçalho).
+- **Segurança:** `getUsuarios` **remove `senha_hash`** da resposta (nunca vai ao
+  cliente); senha nunca em texto puro.
+- Verificado em memória: admin entra no bootstrap (200); senha definida para o
+  supervisor → senha única passa a dar **401** e a individual **200**; self-service
+  troca a própria e reloga; a API **não expõe** o hash. Build e console limpos.
+
+**Decisão/escopo:** entreguei "login individual" de verdade dentro da sessão
+HMAC atual (segura e verificável). **Trocar o provedor para Firebase Auth** segue
+pendente — exige habilitar o Authentication no console do projeto e a config web
+pública (apiKey etc.), que não está disponível aqui; é passo de produção.
+
+**Arquivos:** `types/Usuario.ts`, `lib/schema.ts`, `lib/senha.ts` (novo),
+`services/usuariosService.ts`, `app/api/auth/login/route.ts`,
+`app/api/auth/senha/route.ts` (novo), `app/api/usuarios/[id]/senha/route.ts` (novo),
+`app/(app)/usuarios/page.tsx`, `app/(app)/conta/page.tsx` (novo), `components/AppShell.tsx`.
+
+---
+
 ## 2026-06-16 — Fase F: remanejo entre sedes + correção de conformidade no "mover"
 
 **O que mudou:**

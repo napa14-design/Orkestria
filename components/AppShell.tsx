@@ -101,7 +101,7 @@ export default function AppShell({
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className="so-desktop" style={{ textAlign: "right", lineHeight: 1.2 }}>
+          <Link href="/conta" className="so-desktop" style={{ textAlign: "right", lineHeight: 1.2, textDecoration: "none", color: "inherit" }} title="Minha conta / trocar senha">
             <div style={{ fontSize: 12, fontWeight: 700 }}>{sessao.nome}</div>
             <div
               className="rotulo"
@@ -109,7 +109,7 @@ export default function AppShell({
             >
               {ROTULO_PERFIL[sessao.perfil] ?? sessao.perfil}
             </div>
-          </div>
+          </Link>
           <button
             onClick={sair}
             className="btn btn-mini"

@@ -1,9 +1,27 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { hashSenha } from "@/lib/senha";
 import type { Usuario } from "@/types";
+
+/** Remove o hash de senha antes de devolver ao cliente. */
+function semSenha(u: Usuario): Usuario {
+  const { senha_hash: _omitido, ...resto } = u;
+  void _omitido;
+  return resto;
+}
 
 export async function getUsuarios(): Promise<Usuario[]> {
   const ds = await getDataSource();
-  return ds.listar("usuarios");
+  return (await ds.listar("usuarios")).map(semSenha);
+}
+
+/** Define (ou troca) a senha individual de um usuário. */
+export async function definirSenhaUsuario(id: string, novaSenha: string): Promise<void> {
+  if (!novaSenha || novaSenha.length < 4)
+    throw new Error("A senha deve ter ao menos 4 caracteres.");
+  const ds = await getDataSource();
+  const usuario = await ds.obter("usuarios", id);
+  if (!usuario) throw new Error("Usuário não encontrado.");
+  await ds.atualizar("usuarios", id, { senha_hash: hashSenha(novaSenha), atualizado_em: agoraISO() });
 }
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {

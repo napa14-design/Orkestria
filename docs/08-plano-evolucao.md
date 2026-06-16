@@ -97,7 +97,7 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Login individual (Firebase Auth)** | senha por usuário (já pendente de produção) | — | M |
+| **Login individual** ◐ | senha por usuário (hash scrypt em `senha_hash`) na sessão atual; admin define, self troca; ACCESS_PASSWORD vira só bootstrap. *Trocar o provedor para Firebase Auth* continua pendente (config do console + web SDK) | — | M |
 | **Confirmação pelo funcionário (app/QR)** | ASG confirma "fiz tal atividade" → prova jurídica | Auth individual | G |
 | **Remanejo entre sedes** ✅ | tela `/remanejo` (admin): órfãs de todas as sedes, candidatos com folga inclusive de outra sede (tag ↗); move valida jornada/conflito/conformidade | perfil gerência multi-sede | G |
 | **Score de produtividade + premiação** ✅ | tela `/produtividade`: aderência previsto×realizado por funcionário + CSV; salvaguardas (sem idade/sexo, não punitivo) | guarda-corpos de risco | M |

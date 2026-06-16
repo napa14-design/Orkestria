@@ -67,6 +67,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("email"),
     col("perfil"),
     col("sede_id"),
+    col("senha_hash"),
     col("ativo", "boolean"),
     col("criado_em"),
     col("atualizado_em"),
