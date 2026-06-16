@@ -116,7 +116,7 @@ export default function TaskPalette({
         )}
         {visiveis.map((t) => {
           const local = localPorId.get(t.local_id);
-          const previsto = tempoPrevistoMin(t, local);
+          const previsto = tempoPrevistoMin(t, local, categoriaPorId.get(t.categoria_id ?? ""));
           const blocos = blocosOcupados(previsto, blocoMin);
           return (
             <div

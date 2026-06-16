@@ -6,6 +6,7 @@
  * igualmente para Google Sheets hoje e Firebase Firestore no futuro.
  */
 import type {
+  Categoria,
   ClassificacaoOcupacao,
   Funcionario,
   Local,
@@ -14,6 +15,12 @@ import type {
   Tarefa,
 } from "@/types";
 import { hhmmParaMin } from "./dateUtils";
+
+/** Fator de intensidade efetivo de uma categoria (ausente/≤0 → 1, sem efeito). */
+export function fatorIntensidade(categoria: Categoria | undefined): number {
+  const f = categoria?.fator_intensidade;
+  return typeof f === "number" && f > 0 ? f : 1;
+}
 
 export const PARAMETROS_PADRAO: ParametrosResolvidos = {
   bloco_agenda_min: 30,
@@ -105,18 +112,29 @@ export function cargaSemanalMin(f: Funcionario): number {
  *  - fixo/manual → tempo_base_min
  *  - por_m2      → tempo_base_min × metragem do local
  *  - por_unidade → tempo_base_min × quantidade
+ *
+ * O resultado é multiplicado pelo fator de intensidade da categoria (quando
+ * informada): leve 0,8 · normal 1,0 · densa 1,5.
  */
-export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): number {
+export function tempoPrevistoMin(
+  tarefa: Tarefa,
+  local: Local | undefined,
+  categoria?: Categoria,
+): number {
+  let base: number;
   switch (tarefa.regra_calculo) {
     case "por_m2":
-      return Math.round(tarefa.tempo_base_min * (local?.metragem ?? 0));
+      base = tarefa.tempo_base_min * (local?.metragem ?? 0);
+      break;
     case "por_unidade":
-      return Math.round(tarefa.tempo_base_min * (tarefa.quantidade || 1));
+      base = tarefa.tempo_base_min * (tarefa.quantidade || 1);
+      break;
     case "fixo":
     case "manual":
     default:
-      return Math.round(tarefa.tempo_base_min);
+      base = tarefa.tempo_base_min;
   }
+  return Math.round(base * fatorIntensidade(categoria));
 }
 
 /** blocos = teto(tempo_previsto / bloco). 80min em blocos de 30 → 3 blocos. */

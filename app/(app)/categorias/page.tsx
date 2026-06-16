@@ -82,6 +82,15 @@ export default function PaginaCategorias() {
             ajuda: "Hex, ex.: #2f6f4f — usada no selo da paleta",
             dica: "Cor de exibição (hexadecimal) do selo da categoria na paleta de tarefas e na lista. Opcional.",
           },
+          {
+            key: "fator_intensidade",
+            rotulo: "Fator de intensidade",
+            tipo: "numero",
+            passo: "0.05",
+            padrao: 1,
+            ajuda: "Leve 0,8 · Normal 1,0 · Densa 1,5",
+            dica: "Multiplica o tempo previsto de TODAS as tarefas desta categoria — a intensidade da limpeza. Ex.: 1,5 (densa) deixa cada tarefa 50% mais longa; 0,8 (leve) 20% mais curta; 1,0 não altera nada. Calibrável conforme a realidade da operação.",
+          },
           { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         ]}
         colunas={[
@@ -110,6 +119,20 @@ export default function PaginaCategorias() {
             render: (c) => (
               <span style={{ color: "var(--tinta-2)", fontSize: 13 }}>{c.descricao || "—"}</span>
             ),
+          },
+          {
+            key: "fator_intensidade",
+            rotulo: "Intensidade",
+            render: (c) => {
+              const f = typeof c.fator_intensidade === "number" && c.fator_intensidade > 0 ? c.fator_intensidade : 1;
+              const rotulo = f <= 0.9 ? "leve" : f >= 1.3 ? "densa" : "normal";
+              const cor = f <= 0.9 ? "selo-azul" : f >= 1.3 ? "selo-vermelho" : "selo-cinza";
+              return (
+                <span className={`selo ${cor} num`} title={`Multiplica o tempo previsto por ${f}`}>
+                  ×{f.toLocaleString("pt-BR")} {rotulo}
+                </span>
+              );
+            },
           },
           {
             key: "ativo",

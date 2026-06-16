@@ -204,7 +204,7 @@ export default function PaginaTarefas() {
           rotulo: "Tempo previsto",
           render: (t) => (
             <strong className="num">
-              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id)))}
+              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id), categoriaPorId(t.categoria_id)))}
             </strong>
           ),
         },

@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-16 — Fase B (2/2): intensidade de limpeza no cálculo — Fase B (quase) concluída
+
+**O que mudou (incremento que toca a fórmula de tempo):**
+- **Fator de intensidade na categoria** (`Categoria.fator_intensidade`, padrão
+  1,0): multiplica o tempo previsto de TODAS as tarefas da categoria. Presets
+  leve 0,8 · normal 1,0 · densa 1,5 (calibráveis). `tempoPrevistoMin` ganhou um
+  3º parâmetro opcional `categoria` e aplica o fator no fim; helper
+  `fatorIntensidade` blinda contra valor ausente/≤0 (→ 1).
+- Aplicado em TODOS os pontos que calculam tempo previsto: servidor
+  (`rotinasService` busca a categoria ao alocar), paleta, tela de Tarefas,
+  alocação na agenda. `SugestoesAjuste` usa o fator no previsto E **divide por
+  ele** ao sugerir o novo tempo base (senão a sugestão super-corrigiria).
+- Tela Categorias: campo "Fator de intensidade" + selo "×1,5 densa / ×0,8 leve"
+  na lista. Seed: Higienização e Limpeza terminal densas (1,5); Organização e
+  Reposição leves (0,8).
+- Verificado em memória: alocar Higienização (base 20 ×1,5) → previsto **30**;
+  Organização (30 ×0,8) → **24**; Reposição (15 ×0,8) → **12** — na tela e no
+  servidor. SugestoesAjuste com 3 execuções de 45min (previsto 30) sugeriu base
+  **30** (= 45 ÷ 1,5), confirmando a divisão do fator. Build e console limpos.
+
+**Decisão de modelagem (sua):** intensidade fica na **categoria** (multiplicador
+único), não por tarefa/local. Consequência: o item "tipo de uso do local →
+exigência de nível" da Fase B fica **em aberto** (pressupõe nível por
+local/tarefa) — documentado em `docs/08`. Fase B entrega 3 de 4 itens; o 4º é
+decisão de modelagem futura, não pendência de esforço.
+
+**Arquivos:** `types/Categoria.ts`, `lib/schema.ts`, `lib/calculations.ts`,
+`services/rotinasService.ts`, `components/SugestoesAjuste.tsx`,
+`components/agenda/TaskPalette.tsx`, `app/(app)/{tarefas,rotinas,dashboard,categorias}/page.tsx`,
+`lib/memoryStore.ts`, `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase B (1/2): categoria de atividade + recalibração em cascata
 
 **O que mudou (fundação estrutural da Fase B, sem mexer na fórmula de tempo):**

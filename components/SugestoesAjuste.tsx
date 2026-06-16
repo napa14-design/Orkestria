@@ -6,10 +6,11 @@
  * sugere um novo tempo base — aplicável com um clique.
  */
 import { useMemo, useState } from "react";
-import { mediana, tempoPrevistoMin } from "@/lib/calculations";
+import { fatorIntensidade, mediana, tempoPrevistoMin } from "@/lib/calculations";
 import { apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type {
+  Categoria,
   ExecucaoRealizada,
   Local,
   ParametrosResolvidos,
@@ -39,6 +40,7 @@ export default function SugestoesAjuste({
   execucoes,
   tarefas,
   locais,
+  categorias = [],
   parametros,
   aoAplicado,
 }: {
@@ -46,6 +48,7 @@ export default function SugestoesAjuste({
   execucoes: ExecucaoRealizada[];
   tarefas: Tarefa[];
   locais: Local[];
+  categorias?: Categoria[];
   parametros: ParametrosResolvidos;
   aoAplicado: () => void;
 }) {
@@ -55,6 +58,7 @@ export default function SugestoesAjuste({
   const sugestoes = useMemo<Sugestao[]>(() => {
     const rotinaPorId = new Map(rotinas.map((r) => [r.id, r]));
     const localPorId = new Map(locais.map((l) => [l.id, l]));
+    const categoriaPorId = new Map(categorias.map((c) => [c.id, c]));
 
     // tempos reais agrupados por tarefa
     const reaisPorTarefa = new Map<string, number[]>();
@@ -74,22 +78,26 @@ export default function SugestoesAjuste({
       // tarefas de "tempo referência" não entram (desvio é esperado)
       if (!tarefa || !tarefa.ativo || tarefa.tempo_referencia) continue;
       const local = localPorId.get(tarefa.local_id);
+      const categoria = categoriaPorId.get(tarefa.categoria_id ?? "");
+      const fator = fatorIntensidade(categoria);
 
       // compara com o previsto ATUAL: depois de aplicar, a sugestão some.
-      const previstoAtual = tempoPrevistoMin(tarefa, local);
+      const previstoAtual = tempoPrevistoMin(tarefa, local, categoria);
       if (previstoAtual <= 0) continue;
 
       const med = mediana(reais);
       const desvio = ((med - previstoAtual) / previstoAtual) * 100;
       if (Math.abs(desvio) < parametros.desvio_ajuste_percentual) continue;
 
+      // novo tempo base divide o real pelo multiplicador (metragem/quantidade)
+      // E pelo fator de intensidade, para que aplicá-lo reproduza a mediana.
       let novoTempoBase: number;
       if (tarefa.regra_calculo === "por_m2" && local && local.metragem > 0) {
-        novoTempoBase = Math.round((med / local.metragem) * 100) / 100;
+        novoTempoBase = Math.round((med / fator / local.metragem) * 100) / 100;
       } else if (tarefa.regra_calculo === "por_unidade" && tarefa.quantidade > 0) {
-        novoTempoBase = Math.round((med / tarefa.quantidade) * 10) / 10;
+        novoTempoBase = Math.round((med / fator / tarefa.quantidade) * 10) / 10;
       } else {
-        novoTempoBase = Math.round(med);
+        novoTempoBase = Math.round(med / fator);
       }
       if (novoTempoBase <= 0 || novoTempoBase === tarefa.tempo_base_min) continue;
 
@@ -104,7 +112,7 @@ export default function SugestoesAjuste({
       });
     }
     return resultado.sort((a, b) => Math.abs(b.desvio) - Math.abs(a.desvio));
-  }, [rotinas, execucoes, tarefas, locais, parametros]);
+  }, [rotinas, execucoes, tarefas, locais, categorias, parametros]);
 
   if (sugestoes.length === 0) return null;
 

@@ -55,8 +55,14 @@ Hoje as tarefas são registros soltos por local; falta uma camada de
 |---|---|---|---|
 | **Categoria de atividade** ✅ | entidade `categorias` (catálogo global) que agrupa tarefas afins | — | M |
 | **Recalibração em cascata** ✅ | ação que aplica um fator ao tempo base de todas as tarefas da categoria | categoria | M |
-| **Nível/intensidade de limpeza** | atributo fina × densa que entra no cálculo | categoria | M |
-| **Tipo de uso → exigência** | laboratório/clínica/pátio puxam nível de limpeza | categoria + tipo de local (já existe) | M |
+| **Nível/intensidade de limpeza** ✅ | `fator_intensidade` na categoria (leve 0,8 · normal 1,0 · densa 1,5) multiplica `tempoPrevistoMin` | categoria | M |
+| **Tipo de uso → exigência** ⏸ | laboratório/clínica/pátio puxam nível de limpeza | categoria + tipo de local | M |
+
+> **Decisão (2026-06-16):** a intensidade ficou na **categoria** (multiplicador
+> único por categoria), não por tarefa/local. Por isso "tipo de uso → exigência"
+> (que pressupõe nível por local/tarefa) fica **em aberto**: só faz sentido se,
+> no futuro, a intensidade passar a ser por tarefa. Parado por decisão de
+> modelagem, não por esforço.
 
 ## Fase C — Fundação #2: Segundo eixo (serviços eventuais)
 

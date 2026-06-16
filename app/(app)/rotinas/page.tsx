@@ -261,7 +261,8 @@ export default function PaginaRotinas() {
     const tarefa = (tarefas ?? []).find((t) => t.id === tarefaId);
     if (!tarefa) return;
     const local = (locais ?? []).find((l) => l.id === tarefa.local_id);
-    const previsto = tempoPrevistoMin(tarefa, local);
+    const categoria = (categorias ?? []).find((c) => c.id === tarefa.categoria_id);
+    const previsto = tempoPrevistoMin(tarefa, local, categoria);
 
     const validacao = validarLocalmente(funcionarioId, inicio, previsto, tarefa);
     let forcar = false;

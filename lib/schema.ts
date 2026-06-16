@@ -106,6 +106,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("nome"),
     col("descricao"),
     col("cor"),
+    col("fator_intensidade", "number"),
     col("ativo", "boolean"),
     ...AUDITORIA,
   ],

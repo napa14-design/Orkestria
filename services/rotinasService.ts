@@ -131,13 +131,14 @@ export async function createRotina(
   // valida contra o horário daquela data (ex.: sábado de 4h)
   const funcEfetivo = funcionarioNoDia(funcionario, entrada.data);
 
-  const [local, parametros, rotinasDoDia] = await Promise.all([
+  const [local, parametros, rotinasDoDia, categoria] = await Promise.all([
     ds.obter("locais", tarefa.local_id),
     resolverParametros(tarefa.sede_id),
     getRotinasByData(entrada.data),
+    tarefa.categoria_id ? ds.obter("categorias", tarefa.categoria_id) : Promise.resolve(null),
   ]);
 
-  const previsto = tempoPrevistoMin(tarefa, local ?? undefined);
+  const previsto = tempoPrevistoMin(tarefa, local ?? undefined, categoria ?? undefined);
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
   const fimMin = inicioMin + visual;

@@ -11,5 +11,11 @@ export interface Categoria extends Auditoria {
   descricao: string;
   /** Cor de exibição (hex) usada em selos e na paleta. Opcional. */
   cor?: string;
+  /**
+   * Fator de intensidade de limpeza que multiplica o tempo previsto de TODAS
+   * as tarefas da categoria (ex.: 0,8 leve · 1,0 normal · 1,5 densa). Ausente
+   * ou ≤ 0 equivale a 1,0 (sem efeito). Os valores são calibráveis.
+   */
+  fator_intensidade?: number;
   ativo: boolean;
 }
