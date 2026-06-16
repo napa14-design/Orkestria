@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-16 — Fase F (parcial): score de produtividade por funcionário
+
+**O que mudou:**
+- **Tela `/produtividade`**: indicador OPERACIONAL derivado do previsto ×
+  realizado. Por funcionário (período + sede): nº de serviços realizados, tempo
+  realizado e **aderência** (% das execuções comparáveis dentro de ±X% do
+  previsto). Ranking (🥇🥈🥉) e export CSV (apoia o processo de premiação).
+- **Salvaguardas do diretor**: banner explícito — não usa idade/sexo, não é
+  punitivo, não substitui avaliação de gestão; tarefas de referência/presença
+  ficam de fora (a variação é esperada). "Sem base" para quem não tem execuções
+  comparáveis.
+- Verificado em memória: Maria (real ≈ previsto) 🥇 100%; José (real bem acima)
+  🥈 0%; demais "sem base". Build e console limpos.
+
+**Fase F — em aberto (decisões da direção / produção):** os outros 3 itens não
+foram feitos por exigirem decisão sua e/ou configuração de produção:
+- **Login individual (Firebase Auth)**: troca a autenticação de produção (hoje
+  senha única + cookie HMAC) — precisa do Firebase Auth habilitado no console.
+- **Confirmação pelo funcionário (app/QR)** + **EPI confirmado**: fluxo voltado
+  ao ASG; depende do login individual.
+- **Remanejo entre sedes**: visão de gerência multi-sede + como o deslocamento
+  entre sedes entra na conta.
+
+**Arquivos:** `app/(app)/produtividade/page.tsx` (novo), `components/AppShell.tsx`,
+`docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase E: conformidade (aptidão, treinamento, EPI) — Fase E concluída
 
 **O que mudou (bloco jurídico de conformidade):**

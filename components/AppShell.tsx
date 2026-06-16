@@ -10,6 +10,7 @@ const ITENS: Array<{ href: string; rotulo: string; apenasAdmin?: boolean }> = [
   { href: "/eventuais", rotulo: "Eventuais" },
   { href: "/dashboard", rotulo: "Dashboard" },
   { href: "/relatorios", rotulo: "Relatórios" },
+  { href: "/produtividade", rotulo: "Produtividade" },
   { href: "/funcionarios", rotulo: "Funcionários" },
   { href: "/ausencias", rotulo: "Ausências" },
   { href: "/sedes", rotulo: "Sedes" },
