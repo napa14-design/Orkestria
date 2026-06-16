@@ -136,6 +136,9 @@ export default function OccupancySummary({
               {[
                 ["Jornada líquida", formatarDuracao(selecionado.resumo.jornada_liquida_min)],
                 ["Tempo planejado", formatarDuracao(selecionado.resumo.tempo_planejado_min)],
+                ...(selecionado.resumo.deslocamento_min > 0
+                  ? [["Deslocamento estimado", formatarDuracao(selecionado.resumo.deslocamento_min)] as [string, string]]
+                  : []),
                 ["Ociosidade prevista", formatarDuracao(selecionado.resumo.ociosidade_prevista_min)],
                 ["Tarefas no dia", String(selecionado.resumo.total_tarefas)],
               ].map(([rotulo, valor]) => (

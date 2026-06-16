@@ -42,6 +42,7 @@ export const PARAMETROS_PADRAO: ParametrosResolvidos = {
   min_execucoes_ajuste: 3,
   desvio_ajuste_percentual: 15,
   folga_minima_percentual: 0,
+  deslocamento_min_por_tarefa: 0,
 };
 
 /** Mediana de uma lista de números (robusta a execuções atípicas). */
@@ -232,6 +233,8 @@ export function produtividadeM2PorHora(totalM2: number, totalMin: number): numbe
 export interface ResumoFuncionario {
   jornada_liquida_min: number;
   tempo_planejado_min: number;
+  /** Deslocamento estimado do dia (nº de tarefas × parâmetro da sede). */
+  deslocamento_min: number;
   ociosidade_prevista_min: number;
   ocupacao_percentual: number;
   classificacao: ClassificacaoOcupacao;
@@ -245,13 +248,18 @@ export function resumoFuncionario(
 ): ResumoFuncionario {
   const jornada = jornadaLiquidaMin(funcionario);
   const planejado = tempoPlanejadoMin(rotinasDoDia);
-  const ocupacao = ocupacaoPercentual(planejado, jornada);
+  const totalTarefas = rotinasDoDia.filter((r) => r.status !== "cancelada").length;
+  // deslocamento entre espaços é tempo real do dia (volume invisível antes)
+  const deslocamento = totalTarefas * (p.deslocamento_min_por_tarefa || 0);
+  const ocupado = planejado + deslocamento;
+  const ocupacao = ocupacaoPercentual(ocupado, jornada);
   return {
     jornada_liquida_min: jornada,
     tempo_planejado_min: planejado,
-    ociosidade_prevista_min: ociosidadePrevistaMin(jornada, planejado),
+    deslocamento_min: deslocamento,
+    ociosidade_prevista_min: ociosidadePrevistaMin(jornada, ocupado),
     ocupacao_percentual: ocupacao,
     classificacao: classificarOcupacao(ocupacao, p),
-    total_tarefas: rotinasDoDia.filter((r) => r.status !== "cancelada").length,
+    total_tarefas: totalTarefas,
   };
 }

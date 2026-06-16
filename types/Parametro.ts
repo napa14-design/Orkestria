@@ -29,4 +29,8 @@ export interface ParametrosResolvidos {
   /** % da jornada reservado como folga (buffer p/ imprevistos). Define a
    *  ocupação-alvo da sede = 100 − folga. 0 = sem reserva. */
   folga_minima_percentual: number;
+  /** Minutos de deslocamento/transição atribuídos por tarefa alocada no dia.
+   *  Entra na ocupação como tempo real, sem poluir o desvio das tarefas.
+   *  0 = não contabiliza (até a sede calibrar). */
+  deslocamento_min_por_tarefa: number;
 }

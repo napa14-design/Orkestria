@@ -7,6 +7,66 @@
 
 ---
 
+## 2026-06-16 — Fase D (3/3): deslocamento — Fase D concluída
+
+**O que mudou (último item do enriquecimento do cálculo):**
+- **Tempo de deslocamento** (`deslocamento_min_por_tarefa`, parâmetro por sede,
+  **default 0**): minutos de transição atribuídos por tarefa alocada. Entra na
+  ocupação como tempo real (`resumoFuncionario`: ocupado = planejado + nº tarefas
+  × param; ociosidade e ocupação recalculadas), SEM poluir o desvio de cada
+  tarefa. Linha "Deslocamento estimado" no resumo quando > 0. Default 0 = neutro
+  até a sede calibrar.
+- Seed: p11 (Aldeota 5min/tarefa).
+- Verificado em memória (servidor fixado no boot, sem tocar Firestore): Maria com
+  2 tarefas → "Deslocamento estimado 10min", ociosidade 6h10 (480 − 100 − 10).
+  Build e console limpos.
+
+**Fase D concluída** (3/3): criticidade (incremento 1), tempo por pessoa
+(incremento 2) e deslocamento (este). Próximo: Fase E (conformidade: aptidão,
+treinamento, EPI).
+
+**Arquivos:** `types/Parametro.ts`, `lib/calculations.ts` (`resumoFuncionario`),
+`components/agenda/OccupancySummary.tsx`, `lib/memoryStore.ts`,
+`docs/08-plano-evolucao.md`.
+
+> Nota: a folga/ociosidade do **dashboard** (agregado) ainda soma só tempo de
+> tarefa; o deslocamento é um overlay por funcionário/dia exibido no resumo da
+> agenda. Unificar no dashboard fica para quando o parâmetro for calibrado.
+
+---
+
+## 2026-06-16 — Fase D (2/3): tempo padrão por funcionário × atividade (só planejamento)
+
+**O que mudou:** tabela `tempos_personalizados` (funcionário × tarefa → minutos).
+Na alocação (cliente e servidor), o tempo pessoal **substitui** o padrão
+calculado — reconhece o ritmo de cada pessoa. Tela `/tempos`, service e rotas
+com permissão por sede e unicidade por (funcionário, tarefa). **Só planejamento**
+— nunca avaliação/score (planejar ≠ avaliar). Verificado: Maria 70 / José 95 /
+Ana (sem override) 80; duplicata bloqueada.
+
+**Arquivos:** `types/TempoPersonalizado.ts` (novo), `types/index.ts`,
+`lib/schema.ts`, `services/temposPersonalizadosService.ts` (novo),
+`app/api/tempos-personalizados/{route,[id]/route}.ts` (novos),
+`app/(app)/tempos/page.tsx` (novo), `services/rotinasService.ts`,
+`app/(app)/rotinas/page.tsx`, `components/AppShell.tsx`, `lib/memoryStore.ts`.
+
+---
+
+## 2026-06-16 — Fase D (1/3): criticidade / circuito essencial
+
+**O que mudou:** `Tarefa.critica` — tarefas que não podem deixar de ser feitas.
+Quando uma crítica fica sem cobertura no dia, o `PendenciasPanel` mostra uma
+seção "Circuito essencial descoberto" em vermelho, separada e acima das demais
+pendências. Campo + selo "⛔ crítica" na tela de Tarefas. Seed: t2 e t8 críticas.
+Verificado: Coleta (crítica, não alocada) aparece no circuito; Higienização
+(crítica, alocada hoje) não aparece.
+
+**Arquivos:** `types/Tarefa.ts`, `lib/schema.ts`,
+`components/agenda/PendenciasPanel.tsx`, `app/(app)/tarefas/page.tsx`,
+`lib/memoryStore.ts`.
+
+---
+
 ## 2026-06-16 — Fase C (2/2): presença/plantão + buffer calibrado — Fase C concluída
 
 **O que mudou (fecha o segundo eixo):**

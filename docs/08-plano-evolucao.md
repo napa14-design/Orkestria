@@ -81,9 +81,9 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Tempo de deslocamento** | trajeto entre espaços como volume real | decisão de modelagem | M–G |
-| **Tempo padrão por funcionário × atividade** | reconhecer ritmo de cada pessoa (só planejar) | decisão planejar/avaliar | M |
-| **Criticidade / circuito essencial** | conjunto que não pode deixar de ser feito | decisão de modelagem | M |
+| **Tempo de deslocamento** ✅ | parâmetro por sede `deslocamento_min_por_tarefa` (default 0) entra na ocupação como tempo real | decisão de modelagem | M–G |
+| **Tempo padrão por funcionário × atividade** ✅ | tabela `tempos_personalizados`; override no planejamento (só planejar) | decisão planejar/avaliar | M |
+| **Criticidade / circuito essencial** ✅ | flag `critica` + seção "circuito essencial" no painel de pendências | decisão de modelagem | M |
 
 ## Fase E — Conformidade e aptidão (bloco jurídico)
 
