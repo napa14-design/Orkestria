@@ -94,6 +94,11 @@ function seed(): Banco {
       { id: "tp1", funcionario_id: "f1", tarefa_id: "t1", sede_id: "sede_aldeota", tempo_min: 70, observacao: "Mais rápida na recepção", ...aud },
       { id: "tp2", funcionario_id: "f2", tarefa_id: "t1", sede_id: "sede_aldeota", tempo_min: 95, observacao: "", ...aud },
     ],
+    qualificacoes_funcionario: [
+      { id: "qf1", funcionario_id: "f1", requisito_id: "rq2", sede_id: "sede_aldeota", validade: "", observacao: "Apta a trabalho em altura", ...aud },
+      { id: "qf2", funcionario_id: "f1", requisito_id: "rq1", sede_id: "sede_aldeota", validade: "2026-01-01", observacao: "Treinamento vencido — renovar", ...aud },
+      { id: "qf3", funcionario_id: "f2", requisito_id: "rq1", sede_id: "sede_aldeota", validade: "2027-12-31", observacao: "", ...aud },
+    ],
     modelos_rotina: [],
     historico: [],
     ausencias: [

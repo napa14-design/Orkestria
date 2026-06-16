@@ -10,6 +10,7 @@ export * from "./RotinaPlanejada";
 export * from "./ExecucaoRealizada";
 export * from "./ServicoEventual";
 export * from "./TempoPersonalizado";
+export * from "./QualificacaoFuncionario";
 export * from "./Parametro";
 export * from "./ModeloRotina";
 export * from "./Ausencia";

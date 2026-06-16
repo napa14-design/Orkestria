@@ -37,6 +37,8 @@ import type {
   Funcionario,
   Local,
   ParametrosResolvidos,
+  QualificacaoFuncionario,
+  Requisito,
   RotinaPlanejada,
   Sede,
   Tarefa,
@@ -94,6 +96,11 @@ export default function PaginaRotinas() {
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(
     sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null,
+    fetcher,
+  );
+  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  const { data: qualificacoes } = useSWR<QualificacaoFuncionario[]>(
+    sedeId ? `/api/qualificacoes?sede=${sedeId}` : null,
     fetcher,
   );
   const { data: parametros } = useSWR<ParametrosResolvidos>(
@@ -258,6 +265,9 @@ export default function PaginaRotinas() {
       local,
       parametros: params,
       tempoPrevistoNovo: tempoPrevisto,
+      requisitosCatalogo: requisitos ?? [],
+      qualificacoesFuncionario: (qualificacoes ?? []).filter((q) => q.funcionario_id === funcionarioId),
+      data,
     });
   }
 

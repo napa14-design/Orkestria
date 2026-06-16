@@ -19,6 +19,7 @@ import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
+import { getQualificacoesDoFuncionario } from "./qualificacoesService";
 import { getTempoPessoal } from "./temposPersonalizadosService";
 
 const ROTULO_AUSENCIA: Record<string, string> = {
@@ -132,12 +133,18 @@ export async function createRotina(
   // valida contra o horário daquela data (ex.: sábado de 4h)
   const funcEfetivo = funcionarioNoDia(funcionario, entrada.data);
 
-  const [local, parametros, rotinasDoDia, categoria] = await Promise.all([
-    ds.obter("locais", tarefa.local_id),
-    resolverParametros(tarefa.sede_id),
-    getRotinasByData(entrada.data),
-    tarefa.categoria_id ? ds.obter("categorias", tarefa.categoria_id) : Promise.resolve(null),
-  ]);
+  const exigeRequisitos = !!(tarefa.requisitos ?? "").split(",").filter(Boolean).length;
+  const [local, parametros, rotinasDoDia, categoria, requisitosCatalogo, qualificacoesFuncionario] =
+    await Promise.all([
+      ds.obter("locais", tarefa.local_id),
+      resolverParametros(tarefa.sede_id),
+      getRotinasByData(entrada.data),
+      tarefa.categoria_id ? ds.obter("categorias", tarefa.categoria_id) : Promise.resolve(null),
+      exigeRequisitos ? ds.listar("requisitos") : Promise.resolve([]),
+      exigeRequisitos
+        ? getQualificacoesDoFuncionario(entrada.funcionario_id)
+        : Promise.resolve([]),
+    ]);
 
   // tempo pessoal (planejamento realista) substitui o padrão quando existe
   const tempoPessoal = await getTempoPessoal(entrada.funcionario_id, tarefa.id);
@@ -169,6 +176,9 @@ export async function createRotina(
     local: local ?? undefined,
     parametros,
     tempoPrevistoNovo: previsto,
+    requisitosCatalogo,
+    qualificacoesFuncionario,
+    data: entrada.data,
   });
   const { alertas, autorizou } = aplicarAutorizacaoManual(brutos, entrada.forcar);
   if (temErro(alertas)) throw new ErroValidacao(alertas);

@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-06-16 — Fase E: conformidade (aptidão, treinamento, EPI) — Fase E concluída
+
+**O que mudou (bloco jurídico de conformidade):**
+- **Catálogo `requisitos`** (incremento 1): aptidão | treinamento | epi
+  (global, admin). `Tarefa.requisitos` (CSV) define o que a tarefa exige —
+  campo **multiselect** novo no CrudManager; selos por tipo (🩺/🎓/🧤) na tela de
+  Tarefas. Tela `/requisitos`.
+- **Qualificações do funcionário** (incremento 2): tabela
+  `qualificacoes_funcionario` (funcionário possui aptidão/treinamento, com
+  **validade**). Tela `/qualificacoes` (selo verde válido / vermelho vencido).
+- **Validação na alocação** (`validarAlocacao`): bloqueia (erro) quem não tem um
+  requisito de aptidão/treinamento exigido pela tarefa, ou cujo requisito está
+  **vencido** na data. EPI **não bloqueia** (exibido como lembrete; a confirmação
+  de uso é a Fase F). Cliente e servidor; não é contornável por "forçar".
+- Seed: rq1 química (treinamento), rq2 NR-35 (aptidão), rq3 luvas (EPI);
+  Higienização exige rq1+rq3, Limpeza de vidros exige rq2; Maria tem NR-35 (ok) e
+  química vencida; José tem química válida.
+- Verificado em memória: Maria+vidros (tem NR-35) **201**; José+vidros (sem
+  NR-35) **bloqueado** (REQUISITO_FALTANDO); Maria+higienização (química vencida)
+  **bloqueado** (REQUISITO_VENCIDO). Selos e telas OK. Build e console limpos.
+
+**Fase E concluída** — matriz de aptidão e treinamento com validade completas;
+EPI exigido pela tarefa entregue, faltando só a *confirmação de uso* (Fase F,
+depende do app/QR). Próximo: Fase F (Auth individual, app/QR, remanejo entre
+sedes, score).
+
+**Decisão de modelagem:** um catálogo único `requisitos` com `tipo` cobre os três
+itens; aptidão/treinamento são possuídos pelo funcionário e bloqueiam; EPI é
+exigência da tarefa exibida como lembrete. Requisitos exigidos guardados como CSV
+em `Tarefa.requisitos` (espelha colunas escalares; multiselect na UI).
+
+**Arquivos:** `types/{comum,Requisito,QualificacaoFuncionario,Tarefa,index}.ts`,
+`lib/schema.ts`, `lib/validations.ts`, `services/{requisitos,qualificacoes,rotinas}Service.ts`,
+`app/api/{requisitos,qualificacoes}/...`, `app/(app)/{requisitos,qualificacoes,tarefas,rotinas}/page.tsx`,
+`components/CrudManager.tsx` (multiselect), `components/AppShell.tsx`,
+`app/globals.css` (selo-roxo), `lib/memoryStore.ts`, `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase D (3/3): deslocamento — Fase D concluída
 
 **O que mudou (último item do enriquecimento do cálculo):**

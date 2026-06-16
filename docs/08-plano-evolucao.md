@@ -89,9 +89,9 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Matriz de aptidão (restrição médica/NR)** | bloquear atividade para quem tem restrição | categoria de atividade | M |
-| **Treinamento como pré-requisito (com validade)** | só executa quem tem treino válido; expira | matriz aptidão | M |
-| **EPI por atividade** | registrar/confirmar uso de EPI na tarefa | confirmação (Fase F) | M |
+| **Matriz de aptidão (restrição médica/NR)** ✅ | catálogo `requisitos` + `qualificacoes_funcionario`; bloqueia alocação sem o requisito | categoria de atividade | M |
+| **Treinamento como pré-requisito (com validade)** ✅ | validade na qualificação; vencido volta a bloquear | matriz aptidão | M |
+| **EPI por atividade** ◐ | EPI exigido pela tarefa (selo/lembrete) entregue; a *confirmação de uso* é Fase F | confirmação (Fase F) | M |
 
 ## Fase F — Direção (mudam o alcance; decisões maiores)
 

@@ -7,6 +7,8 @@ import type {
   Funcionario,
   Local,
   ParametrosResolvidos,
+  QualificacaoFuncionario,
+  Requisito,
   RotinaPlanejada,
   Tarefa,
 } from "@/types";
@@ -27,6 +29,10 @@ export function validarAlocacao(args: {
   local?: Local;
   parametros: ParametrosResolvidos;
   tempoPrevistoNovo: number;
+  /** Conformidade: catálogo de requisitos + qualificações do funcionário + data. */
+  requisitosCatalogo?: Requisito[];
+  qualificacoesFuncionario?: QualificacaoFuncionario[];
+  data?: string;
 }): AlertaValidacao[] {
   const { funcionario: f, rotinasExistentes, inicioMin, fimMin } = args;
   const alertas: AlertaValidacao[] = [];
@@ -99,6 +105,32 @@ export function validarAlocacao(args: {
         args.tarefa.restricao_genero === "feminino" ? "mulheres" : "homens"
       } — ${f.nome} não pode executá-la.`,
     });
+  }
+
+  // Requisitos de execução (aptidão/treinamento): bloqueiam quem não tem ou
+  // está vencido. EPI é exibido na UI, mas não bloqueia (confirmação é futura).
+  const exigidos = (args.tarefa?.requisitos ?? "").split(",").filter(Boolean);
+  if (exigidos.length && args.requisitosCatalogo) {
+    const catPorId = new Map(args.requisitosCatalogo.map((r) => [r.id, r]));
+    const minhas = args.qualificacoesFuncionario ?? [];
+    for (const reqId of exigidos) {
+      const req = catPorId.get(reqId);
+      if (!req || req.tipo === "epi") continue; // EPI não bloqueia
+      const q = minhas.find((x) => x.requisito_id === reqId && x.funcionario_id === f.id);
+      if (!q) {
+        alertas.push({
+          nivel: "erro",
+          codigo: "REQUISITO_FALTANDO",
+          mensagem: `${f.nome} não possui o requisito "${req.nome}" exigido por "${args.tarefa?.nome_tarefa}".`,
+        });
+      } else if (q.validade && args.data && q.validade < args.data) {
+        alertas.push({
+          nivel: "erro",
+          codigo: "REQUISITO_VENCIDO",
+          mensagem: `O requisito "${req.nome}" de ${f.nome} venceu em ${q.validade}.`,
+        });
+      }
+    }
   }
 
   // Janela de horário (ex.: refeitório só após o almoço).

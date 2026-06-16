@@ -12,6 +12,7 @@ import type {
   Local,
   ModeloRotinaItem,
   Parametro,
+  QualificacaoFuncionario,
   RegistroHistorico,
   Requisito,
   RotinaPlanejada,
@@ -34,6 +35,7 @@ export interface MapaTabelas {
   execucoes_realizadas: ExecucaoRealizada;
   servicos_eventuais: ServicoEventual;
   tempos_personalizados: TempoPersonalizado;
+  qualificacoes_funcionario: QualificacaoFuncionario;
   parametros: Parametro;
   modelos_rotina: ModeloRotinaItem;
   ausencias: Ausencia;
@@ -202,6 +204,15 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("tarefa_id"),
     col("sede_id"),
     col("tempo_min", "number"),
+    col("observacao"),
+    ...AUDITORIA,
+  ],
+  qualificacoes_funcionario: [
+    col("id"),
+    col("funcionario_id"),
+    col("requisito_id"),
+    col("sede_id"),
+    col("validade"),
     col("observacao"),
     ...AUDITORIA,
   ],
