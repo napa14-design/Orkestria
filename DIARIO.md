@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-16 — Fase A (2/2): folga mínima por sede + relatório mensal
+
+**O que mudou (conclui os itens viáveis da Fase A):**
+- **Folga mínima por sede** (`folga_minima_percentual`): parâmetro que reserva
+  uma fatia da jornada como buffer para imprevistos. Define a **ocupação-alvo**
+  da sede = 100 − folga. No resumo do funcionário e nas barras da equipe
+  aparece um marcador (tick) na barra de ocupação na posição-alvo, mais a
+  legenda "Folga reservada X% · ocupação-alvo ≤ Y%". Puramente informativo
+  (não bloqueia). Seed demo: 10% geral.
+- **Relatório mensal por funcionário** (nova tela `/relatorios`): consolida as
+  execuções do mês (a partir do que foi marcado no Acompanhamento) em folhas
+  imprimíveis, uma por funcionário, com data/tarefa/local/status/tempo real,
+  totais (nº de serviços realizados + tempo) e linhas de assinatura
+  (responsável pela sede / cliente). Filtros de mês e sede; botão Imprimir.
+  Para o cliente assinar — atende o pedido do diretor de "formalizar a saída".
+- Verificado em memória: registradas 2 execuções (conforme + com atraso) →
+  relatório lista as 2 linhas, resumo "2 serviço(s) · 1h45", só aparece quem
+  teve execução; folga: tick em left:90% e legenda ≤ 90%. Build e console OK.
+
+**Arquivos:** `types/Parametro.ts`, `lib/calculations.ts`, `lib/memoryStore.ts`,
+`components/agenda/OccupancySummary.tsx`, `app/(app)/relatorios/page.tsx` (novo),
+`components/AppShell.tsx`.
+
+**Falta na Fase A:** periodicidade fina (tarefas em dias fixos da semana) —
+adiada por exigir decisão de modelagem à parte. Próximo: Fase B (categoria de
+atividade) por `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-12 — Fase A (1/2): janela de horário + "tempo é referência"
 
 **O que mudou (primeiros itens do plano de evolução):**

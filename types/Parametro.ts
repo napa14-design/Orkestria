@@ -26,4 +26,7 @@ export interface ParametrosResolvidos {
   min_execucoes_ajuste: number;
   /** Desvio mediano (%) a partir do qual o sistema sugere ajustar o tempo base. */
   desvio_ajuste_percentual: number;
+  /** % da jornada reservado como folga (buffer p/ imprevistos). Define a
+   *  ocupação-alvo da sede = 100 − folga. 0 = sem reserva. */
+  folga_minima_percentual: number;
 }

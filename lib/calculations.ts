@@ -24,6 +24,7 @@ export const PARAMETROS_PADRAO: ParametrosResolvidos = {
   tolerancia_sobrecarga_min: 0,
   min_execucoes_ajuste: 3,
   desvio_ajuste_percentual: 15,
+  folga_minima_percentual: 0,
 };
 
 /** Mediana de uma lista de números (robusta a execuções atípicas). */

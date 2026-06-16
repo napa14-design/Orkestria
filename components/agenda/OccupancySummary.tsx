@@ -29,9 +29,17 @@ const SELO_CLASSIFICACAO: Record<ClassificacaoOcupacao, string> = {
   sobrecarga: "selo-vermelho",
 };
 
-function BarraOcupacao({ percentual, classe }: { percentual: number; classe: ClassificacaoOcupacao }) {
+function BarraOcupacao({
+  percentual,
+  classe,
+  alvo,
+}: {
+  percentual: number;
+  classe: ClassificacaoOcupacao;
+  alvo?: number; // marca a ocupação-alvo (100 − folga reservada)
+}) {
   return (
-    <div className="barra-trilho">
+    <div className="barra-trilho" style={{ position: "relative" }}>
       <div
         className="barra-preenchimento"
         style={{
@@ -39,6 +47,19 @@ function BarraOcupacao({ percentual, classe }: { percentual: number; classe: Cla
           background: COR_CLASSIFICACAO[classe],
         }}
       />
+      {alvo != null && alvo < 100 && (
+        <div
+          title={`Ocupação-alvo: ${alvo}% (acima disso consome a folga reservada)`}
+          style={{
+            position: "absolute",
+            top: -2,
+            bottom: -2,
+            left: `${alvo}%`,
+            width: 2,
+            background: "var(--tinta)",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -59,6 +80,7 @@ export default function OccupancySummary({
   aoSelecionar: (id: string) => void;
 }) {
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
+  const alvoOcupacao = 100 - (parametros.folga_minima_percentual || 0);
 
   const resumos = useMemo(
     () =>
@@ -102,7 +124,13 @@ export default function OccupancySummary({
             <BarraOcupacao
               percentual={selecionado.resumo.ocupacao_percentual}
               classe={selecionado.resumo.classificacao}
+              alvo={alvoOcupacao}
             />
+            {parametros.folga_minima_percentual > 0 && (
+              <div style={{ fontSize: 11, color: "var(--tinta-3)", marginTop: 4 }}>
+                Folga reservada {parametros.folga_minima_percentual}% · ocupação-alvo ≤ {alvoOcupacao}%
+              </div>
+            )}
 
             <dl style={{ marginTop: 14, display: "grid", gap: 7 }}>
               {[
@@ -169,7 +197,7 @@ export default function OccupancySummary({
                   {resumo.ocupacao_percentual.toFixed(0)}%
                 </span>
               </div>
-              <BarraOcupacao percentual={resumo.ocupacao_percentual} classe={resumo.classificacao} />
+              <BarraOcupacao percentual={resumo.ocupacao_percentual} classe={resumo.classificacao} alvo={alvoOcupacao} />
             </button>
           ))}
         </div>

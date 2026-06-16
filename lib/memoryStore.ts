@@ -84,6 +84,7 @@ function seed(): Banco {
       { id: "p7", chave: "tempo_limpeza_m2_recepcao", valor: "1", tipo: "min_por_m2", descricao: "Tempo padrão por m² para limpeza de recepção", sede_id: "sede_aldeota", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p8", chave: "min_execucoes_ajuste", valor: "3", tipo: "numero", descricao: "Mínimo de execuções com tempo real para sugerir ajuste de tempo padrão", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p9", chave: "desvio_ajuste_percentual", valor: "15", tipo: "percentual", descricao: "Desvio mediano que dispara sugestão de ajuste do tempo base", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
+      { id: "p10", chave: "folga_minima_percentual", valor: "10", tipo: "percentual", descricao: "Folga reservada da jornada (buffer p/ imprevistos) — ocupação-alvo = 100 − este valor", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
     ],
   };
 }
