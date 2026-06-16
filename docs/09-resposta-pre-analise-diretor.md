@@ -44,9 +44,15 @@ Entregamos duas fases completas de evolução:
 - ✅ **Recalibração em cascata** (ajustar um fator propaga para todas as tarefas da categoria).
 - ✅ **Nível/intensidade de limpeza** no cálculo (leve/normal/densa, multiplicador por categoria).
 
-**A seguir (Fase C, em andamento):** o **segundo eixo do produto** — serviços
-eventuais e eventualidades —, que a direção apontou como a contribuição mais
-forte da análise e que destrava a calibração da folga por sede.
+**Fase C — segundo eixo do produto (4 itens):**
+- ✅ **Registro de serviço eventual** (trabalho avulso, registrado a posteriori).
+- ✅ **Registro de imprevisto** (ocorrência que consumiu tempo — não é ociosidade).
+- ✅ **Presença/plantão** como classificação de tarefa (não cobra desvio).
+- ✅ **Buffer calibrado por sede** (sugere a folga a partir dos imprevistos reais).
+
+A Fase C era a contribuição mais forte da análise (o trabalho não-rotineiro) e
+destrava a calibração da folga por sede com dados reais. **A seguir (Fase D):**
+deslocamento, tempo por pessoa e criticidade.
 
 ---
 
@@ -93,10 +99,9 @@ forte da análise e que destrava a calibração da folga por sede.
   tarefas da categoria de uma vez, registrada no histórico.
 - **Flag "tempo é referência"** — ✅ **Entregue** (não gera alerta de desvio,
   não entra no "Top desvios" nem nas sugestões de ajuste).
-- **Atividades de presença / plantão** — 🗺 Planejado (Fase C). Terão
-  classificação própria: (1) não cobram desvio, (2) não contam como ociosidade —
-  é tempo ocupado e necessário — e (3) a duração varia por contexto sem virar
-  "erro de estimativa".
+- **Atividades de presença / plantão** — ✅ **Entregue.** Classificação própria
+  na tarefa (`presença`): não cobra desvio (a duração varia por contexto, não é
+  erro de estimativa). É tempo ocupado e necessário — distinta da ociosidade.
 
 ### Tema 3 — Criticidade e circuito essencial
 
@@ -122,13 +127,13 @@ forte da análise e que destrava a calibração da folga por sede.
 
 ### Tema 5 — Serviços eventuais (segundo eixo do produto)
 
-- **Registro do serviço eventual** — 🛠 **Em andamento (Fase C).** Estamos
-  construindo a porta de entrada do trabalho não planejado: registro a
-  posteriori (início, fim, detalhes), sem partir de uma rotina prévia.
-- **Serviços eventuais como categoria própria (2º eixo)** — 🛠 **Em andamento.**
-  Confirmamos a leitura da direção: o Orkestria passa a ter **dois modos** —
-  rotina planejada (o de hoje) e serviço eventual (registrado depois, com tempo
-  de referência e tratamento próprio na ociosidade).
+- **Registro do serviço eventual** — ✅ **Entregue.** Nova tela "Serviços
+  eventuais" registra o trabalho não planejado a posteriori (início, fim,
+  detalhes), sem partir de uma rotina prévia.
+- **Serviços eventuais como categoria própria (2º eixo)** — ✅ **Entregue.** O
+  Orkestria passa a ter **dois modos**: rotina planejada (o de hoje) e serviço
+  eventual / imprevisto (registrado depois). Os imprevistos têm tratamento
+  próprio e alimentam a calibração da folga.
 
 ### Tema 6 — Ociosidade como buffer calibrado por sede
 
@@ -136,10 +141,10 @@ forte da análise e que destrava a calibração da folga por sede.
   ocupação deixou de ser faixa única: cada sede reserva uma **folga mínima**
   (buffer), e a ocupação-alvo passa a ser 100 − folga.
 - **Parâmetros por sede** — ✅ confirmado, já existia.
-- **Registrar eventualidades para calibrar a folga** — 🛠 **Em andamento (Fase
-  C).** É o que fecha o ciclo: capturando os imprevistos (frequência e volume por
-  sede), passamos a **derivar** quanto buffer cada sede realmente precisa — em vez
-  de um número arbitrado.
+- **Registrar eventualidades para calibrar a folga** — ✅ **Entregue.** Os
+  imprevistos registrados alimentam um painel no dashboard que **deriva** a folga
+  sugerida de cada sede (imprevistos médios por dia ÷ capacidade da sede) — em vez
+  de um número arbitrado. Fecha o ciclo com o Tema 5.
 
 ### Tema 7 — Conformidade e aptidão das pessoas
 
@@ -226,7 +231,7 @@ Para cada decisão que a direção listou como "ainda preciso definir":
 |---|---|---|
 | A | Ganhos rápidos | ✅ concluída (5/5) |
 | B | Categoria + intensidade no cálculo | ✅ concluída (3/4; 1 item é decisão de modelagem) |
-| C | **Serviços eventuais + eventualidades + buffer calibrado** | 🛠 em andamento |
+| C | **Serviços eventuais + eventualidades + buffer calibrado** | ✅ concluída (4/4) |
 | D | Deslocamento, tempo por pessoa, criticidade | 🗺 planejado |
 | E | Conformidade (aptidão, EPI, treinamento) | 🗺 planejado |
 | F | App/QR, remanejo entre sedes, score, premiação | 🗺 planejado |
