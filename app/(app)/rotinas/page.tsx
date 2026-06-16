@@ -329,6 +329,7 @@ export default function PaginaRotinas() {
     };
     setSelecionado(funcionarioId);
     try {
+      let real: RotinaPlanejada | null = null;
       await mutateRotinas(
         async (cur) => {
           const res = await apiPost<RespostaRotina>("/api/rotinas", {
@@ -339,13 +340,20 @@ export default function PaginaRotinas() {
             forcar,
           });
           setAlertas(res.alertas ?? []);
+          real = res.rotina;
           return [...(cur ?? []).filter((r) => r.id !== otimista.id), res.rotina];
         },
         {
           optimisticData: (cur) => [...(cur ?? []), otimista],
+          // Mescla no cache MAIS RECENTE: troca o card provisório pelo real sem
+          // descartar outros adicionados ao mesmo tempo ("somem ao colocar rápido").
+          populateCache: (_res, atual) => {
+            const rr = real;
+            const base = (atual ?? []).filter((r) => r.id !== otimista.id && (!rr || r.id !== rr.id));
+            return rr ? [...base, rr] : base;
+          },
           rollbackOnError: true,
           revalidate: false,
-          populateCache: true,
         },
       );
     } catch (err) {
@@ -379,6 +387,7 @@ export default function PaginaRotinas() {
     const otimista = { ...rotina, funcionario_id: funcionarioId, inicio_planejado: inicio, fim_planejado: fim };
     setSelecionado(funcionarioId);
     try {
+      let real: RotinaPlanejada | null = null;
       await mutateRotinas(
         async (cur) => {
           const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
@@ -387,13 +396,18 @@ export default function PaginaRotinas() {
             forcar,
           });
           setAlertas(res.alertas ?? []);
+          real = res.rotina;
           return (cur ?? []).map((r) => (r.id === rotinaId ? res.rotina : r));
         },
         {
           optimisticData: (cur) => (cur ?? []).map((r) => (r.id === rotinaId ? otimista : r)),
+          // Aplica sobre o cache MAIS RECENTE — não desfaz outros movimentos simultâneos.
+          populateCache: (_res, atual) => {
+            const rr = real;
+            return (atual ?? []).map((r) => (r.id === rotinaId && rr ? rr : r));
+          },
           rollbackOnError: true,
           revalidate: false,
-          populateCache: true,
         },
       );
     } catch (err) {
@@ -404,14 +418,16 @@ export default function PaginaRotinas() {
   /** Redimensionamento pela alça do card; conflitos podem ser autorizados. */
   async function redimensionar(rotinaId: string, novoTempoMin: number) {
     const visual = tempoVisualMin(novoTempoMin, blocoMin);
-    const aplicar = (forcar: boolean) =>
-      mutateRotinas(
+    const aplicar = (forcar: boolean) => {
+      let real: RotinaPlanejada | null = null;
+      return mutateRotinas(
         async (cur) => {
           const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
             tempo_previsto_min: novoTempoMin,
             forcar,
           });
           setAlertas(res.alertas ?? []);
+          real = res.rotina;
           return (cur ?? []).map((r) => (r.id === rotinaId ? res.rotina : r));
         },
         {
@@ -427,11 +443,16 @@ export default function PaginaRotinas() {
                   }
                 : r,
             ),
+          // Aplica sobre o cache MAIS RECENTE — preserva outras edições simultâneas.
+          populateCache: (_res, atual) => {
+            const rr = real;
+            return (atual ?? []).map((r) => (r.id === rotinaId && rr ? rr : r));
+          },
           rollbackOnError: true,
           revalidate: false,
-          populateCache: true,
         },
       );
+    };
     try {
       await aplicar(false);
     } catch (err) {
