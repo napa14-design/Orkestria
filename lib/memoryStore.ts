@@ -79,6 +79,11 @@ function seed(): Banco {
       { id: "r3", data: hoje, funcionario_id: "f2", sede_id: "sede_aldeota", tarefa_id: "t4", local_id: "l4", inicio_planejado: "07:00", fim_planejado: "07:30", tempo_previsto_min: 30, tempo_visual_min: 30, blocos_ocupados: 1, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
     ],
     execucoes_realizadas: [],
+    servicos_eventuais: [
+      { id: "e1", sede_id: "sede_aldeota", funcionario_id: "f2", local_id: "l6", categoria_id: "c6", data: hoje, tipo: "eventual", descricao: "Apoio na montagem de evento no auditório", inicio: "14:00", fim: "15:30", tempo_min: 90, observacao: "Demanda pontual da diretoria", supervisor_id: "u2", ...aud },
+      { id: "e2", sede_id: "sede_aldeota", funcionario_id: "f1", local_id: "l2", categoria_id: "c2", data: hoje, tipo: "imprevisto", descricao: "Vazamento no banheiro — contenção e limpeza extra", inicio: "", fim: "", tempo_min: 45, observacao: "", supervisor_id: "u2", ...aud },
+      { id: "e3", sede_id: "sede_dt", funcionario_id: "f4", local_id: "", categoria_id: "", data: hoje, tipo: "imprevisto", descricao: "Queda de energia — reorganização da rotina", inicio: "", fim: "", tempo_min: 30, observacao: "", supervisor_id: "u2", ...aud },
+    ],
     modelos_rotina: [],
     historico: [],
     ausencias: [

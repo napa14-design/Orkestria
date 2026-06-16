@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-16 — Fase C (1/2): serviços eventuais e imprevistos (2º eixo)
+
+**O que mudou (a porta de entrada do trabalho não-rotineiro):**
+- **Nova entidade `servicos_eventuais`** (separada de `execucoes_realizadas`,
+  que sempre parte de uma rotina): registro a posteriori de trabalho fora da
+  rotina, com `tipo` distinguindo **eventual** (trabalho avulso produtivo) de
+  **imprevisto** (ocorrência que consumiu tempo). Campos: sede, funcionário
+  (opcional), local/categoria (opcionais), data, descrição, início/fim, tempo
+  em minutos, observação, supervisor.
+- **Tela /eventuais** (supervisor+admin): CRUD via CrudManager, selos
+  Eventual/Imprevisto, tempo formatado. Link no menu após Acompanhamento.
+- **Service + rotas** (`/api/servicos-eventuais`): GET por intervalo de data
+  (campo único) + filtro de sede em memória; POST/PUT/DELETE com permissão de
+  sede (supervisor só na própria sede). Escritas logadas no histórico.
+- Seed demo: 3 registros (1 eventual + 2 imprevistos em Aldeota/DT).
+- Verificado em memória: seed 3 → cria → 4; filtro por sede DT retorna só o da
+  DT; supervisor Aldeota recebe 403 ao registrar em outra sede e 201 na própria;
+  tela lista os 5 com selos; form completo. Build e console limpos.
+
+**Decisão de modelagem:** eventuais e imprevistos compartilham uma tabela
+(distintos por `tipo`), separados das execuções de rotina — o "2º modo" do
+produto. Isso prepara o **buffer calibrado por sede** (próximo incremento), que
+deriva a folga a partir do volume de imprevistos por sede.
+
+**Falta na Fase C (2/2):** presença/plantão como classificação de tarefa (não
+cobra desvio, não é ociosidade) + buffer calibrado por sede a partir dos
+imprevistos registrados.
+
+**Arquivos:** `types/comum.ts`, `types/ServicoEventual.ts` (novo), `types/index.ts`,
+`lib/schema.ts`, `services/servicosEventuaisService.ts` (novo),
+`app/api/servicos-eventuais/{route,[id]/route}.ts` (novos),
+`app/(app)/eventuais/page.tsx` (novo), `components/AppShell.tsx`, `lib/memoryStore.ts`.
+
+---
+
 ## 2026-06-16 — Fase B (2/2): intensidade de limpeza no cálculo — Fase B (quase) concluída
 
 **O que mudou (incremento que toca a fórmula de tempo):**

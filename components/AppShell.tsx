@@ -7,6 +7,7 @@ import type { SessaoUsuario } from "@/lib/permissions";
 const ITENS: Array<{ href: string; rotulo: string; apenasAdmin?: boolean }> = [
   { href: "/rotinas", rotulo: "Rotina do dia" },
   { href: "/acompanhamento", rotulo: "Acompanhamento" },
+  { href: "/eventuais", rotulo: "Eventuais" },
   { href: "/dashboard", rotulo: "Dashboard" },
   { href: "/relatorios", rotulo: "Relatórios" },
   { href: "/funcionarios", rotulo: "Funcionários" },

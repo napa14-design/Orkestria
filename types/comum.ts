@@ -34,6 +34,13 @@ export type Prioridade = "alta" | "media" | "baixa";
 /** Restrição de gênero de uma tarefa. "" = sem restrição. */
 export type RestricaoGenero = "" | "feminino" | "masculino";
 
+/**
+ * Natureza de um registro avulso (fora da rotina planejada):
+ *  - "eventual"   → trabalho não planejado que surgiu e foi executado;
+ *  - "imprevisto" → ocorrência/imprevisto que consumiu tempo (não é ociosidade).
+ */
+export type TipoEventual = "eventual" | "imprevisto";
+
 export type StatusRotina =
   | "planejada"
   | "realizada"

@@ -15,6 +15,7 @@ import type {
   RegistroHistorico,
   RotinaPlanejada,
   Sede,
+  ServicoEventual,
   Tarefa,
   Usuario,
 } from "@/types";
@@ -28,6 +29,7 @@ export interface MapaTabelas {
   tarefas: Tarefa;
   rotinas_planejadas: RotinaPlanejada;
   execucoes_realizadas: ExecucaoRealizada;
+  servicos_eventuais: ServicoEventual;
   parametros: Parametro;
   modelos_rotina: ModeloRotinaItem;
   ausencias: Ausencia;
@@ -162,6 +164,22 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("supervisor_id"),
     col("criado_em"),
     col("atualizado_em"),
+  ],
+  servicos_eventuais: [
+    col("id"),
+    col("sede_id"),
+    col("funcionario_id"),
+    col("local_id"),
+    col("categoria_id"),
+    col("data"),
+    col("tipo"),
+    col("descricao"),
+    col("inicio"),
+    col("fim"),
+    col("tempo_min", "number"),
+    col("observacao"),
+    col("supervisor_id"),
+    ...AUDITORIA,
   ],
   parametros: [
     col("id"),
