@@ -14,7 +14,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "Informe e-mail e senha." }, { status: 400 });
   }
 
-  const usuario = await getUsuarioPorEmail(email);
+  let usuario;
+  try {
+    usuario = await getUsuarioPorEmail(email);
+  } catch (e) {
+    console.error("Login: falha ao consultar o cadastro de usuários:", e);
+    return NextResponse.json(
+      {
+        erro: "Não foi possível acessar o cadastro de usuários agora (falha de conexão com o banco). Tente de novo em instantes; se continuar, avise o administrador.",
+      },
+      { status: 503 },
+    );
+  }
+
   const senhaCorreta = usuario
     ? usuario.senha_hash
       ? verificarSenha(senha, usuario.senha_hash)

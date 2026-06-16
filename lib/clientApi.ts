@@ -13,7 +13,13 @@ export class ErroApi extends Error {
 }
 
 async function tratar<T>(res: Response): Promise<T> {
-  if (res.status === 401 && typeof window !== "undefined") {
+  // Sessão expirada → volta ao login. Mas na própria tela de login, um 401
+  // (senha incorreta) deve mostrar a mensagem, não recarregar a página.
+  if (
+    res.status === 401 &&
+    typeof window !== "undefined" &&
+    window.location.pathname !== "/login"
+  ) {
     window.location.href = "/login";
   }
   const corpo = await res.json().catch(() => ({}));
