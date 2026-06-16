@@ -6,6 +6,7 @@
  * vencidas em relação ao último planejamento.
  */
 import { useMemo, useState } from "react";
+import { diaDaSemana, DIAS_SEMANA, parseDiasSemana } from "@/lib/dateUtils";
 import type { Local, RotinaPlanejada, Tarefa } from "@/types";
 
 const JANELA_DIAS: Record<string, number> = {
@@ -32,8 +33,9 @@ export default function PendenciasPanel({
 
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
-  const { diariasFaltando, periodicasVencidas } = useMemo(() => {
+  const { diariasFaltando, devidasHoje, periodicasVencidas } = useMemo(() => {
     const alocadasHoje = new Set(rotinasDoDia.map((r) => r.tarefa_id));
+    const dowHoje = diaDaSemana(data);
     const ultimaData = new Map<string, string>();
     for (const r of historico) {
       if (r.status === "cancelada") continue;
@@ -42,11 +44,16 @@ export default function PendenciasPanel({
     }
 
     const diarias: Tarefa[] = [];
+    const doDia: Tarefa[] = [];
     const periodicas: Array<{ tarefa: Tarefa; ultima: string | null }> = [];
     for (const t of tarefas) {
       if (!t.ativo || alocadasHoje.has(t.id)) continue;
+      const dias = t.frequencia === "semanal" ? parseDiasSemana(t.dias_semana) : [];
       if (t.frequencia === "diaria") {
         diarias.push(t);
+      } else if (dias.length) {
+        // periodicidade fina: devida exatamente nos dias da semana marcados
+        if (dias.includes(dowHoje)) doDia.push(t);
       } else if (t.frequencia in JANELA_DIAS) {
         const ultima = ultimaData.get(t.id) ?? null;
         const limite = JANELA_DIAS[t.frequencia];
@@ -60,10 +67,10 @@ export default function PendenciasPanel({
         if (diasDesde >= limite) periodicas.push({ tarefa: t, ultima });
       }
     }
-    return { diariasFaltando: diarias, periodicasVencidas: periodicas };
+    return { diariasFaltando: diarias, devidasHoje: doDia, periodicasVencidas: periodicas };
   }, [tarefas, rotinasDoDia, historico, data]);
 
-  const total = diariasFaltando.length + periodicasVencidas.length;
+  const total = diariasFaltando.length + devidasHoje.length + periodicasVencidas.length;
   if (total === 0) {
     return (
       <div
@@ -102,9 +109,13 @@ export default function PendenciasPanel({
       >
         <span style={{ flex: 1 }}>
           ⚠ <strong>Ficou de fora hoje:</strong>{" "}
-          {diariasFaltando.length > 0 && `${diariasFaltando.length} tarefa(s) diária(s) sem alocação`}
-          {diariasFaltando.length > 0 && periodicasVencidas.length > 0 && " · "}
-          {periodicasVencidas.length > 0 && `${periodicasVencidas.length} periódica(s) vencida(s)`}
+          {[
+            diariasFaltando.length > 0 && `${diariasFaltando.length} diária(s) sem alocação`,
+            devidasHoje.length > 0 && `${devidasHoje.length} do dia (dia fixo)`,
+            periodicasVencidas.length > 0 && `${periodicasVencidas.length} periódica(s) vencida(s)`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
         <span className="rotulo">{aberto ? "▲ fechar" : "▼ detalhar"}</span>
       </button>
@@ -115,6 +126,17 @@ export default function PendenciasPanel({
               <span className="selo selo-laranja" style={{ marginRight: 8 }}>diária</span>
               <strong>{t.nome_tarefa}</strong>{" "}
               <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(t)}</span>
+            </div>
+          ))}
+          {devidasHoje.map((t) => (
+            <div key={t.id}>
+              <span className="selo selo-azul" style={{ marginRight: 8 }}>
+                {DIAS_SEMANA[diaDaSemana(data)]}
+              </span>
+              <strong>{t.nome_tarefa}</strong>{" "}
+              <span style={{ color: "var(--tinta-3)" }}>
+                — {rotuloLocal(t)} · dia fixo da semana
+              </span>
             </div>
           ))}
           {periodicasVencidas.map(({ tarefa, ultima }) => (

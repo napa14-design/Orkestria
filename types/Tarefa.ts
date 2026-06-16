@@ -41,6 +41,13 @@ export interface Tarefa extends Auditoria {
   /** Janela em que a tarefa pode ocorrer (ex.: refeitório só após o almoço). */
   janela_inicio?: string; // HH:mm — vazio = qualquer horário do expediente
   janela_fim?: string; // HH:mm
+  /**
+   * Periodicidade fina: dias da semana fixos em que a tarefa é devida, como
+   * CSV de índices "0".."6" (0=domingo … 6=sábado). Ex.: "2,4" = toda terça e
+   * quinta. Só faz sentido para frequência "semanal"; vazio/ausente mantém a
+   * cobertura por janela deslizante (a cada 7 dias).
+   */
+  dias_semana?: string;
   ativo: boolean;
   observacoes: string;
 }

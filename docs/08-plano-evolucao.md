@@ -43,7 +43,7 @@ fases estruturais são decididas.
 | **Flag "tempo é referência"** | tarefa marcada não gera alerta de desvio (ex.: montagem de palco) | `Tarefa` (campo) · `execucoesService`/cálculo de desvio · selo na UI | P |
 | **Janela de horário por tarefa** | tarefa só pode cair entre X e Y (ex.: refeitório após o almoço) | `Tarefa` (h_inicio/h_fim) · `validations.validarAlocacao` | P |
 | **Folga mínima por sede** | reservar % da jornada como buffer; faixa de ocupação calibrada por sede | `parametros` (já por sede) + leitura no dashboard/resumo | P |
-| **Periodicidade fina** | refinar diário/semanal/quinzenal/mensal e o vencimento das periódicas | `PendenciasPanel` + regra de vencimento (já existe base) | P–M |
+| **Periodicidade fina** ✅ | tarefa semanal em dias fixos da semana (ex.: terça e quinta); cobrança exata nesses dias | `Tarefa.dias_semana` · `PendenciasPanel` (grupo "do dia") | P–M |
 | **Relatório mensal por funcionário** | saída formatada (PDF) para o cliente assinar | novo gerador (temos os dados em acompanhamento/dashboard) | M |
 
 ## Fase B — Fundação #1: Categoria de atividade

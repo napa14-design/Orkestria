@@ -4,7 +4,7 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
-import { formatarDuracao } from "@/lib/dateUtils";
+import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
 import type { Local, Sede, Tarefa } from "@/types";
 
 const REGRAS = [
@@ -109,6 +109,15 @@ export default function PaginaTarefas() {
           dica: "Com que regularidade a tarefa deveria ser feita. Ajuda o painel \"Ficou de fora hoje\" a avisar quando uma tarefa diária não foi alocada ou uma semanal/mensal está vencida. Não cria a tarefa sozinho — é o supervisor que monta a agenda.",
         },
         {
+          key: "dias_semana",
+          rotulo: "Dias da semana",
+          tipo: "dias_semana",
+          inteira: true,
+          mostrarSe: (f) => f.frequencia === "semanal",
+          ajuda: "Opcional — deixe sem marcar para \"1× por semana\" (janela de 7 dias).",
+          dica: "Periodicidade fina: marque os dias fixos em que a tarefa deve ser feita (ex.: terça e quinta). O painel \"Ficou de fora hoje\" passa a cobrar a tarefa exatamente nesses dias, em vez de uma vez a cada 7 dias. Marcar 2 dias equivale a \"2× por semana\". Vale só para frequência Semanal.",
+        },
+        {
           key: "prioridade",
           rotulo: "Prioridade",
           tipo: "select",
@@ -199,10 +208,16 @@ export default function PaginaTarefas() {
                   {t.janela_inicio}–{t.janela_fim}
                 </span>
               )}
-              {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
-              {!t.restricao_genero && !t.tempo_referencia && !(t.janela_inicio && t.janela_fim) && (
-                <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
+              {t.frequencia === "semanal" && t.dias_semana && (
+                <span className="selo selo-azul">{rotularDiasSemana(t.dias_semana)}</span>
               )}
+              {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
+              {!t.restricao_genero &&
+                !t.tempo_referencia &&
+                !(t.janela_inicio && t.janela_fim) &&
+                !(t.frequencia === "semanal" && t.dias_semana) && (
+                  <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
+                )}
             </span>
           ),
         },

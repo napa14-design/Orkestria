@@ -48,6 +48,46 @@ export function formatarDataBR(iso: string): string {
   return `${d}/${m}/${a}`;
 }
 
+/** Nomes dos dias da semana indexados por getDay() (0=domingo … 6=sábado). */
+export const DIAS_SEMANA = [
+  "domingo",
+  "segunda",
+  "terça",
+  "quarta",
+  "quinta",
+  "sexta",
+  "sábado",
+] as const;
+
+/** Abreviações de 1 letra para seletores compactos (D S T Q Q S S). */
+export const DIAS_SEMANA_CURTO = ["D", "S", "T", "Q", "Q", "S", "S"] as const;
+
+/** Dia da semana de uma data YYYY-MM-DD (0=domingo … 6=sábado). */
+export function diaDaSemana(iso: string): number {
+  return new Date(`${iso}T12:00:00`).getDay();
+}
+
+/** "2,4" → [2, 4]. Vazio/ausente → []. Ignora valores fora de 0–6. */
+export function parseDiasSemana(csv: string | undefined | null): number[] {
+  if (!csv) return [];
+  return csv
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+}
+
+/** [4, 2] → "2,4" (ordenado, sem duplicatas). */
+export function serializarDiasSemana(dias: number[]): string {
+  return [...new Set(dias)].filter((n) => n >= 0 && n <= 6).sort((a, b) => a - b).join(",");
+}
+
+/** "2,4" → "ter, qui" (rótulo curto legível). */
+export function rotularDiasSemana(csv: string | undefined | null): string {
+  return parseDiasSemana(csv)
+    .map((d) => DIAS_SEMANA[d].slice(0, 3))
+    .join(", ");
+}
+
 /** Dois intervalos [aIni, aFim) e [bIni, bFim) em minutos se sobrepõem? */
 export function intervalosSobrepoem(
   aIni: number,

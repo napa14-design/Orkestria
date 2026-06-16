@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-06-16 — Fase A: periodicidade fina (dias fixos da semana) — Fase A concluída
+
+**O que mudou (último item da Fase A):**
+- **Periodicidade fina** (`Tarefa.dias_semana`, CSV "0".."6", 0=dom): uma tarefa
+  **semanal** pode fixar os dias da semana em que é devida (ex.: "2,4" = terça e
+  quinta; marcar 2 dias = "2× por semana"). Vazio mantém o comportamento antigo
+  (janela deslizante de 7 dias). Advisory — não bloqueia a agenda.
+- **Painel "Ficou de fora hoje"** ganhou um terceiro grupo: **"do dia (dia
+  fixo)"** — tarefas semanais cujo dia da semana de hoje está marcado e que não
+  foram alocadas. Aparece com selo do dia (ex.: "terça"). As semanais sem dias
+  fixos continuam na regra de vencimento por janela.
+- **Tela de Tarefas**: novo seletor de dias (linha de toggles D-S-T-Q-Q-S-S),
+  que só aparece quando a frequência é "Semanal" (campo condicional via
+  `mostrarSe` no `CrudManager`). Selo "ter, qui" na coluna "Regras".
+- Helpers de data em `lib/dateUtils.ts` (`DIAS_SEMANA`, `parseDiasSemana`,
+  `serializarDiasSemana`, `rotularDiasSemana`, `diaDaSemana`).
+- Seed demo: t12 "Limpeza de vidros" semanal terça/quinta (Aldeota).
+- Verificado em memória: na terça o painel mostra "1 do dia (dia fixo)" com selo
+  "terça"; na quarta a tarefa não é cobrada (contraprova); seletor traz terça+
+  quinta marcados e some ao trocar para Diária. Build e console OK.
+
+**Decisão de modelagem:** `dias_semana` ficou como **string CSV** (não array)
+para espelhar colunas escalares do Sheets/Firestore (regra do schema) e evitar
+serialização de array; a UI/lógica usa `parse/serializarDiasSemana`. Escopo
+fino e advisory de propósito — não vira bloqueio de alocação.
+
+**Arquivos:** `types/Tarefa.ts`, `lib/schema.ts`, `lib/dateUtils.ts`,
+`components/CrudManager.tsx`, `app/(app)/tarefas/page.tsx`,
+`components/agenda/PendenciasPanel.tsx`, `lib/memoryStore.ts`,
+`docs/08-plano-evolucao.md`.
+
+**Fase A concluída** (5/5). Próximo: Fase B (categoria de atividade), a primeira
+fundação estrutural do plano.
+
+---
+
 ## 2026-06-16 — Fase A (2/2): folga mínima por sede + relatório mensal
 
 **O que mudou (conclui os itens viáveis da Fase A):**

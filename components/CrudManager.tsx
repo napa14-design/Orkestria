@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
+import { DIAS_SEMANA, DIAS_SEMANA_CURTO, parseDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import Carregando from "./Carregando";
 import Modal from "./Modal";
 
@@ -20,7 +21,15 @@ export interface OpcaoCampo {
 export interface CampoForm {
   key: string;
   rotulo: string;
-  tipo: "texto" | "numero" | "hora" | "data" | "select" | "checkbox" | "textarea";
+  tipo:
+    | "texto"
+    | "numero"
+    | "hora"
+    | "data"
+    | "select"
+    | "checkbox"
+    | "textarea"
+    | "dias_semana";
   opcoes?: OpcaoCampo[];
   obrigatorio?: boolean;
   padrao?: unknown;
@@ -29,6 +38,8 @@ export interface CampoForm {
   ajuda?: string; // dica curta exibida abaixo do campo
   /** Explicação completa, mostrada ao clicar no (?) ao lado do rótulo. */
   dica?: string;
+  /** Exibe o campo só quando a condição (sobre o estado atual do form) for verdadeira. */
+  mostrarSe?: (form: Record<string, unknown>) => boolean;
 }
 
 export interface ColunaTabela<T> {
@@ -236,7 +247,8 @@ export default function CrudManager<T extends Registro>({
         aoFechar={() => setAberto(false)}
       >
         <form onSubmit={salvar} className="form-grade">
-          {campos.map((c) => (
+          {campos.map((c) =>
+            c.mostrarSe && !c.mostrarSe(form) ? null : (
             <label
               key={c.key}
               className="campo"
@@ -305,6 +317,42 @@ export default function CrudManager<T extends Registro>({
                   value={String(form[c.key] ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
                 />
+              ) : c.tipo === "dias_semana" ? (
+                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
+                  {DIAS_SEMANA_CURTO.map((letra, idx) => {
+                    const sel = parseDiasSemana(String(form[c.key] ?? ""));
+                    const ativo = sel.includes(idx);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        title={DIAS_SEMANA[idx]}
+                        aria-pressed={ativo}
+                        onClick={() =>
+                          setForm((f) => {
+                            const atuais = parseDiasSemana(String(f[c.key] ?? ""));
+                            const proximos = ativo
+                              ? atuais.filter((d) => d !== idx)
+                              : [...atuais, idx];
+                            return { ...f, [c.key]: serializarDiasSemana(proximos) };
+                          })
+                        }
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 4,
+                          border: "1.5px solid var(--tinta)",
+                          background: ativo ? "var(--acento)" : "var(--cartao)",
+                          color: ativo ? "var(--marfim, #fff)" : "var(--tinta-2)",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {letra}
+                      </button>
+                    );
+                  })}
+                </span>
               ) : (
                 <input
                   type={

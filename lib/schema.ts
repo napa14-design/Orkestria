@@ -114,6 +114,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("tempo_referencia", "boolean"),
     col("janela_inicio"),
     col("janela_fim"),
+    col("dias_semana"),
     col("ativo", "boolean"),
     col("observacoes"),
     ...AUDITORIA,
