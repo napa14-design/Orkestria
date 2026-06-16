@@ -33,7 +33,7 @@ export default function PendenciasPanel({
 
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
-  const { diariasFaltando, devidasHoje, periodicasVencidas } = useMemo(() => {
+  const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas } = useMemo(() => {
     const alocadasHoje = new Set(rotinasDoDia.map((r) => r.tarefa_id));
     const dowHoje = diaDaSemana(data);
     const ultimaData = new Map<string, string>();
@@ -43,19 +43,23 @@ export default function PendenciasPanel({
       if (!atual || r.data > atual) ultimaData.set(r.tarefa_id, r.data);
     }
 
+    const criticas: Array<{ tarefa: Tarefa; motivo: string }> = [];
     const diarias: Tarefa[] = [];
     const doDia: Tarefa[] = [];
     const periodicas: Array<{ tarefa: Tarefa; ultima: string | null }> = [];
     for (const t of tarefas) {
       if (!t.ativo || alocadasHoje.has(t.id)) continue;
       const dias = t.frequencia === "semanal" ? parseDiasSemana(t.dias_semana) : [];
+
+      // decide se a tarefa é esperada hoje e por qual regra
+      let regra: "diaria" | "doDia" | "periodica" | null = null;
+      let ultima: string | null = null;
       if (t.frequencia === "diaria") {
-        diarias.push(t);
+        regra = "diaria";
       } else if (dias.length) {
-        // periodicidade fina: devida exatamente nos dias da semana marcados
-        if (dias.includes(dowHoje)) doDia.push(t);
+        if (dias.includes(dowHoje)) regra = "doDia";
       } else if (t.frequencia in JANELA_DIAS) {
-        const ultima = ultimaData.get(t.id) ?? null;
+        ultima = ultimaData.get(t.id) ?? null;
         const limite = JANELA_DIAS[t.frequencia];
         const diasDesde = ultima
           ? Math.floor(
@@ -64,13 +68,34 @@ export default function PendenciasPanel({
                 86_400_000,
             )
           : Infinity;
-        if (diasDesde >= limite) periodicas.push({ tarefa: t, ultima });
+        if (diasDesde >= limite) regra = "periodica";
       }
+      if (!regra) continue;
+
+      // tarefas críticas saem dos baldes normais e vão para o circuito essencial
+      if (t.critica) {
+        const motivo =
+          regra === "diaria" ? "diária" : regra === "doDia" ? "dia fixo" : t.frequencia;
+        criticas.push({ tarefa: t, motivo });
+        continue;
+      }
+      if (regra === "diaria") diarias.push(t);
+      else if (regra === "doDia") doDia.push(t);
+      else periodicas.push({ tarefa: t, ultima });
     }
-    return { diariasFaltando: diarias, devidasHoje: doDia, periodicasVencidas: periodicas };
+    return {
+      criticasSemCobertura: criticas,
+      diariasFaltando: diarias,
+      devidasHoje: doDia,
+      periodicasVencidas: periodicas,
+    };
   }, [tarefas, rotinasDoDia, historico, data]);
 
-  const total = diariasFaltando.length + devidasHoje.length + periodicasVencidas.length;
+  const total =
+    criticasSemCobertura.length +
+    diariasFaltando.length +
+    devidasHoje.length +
+    periodicasVencidas.length;
   if (total === 0) {
     return (
       <div
@@ -88,10 +113,12 @@ export default function PendenciasPanel({
     return l ? `${l.nome_local} · ${l.andar}` : "";
   };
 
+  const temCritica = criticasSemCobertura.length > 0;
+
   return (
     <div
       className="painel entra"
-      style={{ marginBottom: 14, borderLeft: "6px solid var(--laranja)" }}
+      style={{ marginBottom: 14, borderLeft: `6px solid ${temCritica ? "var(--vermelho)" : "var(--laranja)"}` }}
     >
       <button
         onClick={() => setAberto(!aberto)}
@@ -108,8 +135,10 @@ export default function PendenciasPanel({
         }}
       >
         <span style={{ flex: 1 }}>
-          ⚠ <strong>Ficou de fora hoje:</strong>{" "}
+          {temCritica ? "⛔ " : "⚠ "}
+          <strong>{temCritica ? "Circuito essencial descoberto:" : "Ficou de fora hoje:"}</strong>{" "}
           {[
+            temCritica && `${criticasSemCobertura.length} crítica(s)`,
             diariasFaltando.length > 0 && `${diariasFaltando.length} diária(s) sem alocação`,
             devidasHoje.length > 0 && `${devidasHoje.length} do dia (dia fixo)`,
             periodicasVencidas.length > 0 && `${periodicasVencidas.length} periódica(s) vencida(s)`,
@@ -121,6 +150,30 @@ export default function PendenciasPanel({
       </button>
       {aberto && (
         <div style={{ padding: "0 14px 12px", display: "grid", gap: 4, fontSize: 13 }}>
+          {temCritica && (
+            <div
+              style={{
+                marginBottom: 4,
+                padding: "6px 8px",
+                background: "var(--papel-2)",
+                borderLeft: "4px solid var(--vermelho)",
+                borderRadius: 3,
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              <span className="rotulo" style={{ color: "var(--vermelho)" }}>
+                ⛔ Circuito essencial — cobrir com prioridade
+              </span>
+              {criticasSemCobertura.map(({ tarefa, motivo }) => (
+                <div key={tarefa.id}>
+                  <span className="selo selo-vermelho" style={{ marginRight: 8 }}>{motivo}</span>
+                  <strong>{tarefa.nome_tarefa}</strong>{" "}
+                  <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(tarefa)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {diariasFaltando.map((t) => (
             <div key={t.id}>
               <span className="selo selo-laranja" style={{ marginRight: 8 }}>diária</span>

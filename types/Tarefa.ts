@@ -50,6 +50,13 @@ export interface Tarefa extends Auditoria {
    * desvio; a diferença é semântica (permanência ≠ estimativa que variou).
    */
   presenca?: boolean;
+  /**
+   * Atividade do "circuito essencial": não pode deixar de ser feita. Quando
+   * não coberta no dia, recebe destaque máximo no painel de pendências.
+   * É diferente de `prioridade` (que só ordena) — criticidade é cobertura
+   * obrigatória.
+   */
+  critica?: boolean;
   /** Janela em que a tarefa pode ocorrer (ex.: refeitório só após o almoço). */
   janela_inicio?: string; // HH:mm — vazio = qualquer horário do expediente
   janela_fim?: string; // HH:mm

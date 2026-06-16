@@ -172,6 +172,13 @@ export default function PaginaTarefas() {
           padrao: false,
           dica: "Marque para atividades de permanência (ex.: acompanhar alunos no intervalo, plantão). É tempo ocupado e necessário: o sistema NÃO cobra desvio (a duração varia por contexto, não é erro de estimativa). Diferente de \"tempo é referência\" só no sentido — aqui é tempo de permanência, não de produção.",
         },
+        {
+          key: "critica",
+          rotulo: "Crítica (circuito essencial)",
+          tipo: "checkbox",
+          padrao: false,
+          dica: "Marque tarefas que NÃO podem deixar de ser feitas (ex.: higienização de banheiro). Quando uma crítica fica sem alocação no dia, o painel \"Ficou de fora hoje\" mostra um alerta de “Circuito essencial descoberto” em destaque máximo (vermelho), separado das demais pendências. Diferente de prioridade, que só ordena.",
+        },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -248,9 +255,11 @@ export default function PaginaTarefas() {
               )}
               {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
               {t.presenca && <span className="selo selo-azul">presença</span>}
+              {t.critica && <span className="selo selo-vermelho">⛔ crítica</span>}
               {!t.restricao_genero &&
                 !t.tempo_referencia &&
                 !t.presenca &&
+                !t.critica &&
                 !(t.janela_inicio && t.janela_fim) &&
                 !(t.frequencia === "semanal" && t.dias_semana) && (
                   <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
