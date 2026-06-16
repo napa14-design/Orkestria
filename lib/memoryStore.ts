@@ -85,6 +85,10 @@ function seed(): Banco {
       { id: "e2", sede_id: "sede_aldeota", funcionario_id: "f1", local_id: "l2", categoria_id: "c2", data: hoje, tipo: "imprevisto", descricao: "Vazamento no banheiro — contenção e limpeza extra", inicio: "", fim: "", tempo_min: 45, observacao: "", supervisor_id: "u2", ...aud },
       { id: "e3", sede_id: "sede_dt", funcionario_id: "f4", local_id: "", categoria_id: "", data: hoje, tipo: "imprevisto", descricao: "Queda de energia — reorganização da rotina", inicio: "", fim: "", tempo_min: 30, observacao: "", supervisor_id: "u2", ...aud },
     ],
+    tempos_personalizados: [
+      { id: "tp1", funcionario_id: "f1", tarefa_id: "t1", sede_id: "sede_aldeota", tempo_min: 70, observacao: "Mais rápida na recepção", ...aud },
+      { id: "tp2", funcionario_id: "f2", tarefa_id: "t1", sede_id: "sede_aldeota", tempo_min: 95, observacao: "", ...aud },
+    ],
     modelos_rotina: [],
     historico: [],
     ausencias: [

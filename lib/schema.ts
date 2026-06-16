@@ -17,6 +17,7 @@ import type {
   Sede,
   ServicoEventual,
   Tarefa,
+  TempoPersonalizado,
   Usuario,
 } from "@/types";
 
@@ -30,6 +31,7 @@ export interface MapaTabelas {
   rotinas_planejadas: RotinaPlanejada;
   execucoes_realizadas: ExecucaoRealizada;
   servicos_eventuais: ServicoEventual;
+  tempos_personalizados: TempoPersonalizado;
   parametros: Parametro;
   modelos_rotina: ModeloRotinaItem;
   ausencias: Ausencia;
@@ -181,6 +183,15 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("tempo_min", "number"),
     col("observacao"),
     col("supervisor_id"),
+    ...AUDITORIA,
+  ],
+  tempos_personalizados: [
+    col("id"),
+    col("funcionario_id"),
+    col("tarefa_id"),
+    col("sede_id"),
+    col("tempo_min", "number"),
+    col("observacao"),
     ...AUDITORIA,
   ],
   parametros: [

@@ -40,6 +40,7 @@ import type {
   RotinaPlanejada,
   Sede,
   Tarefa,
+  TempoPersonalizado,
 } from "@/types";
 
 const ROTULO_AUSENCIA: Record<string, string> = {
@@ -91,6 +92,10 @@ export default function PaginaRotinas() {
     fetcher,
   );
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(
+    sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null,
+    fetcher,
+  );
   const { data: parametros } = useSWR<ParametrosResolvidos>(
     sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null,
     fetcher,
@@ -262,7 +267,10 @@ export default function PaginaRotinas() {
     if (!tarefa) return;
     const local = (locais ?? []).find((l) => l.id === tarefa.local_id);
     const categoria = (categorias ?? []).find((c) => c.id === tarefa.categoria_id);
-    const previsto = tempoPrevistoMin(tarefa, local, categoria);
+    const pessoal = (temposPessoais ?? []).find(
+      (tp) => tp.funcionario_id === funcionarioId && tp.tarefa_id === tarefaId,
+    );
+    const previsto = pessoal ? pessoal.tempo_min : tempoPrevistoMin(tarefa, local, categoria);
 
     const validacao = validarLocalmente(funcionarioId, inicio, previsto, tarefa);
     let forcar = false;

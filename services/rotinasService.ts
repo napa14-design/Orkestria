@@ -19,6 +19,7 @@ import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
+import { getTempoPessoal } from "./temposPersonalizadosService";
 
 const ROTULO_AUSENCIA: Record<string, string> = {
   falta: "falta",
@@ -138,7 +139,10 @@ export async function createRotina(
     tarefa.categoria_id ? ds.obter("categorias", tarefa.categoria_id) : Promise.resolve(null),
   ]);
 
-  const previsto = tempoPrevistoMin(tarefa, local ?? undefined, categoria ?? undefined);
+  // tempo pessoal (planejamento realista) substitui o padrão quando existe
+  const tempoPessoal = await getTempoPessoal(entrada.funcionario_id, tarefa.id);
+  const previsto =
+    tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined, categoria ?? undefined);
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
   const fimMin = inicioMin + visual;
