@@ -13,6 +13,7 @@ import type {
   ModeloRotinaItem,
   Parametro,
   RegistroHistorico,
+  Requisito,
   RotinaPlanejada,
   Sede,
   ServicoEventual,
@@ -27,6 +28,7 @@ export interface MapaTabelas {
   sedes: Sede;
   locais: Local;
   categorias: Categoria;
+  requisitos: Requisito;
   tarefas: Tarefa;
   rotinas_planejadas: RotinaPlanejada;
   execucoes_realizadas: ExecucaoRealizada;
@@ -114,6 +116,14 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("ativo", "boolean"),
     ...AUDITORIA,
   ],
+  requisitos: [
+    col("id"),
+    col("nome"),
+    col("tipo"),
+    col("descricao"),
+    col("ativo", "boolean"),
+    ...AUDITORIA,
+  ],
   tarefas: [
     col("id"),
     col("nome_tarefa"),
@@ -130,6 +140,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("tempo_referencia", "boolean"),
     col("presenca", "boolean"),
     col("critica", "boolean"),
+    col("requisitos"),
     col("janela_inicio"),
     col("janela_fim"),
     col("dias_semana"),

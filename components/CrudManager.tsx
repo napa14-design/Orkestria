@@ -29,7 +29,8 @@ export interface CampoForm {
     | "select"
     | "checkbox"
     | "textarea"
-    | "dias_semana";
+    | "dias_semana"
+    | "multiselect";
   opcoes?: OpcaoCampo[];
   obrigatorio?: boolean;
   padrao?: unknown;
@@ -325,6 +326,44 @@ export default function CrudManager<T extends Registro>({
                   value={String(form[c.key] ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
                 />
+              ) : c.tipo === "multiselect" ? (
+                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
+                  {(c.opcoes ?? []).length === 0 && (
+                    <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Nenhuma opção disponível.</span>
+                  )}
+                  {(c.opcoes ?? []).map((o) => {
+                    const sel = String(form[c.key] ?? "").split(",").filter(Boolean);
+                    const ativo = sel.includes(o.valor);
+                    return (
+                      <button
+                        key={o.valor}
+                        type="button"
+                        aria-pressed={ativo}
+                        onClick={() =>
+                          setForm((f) => {
+                            const atuais = String(f[c.key] ?? "").split(",").filter(Boolean);
+                            const proximos = ativo
+                              ? atuais.filter((v) => v !== o.valor)
+                              : [...atuais, o.valor];
+                            return { ...f, [c.key]: proximos.join(",") };
+                          })
+                        }
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 4,
+                          border: "1.5px solid var(--tinta)",
+                          background: ativo ? "var(--acento)" : "var(--cartao)",
+                          color: ativo ? "#fff" : "var(--tinta-2)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {o.rotulo}
+                      </button>
+                    );
+                  })}
+                </span>
               ) : c.tipo === "dias_semana" ? (
                 <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
                   {DIAS_SEMANA_CURTO.map((letra, idx) => {

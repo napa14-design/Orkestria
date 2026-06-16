@@ -57,6 +57,12 @@ export interface Tarefa extends Auditoria {
    * obrigatória.
    */
   critica?: boolean;
+  /**
+   * Requisitos de execução exigidos (CSV de ids do catálogo `requisitos`):
+   * aptidões/treinamentos que o executante precisa ter (bloqueiam a alocação) e
+   * EPIs exigidos (exibidos como lembrete). Vazio = sem exigência.
+   */
+  requisitos?: string;
   /** Janela em que a tarefa pode ocorrer (ex.: refeitório só após o almoço). */
   janela_inicio?: string; // HH:mm — vazio = qualquer horário do expediente
   janela_fim?: string; // HH:mm

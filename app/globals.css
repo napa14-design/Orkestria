@@ -191,6 +191,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .selo-amarelo { background: var(--amarelo); color: var(--tinta); border-color: var(--tinta); }
 .selo-vermelho { background: var(--vermelho); color: #fff; border-color: var(--vermelho); }
 .selo-laranja { background: var(--laranja); color: #fff; border-color: var(--laranja); }
+.selo-roxo { background: #6a4f8a; color: #fff; border-color: #6a4f8a; }
 .selo-cinza { background: var(--papel-3); color: var(--tinta-2); }
 
 /* ── modal ────────────────────────────────────────────────────────── */

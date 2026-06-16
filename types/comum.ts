@@ -41,6 +41,16 @@ export type RestricaoGenero = "" | "feminino" | "masculino";
  */
 export type TipoEventual = "eventual" | "imprevisto";
 
+/**
+ * Tipo de requisito de execução (conformidade):
+ *  - "aptidao"     → aptidão física/médica (ex.: apto a esforço, altura/NR-35);
+ *  - "treinamento" → capacitação que pode vencer (ex.: produtos químicos);
+ *  - "epi"         → EPI exigido pela atividade (ex.: luvas nitrílicas).
+ * aptidão e treinamento são possuídos pelo funcionário (bloqueiam alocação);
+ * epi é exigido pela tarefa e exibido como lembrete (confirmação é fase futura).
+ */
+export type TipoRequisito = "aptidao" | "treinamento" | "epi";
+
 export type StatusRotina =
   | "planejada"
   | "realizada"

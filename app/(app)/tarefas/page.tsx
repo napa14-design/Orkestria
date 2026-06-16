@@ -5,7 +5,7 @@ import CrudManager from "@/components/CrudManager";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
-import type { Categoria, Local, Sede, Tarefa } from "@/types";
+import type { Categoria, Local, Requisito, Sede, Tarefa } from "@/types";
 
 const REGRAS = [
   { valor: "fixo", rotulo: "Tempo fixo" },
@@ -38,10 +38,13 @@ export default function PaginaTarefas() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const localPorId = (id: string) => locais?.find((l) => l.id === id);
   const categoriaPorId = (id?: string) => categorias?.find((c) => c.id === id);
+  const requisitosDe = (csv?: string) =>
+    (csv ?? "").split(",").filter(Boolean).map((id) => requisitos?.find((r) => r.id === id)).filter(Boolean) as Requisito[];
 
   return (
     <CrudManager<Tarefa>
@@ -179,6 +182,15 @@ export default function PaginaTarefas() {
           padrao: false,
           dica: "Marque tarefas que NÃO podem deixar de ser feitas (ex.: higienização de banheiro). Quando uma crítica fica sem alocação no dia, o painel \"Ficou de fora hoje\" mostra um alerta de “Circuito essencial descoberto” em destaque máximo (vermelho), separado das demais pendências. Diferente de prioridade, que só ordena.",
         },
+        {
+          key: "requisitos",
+          rotulo: "Requisitos de execução",
+          tipo: "multiselect",
+          inteira: true,
+          opcoes: (requisitos ?? []).filter((r) => r.ativo).map((r) => ({ valor: r.id, rotulo: r.nome })),
+          ajuda: "Catálogo gerenciado em Requisitos (admin)",
+          dica: "Aptidões/treinamentos que o executante precisa ter (a agenda bloqueia quem não tem ou está vencido) e EPIs exigidos (lembrete). Selecione os que esta tarefa demanda.",
+        },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -256,10 +268,16 @@ export default function PaginaTarefas() {
               {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
               {t.presenca && <span className="selo selo-azul">presença</span>}
               {t.critica && <span className="selo selo-vermelho">⛔ crítica</span>}
+              {requisitosDe(t.requisitos).map((r) => (
+                <span key={r.id} className="selo selo-roxo" title={`Requisito: ${r.tipo}`}>
+                  {r.tipo === "epi" ? "🧤" : r.tipo === "aptidao" ? "🩺" : "🎓"} {r.nome}
+                </span>
+              ))}
               {!t.restricao_genero &&
                 !t.tempo_referencia &&
                 !t.presenca &&
                 !t.critica &&
+                !(t.requisitos && requisitosDe(t.requisitos).length) &&
                 !(t.janela_inicio && t.janela_fim) &&
                 !(t.frequencia === "semanal" && t.dias_semana) && (
                   <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
