@@ -32,6 +32,15 @@ export interface Tarefa extends Auditoria {
    * compatibilidade com tarefas cadastradas antes deste campo existir.
    */
   restricao_genero?: RestricaoGenero;
+  /**
+   * Quando true, o tempo previsto é só uma referência: o sistema NÃO gera
+   * alerta de desvio nem entra nas sugestões de ajuste (ex.: montagem de palco,
+   * cuja execução varia muito).
+   */
+  tempo_referencia?: boolean;
+  /** Janela em que a tarefa pode ocorrer (ex.: refeitório só após o almoço). */
+  janela_inicio?: string; // HH:mm — vazio = qualquer horário do expediente
+  janela_fim?: string; // HH:mm
   ativo: boolean;
   observacoes: string;
 }

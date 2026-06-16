@@ -38,10 +38,13 @@ export async function registrarExecucao(
   if (!rotina) throw new Error("Rotina planejada não encontrada.");
 
   const parametros = await resolverParametros(rotina.sede_id);
+  // Tarefa com "tempo é referência" não cobra desvio (execução varia muito).
+  const tarefa = await ds.obter("tarefas", rotina.tarefa_id);
 
   // Regras de justificativa obrigatória.
   const statusQueExigem: StatusRealizado[] = ["nao_realizada", "remanejada", "cancelada"];
   const desvioGrande =
+    !tarefa?.tempo_referencia &&
     dados.tempo_real_min > 0 &&
     exigeJustificativa(dados.tempo_real_min, rotina.tempo_previsto_min, parametros);
   if ((statusQueExigem.includes(dados.status_realizado) || desvioGrande) && !dados.justificativa.trim()) {

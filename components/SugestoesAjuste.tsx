@@ -71,7 +71,8 @@ export default function SugestoesAjuste({
     for (const [tarefaId, reais] of reaisPorTarefa) {
       if (reais.length < parametros.min_execucoes_ajuste) continue;
       const tarefa = tarefas.find((t) => t.id === tarefaId);
-      if (!tarefa || !tarefa.ativo) continue;
+      // tarefas de "tempo referência" não entram (desvio é esperado)
+      if (!tarefa || !tarefa.ativo || tarefa.tempo_referencia) continue;
       const local = localPorId.get(tarefa.local_id);
 
       // compara com o previsto ATUAL: depois de aplicar, a sugestão some.

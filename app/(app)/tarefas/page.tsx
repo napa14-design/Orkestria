@@ -125,6 +125,25 @@ export default function PaginaTarefas() {
           ajuda: "Ex.: banheiro feminino → só ASG mulheres podem ser alocadas",
           dica: "Restringe quem pode executar a tarefa por gênero. Ex.: limpeza de banheiro feminino marcada como \"Apenas mulheres\" — a agenda bloqueia alocar essa tarefa para um homem. Deixe \"Sem restrição\" quando qualquer ASG pode fazer.",
         },
+        {
+          key: "janela_inicio",
+          rotulo: "Janela: início",
+          tipo: "hora",
+          dica: "Se a tarefa só pode ocorrer num horário específico, informe o início da janela (ex.: 13:00 para limpar o refeitório só após o almoço). Deixe vazio se pode ser feita a qualquer hora do expediente.",
+        },
+        {
+          key: "janela_fim",
+          rotulo: "Janela: fim",
+          tipo: "hora",
+          dica: "Fim da janela em que a tarefa pode ocorrer. A agenda bloqueia alocar a tarefa fora desse intervalo. Preencha junto com a Janela: início.",
+        },
+        {
+          key: "tempo_referencia",
+          rotulo: "Tempo é só referência",
+          tipo: "checkbox",
+          padrao: false,
+          dica: "Marque quando o tempo previsto é apenas uma base e a execução varia muito (ex.: montagem de palco). Assim o sistema NÃO cobra justificativa de desvio, não inclui a tarefa no \"Top desvios\" nem nas sugestões de ajuste — evita poluir os indicadores com falsos desvios.",
+        },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -167,15 +186,25 @@ export default function PaginaTarefas() {
         },
         {
           key: "restricao_genero",
-          rotulo: "Gênero",
-          render: (t) =>
-            t.restricao_genero ? (
-              <span className={`selo ${t.restricao_genero === "feminino" ? "selo-vermelho" : "selo-azul"}`}>
-                {t.restricao_genero === "feminino" ? "♀ Mulheres" : "♂ Homens"}
-              </span>
-            ) : (
-              <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
-            ),
+          rotulo: "Regras",
+          render: (t) => (
+            <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {t.restricao_genero && (
+                <span className={`selo ${t.restricao_genero === "feminino" ? "selo-vermelho" : "selo-azul"}`}>
+                  {t.restricao_genero === "feminino" ? "♀ Mulheres" : "♂ Homens"}
+                </span>
+              )}
+              {t.janela_inicio && t.janela_fim && (
+                <span className="selo selo-laranja num">
+                  {t.janela_inicio}–{t.janela_fim}
+                </span>
+              )}
+              {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
+              {!t.restricao_genero && !t.tempo_referencia && !(t.janela_inicio && t.janela_fim) && (
+                <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>
+              )}
+            </span>
+          ),
         },
         {
           key: "ativo",

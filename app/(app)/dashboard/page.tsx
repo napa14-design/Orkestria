@@ -131,8 +131,11 @@ export default function PaginaDashboard() {
     const tarefasNaoRealizadas = execsDoEscopo.filter(
       (e) => e.status_realizado === "nao_realizada",
     ).length;
+    const refPorTarefa = new Map((tarefas ?? []).map((t) => [t.id, t.tempo_referencia]));
     const desvios = execsDoEscopo
       .filter((e) => e.tempo_real_min > 0)
+      // tarefas de "tempo referência" não contam como desvio (execução varia)
+      .filter((e) => !refPorTarefa.get(rotinaPorId.get(e.rotina_id)!.tarefa_id))
       .map((e) => {
         const rotina = rotinaPorId.get(e.rotina_id)!;
         return {
@@ -161,7 +164,7 @@ export default function PaginaDashboard() {
       porStatus,
       funcsAtivos: funcs.length,
     };
-  }, [rotinas, execucoes, funcionarios, sedeFiltro, params]);
+  }, [rotinas, execucoes, funcionarios, tarefas, sedeFiltro, params]);
 
   const nomeLocal = (id: string) => {
     const l = (locais ?? []).find((x) => x.id === id);

@@ -101,6 +101,19 @@ export function validarAlocacao(args: {
     });
   }
 
+  // Janela de horário (ex.: refeitório só após o almoço).
+  if (args.tarefa?.janela_inicio && args.tarefa?.janela_fim) {
+    const ji = hhmmParaMin(args.tarefa.janela_inicio);
+    const jf = hhmmParaMin(args.tarefa.janela_fim);
+    if (!Number.isNaN(ji) && !Number.isNaN(jf) && (inicioMin < ji || fimMin > jf)) {
+      alertas.push({
+        nivel: "erro",
+        codigo: "JANELA_HORARIO",
+        mensagem: `"${args.tarefa.nome_tarefa}" só pode ser feita entre ${args.tarefa.janela_inicio} e ${args.tarefa.janela_fim}.`,
+      });
+    }
+  }
+
   if (
     args.tarefa?.regra_calculo === "por_m2" &&
     (!args.local || args.local.metragem <= 0)

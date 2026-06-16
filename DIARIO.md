@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-06-12 — Fase A (1/2): janela de horário + "tempo é referência"
+
+**O que mudou (primeiros itens do plano de evolução):**
+- **Janela de horário por tarefa** (`janela_inicio`/`janela_fim`): a tarefa só
+  pode ser alocada dentro do intervalo (ex.: refeitório só após o almoço). A
+  agenda bloqueia fora (`JANELA_HORARIO`), cliente e servidor.
+- **Flag "tempo é referência"** (`tempo_referencia`): tarefas cuja execução
+  varia muito (ex.: montagem de palco) não cobram justificativa de desvio, não
+  entram no "Top 10 desvios" do dashboard nem nas sugestões de ajuste de tempo.
+- Tela de Tarefas: campos novos (com dicas), selos na coluna "Regras"
+  (♀/♂, janela, referência). Seed demo com exemplos (t5 janela 13–16h, t6
+  referência).
+- Verificado em memória: janela bloqueia 09:00 / aceita 13:30; execução de
+  tarefa-referência com desvio 3× passa sem justificativa, tarefa normal é
+  bloqueada (contraprova). Build e console OK.
+
+**Arquivos:** `types/Tarefa.ts`, `lib/schema.ts`, `lib/validations.ts`,
+`lib/memoryStore.ts`, `services/execucoesService.ts`, `components/SugestoesAjuste.tsx`,
+`app/(app)/{tarefas,dashboard,acompanhamento}/page.tsx`.
+
+**Falta na Fase A:** folga mínima por sede, periodicidade fina, relatório
+mensal por funcionário.
+
+---
+
 ## 2026-06-12 — Plano de evolução (pós pré-análise do diretor)
 
 **O que mudou:** o diretor enviou uma pré-análise classificando ideias de

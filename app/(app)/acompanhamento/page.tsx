@@ -186,14 +186,18 @@ export default function PaginaAcompanhamento() {
   const statusCritico = ["nao_realizada", "remanejada", "cancelada"].includes(
     form.status_realizado,
   );
+  // tarefa de "tempo referência" não cobra desvio
+  const ehReferencia = rotinaAberta
+    ? Boolean(tarefaPorId.get(rotinaAberta.tarefa_id)?.tempo_referencia)
+    : false;
   const desvioAtual = rotinaAberta
     ? desvioPercentual(form.tempo_real_min, rotinaAberta.tempo_previsto_min)
     : 0;
   const precisaJustificar =
     statusCritico ||
     (rotinaAberta !== null &&
+      !ehReferencia &&
       form.tempo_real_min > 0 &&
-      !statusCritico &&
       exigeJustificativa(form.tempo_real_min, rotinaAberta.tempo_previsto_min, params));
 
   async function salvarExecucao(e: React.FormEvent) {
