@@ -17,7 +17,8 @@ export async function POST(req: Request) {
 
   let email: string | undefined;
   try {
-    const decoded = await authAdmin().verifyIdToken(idToken);
+    const auth = await authAdmin();
+    const decoded = await auth.verifyIdToken(idToken);
     email = decoded.email?.toLowerCase();
   } catch {
     return NextResponse.json({ erro: "Não foi possível validar o login do Google." }, { status: 401 });
