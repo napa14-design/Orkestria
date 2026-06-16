@@ -2,28 +2,58 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import type { SessaoUsuario } from "@/lib/permissions";
 
-const ITENS: Array<{ href: string; rotulo: string; apenasAdmin?: boolean }> = [
-  { href: "/rotinas", rotulo: "Rotina do dia" },
-  { href: "/acompanhamento", rotulo: "Acompanhamento" },
-  { href: "/eventuais", rotulo: "Eventuais" },
-  { href: "/dashboard", rotulo: "Dashboard" },
-  { href: "/relatorios", rotulo: "Relatórios" },
-  { href: "/produtividade", rotulo: "Produtividade" },
-  { href: "/funcionarios", rotulo: "Funcionários" },
-  { href: "/ausencias", rotulo: "Ausências" },
-  { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasAdmin: true },
-  { href: "/sedes", rotulo: "Sedes" },
-  { href: "/locais", rotulo: "Locais" },
-  { href: "/tarefas", rotulo: "Tarefas" },
-  { href: "/tempos", rotulo: "Tempos por pessoa" },
-  { href: "/qualificacoes", rotulo: "Qualificações" },
-  { href: "/categorias", rotulo: "Categorias", apenasAdmin: true },
-  { href: "/requisitos", rotulo: "Requisitos", apenasAdmin: true },
-  { href: "/parametros", rotulo: "Parâmetros" },
-  { href: "/historico", rotulo: "Histórico" },
-  { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
+type Item = { href: string; rotulo: string; apenasAdmin?: boolean };
+type Grupo = { rotulo: string; itens: Item[] };
+
+/** Menu organizado por intenção: do dia a dia → números → cadastros → sistema. */
+const GRUPOS: Grupo[] = [
+  {
+    rotulo: "Operação",
+    itens: [
+      { href: "/rotinas", rotulo: "Rotina do dia" },
+      { href: "/acompanhamento", rotulo: "Acompanhamento" },
+      { href: "/eventuais", rotulo: "Serviços eventuais" },
+      { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasAdmin: true },
+    ],
+  },
+  {
+    rotulo: "Painéis",
+    itens: [
+      { href: "/dashboard", rotulo: "Dashboard" },
+      { href: "/produtividade", rotulo: "Produtividade" },
+      { href: "/relatorios", rotulo: "Relatórios" },
+    ],
+  },
+  {
+    rotulo: "Pessoas",
+    itens: [
+      { href: "/funcionarios", rotulo: "Funcionários" },
+      { href: "/ausencias", rotulo: "Ausências" },
+      { href: "/tempos", rotulo: "Tempos por pessoa" },
+      { href: "/qualificacoes", rotulo: "Qualificações" },
+    ],
+  },
+  {
+    rotulo: "Estrutura",
+    itens: [
+      { href: "/sedes", rotulo: "Sedes" },
+      { href: "/locais", rotulo: "Locais" },
+      { href: "/tarefas", rotulo: "Tarefas" },
+      { href: "/categorias", rotulo: "Categorias", apenasAdmin: true },
+      { href: "/requisitos", rotulo: "Requisitos", apenasAdmin: true },
+    ],
+  },
+  {
+    rotulo: "Sistema",
+    itens: [
+      { href: "/parametros", rotulo: "Parâmetros" },
+      { href: "/historico", rotulo: "Histórico" },
+      { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
+    ],
+  },
 ];
 
 const ROTULO_PERFIL: Record<string, string> = {
@@ -41,6 +71,25 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [aberto, setAberto] = useState<string | null>(null);
+  const fecharTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // fecha o dropdown ao trocar de página
+  useEffect(() => setAberto(null), [pathname]);
+
+  const ehAdmin = sessao.perfil === "administrador";
+  const visiveis = (g: Grupo) => g.itens.filter((i) => !i.apenasAdmin || ehAdmin);
+  const grupoAtivo = (g: Grupo) => visiveis(g).some((i) => pathname.startsWith(i.href));
+
+  // pequeno atraso ao sair, para o mouse cruzar o vão até o painel
+  function abrir(rotulo: string) {
+    if (fecharTimer.current) clearTimeout(fecharTimer.current);
+    setAberto(rotulo);
+  }
+  function agendarFechar() {
+    if (fecharTimer.current) clearTimeout(fecharTimer.current);
+    fecharTimer.current = setTimeout(() => setAberto(null), 120);
+  }
 
   async function sair() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -55,7 +104,7 @@ export default function AppShell({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 20,
+          gap: 16,
           padding: "10px 20px",
           background: "var(--tinta)",
           color: "var(--papel)",
@@ -65,7 +114,7 @@ export default function AppShell({
           zIndex: 50,
         }}
       >
-        <Link href="/rotinas" style={{ display: "flex", alignItems: "center" }}>
+        <Link href="/rotinas" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-horizontal-fundo-escuro.png"
@@ -74,39 +123,59 @@ export default function AppShell({
           />
         </Link>
 
-        <nav style={{ display: "flex", gap: 2, flex: 1, overflowX: "auto" }}>
-          {ITENS.filter(
-            (item) => !item.apenasAdmin || sessao.perfil === "administrador",
-          ).map((item) => {
-            const ativo = pathname.startsWith(item.href);
+        <nav style={{ display: "flex", gap: 2, flex: 1, flexWrap: "wrap" }}>
+          {GRUPOS.map((g) => {
+            const itens = visiveis(g);
+            if (itens.length === 0) return null;
+            const estaAberto = aberto === g.rotulo;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  textDecoration: "none",
-                  padding: "6px 12px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  borderRadius: 3,
-                  whiteSpace: "nowrap",
-                  color: ativo ? "var(--tinta)" : "var(--papel-3)",
-                  background: ativo ? "var(--papel)" : "transparent",
-                }}
+              <div
+                key={g.rotulo}
+                style={{ position: "relative", display: "flex", alignItems: "center", alignSelf: "stretch" }}
+                onMouseEnter={() => abrir(g.rotulo)}
+                onMouseLeave={agendarFechar}
               >
-                {item.rotulo}
-              </Link>
+                <button
+                  type="button"
+                  className={`nav-trigger${grupoAtivo(g) ? " ativo" : ""}${estaAberto ? " aberto" : ""}`}
+                  aria-haspopup="true"
+                  aria-expanded={estaAberto}
+                  onClick={() => setAberto(estaAberto ? null : g.rotulo)}
+                >
+                  {g.rotulo}
+                  <span className="nav-caret">▾</span>
+                </button>
+
+                {estaAberto && (
+                  <div className="nav-drop" role="menu">
+                    <div className="nav-drop-titulo rotulo">{g.rotulo}</div>
+                    {itens.map((i) => (
+                      <Link
+                        key={i.href}
+                        href={i.href}
+                        role="menuitem"
+                        className={`nav-drop-item${pathname.startsWith(i.href) ? " ativo" : ""}`}
+                        onClick={() => setAberto(null)}
+                      >
+                        {i.rotulo}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/conta" className="so-desktop" style={{ textAlign: "right", lineHeight: 1.2, textDecoration: "none", color: "inherit" }} title="Minha conta / trocar senha">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <Link
+            href="/conta"
+            className="so-desktop"
+            style={{ textAlign: "right", lineHeight: 1.2, textDecoration: "none", color: "inherit" }}
+            title="Minha conta / trocar senha"
+          >
             <div style={{ fontSize: 12, fontWeight: 700 }}>{sessao.nome}</div>
-            <div
-              className="rotulo"
-              style={{ color: "var(--acento)", fontSize: 9 }}
-            >
+            <div className="rotulo" style={{ color: "var(--acento)", fontSize: 9 }}>
               {ROTULO_PERFIL[sessao.perfil] ?? sessao.perfil}
             </div>
           </Link>

@@ -194,6 +194,87 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .selo-roxo { background: #6a4f8a; color: #fff; border-color: #6a4f8a; }
 .selo-cinza { background: var(--papel-3); color: var(--tinta-2); }
 
+/* ── navegação agrupada (cabeçalho) ──────────────────────────────── */
+.nav-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--papel-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  letter-spacing: 0.01em;
+}
+.nav-trigger .nav-caret { font-size: 9px; opacity: 0.6; transition: transform 0.18s ease; }
+.nav-trigger::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 1px;
+  height: 2px;
+  background: var(--acento);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.18s ease;
+}
+.nav-trigger:hover,
+.nav-trigger:focus-visible { color: var(--papel); outline: none; }
+.nav-trigger:hover::after,
+.nav-trigger.ativo::after { transform: scaleX(1); }
+.nav-trigger.aberto .nav-caret { transform: rotate(180deg); }
+.nav-trigger.ativo { color: var(--papel); }
+
+.nav-drop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 9px;
+  min-width: 224px;
+  background: var(--papel);
+  border: 1.5px solid var(--tinta);
+  border-left: 5px solid var(--acento);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 8px;
+  display: grid;
+  gap: 1px;
+  z-index: 60;
+  animation: nav-drop-entra 0.14s ease-out backwards;
+}
+@keyframes nav-drop-entra {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+.nav-drop-titulo { padding: 2px 8px 7px; color: var(--acento); }
+.nav-drop-item {
+  display: block;
+  text-decoration: none;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-2);
+  border-radius: 3px;
+  border-left: 3px solid transparent;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav-drop-item:hover {
+  background: var(--papel-2);
+  color: var(--acento);
+  border-left-color: var(--acento);
+}
+.nav-drop-item.ativo {
+  background: var(--papel-2);
+  color: var(--tinta);
+  border-left-color: var(--acento);
+}
+
 /* ── modal ────────────────────────────────────────────────────────── */
 .modal-fundo {
   position: fixed;
