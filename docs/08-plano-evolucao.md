@@ -53,8 +53,8 @@ Hoje as tarefas são registros soltos por local; falta uma camada de
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Categoria de atividade** | entidade/atributo que agrupa tarefas afins | — | M |
-| **Recalibração em cascata** | ajustar o tempo de uma categoria propaga p/ as tarefas dela | categoria | M |
+| **Categoria de atividade** ✅ | entidade `categorias` (catálogo global) que agrupa tarefas afins | — | M |
+| **Recalibração em cascata** ✅ | ação que aplica um fator ao tempo base de todas as tarefas da categoria | categoria | M |
 | **Nível/intensidade de limpeza** | atributo fina × densa que entra no cálculo | categoria | M |
 | **Tipo de uso → exigência** | laboratório/clínica/pátio puxam nível de limpeza | categoria + tipo de local (já existe) | M |
 

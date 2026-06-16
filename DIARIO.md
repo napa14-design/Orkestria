@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-06-16 — Fase B (1/2): categoria de atividade + recalibração em cascata
+
+**O que mudou (fundação estrutural da Fase B, sem mexer na fórmula de tempo):**
+- **Entidade `categorias`** (catálogo global, compartilhado entre sedes):
+  id, nome, descricao, cor, ativo. Formaliza o antigo campo livre
+  `tipo_tarefa`. `Tarefa` ganhou `categoria_id` (opcional p/ compat).
+- **Tela Categorias** (`/categorias`, só admin): CRUD padrão + ação
+  **Recalibrar** — aplica um fator ao `tempo_base_min` de TODAS as tarefas da
+  categoria de uma vez (presets ±10/±20% ou fator manual). Cada ajuste é logado
+  no histórico pelo decorator. Bloqueia exclusão de categoria com tarefas.
+- **Tela Tarefas**: novo select **Categoria** (catálogo) + coluna com selo
+  colorido; `tipo_tarefa` rebaixado a "Tipo (texto livre)" legado.
+- **Paleta da agenda**: filtro "Tipo" (texto livre) virou **Categoria** (só as
+  usadas na sede); cada card mostra a pílula colorida da categoria.
+- **Permissões**: catálogo global → só administrador cria/edita/exclui/recalibra
+  (`podeGerenciarCatalogo`); supervisor/visualizador apenas leem (para escolher
+  ao cadastrar tarefa). Verificado: supervisor recebe 403.
+- Schema dirige tudo (setup/migração Firestore incluem `categorias`
+  automaticamente). Seed: 7 categorias (c1–c7) e todas as tarefas vinculadas.
+- Verificado em memória: GET 7 categorias; recalibrar c2 ×1.2 → 3 tarefas
+  20→24min, 3 registros no histórico; modal mostra "N tarefa(s) ajustada(s)";
+  filtro da paleta e selos coloridos OK. Build e console limpos.
+
+**Decisão de modelagem:** categoria é **catálogo global** (não por sede) — a
+questão "catálogo mestre por sede" do plano fica em aberto. Recalibração é uma
+**ação** (multiplica tempo_base_min), não um campo herdado, evitando acoplar a
+fórmula a esta etapa.
+
+**Arquivos:** `types/Categoria.ts` (novo), `types/index.ts`, `types/Tarefa.ts`,
+`lib/schema.ts`, `lib/permissions.ts`, `services/categoriasService.ts` (novo),
+`app/api/categorias/{route,[id]/route,recalibrar/route}.ts` (novos),
+`components/CrudManager.tsx` (prop `acoesExtra`), `app/(app)/categorias/page.tsx`
+(novo), `app/(app)/tarefas/page.tsx`, `components/agenda/TaskPalette.tsx`,
+`app/(app)/rotinas/page.tsx`, `components/AppShell.tsx`, `lib/memoryStore.ts`,
+`docs/08-plano-evolucao.md`.
+
+**Falta na Fase B (2/2):** nível/intensidade de limpeza entrando no cálculo de
+tempo + tipo de uso do local → exigência de nível (mexem na fórmula
+`tempoPrevistoMin` — próximo incremento).
+
+---
+
 ## 2026-06-16 — Fase A: periodicidade fina (dias fixos da semana) — Fase A concluída
 
 **O que mudou (último item da Fase A):**

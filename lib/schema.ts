@@ -6,6 +6,7 @@
  */
 import type {
   Ausencia,
+  Categoria,
   ExecucaoRealizada,
   Funcionario,
   Local,
@@ -23,6 +24,7 @@ export interface MapaTabelas {
   funcionarios: Funcionario;
   sedes: Sede;
   locais: Local;
+  categorias: Categoria;
   tarefas: Tarefa;
   rotinas_planejadas: RotinaPlanejada;
   execucoes_realizadas: ExecucaoRealizada;
@@ -99,10 +101,19 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("observacoes"),
     ...AUDITORIA,
   ],
+  categorias: [
+    col("id"),
+    col("nome"),
+    col("descricao"),
+    col("cor"),
+    col("ativo", "boolean"),
+    ...AUDITORIA,
+  ],
   tarefas: [
     col("id"),
     col("nome_tarefa"),
     col("tipo_tarefa"),
+    col("categoria_id"),
     col("local_id"),
     col("sede_id"),
     col("regra_calculo"),

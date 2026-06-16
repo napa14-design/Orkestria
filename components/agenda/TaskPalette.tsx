@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { tempoPrevistoMin, blocosOcupados } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
-import type { Local, Tarefa } from "@/types";
+import type { Categoria, Local, Tarefa } from "@/types";
 
 const COR_PRIORIDADE: Record<string, string> = {
   alta: "var(--vermelho)",
@@ -15,12 +15,14 @@ const COR_PRIORIDADE: Record<string, string> = {
 export default function TaskPalette({
   tarefas,
   locais,
+  categorias = [],
   blocoMin,
   aoIniciarArrasto,
   aoTerminarArrasto,
 }: {
   tarefas: Tarefa[];
   locais: Local[];
+  categorias?: Categoria[];
   blocoMin: number;
   /** Informa quantos blocos o item arrastado ocupa (para o fantasma da agenda). */
   aoIniciarArrasto?: (blocos: number) => void;
@@ -28,22 +30,27 @@ export default function TaskPalette({
 }) {
   const [busca, setBusca] = useState("");
   const [filtroAndar, setFiltroAndar] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroPrioridade, setFiltroPrioridade] = useState("");
 
   const localPorId = useMemo(
     () => new Map(locais.map((l) => [l.id, l])),
     [locais],
   );
+  const categoriaPorId = useMemo(
+    () => new Map(categorias.map((c) => [c.id, c])),
+    [categorias],
+  );
 
   const andares = useMemo(
     () => [...new Set(locais.map((l) => l.andar).filter(Boolean))].sort(),
     [locais],
   );
-  const tipos = useMemo(
-    () => [...new Set(tarefas.map((t) => t.tipo_tarefa).filter(Boolean))].sort(),
-    [tarefas],
-  );
+  // categorias efetivamente usadas por alguma tarefa, na ordem do catálogo
+  const categoriasUsadas = useMemo(() => {
+    const ids = new Set(tarefas.map((t) => t.categoria_id).filter(Boolean));
+    return categorias.filter((c) => ids.has(c.id));
+  }, [tarefas, categorias]);
 
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -51,7 +58,7 @@ export default function TaskPalette({
       if (!t.ativo) return false;
       const local = localPorId.get(t.local_id);
       if (filtroAndar && local?.andar !== filtroAndar) return false;
-      if (filtroTipo && t.tipo_tarefa !== filtroTipo) return false;
+      if (filtroCategoria && t.categoria_id !== filtroCategoria) return false;
       if (filtroPrioridade && t.prioridade !== filtroPrioridade) return false;
       if (q) {
         const texto = `${t.nome_tarefa} ${local?.nome_local ?? ""}`.toLowerCase();
@@ -59,7 +66,7 @@ export default function TaskPalette({
       }
       return true;
     });
-  }, [tarefas, localPorId, busca, filtroAndar, filtroTipo, filtroPrioridade]);
+  }, [tarefas, localPorId, busca, filtroAndar, filtroCategoria, filtroPrioridade]);
 
   return (
     <aside className="painel entra paleta-tarefas">
@@ -82,10 +89,10 @@ export default function TaskPalette({
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
-          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={{ fontSize: 12, padding: 4, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
-            <option value="">Tipo: todos</option>
-            {tipos.map((t) => (
-              <option key={t} value={t}>{t}</option>
+          <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)} style={{ fontSize: 12, padding: 4, width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+            <option value="">Categoria: todas</option>
+            {categoriasUsadas.map((c) => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
           <select
@@ -142,6 +149,18 @@ export default function TaskPalette({
               <div style={{ fontSize: 11, color: "var(--tinta-2)", marginTop: 2 }}>
                 {local ? `${local.nome_local} · ${local.andar}` : "local?"}
               </div>
+              {(() => {
+                const cat = categoriaPorId.get(t.categoria_id ?? "");
+                if (!cat) return null;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: cat.cor || "var(--tinta-3)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: "var(--tinta-3)", textTransform: "uppercase", letterSpacing: 0.3 }}>
+                      {cat.nome}
+                    </span>
+                  </div>
+                );
+              })()}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, alignItems: "center" }}>
                 <span className="num" style={{ fontSize: 11, fontWeight: 700 }}>
                   {formatarDuracao(previsto)}

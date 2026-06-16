@@ -61,6 +61,7 @@ export default function CrudManager<T extends Registro>({
   campos,
   colunas,
   textoNovo = "+ Novo",
+  acoesExtra,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -68,6 +69,8 @@ export default function CrudManager<T extends Registro>({
   campos: CampoForm[];
   colunas: ColunaTabela<T>[];
   textoNovo?: string;
+  /** Controles adicionais por linha, à esquerda de Editar/Excluir. */
+  acoesExtra?: (item: T) => React.ReactNode;
 }) {
   const { data, mutate, isLoading } = useSWR<T[]>(endpoint, fetcher);
   const [busca, setBusca] = useState("");
@@ -224,6 +227,11 @@ export default function CrudManager<T extends Registro>({
                   </td>
                 ))}
                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  {acoesExtra && (
+                    <>
+                      {acoesExtra(item)}{" "}
+                    </>
+                  )}
                   <button className="btn btn-mini btn-fantasma" onClick={() => abrirEdicao(item)}>
                     Editar
                   </button>{" "}

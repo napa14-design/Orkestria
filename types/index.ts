@@ -3,6 +3,7 @@ export * from "./Usuario";
 export * from "./Funcionario";
 export * from "./Sede";
 export * from "./Local";
+export * from "./Categoria";
 export * from "./Tarefa";
 export * from "./RotinaPlanejada";
 export * from "./ExecucaoRealizada";

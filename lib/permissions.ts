@@ -46,3 +46,8 @@ export function podeEditarParametro(
 export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {
   return sessao.perfil === "administrador";
 }
+
+/** Catálogo global (categorias) afeta todas as sedes → só administrador edita. */
+export function podeGerenciarCatalogo(sessao: SessaoUsuario): boolean {
+  return sessao.perfil === "administrador";
+}

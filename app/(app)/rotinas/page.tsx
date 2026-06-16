@@ -33,6 +33,7 @@ import { temErro, validarAlocacao } from "@/lib/validations";
 import type {
   AlertaValidacao,
   Ausencia,
+  Categoria,
   Funcionario,
   Local,
   ParametrosResolvidos,
@@ -89,6 +90,7 @@ export default function PaginaRotinas() {
     sedeId ? `/api/locais?sede=${sedeId}` : null,
     fetcher,
   );
+  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: parametros } = useSWR<ParametrosResolvidos>(
     sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null,
     fetcher,
@@ -535,6 +537,7 @@ export default function PaginaRotinas() {
         <TaskPalette
           tarefas={tarefas ?? []}
           locais={locais ?? []}
+          categorias={categorias ?? []}
           blocoMin={blocoMin}
           aoIniciarArrasto={setBlocosArrasto}
           aoTerminarArrasto={() => setBlocosArrasto(null)}

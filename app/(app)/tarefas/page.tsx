@@ -5,7 +5,7 @@ import CrudManager from "@/components/CrudManager";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
-import type { Local, Sede, Tarefa } from "@/types";
+import type { Categoria, Local, Sede, Tarefa } from "@/types";
 
 const REGRAS = [
   { valor: "fixo", rotulo: "Tempo fixo" },
@@ -37,9 +37,11 @@ const RESTRICOES_GENERO = [
 export default function PaginaTarefas() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const localPorId = (id: string) => locais?.find((l) => l.id === id);
+  const categoriaPorId = (id?: string) => categorias?.find((c) => c.id === id);
 
   return (
     <CrudManager<Tarefa>
@@ -56,11 +58,21 @@ export default function PaginaTarefas() {
           dica: "O nome do serviço que será feito, como aparecerá na agenda. Ex.: \"Limpeza concorrente\", \"Higienização de banheiro\", \"Coleta de resíduos\".",
         },
         {
+          key: "categoria_id",
+          rotulo: "Categoria",
+          tipo: "select",
+          opcoes: (categorias ?? [])
+            .filter((c) => c.ativo)
+            .map((c) => ({ valor: c.id, rotulo: c.nome })),
+          ajuda: "Catálogo gerenciado em Categorias (admin)",
+          dica: "A categoria de atividade que agrupa esta tarefa (ex.: Higienização, Coleta). Usada nos filtros da paleta e na recalibração em cascata. O catálogo é gerenciado na tela Categorias.",
+        },
+        {
           key: "tipo_tarefa",
-          rotulo: "Tipo da tarefa",
+          rotulo: "Tipo (texto livre)",
           tipo: "texto",
-          ajuda: "Ex.: Limpeza concorrente, Higienização",
-          dica: "Uma categoria livre para agrupar e filtrar tarefas parecidas nos relatórios (ex.: \"Higienização\", \"Coleta\", \"Limpeza\"). Não muda o cálculo — serve só para organizar.",
+          ajuda: "Rótulo livre opcional — prefira a Categoria acima",
+          dica: "Campo de texto livre legado, anterior à camada de Categorias. Pode usar para uma observação fina de tipo, mas o agrupamento oficial agora é a Categoria.",
         },
         {
           key: "local_id",
@@ -164,6 +176,22 @@ export default function PaginaTarefas() {
           render: (t) => {
             const l = localPorId(t.local_id);
             return l ? `${l.nome_local} — ${nomeSede(l.sede_id)}` : t.local_id;
+          },
+        },
+        {
+          key: "categoria_id",
+          rotulo: "Categoria",
+          render: (t) => {
+            const c = categoriaPorId(t.categoria_id);
+            if (!c) return <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>;
+            return (
+              <span
+                className="selo"
+                style={{ background: c.cor || "var(--papel-3)", color: "#fff", borderColor: c.cor || "var(--tinta)" }}
+              >
+                {c.nome}
+              </span>
+            );
           },
         },
         {

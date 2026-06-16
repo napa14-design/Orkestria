@@ -14,6 +14,12 @@ export interface Tarefa extends Auditoria {
   local_id: string;
   /** Herdado automaticamente do local — nunca informado manualmente. */
   sede_id: string;
+  /**
+   * Categoria de atividade (entidade `categorias`) que agrupa a tarefa.
+   * Opcional para compatibilidade com tarefas anteriores à camada de categorias;
+   * substitui aos poucos o campo livre `tipo_tarefa`.
+   */
+  categoria_id?: string;
   regra_calculo: RegraCalculo;
   /**
    * Significado depende da regra:
