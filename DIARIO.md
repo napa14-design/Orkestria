@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-12 — Plano de evolução (pós pré-análise do diretor)
+
+**O que mudou:** o diretor enviou uma pré-análise classificando ideias de
+evolução (JÁ EXISTE / MELHORIA / LACUNA / DIREÇÃO / RISCO) em 9 temas. Conferi
+contra o código (classificações batem; e registrei que a "periodicidade por dia
+da semana" já avançou via `escala`). Criado `docs/08-plano-evolucao.md`:
+sequencia tudo em fases A–F por dependência/risco (ganhos rápidos → categoria de
+atividade → serviços eventuais/eventualidades → deslocamento/tempo por pessoa →
+conformidade/aptidão → direção: Auth, app/QR, remanejo entre sedes), com as
+decisões em aberto que travam cada fase e os guarda-corpos de risco
+(tempo individual planejar≠avaliar; idade/sexo fora de produtividade).
+Nada implementado ainda — é o mapa de execução.
+
+**Arquivos:** `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-12 — Consultas filtradas (corta leituras do Firestore)
 
 **O que mudou:** novo método `DataSource.consultar(tabela, condicoes)` que no
