@@ -19,6 +19,7 @@ import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
+import Modal from "@/components/Modal";
 import {
   blocosOcupados,
   funcionarioNoDia,
@@ -77,6 +78,11 @@ export default function PaginaRotinas() {
   // Sedes grandes (50+ ASGs): busca por nome + paginação de colunas.
   const [buscaFuncionario, setBuscaFuncionario] = useState("");
   const [paginaFunc, setPaginaFunc] = useState(0);
+  // Modal de "autorizar conflito manualmente" (substitui o confirm() nativo).
+  const [confirmacao, setConfirmacao] = useState<{
+    mensagens: string[];
+    resolver: (ok: boolean) => void;
+  } | null>(null);
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -228,16 +234,24 @@ export default function PaginaRotinas() {
     return true;
   }
 
-  /** Conflitos que o supervisor pode autorizar manualmente (regras 6 e 7). */
-  function pedirAutorizacao(validacao: AlertaValidacao[]): boolean {
+  /**
+   * Conflitos que o supervisor pode autorizar manualmente (regras 6 e 7).
+   * Abre um modal estilizado e devolve a escolha (sem o confirm() do navegador).
+   */
+  function pedirAutorizacao(validacao: AlertaValidacao[]): Promise<boolean> {
     const erros = validacao.filter((a) => a.nivel === "erro");
     const autorizaveis =
       erros.length > 0 &&
       erros.every((a) => a.codigo === "INTERVALO" || a.codigo === "SOBREPOSICAO");
-    if (!autorizaveis) return false;
-    return window.confirm(
-      `${erros.map((e) => `• ${e.mensagem}`).join("\n")}\n\nAutorizar mesmo assim? A rotina ficará marcada como autorizada manualmente.`,
-    );
+    if (!autorizaveis) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      setConfirmacao({ mensagens: erros.map((e) => e.mensagem), resolver: resolve });
+    });
+  }
+
+  function responderConfirmacao(ok: boolean) {
+    confirmacao?.resolver(ok);
+    setConfirmacao(null);
   }
 
   /** Validação local imediata; o servidor revalida antes de gravar. */
@@ -285,7 +299,7 @@ export default function PaginaRotinas() {
     const validacao = validarLocalmente(funcionarioId, inicio, previsto, tarefa);
     let forcar = false;
     if (temErro(validacao)) {
-      if (!pedirAutorizacao(validacao)) {
+      if (!(await pedirAutorizacao(validacao))) {
         setAlertas(validacao);
         return;
       }
@@ -355,7 +369,7 @@ export default function PaginaRotinas() {
     );
     let forcar = false;
     if (temErro(validacao)) {
-      if (!pedirAutorizacao(validacao)) {
+      if (!(await pedirAutorizacao(validacao))) {
         setAlertas(validacao);
         return;
       }
@@ -421,7 +435,7 @@ export default function PaginaRotinas() {
     try {
       await aplicar(false);
     } catch (err) {
-      if (err instanceof ErroApi && pedirAutorizacao(err.alertas)) {
+      if (err instanceof ErroApi && (await pedirAutorizacao(err.alertas))) {
         try {
           await aplicar(true);
         } catch (err2) {
@@ -601,6 +615,46 @@ export default function PaginaRotinas() {
       />
 
       <AlertPanel alertas={alertas} aoLimpar={() => setAlertas([])} />
+
+      <Modal
+        titulo="Autorizar conflito manualmente?"
+        aberto={!!confirmacao}
+        aoFechar={() => responderConfirmacao(false)}
+        larguraMax={460}
+      >
+        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 10 }}>
+          Esta alocação tem um conflito que você pode autorizar:
+        </p>
+        <div
+          style={{
+            background: "var(--papel-2)",
+            borderLeft: "4px solid var(--amarelo)",
+            borderRadius: 3,
+            padding: "8px 12px",
+            display: "grid",
+            gap: 4,
+            marginBottom: 12,
+          }}
+        >
+          {confirmacao?.mensagens.map((m, i) => (
+            <div key={i} style={{ fontSize: 13, color: "var(--tinta)" }}>
+              ⚠ {m}
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 12, color: "var(--tinta-3)", marginBottom: 16 }}>
+          Se autorizar, a rotina fica marcada como <strong>autorizada manualmente</strong> (e o
+          histórico registra isso).
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button type="button" className="btn" onClick={() => responderConfirmacao(false)}>
+            Cancelar
+          </button>
+          <button type="button" className="btn btn-primario" onClick={() => responderConfirmacao(true)}>
+            Autorizar mesmo assim
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
