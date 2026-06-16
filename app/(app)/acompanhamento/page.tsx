@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import {
+  cobraDesvio,
   desvioPercentual,
   exigeJustificativa,
   PARAMETROS_PADRAO,
@@ -186,9 +187,9 @@ export default function PaginaAcompanhamento() {
   const statusCritico = ["nao_realizada", "remanejada", "cancelada"].includes(
     form.status_realizado,
   );
-  // tarefa de "tempo referência" não cobra desvio
+  // tarefa de referência/presença não cobra desvio
   const ehReferencia = rotinaAberta
-    ? Boolean(tarefaPorId.get(rotinaAberta.tarefa_id)?.tempo_referencia)
+    ? !cobraDesvio(tarefaPorId.get(rotinaAberta.tarefa_id))
     : false;
   const desvioAtual = rotinaAberta
     ? desvioPercentual(form.tempo_real_min, rotinaAberta.tempo_previsto_min)

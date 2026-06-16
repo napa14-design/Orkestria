@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-16 — Fase C (2/2): presença/plantão + buffer calibrado — Fase C concluída
+
+**O que mudou (fecha o segundo eixo):**
+- **Presença/plantão** (`Tarefa.presenca`): classificação de tarefa para tempo de
+  permanência (ex.: acompanhar pátio). NÃO cobra desvio — criamos o helper
+  `cobraDesvio(tarefa) = !(tempo_referencia || presenca)` e o aplicamos em TODOS
+  os pontos de desvio (execucoesService, SugestoesAjuste, dashboard, acompanhamento).
+  Campo no form de Tarefas + selo "presença".
+- **Buffer calibrado por sede** (`components/CalibracaoFolga.tsx`, no dashboard):
+  painel que sugere a folga de cada sede = tempo médio de imprevistos por dia ÷
+  capacidade diária (soma das jornadas líquidas). Sugestão transparente, NÃO
+  aplica sozinha — fecha o ciclo do Tema 6 da pré-análise.
+- Seed: t13 "Acompanhamento de pátio" (presença).
+- Verificado em memória: presença com real 120 / previsto 60 sem justificativa →
+  201 (não cobra); tarefa normal igual → 422 (exige justificativa). Calibração:
+  Aldeota 45min de imprevisto / cap. 24h, DT 30min / 16h — cálculo correto. Selo
+  "presença" na tela. Build e console limpos.
+
+**Fase C concluída** (4/4). Próximo: Fase D (deslocamento, tempo por pessoa,
+criticidade) — toca o cálculo de tempo e tem decisões de modelagem em aberto.
+
+**Arquivos:** `types/Tarefa.ts`, `lib/schema.ts`, `lib/calculations.ts`
+(`cobraDesvio`), `services/execucoesService.ts`, `components/SugestoesAjuste.tsx`,
+`components/CalibracaoFolga.tsx` (novo), `app/(app)/{tarefas,dashboard,acompanhamento}/page.tsx`,
+`lib/memoryStore.ts`, `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase C (1/2): serviços eventuais e imprevistos (2º eixo)
 
 **O que mudou (a porta de entrada do trabalho não-rotineiro):**

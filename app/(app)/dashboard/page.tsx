@@ -3,11 +3,13 @@
 /** Dashboard de indicadores: ocupação, ociosidade, tempo por local/sede. */
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import CalibracaoFolga from "@/components/CalibracaoFolga";
 import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import SugestoesAjuste from "@/components/SugestoesAjuste";
 import {
   classificarOcupacao,
+  cobraDesvio,
   desvioPercentual,
   jornadaLiquidaMin,
   PARAMETROS_PADRAO,
@@ -23,6 +25,7 @@ import type {
   ParametrosResolvidos,
   RotinaPlanejada,
   Sede,
+  ServicoEventual,
   Tarefa,
 } from "@/types";
 
@@ -70,6 +73,10 @@ export default function PaginaDashboard() {
   );
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
     `/api/execucoes?de=${de}&ate=${ate}`,
+    fetcher,
+  );
+  const { data: eventuais } = useSWR<ServicoEventual[]>(
+    `/api/servicos-eventuais?de=${de}&ate=${ate}`,
     fetcher,
   );
 
@@ -133,11 +140,11 @@ export default function PaginaDashboard() {
     const tarefasNaoRealizadas = execsDoEscopo.filter(
       (e) => e.status_realizado === "nao_realizada",
     ).length;
-    const refPorTarefa = new Map((tarefas ?? []).map((t) => [t.id, t.tempo_referencia]));
+    const cobraPorTarefa = new Map((tarefas ?? []).map((t) => [t.id, cobraDesvio(t)]));
     const desvios = execsDoEscopo
       .filter((e) => e.tempo_real_min > 0)
-      // tarefas de "tempo referência" não contam como desvio (execução varia)
-      .filter((e) => !refPorTarefa.get(rotinaPorId.get(e.rotina_id)!.tarefa_id))
+      // tarefas de referência/presença não contam como desvio (execução varia)
+      .filter((e) => cobraPorTarefa.get(rotinaPorId.get(e.rotina_id)!.tarefa_id) !== false)
       .map((e) => {
         const rotina = rotinaPorId.get(e.rotina_id)!;
         return {
@@ -359,6 +366,16 @@ export default function PaginaDashboard() {
           cor="var(--cinza-bloco)"
         />
       </div>
+
+      {/* calibração da folga por sede a partir dos imprevistos */}
+      <CalibracaoFolga
+        servicosEventuais={eventuais ?? []}
+        funcionarios={funcionarios ?? []}
+        sedes={sedes ?? []}
+        de={de}
+        ate={ate}
+        sedeFiltro={sedeFiltro}
+      />
 
       {/* tempos padrão para revisar (previsto × realidade) */}
       <SugestoesAjuste

@@ -22,6 +22,16 @@ export function fatorIntensidade(categoria: Categoria | undefined): number {
   return typeof f === "number" && f > 0 ? f : 1;
 }
 
+/**
+ * A tarefa cobra desvio previsto × realizado? Tarefas de tempo-referência e de
+ * presença/plantão NÃO cobram (a variação é esperada / é tempo de permanência).
+ */
+export function cobraDesvio(
+  tarefa: Pick<Tarefa, "tempo_referencia" | "presenca"> | undefined | null,
+): boolean {
+  return !(tarefa?.tempo_referencia || tarefa?.presenca);
+}
+
 export const PARAMETROS_PADRAO: ParametrosResolvidos = {
   bloco_agenda_min: 30,
   ocupacao_baixa: 60,

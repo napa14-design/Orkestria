@@ -6,7 +6,7 @@
  * sugere um novo tempo base — aplicável com um clique.
  */
 import { useMemo, useState } from "react";
-import { fatorIntensidade, mediana, tempoPrevistoMin } from "@/lib/calculations";
+import { cobraDesvio, fatorIntensidade, mediana, tempoPrevistoMin } from "@/lib/calculations";
 import { apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type {
@@ -75,8 +75,8 @@ export default function SugestoesAjuste({
     for (const [tarefaId, reais] of reaisPorTarefa) {
       if (reais.length < parametros.min_execucoes_ajuste) continue;
       const tarefa = tarefas.find((t) => t.id === tarefaId);
-      // tarefas de "tempo referência" não entram (desvio é esperado)
-      if (!tarefa || !tarefa.ativo || tarefa.tempo_referencia) continue;
+      // tarefas que não cobram desvio (referência/presença) não entram
+      if (!tarefa || !tarefa.ativo || !cobraDesvio(tarefa)) continue;
       const local = localPorId.get(tarefa.local_id);
       const categoria = categoriaPorId.get(tarefa.categoria_id ?? "");
       const fator = fatorIntensidade(categoria);

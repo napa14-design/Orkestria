@@ -165,6 +165,13 @@ export default function PaginaTarefas() {
           padrao: false,
           dica: "Marque quando o tempo previsto é apenas uma base e a execução varia muito (ex.: montagem de palco). Assim o sistema NÃO cobra justificativa de desvio, não inclui a tarefa no \"Top desvios\" nem nas sugestões de ajuste — evita poluir os indicadores com falsos desvios.",
         },
+        {
+          key: "presenca",
+          rotulo: "Presença / plantão",
+          tipo: "checkbox",
+          padrao: false,
+          dica: "Marque para atividades de permanência (ex.: acompanhar alunos no intervalo, plantão). É tempo ocupado e necessário: o sistema NÃO cobra desvio (a duração varia por contexto, não é erro de estimativa). Diferente de \"tempo é referência\" só no sentido — aqui é tempo de permanência, não de produção.",
+        },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -240,8 +247,10 @@ export default function PaginaTarefas() {
                 <span className="selo selo-azul">{rotularDiasSemana(t.dias_semana)}</span>
               )}
               {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
+              {t.presenca && <span className="selo selo-azul">presença</span>}
               {!t.restricao_genero &&
                 !t.tempo_referencia &&
+                !t.presenca &&
                 !(t.janela_inicio && t.janela_fim) &&
                 !(t.frequencia === "semanal" && t.dias_semana) && (
                   <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>

@@ -72,10 +72,10 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Registro de serviço eventual** | atividade não planejada, registrada depois (início/fim/detalhe) | — | G |
-| **Registro de eventualidade/imprevisto** | imprevisto que consumiu tempo (não é ociosidade) | serviço eventual | M |
-| **Buffer calibrado por sede (dados reais)** | derivar a folga necessária a partir dos imprevistos por sede | eventualidades + folga mínima (Fase A) | M |
-| **Atividades de presença/plantão** | tempo de permanência: não cobra desvio, não é ociosidade | classificação de tarefa | M |
+| **Registro de serviço eventual** ✅ | atividade não planejada, registrada depois (início/fim/detalhe) | — | G |
+| **Registro de eventualidade/imprevisto** ✅ | imprevisto que consumiu tempo (não é ociosidade); `tipo` na mesma entidade | serviço eventual | M |
+| **Buffer calibrado por sede (dados reais)** ✅ | painel no dashboard sugere folga = imprevistos médios/dia ÷ capacidade da sede | eventualidades + folga mínima (Fase A) | M |
+| **Atividades de presença/plantão** ✅ | flag `presenca` na tarefa: não cobra desvio (helper `cobraDesvio`) | classificação de tarefa | M |
 
 ## Fase D — Enriquecimento do cálculo de tempo
 

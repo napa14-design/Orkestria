@@ -44,6 +44,12 @@ export interface Tarefa extends Auditoria {
    * cuja execução varia muito).
    */
   tempo_referencia?: boolean;
+  /**
+   * Atividade de presença/plantão (ex.: acompanhar alunos no intervalo): é
+   * tempo de permanência, não de produção. Como `tempo_referencia`, NÃO cobra
+   * desvio; a diferença é semântica (permanência ≠ estimativa que variou).
+   */
+  presenca?: boolean;
   /** Janela em que a tarefa pode ocorrer (ex.: refeitório só após o almoço). */
   janela_inicio?: string; // HH:mm — vazio = qualquer horário do expediente
   janela_fim?: string; // HH:mm

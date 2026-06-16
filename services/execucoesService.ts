@@ -4,7 +4,7 @@
  * A estrutura completa (tipos, aba no Sheets, API) já existe no MVP para que
  * a Fase 2 seja apenas a construção da tela de acompanhamento.
  */
-import { exigeJustificativa } from "@/lib/calculations";
+import { cobraDesvio, exigeJustificativa } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import type { ExecucaoRealizada, StatusRealizado, StatusRotina } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -44,7 +44,7 @@ export async function registrarExecucao(
   // Regras de justificativa obrigatória.
   const statusQueExigem: StatusRealizado[] = ["nao_realizada", "remanejada", "cancelada"];
   const desvioGrande =
-    !tarefa?.tempo_referencia &&
+    cobraDesvio(tarefa) &&
     dados.tempo_real_min > 0 &&
     exigeJustificativa(dados.tempo_real_min, rotina.tempo_previsto_min, parametros);
   if ((statusQueExigem.includes(dados.status_realizado) || desvioGrande) && !dados.justificativa.trim()) {
