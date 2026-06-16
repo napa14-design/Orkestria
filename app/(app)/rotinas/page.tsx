@@ -456,9 +456,11 @@ export default function PaginaRotinas() {
         },
         {
           optimisticData: (cur) => (cur ?? []).filter((r) => r.id !== rotinaId),
+          // Filtra sobre o cache MAIS RECENTE (currentData) — evita que exclusões
+          // rápidas concorrentes reintroduzam um card já removido ("some e volta").
+          populateCache: (_res, atual) => (atual ?? []).filter((r) => r.id !== rotinaId),
           rollbackOnError: true,
           revalidate: false,
-          populateCache: true,
         },
       );
     } catch (err) {
@@ -614,7 +616,11 @@ export default function PaginaRotinas() {
         aoConcluir={concluirPlanejamento}
       />
 
-      <AlertPanel alertas={alertas} aoLimpar={() => setAlertas([])} />
+      <AlertPanel
+        alertas={alertas}
+        aoLimpar={() => setAlertas([])}
+        aoDispensar={(i) => setAlertas((prev) => prev.filter((_, idx) => idx !== i))}
+      />
 
       <Modal
         titulo="Autorizar conflito manualmente?"
