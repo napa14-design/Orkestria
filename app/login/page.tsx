@@ -52,11 +52,26 @@ export default function PaginaLogin() {
     }
   }
 
-  function entrarComGoogle() {
+  async function entrarComGoogle() {
     setErro("");
-    setAviso(
-      "O acesso pelo Google será habilitado em breve (depende da ativação do login individual). Por enquanto, entre com e-mail e senha.",
-    );
+    setAviso("");
+    setEnviando(true);
+    try {
+      const { loginGoogleObterToken } = await import("@/lib/firebaseWeb");
+      const idToken = await loginGoogleObterToken();
+      await apiPost("/api/auth/google", { idToken });
+      router.push("/rotinas");
+      router.refresh();
+    } catch (err) {
+      // popup fechado/cancelado não é erro a exibir
+      const code = (err as { code?: string })?.code ?? "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        setEnviando(false);
+        return;
+      }
+      setErro(err instanceof ErroApi ? err.message : "Falha ao entrar com Google.");
+      setEnviando(false);
+    }
   }
 
   return (
@@ -188,6 +203,7 @@ export default function PaginaLogin() {
               type="button"
               className="btn btn-google entra-3"
               onClick={entrarComGoogle}
+              disabled={enviando}
             >
               <GoogleG />
               Entrar com Google

@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-16 — Fase F: login com Google (Firebase Auth)
+
+**O que mudou:**
+- **"Entrar com Google"** na tela de login (Firebase Auth, provedor Google que o
+  usuário habilitou no console). Fluxo: popup do Google no cliente
+  (`lib/firebaseWeb.ts`, SDK `firebase`) → ID token → `POST /api/auth/google` →
+  **Admin SDK `verifyIdToken`** → e-mail precisa estar **cadastrado e ativo** em
+  `usuarios` → cria a sessão normal (perfil/sede do cadastro). E-mail não
+  cadastrado → 403. Convive com o login por e-mail/senha (não substitui).
+- Helper `lib/firebaseAdmin.ts` (app Admin compartilhado) extraído; `firebaseClient`
+  passou a reusá-lo. Config web é pública (hardcoded em `firebaseWeb.ts`).
+- `middleware.ts`: `/api/auth/*` já era público (cobre a nova rota).
+- Verificado: build ok; rota defensiva (sem token → 400; token inválido → 401 via
+  Admin real). **O popup do Google deve ser testado por você no navegador** (não
+  dá para automatizar headless).
+
+**Para você testar / publicar:**
+- Rodar `npm run dev` (DATA_SOURCE=firebase) e clicar "Entrar com Google" com uma
+  conta cujo e-mail esteja cadastrado em `usuarios` (senão dá 403, que é o esperado).
+- No deploy (Vercel), adicionar o domínio em **Authentication → Authorized
+  domains** no console do Firebase.
+- Nova dependência: `firebase` (SDK cliente) no `package.json`.
+
+**Arquivos:** `lib/firebaseAdmin.ts` (novo), `lib/firebaseWeb.ts` (novo),
+`lib/firebaseClient.ts`, `app/api/auth/google/route.ts` (novo), `app/login/page.tsx`,
+`package.json` (+firebase), `docs/08-plano-evolucao.md`.
+
+---
+
 ## 2026-06-16 — Fase F: login individual (senha por usuário)
 
 **O que mudou:**

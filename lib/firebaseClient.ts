@@ -9,31 +9,16 @@
  * projeto → Contas de serviço → Gerar nova chave privada):
  *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
  */
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import type { CondicaoConsulta, DataSource } from "./datasource";
+import { obterAppAdmin } from "./firebaseAdmin";
 import type { MapaTabelas, NomeTabela } from "./schema";
-
-function obterApp(): App {
-  const existente = getApps()[0];
-  if (existente) return existente;
-
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "DATA_SOURCE=firebase exige FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY no .env",
-    );
-  }
-  return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
-}
 
 export class FirebaseDataSource implements DataSource {
   private db: Firestore;
 
   constructor() {
-    this.db = getFirestore(obterApp());
+    this.db = getFirestore(obterAppAdmin());
   }
 
   async listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
