@@ -81,7 +81,7 @@ function seed(): Banco {
     ],
     rotinas_planejadas: [
       { id: "r1", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t1", local_id: "l1", inicio_planejado: "07:00", fim_planejado: "08:30", tempo_previsto_min: 80, tempo_visual_min: 90, blocos_ocupados: 3, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
-      { id: "r2", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t2", local_id: "l2", inicio_planejado: "08:30", fim_planejado: "09:00", tempo_previsto_min: 20, tempo_visual_min: 30, blocos_ocupados: 1, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
+      { id: "r2", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t2", local_id: "l2", inicio_planejado: "08:30", fim_planejado: "09:30", tempo_previsto_min: 45, tempo_visual_min: 60, blocos_ocupados: 2, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
       { id: "r3", data: hoje, funcionario_id: "f2", sede_id: "sede_aldeota", tarefa_id: "t4", local_id: "l4", inicio_planejado: "07:00", fim_planejado: "07:30", tempo_previsto_min: 30, tempo_visual_min: 30, blocos_ocupados: 1, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
     ],
     execucoes_realizadas: [],

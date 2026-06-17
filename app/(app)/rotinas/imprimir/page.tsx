@@ -15,10 +15,16 @@ import type {
   Ausencia,
   Funcionario,
   Local,
+  Requisito,
   RotinaPlanejada,
   Sede,
   Tarefa,
 } from "@/types";
+
+const ROTULO_SERVICO: Record<string, string> = {
+  pesada: "pesada",
+  desincrustante: "desincrustante",
+};
 
 function Fichas() {
   const params = useSearchParams();
@@ -46,10 +52,25 @@ function Fichas() {
     sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null,
     fetcher,
   );
+  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
 
   const sede = (sedes ?? []).find((s) => s.id === sedeId);
   const tarefaPorId = useMemo(() => new Map((tarefas ?? []).map((t) => [t.id, t])), [tarefas]);
   const localPorId = useMemo(() => new Map((locais ?? []).map((l) => [l.id, l])), [locais]);
+  const reqPorId = useMemo(() => new Map((requisitos ?? []).map((r) => [r.id, r])), [requisitos]);
+
+  // EPIs exigidos pelas tarefas da ficha (derivados dos requisitos tipo "epi").
+  const episDe = (rs: RotinaPlanejada[]) => {
+    const nomes = new Set<string>();
+    for (const r of rs) {
+      const t = tarefaPorId.get(r.tarefa_id);
+      for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
+        const req = reqPorId.get(id);
+        if (req && req.tipo === "epi") nomes.add(req.nome);
+      }
+    }
+    return [...nomes];
+  };
   const ausentes = useMemo(
     () => new Set((ausencias ?? []).map((a) => a.funcionario_id)),
     [ausencias],
@@ -93,7 +114,9 @@ function Fichas() {
         </div>
       )}
 
-      {fichas.map(({ funcionario: f, rotinas: rs }) => (
+      {fichas.map(({ funcionario: f, rotinas: rs }) => {
+        const epis = episDe(rs);
+        return (
         <section
           key={f.id}
           className="ficha-impressao painel"
@@ -136,6 +159,30 @@ function Fichas() {
             </div>
           </div>
 
+          {/* EPIs exigidos pelas tarefas do dia — o ASG confirma o uso */}
+          {epis.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 12,
+                padding: "8px 16px",
+                borderBottom: "1px solid var(--linha)",
+                fontSize: 11,
+              }}
+            >
+              <span className="rotulo" style={{ color: "var(--acento)" }}>
+                🧤 EPIs obrigatórios:
+              </span>
+              {epis.map((nome) => (
+                <span key={nome} className="num" style={{ whiteSpace: "nowrap" }}>
+                  ( ) {nome}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* tarefas */}
           <table className="tabela" style={{ fontSize: 12 }}>
             <thead>
@@ -157,7 +204,14 @@ function Fichas() {
                     <td className="num">
                       {r.inicio_planejado}–{r.fim_planejado}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{t?.nome_tarefa ?? "Tarefa"}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {t?.nome_tarefa ?? "Tarefa"}
+                      {t?.tipo_servico && ROTULO_SERVICO[t.tipo_servico] && (
+                        <span style={{ fontWeight: 400, color: "var(--tinta-3)" }}>
+                          {" "}· {ROTULO_SERVICO[t.tipo_servico]}
+                        </span>
+                      )}
+                    </td>
                     <td>{l ? `${l.nome_local} (${l.andar})` : ""}</td>
                     <td className="num">{formatarDuracao(r.tempo_previsto_min)}</td>
                     <td>( ) Sim&nbsp;&nbsp;( ) Não</td>
@@ -186,7 +240,8 @@ function Fichas() {
             </div>
           </div>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-17 — Onda 4.1 (pós-ata): ficha de confirmação com EPIs
+
+**Contexto:** o ASG não usa celular — a confirmação do que foi feito será por
+**ficha de papel** (e, no futuro, leitura por OCR). Esta entrega cobre a ficha;
+o OCR (4.2) fica como spike a decidir (ver `docs/08`).
+
+**O que mudou:**
+- A impressão `/rotinas/imprimir` ganhou, por ficha (funcionário/dia):
+  - **Lista de EPIs obrigatórios** com caixa de confirmação, derivada dos
+    `requisitos` tipo `epi` das tarefas do dia (ex.: "🧤 ( ) Luvas nitrílicas").
+  - **Tipo de serviço** ao lado da tarefa quando não é rotina
+    (ex.: "Higienização de banheiro · pesada").
+  - (Checklist por ambiente "Feito? Sim/Não", anotações e assinaturas já
+    existiam — o ASG só **confirma**.)
+- Seed: a rotina de exemplo da higienização (r2) foi atualizada para o novo
+  modelo de tempo (45 min / 60 visual / 2 blocos) — consistência da demo.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; ficha de Maria renderiza o
+bloco "EPIS OBRIGATÓRIOS: ( ) Luvas nitrílicas" e a tarefa "Higienização de
+banheiro · pesada"; console limpo. `.env` restaurado para `firebase`.
+
+**Pendente:** 4.2 ingestão por OCR (spike — escolher serviço/lib + credenciais);
+confirmação automática de EPI e reconhecimento facial dependem dessa ingestão.
+
+**Arquivos:** `app/(app)/rotinas/imprimir/page.tsx`, `lib/memoryStore.ts`
+(seed r2), `docs/08`.
+
+---
+
 ## 2026-06-17 — Onda 3 (pós-ata): calendário acadêmico (período letivo)
 
 **Contexto:** terceira onda. Tarefas que só fazem sentido com aula (ex.: limpeza

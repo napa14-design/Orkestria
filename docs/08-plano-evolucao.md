@@ -16,7 +16,7 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | **1** | **Modelo de tempo + regra de horário** | ✅ **feito** |
 | **2** | Granularidade (manter 30 min visual; deslocamento já configurável por sede) | ✅ **feito** (config + nota) |
 | **3** | Calendário acadêmico / período letivo | ✅ **feito** |
-| 4 | Confirmação do executado (ficha de papel + OCR) | pendente |
+| 4 | Confirmação do executado (ficha de papel + OCR) | 🟡 **parcial** (ficha pronta; OCR = spike) |
 | 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | pendente |
 
 **Onda 1 (entregue):** o tempo previsto passou a ser
@@ -28,6 +28,18 @@ regra de horário passou a **bloquear só o início** fora do expediente: uma
 tarefa pode terminar depois da saída, mas não pode iniciar às/após a saída.
 O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
 "Recalibrar" continua, pois mexe no `tempo_base_min`).
+
+**Onda 4 (parcial):** a **ficha de confirmação imprimível** (4.1) está pronta —
+`/rotinas/imprimir` agora lista, por funcionário/dia, os **EPIs obrigatórios**
+(derivados dos requisitos tipo `epi` das tarefas, com caixa de confirmação) e
+marca o **tipo de serviço** (pesada/desincrustante) em cada tarefa, além do
+checklist por ambiente (Feito? Sim/Não), anotações e assinaturas que já
+existiam. O ASG só **confirma** no papel. **Falta (decisão/spike):**
+**4.2 ingestão por OCR** das fichas escaneadas → casar com as rotinas → gerar
+execuções; é o maior risco técnico e depende de escolher um serviço/lib de OCR
+(com credenciais) — tratar como spike isolado antes de comprometer prazo. A
+**confirmação automática de EPI** e o reconhecimento facial (4.3) dependem dessa
+etapa de ingestão.
 
 **Onda 3 (entregue):** nova entidade **`periodos_letivos`** (calendário
 acadêmico por sede: nome, intervalo, dias com aula) com CRUD completo
