@@ -8,9 +8,8 @@
 import { useMemo, useState } from "react";
 import {
   cobraDesvio,
-  fatorIntensidadeLocal,
-  fatorServico,
   mediana,
+  multiplicadorTempo,
   tempoPrevistoMin,
 } from "@/lib/calculations";
 import { apiPut, ErroApi } from "@/lib/clientApi";
@@ -80,8 +79,8 @@ export default function SugestoesAjuste({
       // tarefas que não cobram desvio (referência/presença) não entram
       if (!tarefa || !tarefa.ativo || !cobraDesvio(tarefa)) continue;
       const local = localPorId.get(tarefa.local_id);
-      // fator total = intensidade do ambiente × natureza do serviço
-      const fator = fatorIntensidadeLocal(local) * fatorServico(tarefa);
+      // mesmo multiplicador do tempo previsto (intensidade só em por_m2/unidade)
+      const fator = multiplicadorTempo(tarefa, local);
 
       // compara com o previsto ATUAL: depois de aplicar, a sugestão some.
       const previstoAtual = tempoPrevistoMin(tarefa, local);

@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-06-17 — Estudo da planilha real (Aldeota): granularidade 15 min, não-limpeza e refino do tempo
+
+**Contexto:** o usuário enviou a planilha "Rota de Trabalho ASG · Aldeota" (rota
+operacional real). Analisada e usada para três ajustes concretos.
+
+**1. Estudo documentado** em `docs/11-estudo-planilha-aldeota.md`: estrutura das
+3 abas; descobertas — planejam em blocos de 15/10/5 min; a "Produtividade" deles
+é m²÷tempo (resultado, não fórmula); muito tempo é não-limpeza (café, aguação,
+recolhimento); "Setor"=Local, "Tipo de atividade"="limpeza de rotina <ambiente>",
+"Ação"=POP.
+
+**2. Catálogo de não-limpeza + refino do cálculo:**
+- Nova categoria **"Apoio operacional"** (c8) e tarefas de exemplo **Café da
+  sede** (fixo 60, crítica), **Recolhimento de materiais** (fixo 20), **Aguação
+  de plantas** (fixo 15).
+- **Refino:** a **intensidade do ambiente agora só incide em `por_m2`/
+  `por_unidade`** (limpeza dimensionada pela área); tarefas de **tempo
+  fixo/manual NÃO recebem intensidade** (café na copa = 60, não 78; reposição no
+  banheiro = 15, não 23). O **fator de serviço** (rotina/pesada/desincrustante)
+  continua em todas as regras (vidros fixo desincrustante = 80). Novo helper
+  `multiplicadorTempo(tarefa, local)` compartilhado por `tempoPrevistoMin` e
+  `SugestoesAjuste`.
+
+**3. Granularidade fina (Onda 2 revista):** `bloco_agenda_min` 30 → **15**
+(padrão + seed); `ALTURA_BLOCO` 40 → 30 px para a grade mais densa não ficar
+gigante. Régua e snap da agenda agora de 15 em 15 min. Seed de rotinas
+recalculado para 15 min.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; `/tarefas` mostra Café=1h,
+Reposição=15min, Vidros=1h20, e as 3 tarefas de Apoio operacional; `/rotinas`
+com régua 07:00·07:15·07:30…; console limpo. `.env` restaurado para `firebase`.
+
+**Arquivos:** `lib/calculations.ts` (`multiplicadorTempo` + refino + padrão 15),
+`components/SugestoesAjuste.tsx`, `components/agenda/AgendaGrid.tsx`
+(`ALTURA_BLOCO`), `lib/memoryStore.ts` (categoria c8, tarefas t14–t16, p1=15,
+rotinas r1–r3), `docs/03`, `docs/08`, `docs/11` (novo).
+
+---
+
 ## 2026-06-17 — Onda 5.1 (pós-ata): tipo e grupo de sede
 
 **Contexto:** base para comparar ociosidade entre unidades parecidas e para

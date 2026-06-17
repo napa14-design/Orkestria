@@ -14,7 +14,7 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | Onda | Tema | Status |
 |---|---|---|
 | **1** | **Modelo de tempo + regra de horário** | ✅ **feito** |
-| **2** | Granularidade (manter 30 min visual; deslocamento já configurável por sede) | ✅ **feito** (config + nota) |
+| **2** | Granularidade — snap reduzido p/ **15 min** (evidência da planilha real) | ✅ **feito** |
 | **3** | Calendário acadêmico / período letivo | ✅ **feito** |
 | 4 | Confirmação do executado (ficha de papel + OCR) | 🟡 **parcial** (ficha pronta; OCR = spike) |
 | 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | 🟡 **parcial** (cadastro feito; visão agregada + RH pendentes) |
@@ -63,18 +63,14 @@ do painel "Ficou de fora hoje". Se a sede não tiver calendário cadastrado e
 houver tarefa letiva devida, a agenda mostra um **aviso forte** pedindo o
 cadastro. Lógica pura em `statusPeriodoLetivo` (`lib/calculations.ts`).
 
-**Onda 2 (já atendida):** a precisão dos números **não depende do bloco visual**
+**Onda 2 (resolvida):** a precisão dos números **não depende do bloco visual**
 — `tempo_previsto_min` é exato e o **deslocamento** já é parâmetro por sede
-(`deslocamento_min_por_tarefa`, entregue na Fase D), entrando na ocupação como
-tempo real. A grade segue em 30 min por decisão.
-
-> ⚠️ **Tensão a discutir com o diretor (Murilo):** ele quer "combater o bloco de
-> 30 min" para capturar ganhos de 3 em 3 minutos. Hoje o `tempo_visual_min`
-> ainda **arredonda o tamanho do card** para blocos cheios (uma tarefa de 8 min
-> ocupa 30 min no desenho), embora a ocupação seja calculada no minuto exato. Se
-> ele insistir no ganho de **empacotar tarefas curtas** lado a lado, o próximo
-> passo é reduzir o *snap* (ex.: 10/15 min) — deixando claro que isso é só
-> visual e não muda os números.
+(`deslocamento_min_por_tarefa`, Fase D), entrando na ocupação como tempo real.
+A **planilha real da Aldeota** mostrou que a rota é feita em blocos de **15 min**
+(o mais comum), 10 e até 5 min — confirmando a diretriz do Murilo de "combater o
+bloco de 30 min". **Decisão revista:** o `bloco_agenda_min` passou de 30 → **15**
+(snap fino na grade e no card); continua sendo só visual e ajustável por
+parâmetro. Ver `docs/11`.
 
 ## Princípios que valem para tudo (guarda-corpos)
 

@@ -9,7 +9,7 @@ import { jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import type { Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 
-export const ALTURA_BLOCO = 40; // px por bloco de agenda
+export const ALTURA_BLOCO = 30; // px por bloco de agenda (menor: a grade agora é de 15 min)
 
 const COR_STATUS: Record<StatusRotina, { fundo: string; texto: string }> = {
   planejada: { fundo: "var(--azul)", texto: "#fff" },

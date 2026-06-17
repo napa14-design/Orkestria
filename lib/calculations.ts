@@ -78,7 +78,7 @@ export function cobraDesvio(
 }
 
 export const PARAMETROS_PADRAO: ParametrosResolvidos = {
-  bloco_agenda_min: 30,
+  bloco_agenda_min: 15,
   ocupacao_baixa: 60,
   ocupacao_adequada: 85,
   ocupacao_alta: 100,
@@ -164,14 +164,32 @@ export function cargaSemanalMin(f: Funcionario): number {
 }
 
 /**
+ * Multiplicador aplicado ao tempo base da tarefa:
+ *  - intensidade do AMBIENTE (local) — leve 0,8 · normal 1,0 · densa 1,5 — só
+ *    incide em regras dimensionadas pela área/quantidade (`por_m2`,
+ *    `por_unidade`), onde o quanto o ambiente "suja" escala o esforço. Em
+ *    tarefas de tempo fixo/manual (café, recolhimento, reposição) o tempo já é
+ *    explícito e a intensidade NÃO se aplica (evita inflar atividades que não
+ *    dependem da metragem);
+ *  - natureza do SERVIÇO (rotina 1,0 · pesada 1,5 · desincrustante 2,0) incide
+ *    em todas as regras (a forma de limpar pesa mesmo num tempo fixo, ex.: vidros
+ *    desincrustantes).
+ */
+export function multiplicadorTempo(tarefa: Tarefa, local: Local | undefined): number {
+  const escalaPelaArea =
+    tarefa.regra_calculo === "por_m2" || tarefa.regra_calculo === "por_unidade";
+  const intensidade = escalaPelaArea ? fatorIntensidadeLocal(local) : 1;
+  return intensidade * fatorServico(tarefa);
+}
+
+/**
  * Tempo previsto da tarefa segundo sua regra de cálculo:
  *  - fixo/manual → tempo_base_min
  *  - por_m2      → tempo_base_min × metragem do local (base 1 m² ≈ 1 min)
  *  - por_unidade → tempo_base_min × quantidade
  *
- * O resultado é multiplicado por DOIS fatores independentes:
- *  - intensidade do AMBIENTE (local): leve 0,8 · normal 1,0 · densa 1,5;
- *  - natureza do SERVIÇO (tarefa): rotina 1,0 · pesada 1,5 · desincrustante 2,0.
+ * O resultado é multiplicado por `multiplicadorTempo` (intensidade do ambiente,
+ * só em por_m2/por_unidade, × natureza do serviço, sempre).
  * Fórmula da 1ª fase: m² × tipo de ambiente × tipo de serviço.
  */
 export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): number {
@@ -188,7 +206,7 @@ export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): numb
     default:
       base = tarefa.tempo_base_min;
   }
-  return Math.round(base * fatorIntensidadeLocal(local) * fatorServico(tarefa));
+  return Math.round(base * multiplicadorTempo(tarefa, local));
 }
 
 /** blocos = teto(tempo_previsto / bloco). 80min em blocos de 30 → 3 blocos. */

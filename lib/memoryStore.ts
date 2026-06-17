@@ -58,6 +58,7 @@ function seed(): Banco {
       { id: "c5", nome: "Reposição", descricao: "Abastecimento de materiais e insumos.", cor: "#6b4f8a", fator_intensidade: 1, ativo: true, ...aud },
       { id: "c6", nome: "Limpeza terminal", descricao: "Limpeza profunda/periódica de maior duração.", cor: "#555555", fator_intensidade: 1, ativo: true, ...aud },
       { id: "c7", nome: "Limpeza externa", descricao: "Áreas externas e fachadas.", cor: "#8a6d3b", fator_intensidade: 1, ativo: true, ...aud },
+      { id: "c8", nome: "Apoio operacional", descricao: "Atividades que não são limpeza: café, recolhimento, aguação, montagem.", cor: "#5a7a8a", fator_intensidade: 1, ativo: true, ...aud },
     ],
     requisitos: [
       { id: "rq1", nome: "Manuseio de produtos químicos", tipo: "treinamento", descricao: "Capacitação para uso de saneantes/desinfetantes.", ativo: true, ...aud },
@@ -78,11 +79,14 @@ function seed(): Banco {
       { id: "t9", nome_tarefa: "Limpeza concorrente", tipo_tarefa: "Limpeza concorrente", categoria_id: "c1", local_id: "l7", sede_id: "sede_dt", regra_calculo: "por_m2", tempo_base_min: 1, quantidade: 1, frequencia: "diaria", prioridade: "alta", ativo: true, observacoes: "1 min/m²", ...aud },
       { id: "t10", nome_tarefa: "Higienização de banheiro", tipo_tarefa: "Higienização", categoria_id: "c2", local_id: "l8", sede_id: "sede_dt", regra_calculo: "fixo", tipo_servico: "pesada", tempo_base_min: 20, quantidade: 1, frequencia: "diaria", prioridade: "alta", ativo: true, observacoes: "", ...aud },
       { id: "t11", nome_tarefa: "Limpeza de área externa", tipo_tarefa: "Limpeza externa", categoria_id: "c7", local_id: "l9", sede_id: "sede_dt", regra_calculo: "por_m2", tempo_base_min: 0.4, quantidade: 1, frequencia: "diaria", prioridade: "baixa", ativo: true, observacoes: "0,4 min/m²", ...aud },
+      { id: "t14", nome_tarefa: "Café da sede", tipo_tarefa: "Apoio", categoria_id: "c8", local_id: "l5", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 60, quantidade: 1, frequencia: "diaria", prioridade: "alta", critica: true, ativo: true, observacoes: "Não-limpeza: preparar café para toda a sede (tempo fixo, sem fator de ambiente)", ...aud },
+      { id: "t15", nome_tarefa: "Recolhimento de materiais", tipo_tarefa: "Apoio", categoria_id: "c8", local_id: "l4", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 20, quantidade: 1, frequencia: "diaria", prioridade: "media", ativo: true, observacoes: "Não-limpeza: recolher/repor materiais pelos andares", ...aud },
+      { id: "t16", nome_tarefa: "Aguação de plantas", tipo_tarefa: "Apoio", categoria_id: "c8", local_id: "l1", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 15, quantidade: 1, frequencia: "diaria", prioridade: "baixa", ativo: true, observacoes: "Não-limpeza: regar plantas da recepção/entrada", ...aud },
     ],
     rotinas_planejadas: [
-      { id: "r1", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t1", local_id: "l1", inicio_planejado: "07:00", fim_planejado: "08:30", tempo_previsto_min: 80, tempo_visual_min: 90, blocos_ocupados: 3, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
-      { id: "r2", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t2", local_id: "l2", inicio_planejado: "08:30", fim_planejado: "09:30", tempo_previsto_min: 45, tempo_visual_min: 60, blocos_ocupados: 2, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
-      { id: "r3", data: hoje, funcionario_id: "f2", sede_id: "sede_aldeota", tarefa_id: "t4", local_id: "l4", inicio_planejado: "07:00", fim_planejado: "07:30", tempo_previsto_min: 30, tempo_visual_min: 30, blocos_ocupados: 1, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
+      { id: "r1", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t1", local_id: "l1", inicio_planejado: "07:00", fim_planejado: "08:30", tempo_previsto_min: 80, tempo_visual_min: 90, blocos_ocupados: 6, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
+      { id: "r2", data: hoje, funcionario_id: "f1", sede_id: "sede_aldeota", tarefa_id: "t2", local_id: "l2", inicio_planejado: "08:30", fim_planejado: "09:15", tempo_previsto_min: 45, tempo_visual_min: 45, blocos_ocupados: 3, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
+      { id: "r3", data: hoje, funcionario_id: "f2", sede_id: "sede_aldeota", tarefa_id: "t4", local_id: "l4", inicio_planejado: "07:00", fim_planejado: "07:30", tempo_previsto_min: 30, tempo_visual_min: 30, blocos_ocupados: 2, status: "planejada", observacao: "", supervisor_id: "u2", criado_em: AGORA, atualizado_em: AGORA },
     ],
     execucoes_realizadas: [],
     servicos_eventuais: [
@@ -108,7 +112,7 @@ function seed(): Banco {
       { id: "pl1", sede_id: "sede_aldeota", nome: "2026.1", data_inicio: "2026-02-02", data_fim: "2026-07-03", dias_semana: "1,2,3,4,5", ativo: true, ...aud },
     ],
     parametros: [
-      { id: "p1", chave: "bloco_agenda_min", valor: "30", tipo: "numero", descricao: "Tamanho do bloco da agenda em minutos", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
+      { id: "p1", chave: "bloco_agenda_min", valor: "15", tipo: "numero", descricao: "Tamanho do bloco/snap da agenda em minutos (15 = granularidade fina)", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p2", chave: "ocupacao_baixa", valor: "60", tipo: "percentual", descricao: "Limite para considerar funcionário subutilizado", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p3", chave: "ocupacao_adequada", valor: "85", tipo: "percentual", descricao: "Limite para considerar ocupação adequada", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p4", chave: "ocupacao_alta", valor: "100", tipo: "percentual", descricao: "Limite para alta ocupação/sobrecarga", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },

@@ -32,7 +32,10 @@ tempo_previsto_min         = base_da_regra × fator_intensidade_local × fator_t
                                  por_m2       → tempo_base_min × metragem_do_local (1 m² ≈ 1 min)
                                  por_unidade  → tempo_base_min × quantidade
                                fator_intensidade_local: leve 0,8 · normal 1,0 · densa 1,5 (cadastrado no Local)
+                                 → só incide em por_m2/por_unidade (limpeza dimensionada pela área);
+                                   tarefas de tempo fixo/manual (café, recolhimento) NÃO recebem intensidade
                                fator_tipo_servico:      rotina 1,0 · pesada 1,5 · desincrustante 2,0 (na Tarefa)
+                                 → incide em todas as regras (ex.: vidros desincrustantes num tempo fixo)
 blocos                     = teto(tempo_previsto_min / bloco_agenda_min)
 tempo_visual_min           = blocos × bloco_agenda_min
 tempo_planejado_min        = Σ tempo_previsto_min das rotinas do dia (exceto canceladas)
@@ -47,10 +50,11 @@ produtividade_m2_hora      = total_m2 / horas (planejada e realizada)
 
 ### Exemplo de bloco vs. tempo real
 
-Tarefa de 80 min com bloco de 30 min → `teto(80/30) = 3 blocos` → ocupa 90 min
+Tarefa de 80 min com bloco de 15 min → `teto(80/15) = 6 blocos` → ocupa 90 min
 na agenda. O sistema **guarda os dois valores**: `tempo_previsto_min = 80`
 (usado em produtividade/ocupação) e `tempo_visual_min = 90` (usado só no
-desenho da agenda).
+desenho da agenda). A grade/snap usa `bloco_agenda_min` (padrão **15 min** —
+granularidade fina, alinhada à rota real das sedes; era 30).
 
 ### Exemplo por m² (com os dois fatores)
 
