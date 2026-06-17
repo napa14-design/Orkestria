@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-17 — Cabeçalho da ficha enxugado (logo + nome + sede)
+
+A pedido: o cabeçalho de `/rotinas/imprimir` agora mostra só **logo + nome do
+funcionário + sede·data**. Removidos "Ficha de rotina diária", a linha de
+Expediente/Intervalo e a de Planejado. O **QR de leitura** e os marcadores
+fiduciais permanecem (são funcionais, não informação). Imports
+`jornadaLiquidaMin`/`tempoPlanejadoMin` removidos (sem uso). Verificado em
+memória (build ok, screenshot, console limpo); `.env` restaurado.
+
+**Arquivo:** `app/(app)/rotinas/imprimir/page.tsx`.
+
+---
+
 ## 2026-06-17 — Ficha OMR-ready (base para leitura automática por OpenCV)
 
 **Contexto:** decidido o caminho da confirmação por **OMR clássico (OpenCV)** —

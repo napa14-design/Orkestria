@@ -9,7 +9,6 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import useSWR from "swr";
-import { jornadaLiquidaMin, tempoPlanejadoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
@@ -188,37 +187,20 @@ function Fichas() {
               <img
                 src="/logo-horizontal-fundo-claro.png"
                 alt="Orkestria"
-                style={{ height: 48, width: "auto", margin: "-6px 0" }}
+                style={{ height: 44, width: "auto", margin: "-6px 0" }}
               />
               <div>
-                <div className="rotulo">Ficha de rotina diária</div>
-                <h2 style={{ fontSize: 20, fontWeight: 700 }}>{f.nome}</h2>
+                <h2 style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{f.nome}</h2>
+                <div className="rotulo" style={{ color: "var(--tinta-2)" }}>
+                  {sede?.nome_sede ?? sedeId} · {formatarDataBR(data)}
+                </div>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ textAlign: "right", fontSize: 12 }}>
-                <div>
-                  <strong>{sede?.nome_sede ?? sedeId}</strong> · {formatarDataBR(data)}
-                </div>
-                <div className="num" style={{ color: "var(--tinta-2)" }}>
-                  Expediente {f.entrada}–{f.saida} · Intervalo {f.intervalo_inicio}–{f.intervalo_fim}
-                </div>
-                <div className="num" style={{ color: "var(--tinta-2)" }}>
-                  Planejado: {formatarDuracao(tempoPlanejadoMin(rs))} de{" "}
-                  {formatarDuracao(jornadaLiquidaMin(f))}
-                </div>
-              </div>
-              {/* QR identifica a ficha (sede·data·funcionário) para a leitura */}
-              <div style={{ textAlign: "center", flexShrink: 0 }}>
-                <QRCodeSVG
-                  value={payloadQR(sedeId, data, f.id)}
-                  size={62}
-                  level="M"
-                  marginSize={0}
-                />
-                <div className="num" style={{ fontSize: 7, color: "#000", marginTop: 1, letterSpacing: 0.5 }}>
-                  LEITURA
-                </div>
+            {/* QR identifica a ficha (sede·data·funcionário) para a leitura */}
+            <div style={{ textAlign: "center", flexShrink: 0 }}>
+              <QRCodeSVG value={payloadQR(sedeId, data, f.id)} size={56} level="M" marginSize={0} />
+              <div className="num" style={{ fontSize: 7, color: "#000", marginTop: 1, letterSpacing: 0.5 }}>
+                LEITURA
               </div>
             </div>
           </div>
