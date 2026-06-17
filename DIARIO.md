@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-17 — Ficha OMR-ready (base para leitura automática por OpenCV)
+
+**Contexto:** decidido o caminho da confirmação por **OMR clássico (OpenCV)** —
+como a ficha é gerada por nós, basta detectar marcação (não precisa OCR de
+letra). Esta entrega deixa a ficha pronta para leitura; o motor OpenCV é o
+próximo spike.
+
+**O que mudou em `/rotinas/imprimir`:**
+- **QR code por ficha** (`qrcode.react`) com payload `ORK1|sede|data|funcionario`
+  — o leitor decodifica e busca as rotinas dessa data/sede/funcionário na MESMA
+  ordem de impressão (por horário) para casar cada linha sem ler texto.
+- **Marcadores fiduciais** (4 quadrados pretos nos cantos da ficha) para alinhar/
+  endireitar o scan.
+- **Caixas de marcação reais** (`<Caixa>`, borda 2px #000, fundo branco): a
+  coluna "Feito?" (Sim/Não em texto) virou uma única caixa "Feito" por linha; os
+  EPIs viraram caixa + nome. Tudo #000/#fff para sair limpo no scan.
+- Instrução curta ("Marque um X… não escreva sobre os quadrados dos cantos").
+- Nova dependência: **qrcode.react ^4.2.0**.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; ficha renderiza com 4
+fiduciais, QR (62px) e caixas reais (2 tarefas + 1 EPI na ficha da Maria);
+screenshot confere; console limpo. `.env` restaurado.
+
+**Próximo (spike 4.2):** motor OMR — OpenCV é Python/WASM, roda fora do Next
+(worker Python ou OpenCV.js em route Node) recebendo o scan → casa com
+`rotinas_planejadas` → gera `execucoes_realizadas`. Precisa de **scans reais**
+para calibrar e da decisão de deploy.
+
+**Arquivos:** `app/(app)/rotinas/imprimir/page.tsx`, `package.json`
+(+qrcode.react), `docs/08`.
+
+---
+
 ## 2026-06-17 — Correção: cards da agenda "sumiam" e geravam sobreposição fantasma
 
 **Sintoma (relatado):** ao montar a agenda de vários funcionários, alguns cards

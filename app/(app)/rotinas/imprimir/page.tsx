@@ -7,6 +7,7 @@
  */
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import useSWR from "swr";
 import { jornadaLiquidaMin, tempoPlanejadoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
@@ -25,6 +26,49 @@ const ROTULO_SERVICO: Record<string, string> = {
   pesada: "pesada",
   desincrustante: "desincrustante",
 };
+
+/**
+ * Caixa de marcação (OMR): borda firme preta, fundo branco, posição/tamanho
+ * fixos. O ASG marca um "X"; o leitor mede o preenchimento. Sempre #000/#fff
+ * (independe do tema) para sair limpa na impressão e no scan.
+ */
+function Caixa({ tamanho = 16 }: { tamanho?: number }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: tamanho,
+        height: tamanho,
+        border: "2px solid #000",
+        background: "#fff",
+        verticalAlign: "middle",
+        borderRadius: 0,
+      }}
+    />
+  );
+}
+
+/** Quadrado fiducial de canto — referência para alinhar/endireitar o scan. */
+function Fiducial({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
+  const lado = pos[0] === "t" ? { top: 6 } : { bottom: 6 };
+  const horiz = pos[1] === "l" ? { left: 6 } : { right: 6 };
+  return (
+    <div
+      aria-hidden
+      style={{ position: "absolute", width: 14, height: 14, background: "#000", ...lado, ...horiz }}
+    />
+  );
+}
+
+/**
+ * Conteúdo do QR de cada ficha: versão + sede + data + funcionário. O leitor
+ * decodifica e busca as rotinas planejadas dessa data/sede/funcionário na MESMA
+ * ordem de impressão (por horário) para casar cada linha com sua rotina — sem
+ * precisar ler texto.
+ */
+function payloadQR(sedeId: string, data: string, funcionarioId: string) {
+  return `ORK1|${sedeId}|${data}|${funcionarioId}`;
+}
 
 function Fichas() {
   const params = useSearchParams();
@@ -120,8 +164,14 @@ function Fichas() {
         <section
           key={f.id}
           className="ficha-impressao painel"
-          style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}
+          style={{ marginBottom: 24, padding: 0, overflow: "hidden", position: "relative" }}
         >
+          {/* marcadores fiduciais de canto — alinhamento do scan (OMR) */}
+          <Fiducial pos="tl" />
+          <Fiducial pos="tr" />
+          <Fiducial pos="bl" />
+          <Fiducial pos="br" />
+
           {/* cabeçalho da ficha */}
           <div
             style={{
@@ -145,16 +195,30 @@ function Fichas() {
                 <h2 style={{ fontSize: 20, fontWeight: 700 }}>{f.nome}</h2>
               </div>
             </div>
-            <div style={{ textAlign: "right", fontSize: 12 }}>
-              <div>
-                <strong>{sede?.nome_sede ?? sedeId}</strong> · {formatarDataBR(data)}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ textAlign: "right", fontSize: 12 }}>
+                <div>
+                  <strong>{sede?.nome_sede ?? sedeId}</strong> · {formatarDataBR(data)}
+                </div>
+                <div className="num" style={{ color: "var(--tinta-2)" }}>
+                  Expediente {f.entrada}–{f.saida} · Intervalo {f.intervalo_inicio}–{f.intervalo_fim}
+                </div>
+                <div className="num" style={{ color: "var(--tinta-2)" }}>
+                  Planejado: {formatarDuracao(tempoPlanejadoMin(rs))} de{" "}
+                  {formatarDuracao(jornadaLiquidaMin(f))}
+                </div>
               </div>
-              <div className="num" style={{ color: "var(--tinta-2)" }}>
-                Expediente {f.entrada}–{f.saida} · Intervalo {f.intervalo_inicio}–{f.intervalo_fim}
-              </div>
-              <div className="num" style={{ color: "var(--tinta-2)" }}>
-                Planejado: {formatarDuracao(tempoPlanejadoMin(rs))} de{" "}
-                {formatarDuracao(jornadaLiquidaMin(f))}
+              {/* QR identifica a ficha (sede·data·funcionário) para a leitura */}
+              <div style={{ textAlign: "center", flexShrink: 0 }}>
+                <QRCodeSVG
+                  value={payloadQR(sedeId, data, f.id)}
+                  size={62}
+                  level="M"
+                  marginSize={0}
+                />
+                <div className="num" style={{ fontSize: 7, color: "#000", marginTop: 1, letterSpacing: 0.5 }}>
+                  LEITURA
+                </div>
               </div>
             </div>
           </div>
@@ -176,8 +240,12 @@ function Fichas() {
                 🧤 EPIs obrigatórios:
               </span>
               {epis.map((nome) => (
-                <span key={nome} className="num" style={{ whiteSpace: "nowrap" }}>
-                  ( ) {nome}
+                <span
+                  key={nome}
+                  className="num"
+                  style={{ whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  <Caixa tamanho={12} /> {nome}
                 </span>
               ))}
             </div>
@@ -191,8 +259,8 @@ function Fichas() {
                 <th>Tarefa</th>
                 <th>Local</th>
                 <th style={{ width: 70 }}>Tempo</th>
-                <th style={{ width: 110 }}>Feito?</th>
-                <th style={{ width: 140 }}>Anotações</th>
+                <th style={{ width: 64, textAlign: "center" }}>Feito</th>
+                <th style={{ width: 150 }}>Anotações</th>
               </tr>
             </thead>
             <tbody>
@@ -214,7 +282,9 @@ function Fichas() {
                     </td>
                     <td>{l ? `${l.nome_local} (${l.andar})` : ""}</td>
                     <td className="num">{formatarDuracao(r.tempo_previsto_min)}</td>
-                    <td>( ) Sim&nbsp;&nbsp;( ) Não</td>
+                    <td style={{ textAlign: "center" }}>
+                      <Caixa />
+                    </td>
                     <td style={{ borderBottom: "1px solid var(--linha)" }}></td>
                   </tr>
                 );
@@ -222,12 +292,18 @@ function Fichas() {
             </tbody>
           </table>
 
+          {/* instrução de marcação para a leitura automática */}
+          <div style={{ padding: "6px 16px 0", fontSize: 10, color: "var(--tinta-3)" }}>
+            Marque um <strong>X</strong> dentro da caixa do que foi feito. Não escreva sobre os
+            quadrados pretos dos cantos (servem para a leitura).
+          </div>
+
           {/* rodapé com assinaturas */}
           <div
             style={{
               display: "flex",
               gap: 32,
-              padding: "24px 16px 16px",
+              padding: "16px 16px 16px",
               fontSize: 11,
               color: "var(--tinta-2)",
             }}

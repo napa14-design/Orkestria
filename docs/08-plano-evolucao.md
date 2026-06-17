@@ -42,17 +42,20 @@ produtividade/alocação (salvaguarda vigente); aptidões/restrições já cabem
 passar pelo jurídico (Davi Rocha) — restrição preferencialmente por
 **treinamento**, não por sexo.
 
-**Onda 4 (parcial):** a **ficha de confirmação imprimível** (4.1) está pronta —
-`/rotinas/imprimir` agora lista, por funcionário/dia, os **EPIs obrigatórios**
-(derivados dos requisitos tipo `epi` das tarefas, com caixa de confirmação) e
-marca o **tipo de serviço** (pesada/desincrustante) em cada tarefa, além do
-checklist por ambiente (Feito? Sim/Não), anotações e assinaturas que já
-existiam. O ASG só **confirma** no papel. **Falta (decisão/spike):**
-**4.2 ingestão por OCR** das fichas escaneadas → casar com as rotinas → gerar
-execuções; é o maior risco técnico e depende de escolher um serviço/lib de OCR
-(com credenciais) — tratar como spike isolado antes de comprometer prazo. A
-**confirmação automática de EPI** e o reconhecimento facial (4.3) dependem dessa
-etapa de ingestão.
+**Onda 4 (parcial):** a **ficha de confirmação imprimível** (4.1) está pronta e
+agora **OMR-ready** — `/rotinas/imprimir` traz, por funcionário/dia: **QR code**
+(identifica sede·data·funcionário → o leitor recupera as rotinas na mesma ordem
+de impressão, sem ler texto), **marcadores fiduciais** nos 4 cantos (alinhar/
+endireitar o scan), **caixas de marcação reais** (coluna "Feito" + EPIs), tipo
+de serviço por tarefa, anotações e assinaturas. O ASG só **confirma** (marca X).
+**Decisão de leitura:** escolhido **OMR clássico (OpenCV)** em vez de OCR de
+texto — como a ficha é estruturada por nós, basta detectar marcação (tecnologia
+madura, tipo gabarito). **Falta (spike 4.2):** o motor de leitura — OpenCV é
+Python/WASM, então roda fora do Next (worker Python ou OpenCV.js num route Node)
+recebendo o scan → casa com `rotinas_planejadas` → gera `execucoes_realizadas`.
+Precisa de **scans reais** para calibrar limiar de preenchimento e do método de
+deploy. A **confirmação automática de EPI** e o facial (4.3) dependem dessa
+ingestão.
 
 **Onda 3 (entregue):** nova entidade **`periodos_letivos`** (calendário
 acadêmico por sede: nome, intervalo, dias com aula) com CRUD completo
