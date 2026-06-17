@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-06-17 — Onda 3 (pós-ata): calendário acadêmico (período letivo)
+
+**Contexto:** terceira onda. Tarefas que só fazem sentido com aula (ex.: limpeza
+de sala) não devem ser cobradas em férias. (A Onda 2 — granularidade — foi
+fechada só com documentação: o deslocamento já é parâmetro por sede e a grade
+de 30 min é decisão consciente; ver `docs/08`.)
+
+**O que mudou:**
+- **Nova entidade `periodos_letivos`** (calendário acadêmico por sede):
+  `sede_id`, `nome` (ex.: "2026.2"), `data_inicio`, `data_fim`, `dias_semana`
+  (CSV de dias com aula), `ativo` + auditoria. CRUD completo no padrão do
+  projeto: `types/PeriodoLetivo.ts`, `services/periodosLetivosService.ts`,
+  rotas `app/api/periodos-letivos` (+`[id]`), tela
+  `app/(app)/periodos-letivos/page.tsx` (CrudManager). **Escrita só de
+  administrador** (`podeGerenciarCatalogo`); leitura para qualquer sessão.
+- Item no menu **Estrutura → Calendário acadêmico** (só admin).
+- **Tarefa ganhou `depende_calendario`** (checkbox + selo "📅 letiva"). Helper
+  puro **`statusPeriodoLetivo(periodos, sede, data)`** em `lib/calculations.ts`
+  retorna `dentro` | `fora` | `sem_calendario`.
+- **Cobertura (`PendenciasPanel`)**: recebe `periodos` (a tela de rotinas busca
+  por sede via SWR) e, para tarefas `depende_calendario`: **`fora` → não exige**
+  (some das pendências); **`sem_calendario` com tarefa letiva devida → aviso
+  forte** "Calendário acadêmico não cadastrado…" no topo da agenda.
+- Seed: período "2026.1" de Aldeota (02/02–03/07, seg–sex) + `t6` (limpeza
+  terminal) marcada como letiva.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; CRUD via API (lista, cria
+201, edita 200, validação de período 422, exclui 200); cobertura testada nos 3
+estados na agenda de Aldeota — **dentro** do período a tarefa letiva é cobrada
+(1 periódica) sem aviso; com hoje **fora** (período só fim de semana) ela
+**some**; **sem período** ela volta **com o aviso**. `.env` restaurado para
+`firebase`.
+
+**Arquivos:** `types/PeriodoLetivo.ts` (novo), `types/index.ts`,
+`types/Tarefa.ts` (+`depende_calendario`), `lib/schema.ts` (+tabela +coluna),
+`lib/memoryStore.ts` (seed), `lib/calculations.ts` (`statusPeriodoLetivo`),
+`services/periodosLetivosService.ts` (novo),
+`app/api/periodos-letivos/route.ts` (+`[id]/route.ts`, novos),
+`app/(app)/periodos-letivos/page.tsx` (novo), `components/AppShell.tsx`,
+`components/agenda/PendenciasPanel.tsx`, `app/(app)/rotinas/page.tsx`,
+`app/(app)/tarefas/page.tsx`, `docs/02`, `docs/08`.
+
+---
+
 ## 2026-06-17 — Onda 1 (pós-ata): modelo de tempo m²×ambiente×serviço + regra de horário
 
 **Contexto:** primeira onda das evoluções decididas na ata de 16/06/2026. O

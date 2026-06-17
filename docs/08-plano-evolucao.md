@@ -14,8 +14,8 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | Onda | Tema | Status |
 |---|---|---|
 | **1** | **Modelo de tempo + regra de horário** | ✅ **feito** |
-| 2 | Granularidade (manter 30 min visual; calibrar deslocamento) | pendente |
-| 3 | Calendário acadêmico / período letivo | pendente |
+| **2** | Granularidade (manter 30 min visual; deslocamento já configurável por sede) | ✅ **feito** (config + nota) |
+| **3** | Calendário acadêmico / período letivo | ✅ **feito** |
 | 4 | Confirmação do executado (ficha de papel + OCR) | pendente |
 | 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | pendente |
 
@@ -28,6 +28,28 @@ regra de horário passou a **bloquear só o início** fora do expediente: uma
 tarefa pode terminar depois da saída, mas não pode iniciar às/após a saída.
 O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
 "Recalibrar" continua, pois mexe no `tempo_base_min`).
+
+**Onda 3 (entregue):** nova entidade **`periodos_letivos`** (calendário
+acadêmico por sede: nome, intervalo, dias com aula) com CRUD completo
+(tela em Estrutura → Calendário acadêmico, escrita só de administrador). A
+tarefa ganhou a flag **`depende_calendario`**: tarefas letivas (ex.: limpeza de
+sala) **só são cobradas em período letivo** — fora dele (férias/recesso) somem
+do painel "Ficou de fora hoje". Se a sede não tiver calendário cadastrado e
+houver tarefa letiva devida, a agenda mostra um **aviso forte** pedindo o
+cadastro. Lógica pura em `statusPeriodoLetivo` (`lib/calculations.ts`).
+
+**Onda 2 (já atendida):** a precisão dos números **não depende do bloco visual**
+— `tempo_previsto_min` é exato e o **deslocamento** já é parâmetro por sede
+(`deslocamento_min_por_tarefa`, entregue na Fase D), entrando na ocupação como
+tempo real. A grade segue em 30 min por decisão.
+
+> ⚠️ **Tensão a discutir com o diretor (Murilo):** ele quer "combater o bloco de
+> 30 min" para capturar ganhos de 3 em 3 minutos. Hoje o `tempo_visual_min`
+> ainda **arredonda o tamanho do card** para blocos cheios (uma tarefa de 8 min
+> ocupa 30 min no desenho), embora a ocupação seja calculada no minuto exato. Se
+> ele insistir no ganho de **empacotar tarefas curtas** lado a lado, o próximo
+> passo é reduzir o *snap* (ex.: 10/15 min) — deixando claro que isso é só
+> visual e não muda os números.
 
 ## Princípios que valem para tudo (guarda-corpos)
 

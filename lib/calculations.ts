@@ -10,11 +10,37 @@ import type {
   Funcionario,
   Local,
   ParametrosResolvidos,
+  PeriodoLetivo,
   RotinaPlanejada,
   Tarefa,
   TipoServico,
 } from "@/types";
-import { hhmmParaMin } from "./dateUtils";
+import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
+
+/**
+ * Situação de uma sede no calendário acadêmico em uma data:
+ *  - "sem_calendario" → a sede não tem nenhum período letivo ativo cadastrado;
+ *  - "dentro"         → a data cai dentro de um período letivo (dia com aula);
+ *  - "fora"           → há calendário, mas a data está em férias/recesso.
+ * Tarefas com `depende_calendario` só são exigidas quando "dentro".
+ */
+export type StatusPeriodoLetivo = "sem_calendario" | "dentro" | "fora";
+
+export function statusPeriodoLetivo(
+  periodos: PeriodoLetivo[],
+  sedeId: string,
+  dataISO: string,
+): StatusPeriodoLetivo {
+  const daSede = periodos.filter((p) => p.ativo && p.sede_id === sedeId);
+  if (daSede.length === 0) return "sem_calendario";
+  const dow = diaDaSemana(dataISO);
+  const dentro = daSede.some((p) => {
+    if (!(p.data_inicio <= dataISO && dataISO <= p.data_fim)) return false;
+    const dias = parseDiasSemana(p.dias_semana);
+    return dias.length === 0 || dias.includes(dow);
+  });
+  return dentro ? "dentro" : "fora";
+}
 
 /**
  * Fator de intensidade do AMBIENTE (local): o quanto o espaço suja e pesa na

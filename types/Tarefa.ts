@@ -79,6 +79,13 @@ export interface Tarefa extends Auditoria {
    * cobertura por janela deslizante (a cada 7 dias).
    */
   dias_semana?: string;
+  /**
+   * Depende do calendário acadêmico: a tarefa só é exigida na cobertura quando
+   * a data está dentro de um período letivo da sede (ex.: limpeza de sala de
+   * aula). Fora do período (férias/recesso) ela não aparece como pendência.
+   * Ausente/false = exigida o ano todo (independe do calendário).
+   */
+  depende_calendario?: boolean;
   ativo: boolean;
   observacoes: string;
 }

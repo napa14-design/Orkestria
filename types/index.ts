@@ -14,4 +14,5 @@ export * from "./QualificacaoFuncionario";
 export * from "./Parametro";
 export * from "./ModeloRotina";
 export * from "./Ausencia";
+export * from "./PeriodoLetivo";
 export * from "./Historico";

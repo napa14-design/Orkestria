@@ -12,6 +12,7 @@ import type {
   Local,
   ModeloRotinaItem,
   Parametro,
+  PeriodoLetivo,
   QualificacaoFuncionario,
   RegistroHistorico,
   Requisito,
@@ -39,6 +40,7 @@ export interface MapaTabelas {
   parametros: Parametro;
   modelos_rotina: ModeloRotinaItem;
   ausencias: Ausencia;
+  periodos_letivos: PeriodoLetivo;
   historico: RegistroHistorico;
 }
 
@@ -149,6 +151,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("janela_inicio"),
     col("janela_fim"),
     col("dias_semana"),
+    col("depende_calendario", "boolean"),
     col("ativo", "boolean"),
     col("observacoes"),
     ...AUDITORIA,
@@ -249,6 +252,16 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("data_inicio"),
     col("data_fim"),
     col("observacao"),
+    ...AUDITORIA,
+  ],
+  periodos_letivos: [
+    col("id"),
+    col("sede_id"),
+    col("nome"),
+    col("data_inicio"),
+    col("data_fim"),
+    col("dias_semana"),
+    col("ativo", "boolean"),
     ...AUDITORIA,
   ],
   historico: [

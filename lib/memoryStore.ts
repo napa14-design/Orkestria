@@ -70,7 +70,7 @@ function seed(): Banco {
       { id: "t3", nome_tarefa: "Higienização de banheiro", tipo_tarefa: "Higienização", categoria_id: "c2", local_id: "l3", sede_id: "sede_aldeota", regra_calculo: "por_unidade", tipo_servico: "pesada", tempo_base_min: 20, quantidade: 1, frequencia: "diaria", prioridade: "alta", restricao_genero: "masculino", ativo: true, observacoes: "Banheiro masculino — apenas ASG homens", ...aud },
       { id: "t4", nome_tarefa: "Limpeza de corredor", tipo_tarefa: "Limpeza concorrente", categoria_id: "c1", local_id: "l4", sede_id: "sede_aldeota", regra_calculo: "por_m2", tempo_base_min: 0.5, quantidade: 1, frequencia: "diaria", prioridade: "media", ativo: true, observacoes: "0,5 min/m²", ...aud },
       { id: "t5", nome_tarefa: "Organização de copa", tipo_tarefa: "Organização", categoria_id: "c4", local_id: "l5", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 30, quantidade: 1, frequencia: "diaria", prioridade: "media", janela_inicio: "13:00", janela_fim: "16:00", ativo: true, observacoes: "Só após o almoço", ...aud },
-      { id: "t6", nome_tarefa: "Limpeza terminal", tipo_tarefa: "Limpeza terminal", categoria_id: "c6", local_id: "l6", sede_id: "sede_aldeota", regra_calculo: "por_m2", tipo_servico: "pesada", tempo_base_min: 1.5, quantidade: 1, frequencia: "semanal", prioridade: "baixa", tempo_referencia: true, ativo: true, observacoes: "1,5 min/m² — tempo de referência", ...aud },
+      { id: "t6", nome_tarefa: "Limpeza terminal", tipo_tarefa: "Limpeza terminal", categoria_id: "c6", local_id: "l6", sede_id: "sede_aldeota", regra_calculo: "por_m2", tipo_servico: "pesada", tempo_base_min: 1.5, quantidade: 1, frequencia: "semanal", prioridade: "baixa", tempo_referencia: true, depende_calendario: true, ativo: true, observacoes: "1,5 min/m² — tempo de referência; só em período letivo", ...aud },
       { id: "t7", nome_tarefa: "Reposição de material", tipo_tarefa: "Reposição", categoria_id: "c5", local_id: "l2", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 15, quantidade: 1, frequencia: "diaria", prioridade: "media", ativo: true, observacoes: "", ...aud },
       { id: "t8", nome_tarefa: "Coleta de resíduos", tipo_tarefa: "Coleta", categoria_id: "c3", local_id: "l4", sede_id: "sede_aldeota", regra_calculo: "fixo", tempo_base_min: 20, quantidade: 1, frequencia: "diaria", prioridade: "alta", critica: true, ativo: true, observacoes: "", ...aud },
       { id: "t12", nome_tarefa: "Limpeza de vidros", tipo_tarefa: "Limpeza terminal", categoria_id: "c6", local_id: "l1", sede_id: "sede_aldeota", regra_calculo: "fixo", tipo_servico: "desincrustante", tempo_base_min: 40, quantidade: 1, frequencia: "semanal", prioridade: "media", dias_semana: "2,4", requisitos: "rq2", ativo: true, observacoes: "Toda terça e quinta", ...aud },
@@ -103,6 +103,9 @@ function seed(): Banco {
     historico: [],
     ausencias: [
       { id: "a1", funcionario_id: "f3", sede_id: "sede_aldeota", tipo: "atestado", data_inicio: hoje, data_fim: hoje, observacao: "Atestado médico — exemplo do modo demo", ...aud },
+    ],
+    periodos_letivos: [
+      { id: "pl1", sede_id: "sede_aldeota", nome: "2026.1", data_inicio: "2026-02-02", data_fim: "2026-07-03", dias_semana: "1,2,3,4,5", ativo: true, ...aud },
     ],
     parametros: [
       { id: "p1", chave: "bloco_agenda_min", valor: "30", tipo: "numero", descricao: "Tamanho do bloco da agenda em minutos", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },

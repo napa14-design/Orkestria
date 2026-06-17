@@ -45,6 +45,7 @@ const GRUPOS: Grupo[] = [
       { href: "/tarefas", rotulo: "Tarefas" },
       { href: "/categorias", rotulo: "Categorias", apenasAdmin: true },
       { href: "/requisitos", rotulo: "Requisitos", apenasAdmin: true },
+      { href: "/periodos-letivos", rotulo: "Calendário acadêmico", apenasAdmin: true },
     ],
   },
   {

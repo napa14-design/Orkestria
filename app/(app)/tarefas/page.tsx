@@ -198,6 +198,13 @@ export default function PaginaTarefas() {
           dica: "Marque tarefas que NÃO podem deixar de ser feitas (ex.: higienização de banheiro). Quando uma crítica fica sem alocação no dia, o painel \"Ficou de fora hoje\" mostra um alerta de “Circuito essencial descoberto” em destaque máximo (vermelho), separado das demais pendências. Diferente de prioridade, que só ordena.",
         },
         {
+          key: "depende_calendario",
+          rotulo: "Depende do calendário acadêmico",
+          tipo: "checkbox",
+          padrao: false,
+          dica: "Marque para tarefas que só fazem sentido em período letivo (ex.: limpeza de sala de aula). Fora do período (férias/recesso), elas deixam de ser cobradas no painel \"Ficou de fora hoje\". O calendário é cadastrado em Estrutura → Calendário acadêmico, por sede.",
+        },
+        {
           key: "requisitos",
           rotulo: "Requisitos de execução",
           tipo: "multiselect",
@@ -288,6 +295,7 @@ export default function PaginaTarefas() {
               {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
               {t.presenca && <span className="selo selo-azul">presença</span>}
               {t.critica && <span className="selo selo-vermelho">⛔ crítica</span>}
+              {t.depende_calendario && <span className="selo selo-azul">📅 letiva</span>}
               {requisitosDe(t.requisitos).map((r) => (
                 <span key={r.id} className="selo selo-roxo" title={`Requisito: ${r.tipo}`}>
                   {r.tipo === "epi" ? "🧤" : r.tipo === "aptidao" ? "🩺" : "🎓"} {r.nome}
@@ -298,6 +306,7 @@ export default function PaginaTarefas() {
                 !t.tempo_referencia &&
                 !t.presenca &&
                 !t.critica &&
+                !t.depende_calendario &&
                 !(t.requisitos && requisitosDe(t.requisitos).length) &&
                 !(t.janela_inicio && t.janela_fim) &&
                 !(t.frequencia === "semanal" && t.dias_semana) && (

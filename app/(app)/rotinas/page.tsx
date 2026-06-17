@@ -38,6 +38,7 @@ import type {
   Funcionario,
   Local,
   ParametrosResolvidos,
+  PeriodoLetivo,
   QualificacaoFuncionario,
   Requisito,
   RotinaPlanejada,
@@ -100,6 +101,10 @@ export default function PaginaRotinas() {
     fetcher,
   );
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const { data: periodosLetivos } = useSWR<PeriodoLetivo[]>(
+    sedeId ? `/api/periodos-letivos?sede=${sedeId}` : null,
+    fetcher,
+  );
   const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(
     sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null,
     fetcher,
@@ -555,6 +560,7 @@ export default function PaginaRotinas() {
         rotinasDoDia={rotinas ?? []}
         historico={historico ?? []}
         data={data}
+        periodos={periodosLetivos ?? []}
       />
 
       {/* paginação de colunas — só aparece em sedes grandes */}

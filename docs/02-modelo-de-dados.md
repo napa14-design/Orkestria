@@ -76,6 +76,7 @@ id · nome_sede · cidade · endereco · ativo · auditoria (4 campos).
 | quantidade | número | usada em por_unidade |
 | frequencia | enum | diaria · semanal · quinzenal · mensal · sob_demanda |
 | prioridade | enum | alta · media · baixa |
+| depende_calendario | boolean | quando true, só é exigida em período letivo da sede (ver `periodos_letivos`) |
 | ativo, observacoes, auditoria | | |
 
 ### rotinas_planejadas
@@ -128,6 +129,19 @@ planejadas dele entram no painel de cobertura para remanejamento.
 | tipo | enum | falta · atestado · ferias · folga · outro |
 | data_inicio, data_fim | YYYY-MM-DD | período inclusivo |
 | observacao, auditoria | | |
+
+### periodos_letivos
+Calendário acadêmico por sede. Fora do período (férias/recesso), as tarefas com
+`depende_calendario` deixam de ser exigidas na cobertura da agenda. Cadastro de
+administrador (catálogo global por sede).
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| sede_id | string | **obrigatório — o calendário é por sede** |
+| nome | string | ex.: "2026.2" |
+| data_inicio, data_fim | YYYY-MM-DD | intervalo do período (inclusivo) |
+| dias_semana | string | CSV de índices 0..6 (dias com aula); vazio = todos os dias do intervalo |
+| ativo, auditoria | | |
 
 ### historico
 Log de alterações preenchido automaticamente: toda escrita em qualquer tabela

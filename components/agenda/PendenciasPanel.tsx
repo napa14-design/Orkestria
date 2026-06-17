@@ -6,8 +6,9 @@
  * vencidas em relação ao último planejamento.
  */
 import { useMemo, useState } from "react";
+import { statusPeriodoLetivo } from "@/lib/calculations";
 import { diaDaSemana, DIAS_SEMANA, parseDiasSemana } from "@/lib/dateUtils";
-import type { Local, RotinaPlanejada, Tarefa } from "@/types";
+import type { Local, PeriodoLetivo, RotinaPlanejada, Tarefa } from "@/types";
 
 const JANELA_DIAS: Record<string, number> = {
   semanal: 7,
@@ -21,6 +22,7 @@ export default function PendenciasPanel({
   rotinasDoDia,
   historico,
   data,
+  periodos = [],
 }: {
   tarefas: Tarefa[];
   locais: Local[];
@@ -28,12 +30,14 @@ export default function PendenciasPanel({
   /** Rotinas dos últimos ~31 dias (para calcular vencimento das periódicas). */
   historico: RotinaPlanejada[];
   data: string;
+  /** Períodos letivos cadastrados (calendário acadêmico por sede). */
+  periodos?: PeriodoLetivo[];
 }) {
   const [aberto, setAberto] = useState(false);
 
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
-  const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas } = useMemo(() => {
+  const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas, letivasSemCalendario } = useMemo(() => {
     const alocadasHoje = new Set(rotinasDoDia.map((r) => r.tarefa_id));
     const dowHoje = diaDaSemana(data);
     const ultimaData = new Map<string, string>();
@@ -47,8 +51,18 @@ export default function PendenciasPanel({
     const diarias: Tarefa[] = [];
     const doDia: Tarefa[] = [];
     const periodicas: Array<{ tarefa: Tarefa; ultima: string | null }> = [];
+    const semCal: Tarefa[] = [];
     for (const t of tarefas) {
       if (!t.ativo || alocadasHoje.has(t.id)) continue;
+
+      // Calendário acadêmico: tarefas letivas só são cobradas em período letivo.
+      let avisoSemCalendario = false;
+      if (t.depende_calendario) {
+        const st = statusPeriodoLetivo(periodos, t.sede_id, data);
+        if (st === "fora") continue; // férias/recesso → não é exigida hoje
+        avisoSemCalendario = st === "sem_calendario";
+      }
+
       const dias = t.frequencia === "semanal" ? parseDiasSemana(t.dias_semana) : [];
 
       // decide se a tarefa é esperada hoje e por qual regra
@@ -72,6 +86,9 @@ export default function PendenciasPanel({
       }
       if (!regra) continue;
 
+      // devida hoje, mas a sede não tem calendário cadastrado → sinaliza
+      if (avisoSemCalendario) semCal.push(t);
+
       // tarefas críticas saem dos baldes normais e vão para o circuito essencial
       if (t.critica) {
         const motivo =
@@ -88,8 +105,30 @@ export default function PendenciasPanel({
       diariasFaltando: diarias,
       devidasHoje: doDia,
       periodicasVencidas: periodicas,
+      letivasSemCalendario: semCal,
     };
-  }, [tarefas, rotinasDoDia, historico, data]);
+  }, [tarefas, rotinasDoDia, historico, data, periodos]);
+
+  const rotuloLocal = (t: Tarefa) => {
+    const l = localPorId.get(t.local_id);
+    return l ? `${l.nome_local} · ${l.andar}` : "";
+  };
+
+  // Aviso forte: tarefa letiva sendo cobrada sem calendário cadastrado na sede.
+  const avisoCalendario =
+    letivasSemCalendario.length > 0 ? (
+      <div
+        className="painel entra"
+        style={{ marginBottom: 14, padding: "8px 14px", borderLeft: "6px solid var(--vermelho)", fontSize: 13 }}
+      >
+        📅 <strong>Calendário acadêmico não cadastrado:</strong>{" "}
+        {letivasSemCalendario.length} tarefa(s) que dependem do calendário estão
+        sendo cobradas sem um período letivo cadastrado para a sede —{" "}
+        {letivasSemCalendario.map((t) => t.nome_tarefa).join(", ")}. Cadastre o
+        período em <strong>Estrutura → Calendário acadêmico</strong> para não exigir
+        tarefas letivas em férias.
+      </div>
+    ) : null;
 
   const total =
     criticasSemCobertura.length +
@@ -98,24 +137,24 @@ export default function PendenciasPanel({
     periodicasVencidas.length;
   if (total === 0) {
     return (
-      <div
-        className="painel entra"
-        style={{ marginBottom: 14, padding: "8px 14px", borderLeft: "6px solid var(--verde)", fontSize: 13 }}
-      >
-        ✓ <strong>Cobertura completa:</strong> todas as tarefas diárias estão alocadas
-        e nenhuma periódica está vencida.
-      </div>
+      <>
+        {avisoCalendario}
+        <div
+          className="painel entra"
+          style={{ marginBottom: 14, padding: "8px 14px", borderLeft: "6px solid var(--verde)", fontSize: 13 }}
+        >
+          ✓ <strong>Cobertura completa:</strong> todas as tarefas diárias estão alocadas
+          e nenhuma periódica está vencida.
+        </div>
+      </>
     );
   }
-
-  const rotuloLocal = (t: Tarefa) => {
-    const l = localPorId.get(t.local_id);
-    return l ? `${l.nome_local} · ${l.andar}` : "";
-  };
 
   const temCritica = criticasSemCobertura.length > 0;
 
   return (
+    <>
+    {avisoCalendario}
     <div
       className="painel entra"
       style={{ marginBottom: 14, borderLeft: `6px solid ${temCritica ? "var(--vermelho)" : "var(--laranja)"}` }}
@@ -210,5 +249,6 @@ export default function PendenciasPanel({
         </div>
       )}
     </div>
+    </>
   );
 }
