@@ -6,11 +6,16 @@
  * sugere um novo tempo base — aplicável com um clique.
  */
 import { useMemo, useState } from "react";
-import { cobraDesvio, fatorIntensidade, mediana, tempoPrevistoMin } from "@/lib/calculations";
+import {
+  cobraDesvio,
+  fatorIntensidadeLocal,
+  fatorServico,
+  mediana,
+  tempoPrevistoMin,
+} from "@/lib/calculations";
 import { apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type {
-  Categoria,
   ExecucaoRealizada,
   Local,
   ParametrosResolvidos,
@@ -40,7 +45,6 @@ export default function SugestoesAjuste({
   execucoes,
   tarefas,
   locais,
-  categorias = [],
   parametros,
   aoAplicado,
 }: {
@@ -48,7 +52,6 @@ export default function SugestoesAjuste({
   execucoes: ExecucaoRealizada[];
   tarefas: Tarefa[];
   locais: Local[];
-  categorias?: Categoria[];
   parametros: ParametrosResolvidos;
   aoAplicado: () => void;
 }) {
@@ -58,7 +61,6 @@ export default function SugestoesAjuste({
   const sugestoes = useMemo<Sugestao[]>(() => {
     const rotinaPorId = new Map(rotinas.map((r) => [r.id, r]));
     const localPorId = new Map(locais.map((l) => [l.id, l]));
-    const categoriaPorId = new Map(categorias.map((c) => [c.id, c]));
 
     // tempos reais agrupados por tarefa
     const reaisPorTarefa = new Map<string, number[]>();
@@ -78,11 +80,11 @@ export default function SugestoesAjuste({
       // tarefas que não cobram desvio (referência/presença) não entram
       if (!tarefa || !tarefa.ativo || !cobraDesvio(tarefa)) continue;
       const local = localPorId.get(tarefa.local_id);
-      const categoria = categoriaPorId.get(tarefa.categoria_id ?? "");
-      const fator = fatorIntensidade(categoria);
+      // fator total = intensidade do ambiente × natureza do serviço
+      const fator = fatorIntensidadeLocal(local) * fatorServico(tarefa);
 
       // compara com o previsto ATUAL: depois de aplicar, a sugestão some.
-      const previstoAtual = tempoPrevistoMin(tarefa, local, categoria);
+      const previstoAtual = tempoPrevistoMin(tarefa, local);
       if (previstoAtual <= 0) continue;
 
       const med = mediana(reais);
@@ -112,7 +114,7 @@ export default function SugestoesAjuste({
       });
     }
     return resultado.sort((a, b) => Math.abs(b.desvio) - Math.abs(a.desvio));
-  }, [rotinas, execucoes, tarefas, locais, categorias, parametros]);
+  }, [rotinas, execucoes, tarefas, locais, parametros]);
 
   if (sugestoes.length === 0) return null;
 

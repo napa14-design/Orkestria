@@ -22,6 +22,16 @@ export type TipoLocal =
 
 export type RegraCalculo = "fixo" | "por_m2" | "por_unidade" | "manual";
 
+/**
+ * Natureza do esforço de uma tarefa de limpeza — multiplica o tempo previsto:
+ *  - "rotina"        → limpeza de manutenção do dia a dia (fator 1,0);
+ *  - "pesada"        → limpeza reforçada/profunda (fator 1,5);
+ *  - "desincrustante"→ remoção de sujeira aderida/encardido (fator 2,0).
+ * Ausente = "rotina". Os multiplicadores são calibráveis (constantes em
+ * `lib/calculations.ts`).
+ */
+export type TipoServico = "rotina" | "pesada" | "desincrustante";
+
 export type Frequencia =
   | "diaria"
   | "semanal"

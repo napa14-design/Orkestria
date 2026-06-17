@@ -26,10 +26,13 @@ no cliente (feedback imediato) e no servidor (validação definitiva).
 
 ```
 jornada_liquida_min        = horario_saida − horario_entrada − intervalo_min
-tempo_previsto_min         = regra da tarefa:
-                               fixo/manual  → tempo_base_min
-                               por_m2       → tempo_base_min × metragem_do_local
-                               por_unidade  → tempo_base_min × quantidade
+tempo_previsto_min         = base_da_regra × fator_intensidade_local × fator_tipo_servico
+                               base_da_regra:
+                                 fixo/manual  → tempo_base_min
+                                 por_m2       → tempo_base_min × metragem_do_local (1 m² ≈ 1 min)
+                                 por_unidade  → tempo_base_min × quantidade
+                               fator_intensidade_local: leve 0,8 · normal 1,0 · densa 1,5 (cadastrado no Local)
+                               fator_tipo_servico:      rotina 1,0 · pesada 1,5 · desincrustante 2,0 (na Tarefa)
 blocos                     = teto(tempo_previsto_min / bloco_agenda_min)
 tempo_visual_min           = blocos × bloco_agenda_min
 tempo_planejado_min        = Σ tempo_previsto_min das rotinas do dia (exceto canceladas)
@@ -49,14 +52,21 @@ na agenda. O sistema **guarda os dois valores**: `tempo_previsto_min = 80`
 (usado em produtividade/ocupação) e `tempo_visual_min = 90` (usado só no
 desenho da agenda).
 
-### Exemplo por m²
+### Exemplo por m² (com os dois fatores)
 
-| Local | Metragem | Regra | Tempo previsto |
-|---|---|---|---|
-| Recepção — Sede Aldeota | 80 m² | 1 min/m² | 80 min |
-| Recepção — Sede DT | 45 m² | 1 min/m² | 45 min |
+| Tarefa | Local | m² | Intensidade | Serviço | Tempo previsto |
+|---|---|---|---|---|---|
+| Limpeza concorrente | Recepção Aldeota | 80 | 1,0 | rotina 1,0 | 80 min |
+| Limpeza concorrente | Recepção DT | 45 | 1,0 | rotina 1,0 | 45 min |
+| Higienização | Banheiro | 25 (por unidade) | 1,5 | pesada 1,5 | 20 × 1,5 × 1,5 = 45 min |
+| Limpeza de área externa | Área externa | 200 | 0,8 | rotina 1,0 | 0,4 × 200 × 0,8 = 64 min |
 
-Mesma tarefa, locais diferentes → tempos diferentes.
+Mesma tarefa, locais diferentes → tempos diferentes. Os dois fatores
+(ambiente e serviço) são independentes e se multiplicam.
+
+> Esta é a 1ª fase do modelo de tempo decidido na ata de 16/06/2026:
+> **m² × tipo de ambiente × tipo de serviço**. Os multiplicadores são
+> constantes calibráveis em `lib/calculations.ts`.
 
 ## 3. Classificação de ocupação (parametrizável)
 
@@ -75,7 +85,7 @@ Os limites vêm dos parâmetros `ocupacao_baixa`, `ocupacao_adequada` e
 | Código | Nível | Situação |
 |---|---|---|
 | SEM_JORNADA | erro | funcionário sem entrada/saída cadastrada |
-| FORA_DO_EXPEDIENTE | erro | bloco começa antes da entrada ou termina após a saída |
+| FORA_DO_EXPEDIENTE | erro | bloco **inicia** antes da entrada ou às/após a saída (pode terminar após a saída — decisão da ata) |
 | INTERVALO | erro | bloco sobrepõe o intervalo |
 | SOBREPOSICAO | erro | conflita com outra tarefa do mesmo funcionário |
 | SEM_TEMPO_PREVISTO | erro | tarefa com tempo calculado ≤ 0 |

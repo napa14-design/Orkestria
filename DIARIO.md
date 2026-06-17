@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-06-17 — Onda 1 (pós-ata): modelo de tempo m²×ambiente×serviço + regra de horário
+
+**Contexto:** primeira onda das evoluções decididas na ata de 16/06/2026. O
+cálculo do tempo previsto passou a refletir o que o diretor descreveu:
+**m² × tipo de ambiente × tipo de serviço** (base 1 m² ≈ 1 min).
+
+**O que mudou:**
+- **Intensidade migrou da CATEGORIA para o LOCAL.** Novo campo
+  `Local.fator_intensidade` (leve 0,8 · normal 1,0 · densa 1,5; ausente/≤0 = 1).
+  O fator da categoria **deixou de afetar o cálculo** (neutralizado no seed e
+  removido do form/coluna de Categorias). A ação **"Recalibrar" continua** —
+  ela mexe no `tempo_base_min`, é independente da intensidade.
+- **Tarefa ganhou `tipo_servico`** (`rotina` 1,0 · `pesada` 1,5 ·
+  `desincrustante` 2,0 — constantes calibráveis `FATOR_TIPO_SERVICO` em
+  `lib/calculations.ts`). Select + selo na tela de Tarefas.
+- `tempoPrevistoMin(tarefa, local)` **perdeu o 3º argumento** (categoria) e agora
+  multiplica `base × fatorIntensidadeLocal(local) × fatorServico(tarefa)`.
+  Atualizados os 6 call sites (rotinasService, TaskPalette, tarefas, rotinas,
+  SugestoesAjuste, dashboard). `SugestoesAjuste` passou a dividir pelo fator do
+  **local × serviço** ao sugerir novo tempo base.
+- **Regra de horário (FORA_DO_EXPEDIENTE):** passou a bloquear **só o início**
+  fora do expediente (`inicioMin < entrada || inicioMin >= saida`). Uma tarefa
+  **pode terminar** depois da saída; **não pode iniciar** às/após a saída.
+- Telas: **Locais** ganhou campo "Intensidade (fator)" + coluna; **Tarefas**
+  ganhou "Tipo de serviço" + selo; **Categorias** teve o campo de intensidade
+  ocultado (legado) com nota no subtítulo.
+- Seed (`memoryStore`): banheiros/copa densos (1,5/1,3), área externa leve (0,8),
+  higienizações `pesada`, vidros `desincrustante`; fator das categorias = 1.
+
+**Verificado (DATA_SOURCE=memory):** build ok; `/tarefas` mostra os tempos
+corretos (banheiro 45 min = 20×1,5×1,5; área externa 64 min = 0,4×200×0,8;
+vidros 80 min = 40×2); regra de horário testada via API (inicia 15:30 e termina
+17:30 → **passa**; inicia 16:00 = saída → **FORA_DO_EXPEDIENTE**). Console limpo.
+`.env` restaurado para `firebase`.
+
+**Pendente (transversal, não-código):** persistir a ata em
+`docs/10-ata-2026-06-16.md`; estudar as planilhas das sedes (atividades
+não-limpeza); demais ondas (2–5).
+
+**Arquivos:** `types/comum.ts` (+`TipoServico`), `types/Local.ts`
+(+`fator_intensidade`), `types/Tarefa.ts` (+`tipo_servico`), `lib/calculations.ts`,
+`lib/validations.ts`, `lib/schema.ts`, `lib/memoryStore.ts`,
+`components/SugestoesAjuste.tsx`, `components/agenda/TaskPalette.tsx`,
+`services/rotinasService.ts`, `app/(app)/tarefas/page.tsx`,
+`app/(app)/locais/page.tsx`, `app/(app)/categorias/page.tsx`,
+`app/(app)/dashboard/page.tsx`, `docs/02`, `docs/03`, `docs/08`.
+
+---
+
 ## 2026-06-16 — Fase F: login com Google (Firebase Auth)
 
 **O que mudou:**

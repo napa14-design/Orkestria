@@ -6,6 +6,29 @@
 > **decisão** precisa estar tomada antes de começar.
 > Esforço: **P** pequeno (dias) · **M** médio (1–2 semanas) · **G** grande (projeto).
 
+## Atualização pós-ata de alinhamento (16/06/2026)
+
+A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
+**ondas**. O detalhamento vivo está no plano de execução desta rodada; resumo:
+
+| Onda | Tema | Status |
+|---|---|---|
+| **1** | **Modelo de tempo + regra de horário** | ✅ **feito** |
+| 2 | Granularidade (manter 30 min visual; calibrar deslocamento) | pendente |
+| 3 | Calendário acadêmico / período letivo | pendente |
+| 4 | Confirmação do executado (ficha de papel + OCR) | pendente |
+| 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | pendente |
+
+**Onda 1 (entregue):** o tempo previsto passou a ser
+**m² × intensidade do ambiente × tipo de serviço** (base 1 m² ≈ 1 min). A
+**intensidade migrou da categoria para o LOCAL** (`fator_intensidade`: leve 0,8
+· normal 1,0 · densa 1,5) e a tarefa ganhou **`tipo_servico`** (rotina 1,0 ·
+pesada 1,5 · desincrustante 2,0 — calibráveis em `lib/calculations.ts`). A
+regra de horário passou a **bloquear só o início** fora do expediente: uma
+tarefa pode terminar depois da saída, mas não pode iniciar às/após a saída.
+O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
+"Recalibrar" continua, pois mexe no `tempo_base_min`).
+
 ## Princípios que valem para tudo (guarda-corpos)
 
 1. **Planejar ≠ avaliar.** Qualquer número por pessoa (tempo individual, score)

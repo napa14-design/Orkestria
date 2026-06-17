@@ -69,6 +69,15 @@ export default function PaginaLocais() {
           ajuda: "Base do cálculo de tempo por m²",
           dica: "A área do local em metros quadrados. É o que o sistema multiplica nas tarefas com regra POR M² (ex.: 1 min/m² numa sala de 80 m² = 80 min). Local sem metragem gera alerta nas tarefas por m².",
         },
+        {
+          key: "fator_intensidade",
+          rotulo: "Intensidade (fator)",
+          tipo: "numero",
+          passo: "0.1",
+          padrao: 1,
+          ajuda: "Leve 0,8 · Normal 1,0 · Densa 1,5",
+          dica: "O quanto este ambiente \"suja\" e pesa na limpeza — multiplica o tempo previsto de TODAS as tarefas do local. Banheiros e copas são densos (1,5); salas comuns são normais (1,0); áreas abertas/externas são leves (0,8). Use 1 (ou deixe em branco) quando não quiser efeito. Antes esse fator ficava na Categoria; agora é por ambiente.",
+        },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
@@ -98,6 +107,20 @@ export default function PaginaLocais() {
             ) : (
               <span className="selo selo-amarelo">sem metragem</span>
             ),
+        },
+        {
+          key: "fator_intensidade",
+          rotulo: "Intensidade",
+          render: (l) => {
+            const f = l.fator_intensidade;
+            if (!f || f === 1)
+              return <span className="num" style={{ color: "var(--tinta-3)" }}>normal</span>;
+            return (
+              <span className={`selo ${f > 1 ? "selo-laranja" : "selo-azul"} num`}>
+                {f > 1 ? "densa" : "leve"} ×{f.toLocaleString("pt-BR")}
+              </span>
+            );
+          },
         },
         {
           key: "ativo",

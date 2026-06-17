@@ -14,6 +14,12 @@ const REGRAS = [
   { valor: "manual", rotulo: "Manual" },
 ];
 
+const TIPOS_SERVICO = [
+  { valor: "rotina", rotulo: "Rotina (manutenção) ×1,0" },
+  { valor: "pesada", rotulo: "Pesada (reforçada) ×1,5" },
+  { valor: "desincrustante", rotulo: "Desincrustante (encardido) ×2,0" },
+];
+
 const FREQUENCIAS = [
   { valor: "diaria", rotulo: "Diária" },
   { valor: "semanal", rotulo: "Semanal" },
@@ -97,6 +103,15 @@ export default function PaginaTarefas() {
           obrigatorio: true,
           opcoes: REGRAS,
           dica: "Como o sistema descobre quanto tempo a tarefa leva. • FIXO: sempre o mesmo tempo (ex.: repor material = 15 min). • POR M²: multiplica o tempo pela metragem do local (ex.: 1 min/m² numa sala de 80 m² = 80 min). • POR UNIDADE: multiplica pela quantidade (ex.: 20 min × 3 banheiros = 60 min). • MANUAL: você digita o tempo na mão.",
+        },
+        {
+          key: "tipo_servico",
+          rotulo: "Tipo de serviço",
+          tipo: "select",
+          padrao: "rotina",
+          opcoes: TIPOS_SERVICO,
+          ajuda: "Multiplica o tempo previsto pela natureza do esforço",
+          dica: "A natureza do esforço de limpeza, que multiplica o tempo previsto. • ROTINA: manutenção do dia a dia (×1,0). • PESADA: limpeza reforçada/profunda (×1,5). • DESINCRUSTANTE: remover sujeira aderida/encardido (×2,0). Combina-se com a intensidade do ambiente (cadastrada no Local): o tempo final = m² × intensidade do local × tipo de serviço.",
         },
         {
           key: "tempo_base_min",
@@ -230,7 +245,7 @@ export default function PaginaTarefas() {
           rotulo: "Tempo previsto",
           render: (t) => (
             <strong className="num">
-              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id), categoriaPorId(t.categoria_id)))}
+              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id)))}
             </strong>
           ),
         },
@@ -257,6 +272,11 @@ export default function PaginaTarefas() {
                   {t.restricao_genero === "feminino" ? "♀ Mulheres" : "♂ Homens"}
                 </span>
               )}
+              {t.tipo_servico && t.tipo_servico !== "rotina" && (
+                <span className="selo selo-laranja">
+                  {t.tipo_servico === "pesada" ? "pesada ×1,5" : "desincrustante ×2,0"}
+                </span>
+              )}
               {t.janela_inicio && t.janela_fim && (
                 <span className="selo selo-laranja num">
                   {t.janela_inicio}–{t.janela_fim}
@@ -274,6 +294,7 @@ export default function PaginaTarefas() {
                 </span>
               ))}
               {!t.restricao_genero &&
+                (!t.tipo_servico || t.tipo_servico === "rotina") &&
                 !t.tempo_referencia &&
                 !t.presenca &&
                 !t.critica &&

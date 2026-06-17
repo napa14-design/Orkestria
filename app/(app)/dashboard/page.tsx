@@ -18,7 +18,6 @@ import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
-  Categoria,
   ExecucaoRealizada,
   Funcionario,
   Local,
@@ -62,7 +61,6 @@ export default function PaginaDashboard() {
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
   const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
-  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: parametros } = useSWR<ParametrosResolvidos>(
     "/api/parametros?resolvidos=1",
     fetcher,
@@ -383,7 +381,6 @@ export default function PaginaDashboard() {
         execucoes={execucoes ?? []}
         tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
         locais={locais ?? []}
-        categorias={categorias ?? []}
         parametros={params}
         aoAplicado={() => void mutateTarefas()}
       />

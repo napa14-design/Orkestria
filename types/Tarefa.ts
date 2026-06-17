@@ -4,6 +4,7 @@ import type {
   Prioridade,
   RegraCalculo,
   RestricaoGenero,
+  TipoServico,
 } from "./comum";
 
 export interface Tarefa extends Auditoria {
@@ -21,6 +22,11 @@ export interface Tarefa extends Auditoria {
    */
   categoria_id?: string;
   regra_calculo: RegraCalculo;
+  /**
+   * Natureza do esforço (rotina/pesada/desincrustante) — multiplica o tempo
+   * previsto. Ausente = "rotina" (fator 1,0). Veja `TipoServico`.
+   */
+  tipo_servico?: TipoServico;
   /**
    * Significado depende da regra:
    *  - fixo/manual: tempo total em minutos

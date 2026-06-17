@@ -6,20 +6,39 @@
  * igualmente para Google Sheets hoje e Firebase Firestore no futuro.
  */
 import type {
-  Categoria,
   ClassificacaoOcupacao,
   Funcionario,
   Local,
   ParametrosResolvidos,
   RotinaPlanejada,
   Tarefa,
+  TipoServico,
 } from "@/types";
 import { hhmmParaMin } from "./dateUtils";
 
-/** Fator de intensidade efetivo de uma categoria (ausente/≤0 → 1, sem efeito). */
-export function fatorIntensidade(categoria: Categoria | undefined): number {
-  const f = categoria?.fator_intensidade;
+/**
+ * Fator de intensidade do AMBIENTE (local): o quanto o espaço suja e pesa na
+ * limpeza. Ausente/≤0 → 1 (sem efeito). Presets: leve 0,8 · normal 1,0 ·
+ * densa 1,5. Migrou da categoria para o local (decisão da ata de 16/06/2026).
+ */
+export function fatorIntensidadeLocal(local: Local | undefined): number {
+  const f = local?.fator_intensidade;
   return typeof f === "number" && f > 0 ? f : 1;
+}
+
+/**
+ * Multiplicadores por natureza do serviço de limpeza. Constantes calibráveis:
+ * a 1ª fase usa estes valores; podem virar parâmetro no futuro.
+ */
+export const FATOR_TIPO_SERVICO: Record<TipoServico, number> = {
+  rotina: 1,
+  pesada: 1.5,
+  desincrustante: 2,
+};
+
+/** Fator do tipo de serviço da tarefa (ausente = "rotina" → 1). */
+export function fatorServico(tarefa: Pick<Tarefa, "tipo_servico"> | undefined): number {
+  return FATOR_TIPO_SERVICO[tarefa?.tipo_servico ?? "rotina"] ?? 1;
 }
 
 /**
@@ -121,17 +140,15 @@ export function cargaSemanalMin(f: Funcionario): number {
 /**
  * Tempo previsto da tarefa segundo sua regra de cálculo:
  *  - fixo/manual → tempo_base_min
- *  - por_m2      → tempo_base_min × metragem do local
+ *  - por_m2      → tempo_base_min × metragem do local (base 1 m² ≈ 1 min)
  *  - por_unidade → tempo_base_min × quantidade
  *
- * O resultado é multiplicado pelo fator de intensidade da categoria (quando
- * informada): leve 0,8 · normal 1,0 · densa 1,5.
+ * O resultado é multiplicado por DOIS fatores independentes:
+ *  - intensidade do AMBIENTE (local): leve 0,8 · normal 1,0 · densa 1,5;
+ *  - natureza do SERVIÇO (tarefa): rotina 1,0 · pesada 1,5 · desincrustante 2,0.
+ * Fórmula da 1ª fase: m² × tipo de ambiente × tipo de serviço.
  */
-export function tempoPrevistoMin(
-  tarefa: Tarefa,
-  local: Local | undefined,
-  categoria?: Categoria,
-): number {
+export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): number {
   let base: number;
   switch (tarefa.regra_calculo) {
     case "por_m2":
@@ -145,7 +162,7 @@ export function tempoPrevistoMin(
     default:
       base = tarefa.tempo_base_min;
   }
-  return Math.round(base * fatorIntensidade(categoria));
+  return Math.round(base * fatorIntensidadeLocal(local) * fatorServico(tarefa));
 }
 
 /** blocos = teto(tempo_previsto / bloco). 80min em blocos de 30 → 3 blocos. */

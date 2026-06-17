@@ -134,22 +134,21 @@ export async function createRotina(
   const funcEfetivo = funcionarioNoDia(funcionario, entrada.data);
 
   const exigeRequisitos = !!(tarefa.requisitos ?? "").split(",").filter(Boolean).length;
-  const [local, parametros, rotinasDoDia, categoria, requisitosCatalogo, qualificacoesFuncionario] =
+  const [local, parametros, rotinasDoDia, requisitosCatalogo, qualificacoesFuncionario] =
     await Promise.all([
       ds.obter("locais", tarefa.local_id),
       resolverParametros(tarefa.sede_id),
       getRotinasByData(entrada.data),
-      tarefa.categoria_id ? ds.obter("categorias", tarefa.categoria_id) : Promise.resolve(null),
       exigeRequisitos ? ds.listar("requisitos") : Promise.resolve([]),
       exigeRequisitos
         ? getQualificacoesDoFuncionario(entrada.funcionario_id)
         : Promise.resolve([]),
     ]);
 
-  // tempo pessoal (planejamento realista) substitui o padrão quando existe
+  // tempo pessoal (planejamento realista) substitui o padrão quando existe.
+  // Intensidade vem do local e a natureza do esforço da própria tarefa.
   const tempoPessoal = await getTempoPessoal(entrada.funcionario_id, tarefa.id);
-  const previsto =
-    tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined, categoria ?? undefined);
+  const previsto = tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined);
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
   const fimMin = inicioMin + visual;

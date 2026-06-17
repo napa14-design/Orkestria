@@ -61,6 +61,7 @@ id · nome_sede · cidade · endereco · ativo · auditoria (4 campos).
 | nome_local | string | |
 | tipo_local | enum | sala · banheiro · corredor · area_comum · area_externa · copa · escada · recepcao · auditorio · almoxarifado · outros |
 | metragem | número | m²; 0 gera alerta |
+| fator_intensidade | número | intensidade do ambiente — multiplica o tempo das tarefas do local (leve 0,8 · normal 1,0 · densa 1,5). Ausente/≤0 = 1. **Substitui o antigo fator da categoria.** |
 | ativo, observacoes, auditoria | | |
 
 ### tarefas
@@ -70,6 +71,7 @@ id · nome_sede · cidade · endereco · ativo · auditoria (4 campos).
 | local_id | string | **obrigatório** |
 | sede_id | string | **preenchido automaticamente a partir do local** |
 | regra_calculo | enum | fixo · por_m2 · por_unidade · manual |
+| tipo_servico | enum | natureza do esforço — multiplica o tempo: rotina 1,0 · pesada 1,5 · desincrustante 2,0. Ausente = rotina |
 | tempo_base_min | número | total (fixo/manual) · min/m² (por_m2) · min/un (por_unidade) |
 | quantidade | número | usada em por_unidade |
 | frequencia | enum | diaria · semanal · quinzenal · mensal · sob_demanda |

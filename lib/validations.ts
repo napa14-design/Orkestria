@@ -49,11 +49,14 @@ export function validarAlocacao(args: {
     return alertas;
   }
 
-  if (inicioMin < entrada || fimMin > saida) {
+  // Regra de horário: a tarefa não pode INICIAR fora do expediente, mas PODE
+  // terminar depois da saída (uma tarefa começada perto do fim do turno se
+  // estende — a decisão da ata é "pode terminar, não iniciar fora").
+  if (inicioMin < entrada || inicioMin >= saida) {
     alertas.push({
       nivel: "erro",
       codigo: "FORA_DO_EXPEDIENTE",
-      mensagem: `Tarefa fora do expediente de ${f.nome} (${f.entrada}–${f.saida}).`,
+      mensagem: `Tarefa inicia fora do expediente de ${f.nome} (${f.entrada}–${f.saida}).`,
     });
   }
 
