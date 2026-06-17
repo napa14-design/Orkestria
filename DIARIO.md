@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-06-17 — Distribuição automática (sugestão) no Remanejo
+
+**Contexto:** quando alguém falta, as tarefas viram órfãs e o supervisor
+remaneja na mão. Agora há um botão que **sugere a distribuição** das órfãs entre
+quem tem folga — o supervisor revisa e confirma (servidor revalida ao aplicar).
+
+**O que mudou em `/remanejo`:**
+- Botão **"✨ Distribuir automaticamente (sugestão)"**: encaixe ganancioso —
+  ordena as órfãs por **criticidade → prioridade → horário** e, para cada uma,
+  escolhe o melhor candidato **elegível**, preenchendo os destinos.
+- **Elegibilidade espelha as regras do servidor:** gênero (ex.: banheiro
+  feminino só mulher), **conformidade** (aptidão/treinamento não vencidos; EPI
+  não bloqueia), **expediente** do candidato (não inicia fora) e **intervalo**,
+  e **sem conflito** de horário (considerando atribuições já sugeridas na rodada).
+- **Critério de sede:** prefere colega da **mesma sede**; só cruza sede quando
+  não há ninguém elegível na sede do ausente.
+- O que não consegue encaixar fica **sem candidato** e é avisado na mensagem
+  ("N sem candidato disponível") — sem propor quem seria recusado.
+- Botão **"Aplicar todas as sugestões"** (sequencial, cada uma revalidada).
+- Novas leituras na tela: `/api/requisitos` e `/api/qualificacoes`.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok. Maria (f1) em falta + José
+liberado → sugeriu a "Limpeza concorrente" para **José (mesma sede)** e deixou a
+"Higienização de banheiro feminino" **sem candidato** (exige treinamento que só a
+Maria tinha; ninguém qualificado/disponível). "Aplicar todas" gravou só a
+viável (t1→José), sem erro, e manteve a órfã restante para decisão manual.
+Console limpo. `.env` restaurado.
+
+**Arquivo:** `app/(app)/remanejo/page.tsx`.
+
+---
+
 ## 2026-06-17 — Duração por dia para presença/plantão (e regra manual)
 
 **Contexto:** tarefas de **presença/plantão** e de **regra manual** têm duração
