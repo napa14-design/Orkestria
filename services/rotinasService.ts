@@ -64,6 +64,12 @@ export interface NovaRotina {
   observacao?: string;
   /** Autorização manual: rebaixa INTERVALO/SOBREPOSICAO de erro para alerta. */
   forcar?: boolean;
+  /**
+   * Duração (min) informada na alocação — só é respeitada para tarefas de
+   * presença/plantão ou regra "manual", cuja duração varia por dia. Para as
+   * demais o servidor sempre calcula (m² × ambiente × serviço).
+   */
+  duracao_min?: number;
 }
 
 const CODIGOS_AUTORIZAVEIS = new Set(["INTERVALO", "SOBREPOSICAO"]);
@@ -147,8 +153,14 @@ export async function createRotina(
 
   // tempo pessoal (planejamento realista) substitui o padrão quando existe.
   // Intensidade vem do local e a natureza do esforço da própria tarefa.
+  // Presença/plantão e regra manual: duração variável por dia — o servidor
+  // respeita a duração informada na alocação (e ignora para tarefas calculadas).
+  const duracaoVariavel = tarefa.presenca || tarefa.regra_calculo === "manual";
   const tempoPessoal = await getTempoPessoal(entrada.funcionario_id, tarefa.id);
-  const previsto = tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined);
+  const previsto =
+    duracaoVariavel && typeof entrada.duracao_min === "number" && entrada.duracao_min > 0
+      ? Math.round(entrada.duracao_min)
+      : tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined);
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
   const fimMin = inicioMin + visual;

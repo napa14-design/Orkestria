@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-17 — Duração por dia para presença/plantão (e regra manual)
+
+**Contexto:** tarefas de **presença/plantão** e de **regra manual** têm duração
+que varia a cada dia (a ata: "toda quarta a fulana tem plantão, um dia 20 min,
+outro 15"). A duração é da **alocação**, não da tarefa.
+
+**O que mudou:**
+- Ao **soltar** uma tarefa de presença ou regra manual na agenda, abre o modal
+  **"Quanto tempo hoje?"** (presets 15/30/60/90/120 + campo livre em minutos). O
+  card entra já com a duração escolhida; cancelar aborta o drop.
+- **Servidor passa a respeitar a duração informada** (`duracao_min` em
+  `NovaRotina`) — **só** para tarefas `presenca` ou regra `manual`; para as
+  demais continua calculando (m² × ambiente × serviço). Antes o servidor sempre
+  recalculava e a escolha do supervisor se perdia.
+- Tarefas de tempo fixo/manual não recebem fator de intensidade (já vigente), e
+  presença não cobra desvio — então o número fica exatamente o escolhido.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; soltei "Acompanhamento de
+pátio" (presença) às 14:00, escolhi 1h30 → rotina gravada com previsto/visual 90
+e fim 15:30; modal aparece e cancelar aborta; console limpo. `.env` restaurado.
+
+**Arquivos:** `app/(app)/rotinas/page.tsx` (modal + duracao_min no POST),
+`services/rotinasService.ts` (`NovaRotina.duracao_min` + uso no `createRotina`).
+
+---
+
 ## 2026-06-17 — Cabeçalho da ficha enxugado (logo + nome + sede)
 
 A pedido: o cabeçalho de `/rotinas/imprimir` agora mostra só **logo + nome do

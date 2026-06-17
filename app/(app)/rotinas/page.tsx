@@ -29,7 +29,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
-import { hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
+import { formatarDuracao, hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
 import { temErro, validarAlocacao } from "@/lib/validations";
 import type {
   AlertaValidacao,
@@ -84,6 +84,13 @@ export default function PaginaRotinas() {
     mensagens: string[];
     resolver: (ok: boolean) => void;
   } | null>(null);
+  // Modal "quanto tempo hoje?" para tarefas de presença/plantão e regra manual,
+  // cuja duração varia a cada dia (definida na alocação, não na tarefa).
+  const [duracaoPrompt, setDuracaoPrompt] = useState<{
+    nome: string;
+    resolver: (min: number | null) => void;
+  } | null>(null);
+  const [duracaoInput, setDuracaoInput] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -259,6 +266,19 @@ export default function PaginaRotinas() {
     setConfirmacao(null);
   }
 
+  /** Pergunta a duração (min) ao soltar tarefa de presença/manual. */
+  function pedirDuracao(nome: string, sugestaoMin: number): Promise<number | null> {
+    setDuracaoInput(String(Math.max(5, Math.round(sugestaoMin))));
+    return new Promise<number | null>((resolve) => {
+      setDuracaoPrompt({ nome, resolver: resolve });
+    });
+  }
+
+  function responderDuracao(min: number | null) {
+    duracaoPrompt?.resolver(min);
+    setDuracaoPrompt(null);
+  }
+
   /** Validação local imediata; o servidor revalida antes de gravar. */
   function validarLocalmente(
     funcionarioId: string,
@@ -298,7 +318,17 @@ export default function PaginaRotinas() {
     const pessoal = (temposPessoais ?? []).find(
       (tp) => tp.funcionario_id === funcionarioId && tp.tarefa_id === tarefaId,
     );
-    const previsto = pessoal ? pessoal.tempo_min : tempoPrevistoMin(tarefa, local);
+    const base = pessoal ? pessoal.tempo_min : tempoPrevistoMin(tarefa, local);
+
+    // Presença/plantão e regra manual têm duração variável por dia: pergunta
+    // "quanto tempo hoje?" em vez de assumir o tempo base.
+    const duracaoVariavel = tarefa.presenca || tarefa.regra_calculo === "manual";
+    let previsto = base;
+    if (duracaoVariavel) {
+      const escolhido = await pedirDuracao(tarefa.nome_tarefa, base > 0 ? base : blocoMin * 2);
+      if (escolhido == null) return; // supervisor cancelou
+      previsto = escolhido;
+    }
 
     const validacao = validarLocalmente(funcionarioId, inicio, previsto, tarefa);
     let forcar = false;
@@ -342,6 +372,7 @@ export default function PaginaRotinas() {
             tarefa_id: tarefaId,
             inicio_planejado: inicio,
             forcar,
+            duracao_min: duracaoVariavel ? previsto : undefined,
           });
           setAlertas(res.alertas ?? []);
           real = res.rotina;
@@ -700,6 +731,58 @@ export default function PaginaRotinas() {
           </button>
           <button type="button" className="btn btn-primario" onClick={() => responderConfirmacao(true)}>
             Autorizar mesmo assim
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Quanto tempo hoje?"
+        aberto={!!duracaoPrompt}
+        aoFechar={() => responderDuracao(null)}
+        larguraMax={420}
+      >
+        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 12 }}>
+          <strong>{duracaoPrompt?.nome}</strong> é uma atividade de duração variável (presença/
+          plantão ou tempo manual). Informe a duração <strong>deste dia</strong> — não muda a tarefa.
+        </p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {[15, 30, 60, 90, 120].map((m) => (
+            <button
+              key={m}
+              type="button"
+              className="btn btn-mini"
+              onClick={() => setDuracaoInput(String(m))}
+              style={{ fontWeight: 700, outline: Number(duracaoInput) === m ? "2px solid var(--acento)" : "none" }}
+            >
+              {formatarDuracao(m)}
+            </button>
+          ))}
+        </div>
+        <label className="campo" style={{ marginBottom: 16 }}>
+          <span className="rotulo">Duração (minutos)</span>
+          <input
+            type="number"
+            min="5"
+            step="5"
+            value={duracaoInput}
+            autoFocus
+            onChange={(e) => setDuracaoInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && Number(duracaoInput) > 0) responderDuracao(Number(duracaoInput));
+            }}
+          />
+        </label>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button type="button" className="btn" onClick={() => responderDuracao(null)}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primario"
+            disabled={!(Number(duracaoInput) > 0)}
+            onClick={() => responderDuracao(Number(duracaoInput))}
+          >
+            Colocar na agenda
           </button>
         </div>
       </Modal>
