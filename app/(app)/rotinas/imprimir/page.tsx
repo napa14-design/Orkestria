@@ -196,8 +196,9 @@ function Fichas() {
                 </div>
               </div>
             </div>
-            {/* QR identifica a ficha (sede·data·funcionário) para a leitura */}
-            <div style={{ textAlign: "center", flexShrink: 0 }}>
+            {/* QR identifica a ficha (sede·data·funcionário) para a leitura.
+                Afastado do canto p/ não encostar no marcador fiducial. */}
+            <div style={{ textAlign: "center", flexShrink: 0, marginTop: 18, marginRight: 14 }}>
               <QRCodeSVG value={payloadQR(sedeId, data, f.id)} size={56} level="M" marginSize={0} />
               <div className="num" style={{ fontSize: 7, color: "#000", marginTop: 1, letterSpacing: 0.5 }}>
                 LEITURA
