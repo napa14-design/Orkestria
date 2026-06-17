@@ -28,9 +28,9 @@ function seed(): Banco {
       { id: "u3", nome: "Gerência", email: "gerencia@empresa.com", perfil: "visualizador", sede_id: "geral", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
     ],
     sedes: [
-      { id: "sede_aldeota", nome_sede: "Sede Aldeota", cidade: "Fortaleza", endereco: "Av. Santos Dumont, 1000", ativo: true, ...aud },
-      { id: "sede_dt", nome_sede: "Sede DT", cidade: "Fortaleza", endereco: "Rua Padre Valdevino, 200", ativo: true, ...aud },
-      { id: "sede_centro", nome_sede: "Sede Centro", cidade: "Fortaleza", endereco: "Rua Major Facundo, 500", ativo: true, ...aud },
+      { id: "sede_aldeota", nome_sede: "Sede Aldeota", cidade: "Fortaleza", endereco: "Av. Santos Dumont, 1000", tipo_sede: "faculdade", grupo: "Centro", ativo: true, ...aud },
+      { id: "sede_dt", nome_sede: "Sede DT", cidade: "Fortaleza", endereco: "Rua Padre Valdevino, 200", tipo_sede: "escola", grupo: "Sul", ativo: true, ...aud },
+      { id: "sede_centro", nome_sede: "Sede Centro", cidade: "Fortaleza", endereco: "Rua Major Facundo, 500", tipo_sede: "educacao_infantil", grupo: "Centro", ativo: true, ...aud },
     ],
     funcionarios: [
       { id: "f1", nome: "Maria das Graças", genero: "feminino", sede_id: "sede_aldeota", turno: "manha", entrada: "07:00", saida: "16:00", intervalo_min: 60, intervalo_inicio: "12:00", intervalo_fim: "13:00", escala: "seg_sab", entrada_sabado: "07:00", saida_sabado: "11:00", cargo: "ASG", ativo: true, observacoes: "Escala 44h: sáb 4h", ...aud },

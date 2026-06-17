@@ -4,6 +4,19 @@ export type Perfil = "administrador" | "supervisor" | "visualizador";
 
 export type Turno = "manha" | "tarde" | "noite" | "integral";
 
+/**
+ * Natureza da sede — usada para comparar ociosidade entre unidades parecidas e
+ * sugerir uma folga-alvo por perfil (ex.: educação infantil tende a uma folga
+ * maior). Não altera cálculo sozinho; a folga-alvo continua em
+ * `folga_minima_percentual` por sede.
+ */
+export type TipoSede =
+  | "educacao_infantil"
+  | "escola"
+  | "faculdade"
+  | "administrativo"
+  | "outros";
+
 /** Dias trabalhados na semana. seg_sab cobre escalas tipo 44h (sáb 4h). */
 export type Escala = "seg_sex" | "seg_sab" | "todos";
 

@@ -51,7 +51,10 @@ parametros (sede_id|geral)   │ ├──< funcionarios (sede_id)
 > `jornada_liquida = saida − entrada − intervalo_min`.
 
 ### sedes
-id · nome_sede · cidade · endereco · ativo · auditoria (4 campos).
+id · nome_sede · cidade · endereco · **tipo_sede** (educacao_infantil · escola ·
+faculdade · administrativo · outros) · **grupo** (texto, ex.: "Sul") · ativo ·
+auditoria. `tipo_sede`/`grupo` são opcionais e servem para comparar/agrupar
+sedes; a folga-alvo continua por sede (`folga_minima_percentual`).
 
 ### locais
 | Campo | Tipo | Observação |

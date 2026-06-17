@@ -17,7 +17,7 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | **2** | Granularidade (manter 30 min visual; deslocamento já configurável por sede) | ✅ **feito** (config + nota) |
 | **3** | Calendário acadêmico / período letivo | ✅ **feito** |
 | 4 | Confirmação do executado (ficha de papel + OCR) | 🟡 **parcial** (ficha pronta; OCR = spike) |
-| 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | pendente |
+| 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | 🟡 **parcial** (cadastro feito; visão agregada + RH pendentes) |
 
 **Onda 1 (entregue):** o tempo previsto passou a ser
 **m² × intensidade do ambiente × tipo de serviço** (base 1 m² ≈ 1 min). A
@@ -28,6 +28,19 @@ regra de horário passou a **bloquear só o início** fora do expediente: uma
 tarefa pode terminar depois da saída, mas não pode iniciar às/após a saída.
 O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
 "Recalibrar" continua, pois mexe no `tempo_base_min`).
+
+**Onda 5 (parcial):** a Sede ganhou **`tipo_sede`** (educação infantil · escola
+· faculdade · administrativo · outros) e **`grupo`** (ex.: "Sul"), cadastráveis
+na tela de Sedes — base para comparar ociosidade entre unidades parecidas e para
+visões agregadas por grupo. A **folga-alvo já é por sede**
+(`folga_minima_percentual`), então a "ociosidade-alvo por tipo" se resolve hoje
+configurando o parâmetro de cada sede. **Pendente:** a **visão agregada** por
+tipo/grupo (dashboard/remanejo somando unidades). **5.2 (dados de RH):** segue
+**em estudo, sem decisão** — idade e sexo **continuam fora** do motor de
+produtividade/alocação (salvaguarda vigente); aptidões/restrições já cabem em
+`qualificacoes`. Antes de qualquer uso de atributos de pessoa em produtividade,
+passar pelo jurídico (Davi Rocha) — restrição preferencialmente por
+**treinamento**, não por sexo.
 
 **Onda 4 (parcial):** a **ficha de confirmação imprimível** (4.1) está pronta —
 `/rotinas/imprimir` agora lista, por funcionário/dia, os **EPIs obrigatórios**

@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-06-17 — Onda 5.1 (pós-ata): tipo e grupo de sede
+
+**Contexto:** base para comparar ociosidade entre unidades parecidas e para
+visões agregadas por grupo (ex.: Sul 1/2/3). A 5.2 (dados de RH) segue em
+estudo, sem decisão — idade/sexo continuam fora do motor (ver `docs/08`).
+
+**O que mudou:**
+- Sede ganhou **`tipo_sede`** (educacao_infantil · escola · faculdade ·
+  administrativo · outros) e **`grupo`** (texto livre, ex.: "Sul", "Centro"),
+  ambos opcionais. Cadastráveis na tela de Sedes (selos "Tipo / Grupo" na lista).
+- `lib/schema.ts` (+2 colunas), seed das 3 sedes com tipo/grupo de exemplo.
+- A folga-alvo de ociosidade **já é por sede** (`folga_minima_percentual`); o
+  tipo/grupo é para categorização e comparação, não muda cálculo sozinho.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; `/sedes` lista a coluna
+"Tipo / Grupo" com selos (Aldeota=Faculdade·Centro, DT=Escola·Sul,
+Centro=Educação infantil·Centro); console limpo. `.env` restaurado para `firebase`.
+
+**Pendente:** visão agregada por tipo/grupo (dashboard/remanejo); 5.2 dados de
+RH (decisão jurídica — Davi Rocha).
+
+**Arquivos:** `types/comum.ts` (+`TipoSede`), `types/Sede.ts` (+`tipo_sede`,
+`grupo`), `lib/schema.ts`, `lib/memoryStore.ts`, `app/(app)/sedes/page.tsx`,
+`docs/02`, `docs/08`.
+
+---
+
 ## 2026-06-17 — Onda 4.1 (pós-ata): ficha de confirmação com EPIs
 
 **Contexto:** o ASG não usa celular — a confirmação do que foi feito será por
