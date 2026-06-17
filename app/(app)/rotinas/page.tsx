@@ -357,7 +357,11 @@ export default function PaginaRotinas() {
             return rr ? [...base, rr] : base;
           },
           rollbackOnError: true,
-          revalidate: false,
+          // Reconcilia com o servidor após a operação (deduplicado pela SWR).
+          // populateCache dá o feedback imediato; esta revalidação corrige
+          // qualquer divergência de cache em adições/edições concorrentes —
+          // sem flicker, pois keepPreviousData está ligado globalmente.
+          revalidate: true,
         },
       );
     } catch (err) {
@@ -411,7 +415,11 @@ export default function PaginaRotinas() {
             return (atual ?? []).map((r) => (r.id === rotinaId && rr ? rr : r));
           },
           rollbackOnError: true,
-          revalidate: false,
+          // Reconcilia com o servidor após a operação (deduplicado pela SWR).
+          // populateCache dá o feedback imediato; esta revalidação corrige
+          // qualquer divergência de cache em adições/edições concorrentes —
+          // sem flicker, pois keepPreviousData está ligado globalmente.
+          revalidate: true,
         },
       );
     } catch (err) {
@@ -453,7 +461,11 @@ export default function PaginaRotinas() {
             return (atual ?? []).map((r) => (r.id === rotinaId && rr ? rr : r));
           },
           rollbackOnError: true,
-          revalidate: false,
+          // Reconcilia com o servidor após a operação (deduplicado pela SWR).
+          // populateCache dá o feedback imediato; esta revalidação corrige
+          // qualquer divergência de cache em adições/edições concorrentes —
+          // sem flicker, pois keepPreviousData está ligado globalmente.
+          revalidate: true,
         },
       );
     };
@@ -485,7 +497,11 @@ export default function PaginaRotinas() {
           // rápidas concorrentes reintroduzam um card já removido ("some e volta").
           populateCache: (_res, atual) => (atual ?? []).filter((r) => r.id !== rotinaId),
           rollbackOnError: true,
-          revalidate: false,
+          // Reconcilia com o servidor após a operação (deduplicado pela SWR).
+          // populateCache dá o feedback imediato; esta revalidação corrige
+          // qualquer divergência de cache em adições/edições concorrentes —
+          // sem flicker, pois keepPreviousData está ligado globalmente.
+          revalidate: true,
         },
       );
     } catch (err) {

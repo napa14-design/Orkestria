@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-06-17 — Correção: cards da agenda "sumiam" e geravam sobreposição fantasma
+
+**Sintoma (relatado):** ao montar a agenda de vários funcionários, alguns cards
+sumiam da tela; tentar pôr outra tarefa onde o servidor já tinha uma acusava
+"Sobreposição com tarefa já planejada às HH:MM" mesmo sem nada visível; **F5
+trazia tudo de volta**.
+
+**Causa:** todas as rotinas do dia (todos os funcionários) vivem numa **única
+chave SWR**. As mutações otimistas usavam `revalidate: false` — então o cache do
+cliente **nunca reconciliava com o servidor**. Numa adição concorrente que se
+perdesse no cache (ou num `rollbackOnError` com snapshot defasado), o card
+desaparecia da tela embora gravado. Como a validação local só enxerga o cache,
+ela não via a tarefa escondida → o servidor recusava por sobreposição → o erro
+revertia ainda mais cards. Só o F5 (recarga) ressincronizava.
+
+**Correção:** os quatro handlers (`soltarNova`, `mover`, `redimensionar`,
+`remover`) passaram de `revalidate: false` → **`revalidate: true`**. O
+`populateCache` continua dando o feedback imediato; a revalidação (deduplicada
+pela SWR) reconcilia o cache com o servidor após cada operação. **Sem flicker**,
+pois `keepPreviousData` já está ligado no `SWRConfig` global (a grade não
+desmonta durante a revalidação).
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; teste determinístico —
+inserida uma rotina "por trás" do cliente via API (servidor=4, tela=3); ao
+remover um card pela UI, a revalidação **trouxe o card escondido à tela**
+(tela=servidor=3, sem sobreposição fantasma). Console limpo. `.env` restaurado.
+
+**Arquivo:** `app/(app)/rotinas/page.tsx` (4× `revalidate`).
+
+---
+
 ## 2026-06-17 — Estudo da planilha real (Aldeota): granularidade 15 min, não-limpeza e refino do tempo
 
 **Contexto:** o usuário enviou a planilha "Rota de Trabalho ASG · Aldeota" (rota
