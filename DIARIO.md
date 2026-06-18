@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-18 — Leitor OMR (Python/OpenCV) das fichas — protótipo validado
+
+**Contexto:** o usuário imprimiu as fichas de exemplo, marcou à mão de vários
+jeitos (X, tique, risco, ponto, preenchido, vazias) e mandou escaneado
+(CamScanner, 4 fichas). Objetivo: provar que dá para ler automaticamente.
+
+**O que foi feito — novo módulo `omr-service/` (roda fora do Vercel):**
+- `reader.py` — núcleo: decodifica o **QR** (identifica sede·data·funcionário),
+  acha os **4 fiduciais** dos cantos, **endireita** (perspectiva) e mede a
+  **tinta dentro de cada caixa "Feito"** → marcada/vazia. Não lê letra; só mede
+  tinta, então qualquer estilo de marca funciona. Geometria = a do gerador de
+  fichas (pontos PDF). Marca fraca/ambígua → `confianca: "baixa"` (revisão).
+- `app.py` — serviço HTTP FastAPI (`POST /ler`).
+- `testar.py` — CLI de validação contra PDF/imagem.
+- `requirements.txt`, `README.md`, `.gitignore`.
+
+**Validado nas 4 fichas reais escaneadas:** QR lido nas 4; leitura **bateu marca
+a marca** — Edineia 6/6, Elenice (vazia, marcada×5, vazia → flag "revisar" no
+ponto fraco 0.182), Antônio 6/6, David (feita,vazia,feita,vazia,vazia,feita).
+Sem letra, sem padrão de marca exigido.
+
+**Notas:** em produção o `num_tarefas` vem do QR→banco (leitura determinística,
+sem adivinhar nº de linhas). Próximo: tela de upload no app + casar com
+`rotinas_planejadas` → gravar `execucoes_realizadas`; baixa confiança → revisão.
+
+**Arquivos:** `omr-service/` (novo).
+
+---
+
 ## 2026-06-18 — Logos sem margem branca (recorte na fonte) em todo o app
 
 **Contexto:** as logos pareciam pequenas porque os PNGs tinham **margem
