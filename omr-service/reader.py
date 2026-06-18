@@ -18,6 +18,9 @@ CAIXA_X_PDF = 436          # x do centro da coluna "Feito"
 LINHA0_PDF = 690           # y do centro da caixa: linha i → LINHA0 - DELTA*i
 LINHA_DELTA = 21           # passo vertical entre linhas (pt)
 CAIXA_LADO_PDF = 12        # lado da caixa (pt)
+EPI_X_PDF = 76             # bloco de EPIs no rodapé (coluna fixa)
+EPI_LINHA0_PDF = 382       # EPI i → y = EPI_LINHA0 - EPI_DELTA*i
+EPI_DELTA = 18
 S = 3.0                    # escala px/pt do canvas canônico
 
 LIMIAR_MARCA = 0.12        # tinta no miolo acima disso = marcada
@@ -85,7 +88,7 @@ def _confianca(fi: float) -> str:
     return "baixa"   # marca fraca/ambígua → revisão humana
 
 
-def ler_ficha(img_bgr: np.ndarray, num_tarefas: int | None = None, max_linhas: int = 14) -> dict:
+def ler_ficha(img_bgr: np.ndarray, num_tarefas: int | None = None, num_epis: int | None = None, max_linhas: int = 14) -> dict:
     """
     Lê uma ficha. Se `num_tarefas` for informado (produção, via QR→banco),
     mede exatamente essas linhas. Sem ele, tenta descobrir quantas há (modo
@@ -118,10 +121,30 @@ def ler_ficha(img_bgr: np.ndarray, num_tarefas: int | None = None, max_linhas: i
                 if nao_box >= 3:
                     break
 
+    # EPIs no rodapé (coluna fixa) — lido igual às tarefas.
+    epis, nao_e, comecou_e = [], 0, False
+    cxe, _ = _to_canon(EPI_X_PDF, 0)
+    total_e = num_epis if num_epis else 6
+    for i in range(1, total_e + 1):
+        _, cy = _to_canon(EPI_X_PDF, EPI_LINHA0_PDF - EPI_DELTA * i)
+        fi = _tinta(canon, cxe, cy, CAIXA_LADO_PDF, 0.55)
+        if num_epis:
+            epis.append({"epi": i, "marcada": fi > LIMIAR_MARCA, "tinta": round(fi, 3), "confianca": _confianca(fi)})
+        else:
+            fb = _tinta(canon, cxe, cy, CAIXA_LADO_PDF * 1.6, 1.0)
+            if fb > LIMIAR_BORDA:
+                comecou_e, nao_e = True, 0
+                epis.append({"epi": len(epis) + 1, "marcada": fi > LIMIAR_MARCA, "tinta": round(fi, 3), "confianca": _confianca(fi)})
+            elif comecou_e:
+                nao_e += 1
+                if nao_e >= 2:
+                    break
+
     return {
         "ok": True,
         "qr": qr,
         "tarefas": linhas,
+        "epis": epis,
         "feitas": sum(1 for l in linhas if l["marcada"]),
-        "revisar": sum(1 for l in linhas if l["confianca"] == "baixa"),
+        "revisar": sum(1 for l in (linhas + epis) if l["confianca"] == "baixa"),
     }

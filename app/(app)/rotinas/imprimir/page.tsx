@@ -206,34 +206,6 @@ function Fichas() {
             </div>
           </div>
 
-          {/* EPIs exigidos pelas tarefas do dia — o ASG confirma o uso */}
-          {epis.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: 12,
-                padding: "8px 16px",
-                borderBottom: "1px solid var(--linha)",
-                fontSize: 11,
-              }}
-            >
-              <span className="rotulo" style={{ color: "var(--acento)" }}>
-                🧤 EPIs obrigatórios:
-              </span>
-              {epis.map((nome) => (
-                <span
-                  key={nome}
-                  className="num"
-                  style={{ whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}
-                >
-                  <Caixa tamanho={12} /> {nome}
-                </span>
-              ))}
-            </div>
-          )}
-
           {/* tarefas */}
           <table className="tabela" style={{ fontSize: 12 }}>
             <thead>
@@ -280,6 +252,22 @@ function Fichas() {
             Marque um <strong>X</strong> dentro da caixa do que foi feito. Não escreva sobre os
             quadrados pretos dos cantos (servem para a leitura).
           </div>
+
+          {/* EPIs utilizados — no rodapé (usa o espaço e dá posição fixa p/ leitura) */}
+          {epis.length > 0 && (
+            <div style={{ padding: "14px 16px 0" }}>
+              <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 6 }}>
+                EPIs utilizados (marque o que usou)
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {epis.map((nome) => (
+                  <span key={nome} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <Caixa /> {nome}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* rodapé com assinaturas */}
           <div

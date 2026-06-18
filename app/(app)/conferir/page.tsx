@@ -9,7 +9,7 @@ import { useRef, useState } from "react";
 import { lerFicha, parseQR, type ResultadoOMR } from "@/lib/omr";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
-import type { Funcionario, RotinaPlanejada, Sede, Tarefa } from "@/types";
+import type { Funcionario, Requisito, RotinaPlanejada, Sede, Tarefa } from "@/types";
 
 const MAX_LARGURA = 1400;
 
@@ -29,6 +29,7 @@ export default function PaginaConferir() {
   const [qrInfo, setQrInfo] = useState<{ sede: string; data: string; funcionario: string } | null>(null);
   const [funcNome, setFuncNome] = useState<string>("");
   const [linhas, setLinhas] = useState<LinhaConferida[]>([]);
+  const [epiLinhas, setEpiLinhas] = useState<{ nome: string; marcada: boolean; tinta: number; revisar: boolean }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function imagemParaRGBA(bitmap: ImageBitmap) {
@@ -48,6 +49,7 @@ export default function PaginaConferir() {
     setErro("");
     setBruto(null);
     setLinhas([]);
+    setEpiLinhas([]);
     setQrInfo(null);
     setFuncNome("");
     try {
@@ -69,21 +71,46 @@ export default function PaginaConferir() {
       }
 
       // busca as rotinas planejadas daquele funcionário/data/sede
-      const [rotinas, tarefas, locais, funcionarios] = await Promise.all([
+      const [rotinas, tarefas, requisitos, funcionarios] = await Promise.all([
         fetcher(`/api/rotinas?data=${info.data}&sede=${info.sede}`) as Promise<RotinaPlanejada[]>,
         fetcher(`/api/tarefas?sede=${info.sede}`) as Promise<Tarefa[]>,
-        fetcher(`/api/locais?sede=${info.sede}`).catch(() => []) as Promise<unknown[]>,
+        fetcher("/api/requisitos").catch(() => []) as Promise<Requisito[]>,
         fetcher("/api/funcionarios") as Promise<Funcionario[]>,
       ]);
-      void (locais as unknown);
       setFuncNome(funcionarios.find((f) => f.id === info.funcionario)?.nome ?? info.funcionario);
       const tPorId = new Map(tarefas.map((t) => [t.id, t]));
+      const reqPorId = new Map(requisitos.map((r) => [r.id, r]));
       const doFunc = rotinas
         .filter((r) => r.funcionario_id === info.funcionario && r.status !== "cancelada")
         .sort((a, b) => a.inicio_planejado.localeCompare(b.inicio_planejado));
 
-      // 2ª passada determinística: mede exatamente o nº de tarefas do dia
-      const def = doFunc.length ? lerFicha(img, { numTarefas: doFunc.length }) : prelim;
+      // EPIs do dia: união (em ordem) dos requisitos tipo "epi" das tarefas
+      const episNomes: string[] = [];
+      const vistos = new Set<string>();
+      for (const r of doFunc) {
+        const t = tPorId.get(r.tarefa_id);
+        for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
+          const req = reqPorId.get(id);
+          if (req?.tipo === "epi" && !vistos.has(req.nome)) {
+            vistos.add(req.nome);
+            episNomes.push(req.nome);
+          }
+        }
+      }
+
+      // 2ª passada determinística: mede exatamente o nº de tarefas e de EPIs
+      const def = doFunc.length
+        ? lerFicha(img, { numTarefas: doFunc.length, numEpis: episNomes.length })
+        : prelim;
+
+      setEpiLinhas(
+        episNomes.map((nome, i) => ({
+          nome,
+          marcada: def.epis[i]?.marcada ?? false,
+          tinta: def.epis[i]?.tinta ?? 0,
+          revisar: def.epis[i]?.confianca === "baixa",
+        })),
+      );
 
       const conferidas: LinhaConferida[] = (doFunc.length ? doFunc : []).map((r, i) => {
         const l = def.tarefas[i];
@@ -114,6 +141,7 @@ export default function PaginaConferir() {
     const f = e.target.files?.[0];
     if (f) void processar(f);
   }
+
 
   const feitas = linhas.filter((l) => l.marcada).length;
 
@@ -186,8 +214,31 @@ export default function PaginaConferir() {
                   ))}
                 </tbody>
               </table>
+
+              {epiLinhas.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 6 }}>EPIs utilizados</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+                    {epiLinhas.map((e, i) => (
+                      <label key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={e.marcada}
+                          onChange={(ev) =>
+                            setEpiLinhas((arr) => arr.map((x, j) => (j === i ? { ...x, marcada: ev.target.checked } : x)))
+                          }
+                        />
+                        {e.nome}
+                        {e.revisar && <span className="selo selo-amarelo">revisar</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-                <strong>{feitas}</strong> de {linhas.length} marcadas como feitas.
+                <strong>{feitas}</strong> de {linhas.length} tarefas feitas
+                {epiLinhas.length > 0 && <> · {epiLinhas.filter((e) => e.marcada).length}/{epiLinhas.length} EPIs</>}.
                 <button className="btn btn-primario" disabled title="Gravação do realizado — próxima etapa">
                   Salvar realizado (em breve)
                 </button>
@@ -205,6 +256,20 @@ export default function PaginaConferir() {
                   {l.confianca === "baixa" && <span className="selo selo-amarelo" style={{ marginLeft: 6 }}>revisar</span>}
                 </div>
               ))}
+              {bruto.epis.length > 0 && (
+                <div style={{ marginTop: 8, borderTop: "1px solid var(--linha)", paddingTop: 6 }}>
+                  <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 4 }}>EPIs</div>
+                  {bruto.epis.map((l) => (
+                    <div key={l.linha}>
+                      <span className="selo" style={{ background: l.marcada ? "var(--verde)" : "var(--cinza-bloco)", color: l.marcada ? "#fff" : "var(--tinta)" }}>
+                        {l.marcada ? "USADO" : "não"}
+                      </span>{" "}
+                      EPI {l.linha} · {(l.tinta * 100).toFixed(0)}%
+                      {l.confianca === "baixa" && <span className="selo selo-amarelo" style={{ marginLeft: 6 }}>revisar</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="num" style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 4 }}>
                 {bruto.tarefas.length} caixas · {bruto.feitas} marcadas · {bruto.revisar} a revisar
               </p>

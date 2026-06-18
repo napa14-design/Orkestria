@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-18 — OMR lê os EPIs (bloco no rodapé) + EPIs movidos para o rodapé na ficha
+
+**Contexto:** o leitor lia só a coluna "Feito" das tarefas; faltavam os EPIs.
+Os EPIs ficavam inline no topo (posições variáveis, difíceis de localizar). A
+pedido, foram para o **rodapé** (aproveita o espaço em branco e dá posição fixa).
+
+**O que mudou:**
+- **`lib/omr.ts`** + **`omr-service/reader.py`**: nova geometria do bloco de
+  EPIs (coluna fixa, `EPI_X=76`, `EPI_LINHA0=382`, `EPI_DELTA=18`) e leitura dos
+  EPIs igual às tarefas. `lerFicha` aceita `numEpis` (determinístico) e retorna
+  `epis: []`.
+- **`app/(app)/conferir/page.tsx`**: deriva os EPIs do dia (união dos requisitos
+  tipo `epi` das tarefas), lê com `numTarefas`+`numEpis` e mostra um bloco
+  **"EPIs utilizados"** editável (com flag "revisar").
+- **`app/(app)/rotinas/imprimir`**: os EPIs saíram do topo e viraram um bloco
+  **"EPIs utilizados (marque o que usou)"** no rodapé, antes das assinaturas.
+- Novo PDF de exemplo gerado em Downloads com os EPIs no rodapé.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; gerei uma ficha de teste com
+marcas conhecidas (tarefas 1,3,6 + EPI 1) e rodei o leitor TS no navegador em
+modo determinístico — leu tarefas `1:X 2:- 3:X 4:- 5:- 6:X 7:- 8:-` e **EPI
+`1:X`**, exato. `.env` restaurado.
+
+**Pendente:** gravar `execucoes_realizadas`; e a unificação de geometria
+ficha-do-app × leitor (hoje o leitor casa com o PDF de exemplo; a ficha HTML do
+app é visualmente igual mas a leitura fina exige uma geometria única — ideal:
+ficha gerada como PDF de layout fixo).
+
+**Arquivos:** `lib/omr.ts`, `omr-service/reader.py`,
+`app/(app)/conferir/page.tsx`, `app/(app)/rotinas/imprimir/page.tsx`.
+
+---
+
 ## 2026-06-18 — Leitor OMR no NAVEGADOR (TypeScript) + tela "Conferir ficha"
 
 **Contexto:** decidido manter tudo no Vercel (sem serviço externo). Portei o

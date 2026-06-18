@@ -23,6 +23,11 @@ const LINHA_DELTA = 21;
 const CAIXA_LADO_PDF = 12;
 const LIMIAR_MARCA = 0.12;
 
+// Bloco de EPIs no rodapé (caixas numa coluna fixa à esquerda).
+const EPI_X_PDF = 76;
+const EPI_LINHA0_PDF = 382; // EPI i → y = EPI_LINHA0 - EPI_DELTA*i
+const EPI_DELTA = 18;
+
 export interface LinhaOMR {
   linha: number;
   marcada: boolean;
@@ -34,6 +39,7 @@ export interface ResultadoOMR {
   erro?: string;
   qr: string | null;
   tarefas: LinhaOMR[];
+  epis: LinhaOMR[];
   feitas: number;
   revisar: number;
 }
@@ -280,7 +286,7 @@ export function parseQR(qr: string | null): { sede: string; data: string; funcio
  */
 export function lerFicha(
   img: ImagemRGBA,
-  opts: { numTarefas?: number; maxLinhas?: number } = {},
+  opts: { numTarefas?: number; numEpis?: number; maxLinhas?: number } = {},
 ): ResultadoOMR {
   const { width: w, height: h } = img;
   const g = cinza(img);
@@ -296,13 +302,13 @@ export function lerFicha(
   }
 
   const fid = fiduciais(g, w, h, thr);
-  if (!fid) return { ok: false, erro: "fiduciais não encontrados", qr, tarefas: [], feitas: 0, revisar: 0 };
+  if (!fid) return { ok: false, erro: "fiduciais não encontrados", qr, tarefas: [], epis: [], feitas: 0, revisar: 0 };
 
   const H = homografia(
     [FID_PDF.TL, FID_PDF.TR, FID_PDF.BR, FID_PDF.BL],
     [fid.TL, fid.TR, fid.BR, fid.BL],
   );
-  if (!H) return { ok: false, erro: "alinhamento falhou", qr, tarefas: [], feitas: 0, revisar: 0 };
+  if (!H) return { ok: false, erro: "alinhamento falhou", qr, tarefas: [], epis: [], feitas: 0, revisar: 0 };
 
   const linhas: LinhaOMR[] = [];
   const max = opts.numTarefas ?? opts.maxLinhas ?? 14;
@@ -325,11 +331,34 @@ export function lerFicha(
     }
   }
 
+  // Bloco de EPIs no rodapé (coluna fixa). Lido igual às tarefas.
+  const epis: LinhaOMR[] = [];
+  const maxE = opts.numEpis ?? 6;
+  let semBoxE = 0,
+    comecouE = false;
+  for (let i = 1; i <= maxE; i++) {
+    const cy = EPI_LINHA0_PDF - EPI_DELTA * i;
+    const fi = tinta(g, w, h, H, thr, EPI_X_PDF, cy, CAIXA_LADO_PDF, 0.55);
+    if (opts.numEpis) {
+      epis.push({ linha: i, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });
+    } else {
+      const fb = tinta(g, w, h, H, thr, EPI_X_PDF, cy, CAIXA_LADO_PDF * 1.6, 1.0);
+      if (fb > 0.18) {
+        comecouE = true;
+        semBoxE = 0;
+        epis.push({ linha: epis.length + 1, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });
+      } else if (comecouE && ++semBoxE >= 2) {
+        break;
+      }
+    }
+  }
+
   return {
     ok: true,
     qr,
     tarefas: linhas,
+    epis,
     feitas: linhas.filter((l) => l.marcada).length,
-    revisar: linhas.filter((l) => l.confianca === "baixa").length,
+    revisar: [...linhas, ...epis].filter((l) => l.confianca === "baixa").length,
   };
 }
