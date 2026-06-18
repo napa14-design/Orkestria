@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-06-18 — Ficha do app vira PDF de layout fixo (geometria unificada com o leitor)
+
+**Contexto:** a ficha do app era HTML (`/rotinas/imprimir`), com geometria que
+não casava exatamente com o leitor OMR (calibrado no PDF de exemplo). Para a
+leitura ser 100% confiável a partir das fichas impressas pelo sistema, a ficha
+passou a ser **PDF de layout fixo gerado no servidor**, usando as MESMAS
+constantes do leitor.
+
+**O que mudou:**
+- **`lib/fichaGeometria.ts`** (novo): fonte ÚNICA da geometria (cartão,
+  fiduciais, coluna "Feito", bloco de EPIs). `lib/omr.ts` foi refatorado para
+  importar daqui — gerador e leitor nunca mais divergem.
+- **`services/fichaPdf.ts`** (novo): gera o PDF com **pdf-lib** (uma página por
+  funcionário com rotina no dia) — fiduciais, QR (`qrcode`), logo recortado,
+  tabela com a caixa "Feito" no x/linha exatos, EPIs no rodapé, assinaturas.
+  Aceita `marcarTodas` (gabarito de calibração).
+- **`/api/fichas/pdf`** (novo): `GET ?data&sede` → PDF (`Content-Type:
+  application/pdf`). `&marcar=todas` = gabarito de teste.
+- Botão **🖨 Fichas** (FiltersBar) agora abre o PDF, não mais a página HTML.
+- Novas deps: **pdf-lib**, **qrcode** (+ @types/qrcode).
+
+**Verificado (DATA_SOURCE=memory):** gerei a ficha PELO APP (curl com sessão) em
+2 versões e li com o leitor (determinístico): **gabarito → tudo marcada**
+(tarefas+EPI), **normal → tudo vazia**; QR lido. Prova de que cada caixa
+desenhada cai exatamente onde o leitor mede. Build/lint ok; `.env` restaurado.
+
+**Notas:** a página HTML `/rotinas/imprimir` ficou sem link (substituída pelo
+PDF) — pode ser removida depois. Falta: campo próprio p/ EPIs no realizado e
+idempotência ao salvar.
+
+**Arquivos:** `lib/fichaGeometria.ts` (novo), `lib/omr.ts`,
+`services/fichaPdf.ts` (novo), `app/api/fichas/pdf/route.ts` (novo),
+`components/agenda/FiltersBar.tsx`, `package.json`.
+
+---
+
 ## 2026-06-18 — Conferir ficha: grava o realizado (fecha o ciclo) + leitura mais limpa
 
 **Gravar o realizado:** o botão "Salvar realizado" na tela Conferir ficha agora

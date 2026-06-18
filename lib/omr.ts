@@ -9,24 +9,20 @@
  * ficha → ajuste só estas constantes.
  */
 import jsQR from "jsqr";
+import { CAIXA_LADO, EPI, FID, TAREFA } from "./fichaGeometria";
 
-// ── Geometria (pontos PDF) ──────────────────────────────────────────────
-const FID_PDF = {
-  TL: [54, 788] as [number, number],
-  TR: [541, 788] as [number, number],
-  BR: [541, 264] as [number, number],
-  BL: [54, 264] as [number, number],
-};
-const CAIXA_X_PDF = 436;
-const LINHA0_PDF = 690; // linha i → y = LINHA0 - DELTA*i
-const LINHA_DELTA = 21;
-const CAIXA_LADO_PDF = 12;
+// ── Geometria (pontos PDF) — importada da fonte única ────────────────────
+const FID_PDF = FID;
+const CAIXA_X_PDF = TAREFA.x;
+const LINHA0_PDF = TAREFA.linha0; // linha i → y = LINHA0 - DELTA*i
+const LINHA_DELTA = TAREFA.delta;
+const CAIXA_LADO_PDF = CAIXA_LADO;
 const LIMIAR_MARCA = 0.12;
 
 // Bloco de EPIs no rodapé (caixas numa coluna fixa à esquerda).
-const EPI_X_PDF = 76;
-const EPI_LINHA0_PDF = 382; // EPI i → y = EPI_LINHA0 - EPI_DELTA*i
-const EPI_DELTA = 18;
+const EPI_X_PDF = EPI.x;
+const EPI_LINHA0_PDF = EPI.linha0; // EPI i → y = EPI_LINHA0 - EPI_DELTA*i
+const EPI_DELTA = EPI.delta;
 
 export interface LinhaOMR {
   linha: number;

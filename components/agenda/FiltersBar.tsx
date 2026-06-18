@@ -121,11 +121,11 @@ export default function FiltersBar({
         ⧉ Duplicar / Modelos
       </button>
       <Link
-        href={`/rotinas/imprimir?data=${data}&sede=${sedeId}`}
+        href={`/api/fichas/pdf?data=${data}&sede=${sedeId}`}
         target="_blank"
         className="btn"
         style={{ textDecoration: "none" }}
-        title="Fichas de rotina em papel, uma por funcionário"
+        title="Fichas de rotina em PDF (layout fixo, prontas para leitura automática)"
       >
         🖨 Fichas
       </Link>
