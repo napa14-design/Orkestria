@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-18 — Conferir ficha: grava o realizado (fecha o ciclo) + leitura mais limpa
+
+**Gravar o realizado:** o botão "Salvar realizado" na tela Conferir ficha agora
+grava de verdade — uma `execucao_realizada` por rotina, reusando
+`POST /api/execucoes` (`registrarExecucao`, que também atualiza o status da
+rotina). Marcada → `conforme_planejado` (tempo = previsto); não marcada →
+`nao_realizada` com justificativa automática ("Não confirmada na ficha (leitura
+OMR)"). Os **EPIs** (sem campo próprio no schema) vão na `observacao`
+("[Confirmado via ficha/OMR] · EPIs usados: …").
+
+**Leitura mais limpa:** removidos os `%` e o "linha N" do corpo (eram ruído de
+diagnóstico) — % só no tooltip. Tabela casada: Horário · Tarefa · Feito
+(feito/não + selo "revisar" só em marca fraca). Leitura bruta (ficha sem
+rotinas): contagem + chips numerados verde/cinza.
+
+**Verificado (DATA_SOURCE=memory):** gerei uma ficha apontando para f1 (Maria,
+2 rotinas hoje), marquei a tarefa 1 e o EPI, e "Salvar" → 2 execuções gravadas
+(r1 conforme_planejado/80min, r2 nao_realizada/0), status das rotinas atualizado
+(t1 realizada, t2 não realizada), EPI na observação. Build/lint ok, console
+limpo. `.env` restaurado.
+
+**Pendente:** unificação de geometria (ficha do app como PDF de layout fixo,
+casando 100% com o leitor); campo próprio p/ EPIs no realizado (hoje na
+observação); evitar regravar (idempotência) se salvar a mesma ficha 2×.
+
+**Arquivos:** `app/(app)/conferir/page.tsx`.
+
+---
+
 ## 2026-06-18 — OMR lê os EPIs (bloco no rodapé) + EPIs movidos para o rodapé na ficha
 
 **Contexto:** o leitor lia só a coluna "Feito" das tarefas; faltavam os EPIs.

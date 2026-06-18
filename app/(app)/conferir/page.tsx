@@ -7,7 +7,7 @@
  */
 import { useRef, useState } from "react";
 import { lerFicha, parseQR, type LinhaOMR, type ResultadoOMR } from "@/lib/omr";
-import { fetcher } from "@/lib/clientApi";
+import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
 import type { Funcionario, Requisito, RotinaPlanejada, Sede, Tarefa } from "@/types";
 
@@ -48,6 +48,8 @@ export default function PaginaConferir() {
   const [funcNome, setFuncNome] = useState<string>("");
   const [linhas, setLinhas] = useState<LinhaConferida[]>([]);
   const [epiLinhas, setEpiLinhas] = useState<{ nome: string; marcada: boolean; tinta: number; revisar: boolean }[]>([]);
+  const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function imagemParaRGBA(bitmap: ImageBitmap) {
@@ -68,6 +70,7 @@ export default function PaginaConferir() {
     setBruto(null);
     setLinhas([]);
     setEpiLinhas([]);
+    setSalvo("");
     setQrInfo(null);
     setFuncNome("");
     try {
@@ -158,6 +161,41 @@ export default function PaginaConferir() {
   function aoEscolher(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (f) void processar(f);
+  }
+
+  /** Grava o realizado: uma execução por rotina (feito × não feito). */
+  async function salvar() {
+    if (!qrInfo || linhas.length === 0) return;
+    setSalvando(true);
+    setErro("");
+    setSalvo("");
+    const usados = epiLinhas.filter((e) => e.marcada).map((e) => e.nome);
+    const epiNota = epiLinhas.length
+      ? ` · EPIs usados: ${usados.length ? usados.join(", ") : "nenhum"}`
+      : "";
+    try {
+      let n = 0;
+      for (const l of linhas) {
+        if (!l.rotina) continue;
+        const feito = l.marcada;
+        await apiPost("/api/execucoes", {
+          rotina_id: l.rotina.id,
+          data_execucao: qrInfo.data,
+          status_realizado: feito ? "conforme_planejado" : "nao_realizada",
+          inicio_real: feito ? l.rotina.inicio_planejado : "",
+          fim_real: feito ? l.rotina.fim_planejado : "",
+          tempo_real_min: feito ? l.rotina.tempo_previsto_min : 0,
+          justificativa: feito ? "" : "Não confirmada na ficha (leitura OMR).",
+          observacao: "[Confirmado via ficha/OMR]" + epiNota,
+        });
+        n++;
+      }
+      setSalvo(`Realizado gravado: ${n} tarefa(s) registrada(s).`);
+    } catch (e) {
+      setErro(e instanceof ErroApi ? e.message : "Erro ao gravar o realizado.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
 
@@ -265,10 +303,11 @@ export default function PaginaConferir() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                 <strong>{feitas}</strong> de {linhas.length} tarefas feitas
                 {epiLinhas.length > 0 && <> · {epiLinhas.filter((e) => e.marcada).length}/{epiLinhas.length} EPIs</>}.
-                <button className="btn btn-primario" disabled title="Gravação do realizado — próxima etapa">
-                  Salvar realizado (em breve)
+                <button className="btn btn-primario" onClick={salvar} disabled={salvando || !!salvo}>
+                  {salvando ? "Gravando…" : salvo ? "Gravado ✓" : "Salvar realizado"}
                 </button>
               </div>
+              {salvo && <div className="alerta alerta-ok" style={{ marginTop: 10 }}>{salvo}</div>}
             </>
           ) : (
             // sem casamento com rotinas (ex.: ficha de exemplo): leitura resumida
