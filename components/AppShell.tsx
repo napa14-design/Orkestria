@@ -16,6 +16,7 @@ const GRUPOS: Grupo[] = [
     itens: [
       { href: "/rotinas", rotulo: "Rotina do dia" },
       { href: "/acompanhamento", rotulo: "Acompanhamento" },
+      { href: "/conferir", rotulo: "Conferir ficha" },
       { href: "/eventuais", rotulo: "Serviços eventuais" },
       { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasAdmin: true },
     ],

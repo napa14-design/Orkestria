@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-06-18 — Leitor OMR no NAVEGADOR (TypeScript) + tela "Conferir ficha"
+
+**Contexto:** decidido manter tudo no Vercel (sem serviço externo). Portei o
+leitor OMR do Python para **TypeScript rodando no navegador** e criei a tela de
+upload. O `omr-service/` Python continua como referência/calibração.
+
+**O que mudou:**
+- **`lib/omr.ts`** — porte 1:1 do leitor: cinza + Otsu, detecção dos 4 fiduciais
+  por **componentes conectados** (escolhendo os 4 pontos extremos — robusto ao
+  cartão não preencher a imagem), **homografia** (PDF→pixel) e medição da tinta
+  de cada caixa. QR via **jsQR** (nova dep). Sem WASM/serviço externo.
+- **`app/(app)/conferir/page.tsx`** — sobe/fotografa a ficha → canvas → `lib/omr`
+  lê QR + caixas → casa com as `rotinas_planejadas` do dia (ordenadas) e mostra
+  o realizado **editável** (com flag "revisar" para marca fraca). Sem casamento
+  (QR sem rotinas) mostra a leitura bruta para diagnóstico.
+- Menu: **Operação → Conferir ficha**.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; carreguei uma das fichas
+reais escaneadas (Elenice) no navegador → o leitor TS deu **8 caixas · 6
+marcadas · 1 a revisar**, idêntico ao Python e ao visual (inclusive sinalizando
+o ponto fraco de 16%). QR lido. `.env` restaurado.
+
+**Pendente:** gravar o realizado (`execucoes_realizadas`) — botão "Salvar (em
+breve)"; e validar o **casamento QR→rotinas** com dados reais (o QR de exemplo
+F001 não existe nos dados de memória).
+
+**Arquivos:** `lib/omr.ts` (novo), `app/(app)/conferir/page.tsx` (novo),
+`components/AppShell.tsx`, `package.json` (+jsqr).
+
+---
+
 ## 2026-06-18 — Leitor OMR (Python/OpenCV) das fichas — protótipo validado
 
 **Contexto:** o usuário imprimiu as fichas de exemplo, marcou à mão de vários
