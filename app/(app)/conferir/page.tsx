@@ -6,12 +6,30 @@
  * planejadas do dia e mostra o realizado para confirmar. Nada de serviço externo.
  */
 import { useRef, useState } from "react";
-import { lerFicha, parseQR, type ResultadoOMR } from "@/lib/omr";
+import { lerFicha, parseQR, type LinhaOMR, type ResultadoOMR } from "@/lib/omr";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
 import type { Funcionario, Requisito, RotinaPlanejada, Sede, Tarefa } from "@/types";
 
 const MAX_LARGURA = 1400;
+
+/** Fileira de "selos" numerados: verde = marcado, cinza = vazio. */
+function Chips({ itens, prefixo }: { itens: LinhaOMR[]; prefixo: string }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {itens.map((l) => (
+        <span
+          key={l.linha}
+          className={`selo ${l.marcada ? "selo-verde" : "selo-cinza"}`}
+          title={`${prefixo} ${l.linha} · ${(l.tinta * 100).toFixed(0)}%${l.confianca === "baixa" ? " · revisar" : ""}`}
+          style={{ minWidth: 26, justifyContent: "center", outline: l.confianca === "baixa" ? "2px solid var(--amarelo)" : undefined }}
+        >
+          {l.marcada ? "✓" : "·"} {l.linha}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 interface LinhaConferida {
   rotina?: RotinaPlanejada;
@@ -185,30 +203,38 @@ export default function PaginaConferir() {
               <table className="tabela" style={{ fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 80 }}>Horário</th>
+                    <th style={{ width: 90 }}>Horário</th>
                     <th>Tarefa</th>
-                    <th style={{ width: 90, textAlign: "center" }}>Feito?</th>
-                    <th style={{ width: 110 }}>Leitura</th>
+                    <th style={{ width: 130, textAlign: "center" }}>Feito?</th>
                   </tr>
                 </thead>
                 <tbody>
                   {linhas.map((l, i) => (
                     <tr key={i} style={l.revisar ? { background: "var(--papel-2)" } : undefined}>
                       <td className="num">{l.local}</td>
-                      <td style={{ fontWeight: 600 }}>{l.nome}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={l.marcada}
-                          onChange={(e) =>
-                            setLinhas((arr) =>
-                              arr.map((x, j) => (j === i ? { ...x, marcada: e.target.checked } : x)),
-                            )
-                          }
-                        />
+                      <td style={{ fontWeight: 600 }}>
+                        {l.nome}
+                        {l.revisar && (
+                          <span className="selo selo-amarelo" style={{ marginLeft: 8 }} title={`Leitura fraca (${(l.tinta * 100).toFixed(0)}%) — confira`}>
+                            revisar
+                          </span>
+                        )}
                       </td>
-                      <td className="num" style={{ fontSize: 11, color: "var(--tinta-3)" }}>
-                        {(l.tinta * 100).toFixed(0)}% {l.revisar && <span className="selo selo-amarelo">revisar</span>}
+                      <td style={{ textAlign: "center" }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={l.marcada}
+                            onChange={(e) =>
+                              setLinhas((arr) =>
+                                arr.map((x, j) => (j === i ? { ...x, marcada: e.target.checked } : x)),
+                              )
+                            }
+                          />
+                          <span style={{ fontSize: 12, color: l.marcada ? "var(--verde)" : "var(--tinta-3)" }}>
+                            {l.marcada ? "feito" : "não"}
+                          </span>
+                        </label>
                       </td>
                     </tr>
                   ))}
@@ -245,34 +271,30 @@ export default function PaginaConferir() {
               </div>
             </>
           ) : (
-            // sem casamento com rotinas: mostra a leitura bruta (útil p/ diagnóstico)
-            <div style={{ display: "grid", gap: 4, fontSize: 13 }}>
-              {bruto.tarefas.map((l) => (
-                <div key={l.linha}>
-                  <span className="selo" style={{ background: l.marcada ? "var(--verde)" : "var(--cinza-bloco)", color: l.marcada ? "#fff" : "var(--tinta)" }}>
-                    {l.marcada ? "FEITO" : "vazio"}
-                  </span>{" "}
-                  linha {l.linha} · {(l.tinta * 100).toFixed(0)}%
-                  {l.confianca === "baixa" && <span className="selo selo-amarelo" style={{ marginLeft: 6 }}>revisar</span>}
-                </div>
-              ))}
-              {bruto.epis.length > 0 && (
-                <div style={{ marginTop: 8, borderTop: "1px solid var(--linha)", paddingTop: 6 }}>
-                  <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 4 }}>EPIs</div>
-                  {bruto.epis.map((l) => (
-                    <div key={l.linha}>
-                      <span className="selo" style={{ background: l.marcada ? "var(--verde)" : "var(--cinza-bloco)", color: l.marcada ? "#fff" : "var(--tinta)" }}>
-                        {l.marcada ? "USADO" : "não"}
-                      </span>{" "}
-                      EPI {l.linha} · {(l.tinta * 100).toFixed(0)}%
-                      {l.confianca === "baixa" && <span className="selo selo-amarelo" style={{ marginLeft: 6 }}>revisar</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="num" style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 4 }}>
-                {bruto.tarefas.length} caixas · {bruto.feitas} marcadas · {bruto.revisar} a revisar
+            // sem casamento com rotinas (ex.: ficha de exemplo): leitura resumida
+            <div style={{ fontSize: 13 }}>
+              <p style={{ color: "var(--tinta-3)", fontSize: 12, marginBottom: 10 }}>
+                Esta ficha não tem rotinas no sistema para casar com os nomes —
+                mostrando o que foi lido (passe o mouse para ver a intensidade).
               </p>
+              <div style={{ marginBottom: 4 }}>
+                Tarefas feitas: <strong>{bruto.feitas}</strong> de {bruto.tarefas.length}
+              </div>
+              <Chips itens={bruto.tarefas} prefixo="Tarefa" />
+              {bruto.epis.length > 0 && (
+                <>
+                  <div style={{ margin: "12px 0 4px" }}>
+                    EPIs usados: <strong>{bruto.epis.filter((e) => e.marcada).length}</strong> de {bruto.epis.length}
+                  </div>
+                  <Chips itens={bruto.epis} prefixo="EPI" />
+                </>
+              )}
+              {bruto.revisar > 0 && (
+                <p style={{ marginTop: 10, fontSize: 12 }}>
+                  <span className="selo selo-amarelo">{bruto.revisar} a revisar</span>{" "}
+                  <span style={{ color: "var(--tinta-3)" }}>marca(s) fraca(s) — confira no original.</span>
+                </p>
+              )}
             </div>
           )}
         </div>
