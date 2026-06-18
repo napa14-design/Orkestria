@@ -84,9 +84,9 @@ export default function PaginaLogin() {
             src="/logo-fundo-escuro.png"
             alt="Orkestria"
             style={{
-              width: "min(420px, 78%)",
+              width: "min(300px, 62%)",
               height: "auto",
-              margin: "-48px auto -54px",
+              margin: "0 auto 8px",
               display: "block",
             }}
           />

@@ -165,7 +165,7 @@ export default function PaginaRelatorios() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-horizontal-fundo-claro.png" alt="Orkestria" style={{ height: 44, width: "auto", margin: "-6px 0" }} />
+                  <img src="/logo-horizontal-fundo-claro.png" alt="Orkestria" style={{ height: 32, width: "auto", display: "block" }} />
                   <div>
                     <div className="rotulo">Relatório mensal de serviços</div>
                     <h2 style={{ fontSize: 20, fontWeight: 700 }}>{f.nome}</h2>

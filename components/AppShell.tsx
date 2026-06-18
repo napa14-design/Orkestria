@@ -132,7 +132,7 @@ export default function AppShell({
           <img
             src="/logo-horizontal-fundo-escuro.png"
             alt="Orkestria"
-            style={{ height: 52, width: "auto", margin: "-8px 0", display: "block" }}
+            style={{ height: 30, width: "auto", display: "block" }}
           />
         </Link>
 

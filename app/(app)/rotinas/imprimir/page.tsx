@@ -187,7 +187,7 @@ function Fichas() {
               <img
                 src="/logo-horizontal-fundo-claro.png"
                 alt="Orkestria"
-                style={{ height: 44, width: "auto", margin: "-6px 0" }}
+                style={{ height: 34, width: "auto", display: "block" }}
               />
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{f.nome}</h2>

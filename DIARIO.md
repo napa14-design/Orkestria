@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-06-18 — Logos sem margem branca (recorte na fonte) em todo o app
+
+**Contexto:** as logos pareciam pequenas porque os PNGs tinham **margem
+transparente embutida** (43–55% da altura desperdiçada). Auditadas todas.
+
+**O que mudou:**
+- **Recorte na fonte** dos 4 PNGs em `public/` (sobrescritos na área útil):
+  `logo-fundo-claro` 1254² → 1031×686, `logo-fundo-escuro` → 1027×691,
+  `logo-horizontal-fundo-claro` 1983×793 → 1637×358, `logo-horizontal-fundo-escuro`
+  → 1542×345. (SVGs de símbolo/favicon são vetoriais e não entram como logo na UI.)
+- **Reajuste de tamanho** nos 4 usos (a altura caiu, já que agora preenchem):
+  - `AppShell` (header escuro): 52→**30 px**, sem o `margin -8px` de compensação.
+  - `app/(app)/rotinas/imprimir` (ficha): 44→**34 px**, sem margem.
+  - `app/(app)/relatorios` (relatório): 44→**32 px**, sem margem.
+  - `app/login` (logo quadrado): removidas as margens negativas `-48/-54px` que
+    compensavam o vazio; largura `min(420,78%)`→`min(300,62%)`, `margin 0 auto 8px`.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; via DOM, cada `<img>` agora
+carrega o natural recortado (login 1027×691→300×202; header 1542×345→134×30;
+ficha 1637×358→155×34) sem espaço branco; console limpo. `.env` restaurado.
+
+**Arquivos:** `public/logo-*.png` (4, recortados), `components/AppShell.tsx`,
+`app/(app)/rotinas/imprimir/page.tsx`, `app/(app)/relatorios/page.tsx`,
+`app/login/page.tsx`.
+
+---
+
 ## 2026-06-17 — Distribuição automática (sugestão) no Remanejo
 
 **Contexto:** quando alguém falta, as tarefas viram órfãs e o supervisor
