@@ -15,6 +15,7 @@ const ATALHOS = [
   { emoji: "🗒️", href: "/conferir", titulo: "Conferir ficha", desc: "Suba a foto da ficha e registre o feito." },
   { emoji: "📊", href: "/dashboard", titulo: "Dashboard", desc: "Ocupação, ociosidade e desvios." },
   { emoji: "✅", href: "/acompanhamento", titulo: "Acompanhamento", desc: "Previsto × realizado do dia." },
+  { emoji: "📋", href: "/da-ata", titulo: "Da ata ao sistema", desc: "O que a direção pediu × o que o sistema faz." },
 ];
 
 const cartao: React.CSSProperties = {

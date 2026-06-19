@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-19 — Tela "Da ata ao sistema" (transparência para a direção)
+
+- Nova tela **`/da-ata`**: painel que mostra, lado a lado, cada ponto levantado
+  na reunião de alinhamento (16/06/2026) e na pré-análise **× o que o Orkestria
+  faz em resposta**, com selo de status (Entregue · Parcial · Decisão/cautela) e
+  placar no topo (24 pontos: 19 entregues, 1 parcial, 4 decisão/cautela).
+  Conteúdo fiel a `docs/08` e `docs/09` — sem inventar; pendências e decisões em
+  aberto ficam explícitas.
+- 10 blocos: cálculo de tempo, previsto/realizado, criticidade, faltas/remanejo,
+  serviços eventuais, ociosidade por sede, conformidade/EPI, confirmação por
+  ficha/OMR, calendário acadêmico e produtividade/dados sensíveis.
+- **Acesso:** item "Da ata ao sistema" no menu Sistema + atalho na tela Início.
+- Arquivos: `app/(app)/da-ata/page.tsx` (novo), `components/AppShell.tsx`,
+  `app/(app)/inicio/page.tsx`.
+
+---
+
 ## 2026-06-19 — Passos do dia inteligentes + favicon novo
 
 - **Passos inteligentes** na faixa da agenda: **Faltas** ganha destaque (âmbar)
