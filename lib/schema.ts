@@ -185,6 +185,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("fim_real"),
     col("tempo_real_min", "number"),
     col("justificativa"),
+    col("epis_confirmados"),
     col("observacao"),
     col("supervisor_id"),
     col("criado_em"),

@@ -60,13 +60,25 @@ export async function registrarExecucao(
   }
 
   const agora = agoraISO();
-  const execucao: ExecucaoRealizada = {
-    id: novoId(),
-    ...dados,
-    criado_em: agora,
-    atualizado_em: agora,
-  };
-  await ds.criar("execucoes_realizadas", execucao);
+  dados = { ...dados, epis_confirmados: dados.epis_confirmados ?? "" };
+
+  // Idempotência: uma execução por (rotina, data). Reenviar a mesma ficha
+  // ATUALIZA o registro em vez de duplicar.
+  const doRotina = await ds.consultar("execucoes_realizadas", [
+    { campo: "rotina_id", op: "==" as const, valor: dados.rotina_id },
+  ]);
+  const existente = doRotina.find((e) => e.data_execucao === dados.data_execucao);
+
+  let execucao: ExecucaoRealizada;
+  if (existente) {
+    execucao = await ds.atualizar("execucoes_realizadas", existente.id, {
+      ...dados,
+      atualizado_em: agora,
+    });
+  } else {
+    execucao = { id: novoId(), ...dados, criado_em: agora, atualizado_em: agora };
+    await ds.criar("execucoes_realizadas", execucao);
+  }
 
   // Sincroniza o status da rotina planejada.
   await ds.atualizar("rotinas_planejadas", rotina.id, {

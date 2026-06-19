@@ -169,10 +169,7 @@ export default function PaginaConferir() {
     setSalvando(true);
     setErro("");
     setSalvo("");
-    const usados = epiLinhas.filter((e) => e.marcada).map((e) => e.nome);
-    const epiNota = epiLinhas.length
-      ? ` · EPIs usados: ${usados.length ? usados.join(", ") : "nenhum"}`
-      : "";
+    const episConfirmados = epiLinhas.filter((e) => e.marcada).map((e) => e.nome).join(", ");
     try {
       let n = 0;
       for (const l of linhas) {
@@ -186,7 +183,8 @@ export default function PaginaConferir() {
           fim_real: feito ? l.rotina.fim_planejado : "",
           tempo_real_min: feito ? l.rotina.tempo_previsto_min : 0,
           justificativa: feito ? "" : "Não confirmada na ficha (leitura OMR).",
-          observacao: "[Confirmado via ficha/OMR]" + epiNota,
+          epis_confirmados: episConfirmados,
+          observacao: "[Confirmado via ficha/OMR]",
         });
         n++;
       }

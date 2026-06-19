@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-06-18 — Fechamento: campo de EPI no realizado, idempotência e remoção da ficha HTML
+
+Fecha as 3 pendências do fluxo da ficha:
+
+- **Campo próprio de EPIs no realizado:** `ExecucaoRealizada.epis_confirmados`
+  (CSV de nomes) + coluna no `SCHEMA`. A tela Conferir passa a enviar os EPIs
+  confirmados nesse campo (antes iam na observação). `registrarExecucao`
+  normaliza para "" quando não informado (Acompanhamento não envia).
+- **Idempotência:** `registrarExecucao` virou **upsert por (rotina, data)** —
+  reenviar a mesma ficha ATUALIZA a execução em vez de duplicar. Beneficia
+  também o Acompanhamento.
+- **Removida a página HTML** `app/(app)/rotinas/imprimir` (substituída pelo PDF
+  de layout fixo; já estava sem link).
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; 2 POSTs idênticos para r1 →
+**1 execução** (sem duplicar) com `epis_confirmados="Luvas nitrílicas"`; console
+limpo. `.env` restaurado.
+
+**Arquivos:** `types/ExecucaoRealizada.ts`, `lib/schema.ts`,
+`services/execucoesService.ts`, `app/(app)/conferir/page.tsx`, removido
+`app/(app)/rotinas/imprimir/page.tsx`.
+
+---
+
 ## 2026-06-18 — Ficha do app vira PDF de layout fixo (geometria unificada com o leitor)
 
 **Contexto:** a ficha do app era HTML (`/rotinas/imprimir`), com geometria que
