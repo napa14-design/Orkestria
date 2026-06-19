@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-06-19 — Faixa "Passos do dia" na agenda
+
+Reúne o fluxo diário do supervisor numa linha só, no topo da agenda (modo dia):
+- **↺ Repetir o dia anterior (DD/MM)** — só aparece quando há dia anterior com
+  rotina (o botão de 1 clique já existente).
+- **⚠ Faltas (N)** — link para Ausências, com a contagem de ausentes do dia.
+- **🖨 Imprimir fichas** — abre o PDF (data/sede atuais).
+- **✅ Registrar o realizado** — link para Acompanhamento.
+- **❔ Como usar** — a ajuda da agenda.
+No modo semana, mostra só a ajuda.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; a faixa renderiza com
+"Faltas (1)" (ausência do dia), e os links apontam para /ausencias,
+/api/fichas/pdf?data&sede e /acompanhamento; console limpo. `.env` restaurado.
+
+**Arquivos:** `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-19 — Dia a dia do supervisor: "Repetir o dia anterior" em 1 clique
 
 **Contexto:** o supervisor montou que a rotina **quase sempre se repete**. O

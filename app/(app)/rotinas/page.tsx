@@ -7,6 +7,7 @@
  * Os conflitos são validados duas vezes: aqui no cliente, para resposta
  * imediata, e novamente no servidor antes de gravar.
  */
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import AgendaGrid from "@/components/agenda/AgendaGrid";
@@ -613,21 +614,48 @@ export default function PaginaRotinas() {
         aoDuplicar={() => setPlanejamentoAberto(true)}
       />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div>
-          {modo === "dia" && fonteRepetir && (
+      {modo === "dia" ? (
+        <div
+          className="painel"
+          style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", marginBottom: 10 }}
+        >
+          <span className="rotulo" style={{ color: "var(--acento)" }}>Passos do dia</span>
+          {fonteRepetir && (
             <button
               className="btn btn-mini"
               onClick={repetirDiaAnterior}
               disabled={repetindo}
-              title={`Copia as tarefas de ${formatarDataBR(fonteRepetir.data)} para hoje (conflitos são pulados)`}
+              title={`Copia as tarefas de ${formatarDataBR(fonteRepetir.data)} para o dia aberto (conflitos são pulados)`}
             >
               {repetindo ? "Repetindo…" : `↺ Repetir o dia anterior (${formatarDataBR(fonteRepetir.data)})`}
             </button>
           )}
+          <Link href="/ausencias" className="btn btn-mini btn-fantasma">
+            ⚠ Faltas{(ausencias?.length ?? 0) > 0 ? ` (${ausencias!.length})` : ""}
+          </Link>
+          {sedeId && (
+            <a
+              href={`/api/fichas/pdf?data=${data}&sede=${sedeId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-mini btn-fantasma"
+              style={{ textDecoration: "none" }}
+            >
+              🖨 Imprimir fichas
+            </a>
+          )}
+          <Link href="/acompanhamento" className="btn btn-mini btn-fantasma">
+            ✅ Registrar o realizado
+          </Link>
+          <span style={{ marginLeft: "auto" }}>
+            <AjudaAgenda />
+          </span>
         </div>
-        <AjudaAgenda />
-      </div>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <AjudaAgenda />
+        </div>
+      )}
 
       {modo === "semana" ? (
         <SemanaGrid
