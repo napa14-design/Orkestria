@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-06-19 — Dia a dia do supervisor: "Repetir o dia anterior" em 1 clique
+
+**Contexto:** o supervisor montou que a rotina **quase sempre se repete**. O
+"Duplicar / Modelos" existente é completo mas pesado para o uso diário. Foco no
+atalho de todo dia.
+
+**O que mudou (`app/(app)/rotinas/page.tsx`):**
+- **Botão "↺ Repetir o dia anterior (DD/MM)"** na barra de ação da agenda:
+  copia, num clique, as tarefas do **último dia com rotina** (antes da data
+  atual, da sede) para o dia aberto — reusa `POST /api/rotinas/duplicar`
+  (conflitos pulados). A data-fonte sai do `historico` já carregado.
+- **Aviso de "dia vazio"**: quando o dia não tem rotina e existe um dia anterior
+  com rotina, um painel convida a repetir ("Dia ainda vazio… copiar o dia
+  anterior — DD/MM · N tarefas").
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; em 20/06 (vazio), o aviso e
+o botão apareceram apontando 19/06 (3 tarefas); ao clicar, **3 tarefas copiadas**
+para 20/06 e o aviso sumiu. Console limpo. `.env` restaurado.
+
+**Próximo (mesmo tema, se quiser):** deixar mais à mão os outros passos diários
+que o supervisor citou — tratar faltas/ausências, imprimir fichas (já no botão
+🖨) e registrar o realizado.
+
+**Arquivos:** `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-18 — Usabilidade: tela Início, primeiros passos/telas vazias e ajuda da agenda
 
 Três melhorias de "mais fácil e intuitivo" (escolhidas pelo usuário):

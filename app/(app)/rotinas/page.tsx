@@ -30,7 +30,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
-import { formatarDuracao, hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
+import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
 import { temErro, validarAlocacao } from "@/lib/validations";
 import type {
   AlertaValidacao,
@@ -541,6 +541,45 @@ export default function PaginaRotinas() {
     }
   }
 
+  // Dia anterior com rotina (fonte do "repetir") — o mais recente antes de hoje.
+  const fonteRepetir = useMemo(() => {
+    const porData = new Map<string, number>();
+    for (const r of historico ?? []) {
+      if (r.status === "cancelada") continue;
+      porData.set(r.data, (porData.get(r.data) ?? 0) + 1);
+    }
+    let melhor: { data: string; n: number } | null = null;
+    for (const [d, n] of porData) if (!melhor || d > melhor.data) melhor = { data: d, n };
+    return melhor;
+  }, [historico]);
+
+  const [repetindo, setRepetindo] = useState(false);
+  async function repetirDiaAnterior() {
+    if (!fonteRepetir || !sedeId) return;
+    setRepetindo(true);
+    try {
+      const r = await apiPost<{ copiadas: number; puladas: number }>("/api/rotinas/duplicar", {
+        data_origem: fonteRepetir.data,
+        datas_destino: [data],
+        sede_id: sedeId,
+      });
+      await mutateRotinas();
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "REPETIR",
+          mensagem: `${r.copiadas} tarefa(s) copiadas de ${formatarDataBR(fonteRepetir.data)}${
+            r.puladas > 0 ? ` · ${r.puladas} puladas por conflito` : ""
+          }.`,
+        },
+      ]);
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setRepetindo(false);
+    }
+  }
+
   function concluirPlanejamento(mensagem: string) {
     setAlertas([{ nivel: "alerta", codigo: "PLANEJAMENTO", mensagem }]);
     void mutateRotinas();
@@ -574,7 +613,19 @@ export default function PaginaRotinas() {
         aoDuplicar={() => setPlanejamentoAberto(true)}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div>
+          {modo === "dia" && fonteRepetir && (
+            <button
+              className="btn btn-mini"
+              onClick={repetirDiaAnterior}
+              disabled={repetindo}
+              title={`Copia as tarefas de ${formatarDataBR(fonteRepetir.data)} para hoje (conflitos são pulados)`}
+            >
+              {repetindo ? "Repetindo…" : `↺ Repetir o dia anterior (${formatarDataBR(fonteRepetir.data)})`}
+            </button>
+          )}
+        </div>
         <AjudaAgenda />
       </div>
 
@@ -597,6 +648,21 @@ export default function PaginaRotinas() {
         </div>
       ) : (
         <>
+      {(rotinas?.length ?? 0) === 0 && fonteRepetir && (
+        <div
+          className="painel entra"
+          style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+        >
+          <span style={{ flex: 1, minWidth: 220 }}>
+            <strong>Dia ainda vazio.</strong> A rotina costuma repetir — comece copiando o dia anterior
+            ({formatarDataBR(fonteRepetir.data)} · {fonteRepetir.n} tarefa{fonteRepetir.n === 1 ? "" : "s"}) e ajuste o que mudou.
+          </span>
+          <button className="btn btn-primario" onClick={repetirDiaAnterior} disabled={repetindo}>
+            {repetindo ? "Repetindo…" : "↺ Repetir o dia anterior"}
+          </button>
+        </div>
+      )}
+
       <CoberturaPanel
         funcionarios={efetivosVisiveis}
         ausencias={ausentesMap}
