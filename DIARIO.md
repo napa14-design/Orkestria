@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-06-18 — Usabilidade: tela Início, primeiros passos/telas vazias e ajuda da agenda
+
+Três melhorias de "mais fácil e intuitivo" (escolhidas pelo usuário):
+
+- **Tela Início** (`/inicio`, server component): saudação com o nome, atalhos
+  grandes (Rotina do dia, Conferir ficha, Dashboard, Acompanhamento) e um guia
+  **"Comece por aqui"** (Sede → Local → Tarefa → Funcionário → Montar a rotina),
+  cada passo linkado. O pós-login e o logo agora apontam para `/inicio` (antes
+  caía direto na agenda). Item "Início" no menu Operação. Hover nos cartões
+  (`globals.css`).
+- **Telas vazias acolhedoras** (no `CrudManager`, cobre todos os cadastros):
+  sem dados → convite + botão "criar o primeiro"; busca sem resultado →
+  "Nada encontrado para …". Prop `vazio` com mensagens sob medida em Sedes,
+  Locais, Tarefas e Funcionários.
+- **Ajuda da agenda** (`components/agenda/AjudaAgenda.tsx`): botão "❔ Como usar"
+  na tela de rotinas abre um modal com legenda — montar/mover/redimensionar,
+  blocos de 15 min, cores do card, ocupação/ociosidade, coluna bloqueada e o
+  painel "Ficou de fora hoje".
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; Início renderiza saudação +
+atalhos + passos; modal de ajuda abre com todas as seções; busca vazia mostra a
+mensagem amigável; console limpo. `.env` restaurado.
+
+**Arquivos:** `app/(app)/inicio/page.tsx` (novo), `app/(app)/page.tsx` (redirect),
+`components/AppShell.tsx`, `components/CrudManager.tsx`,
+`components/agenda/AjudaAgenda.tsx` (novo), `app/(app)/rotinas/page.tsx`,
+`app/(app)/{sedes,locais,tarefas,funcionarios}/page.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-06-18 — Fechamento: campo de EPI no realizado, idempotência e remoção da ficha HTML
 
 Fecha as 3 pendências do fluxo da ficha:

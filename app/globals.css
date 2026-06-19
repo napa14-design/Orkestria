@@ -113,6 +113,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 rgba(34,49,39,0.82); }
 .btn:active { transform: translate(2px, 2px); box-shadow: none; }
+
+/* cartões de atalho da tela Início */
+.cartao-atalho { transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease; }
+.cartao-atalho:hover { transform: translate(-1px, -1px); box-shadow: var(--sombra); border-color: var(--acento); }
 .btn:disabled { opacity: 0.45; pointer-events: none; }
 
 .btn-primario { background: var(--acento); color: #fff; }

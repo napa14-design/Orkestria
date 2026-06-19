@@ -63,6 +63,7 @@ export default function CrudManager<T extends Registro>({
   colunas,
   textoNovo = "+ Novo",
   acoesExtra,
+  vazio,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -72,6 +73,8 @@ export default function CrudManager<T extends Registro>({
   textoNovo?: string;
   /** Controles adicionais por linha, à esquerda de Editar/Excluir. */
   acoesExtra?: (item: T) => React.ReactNode;
+  /** Mensagem amigável quando ainda não há nada cadastrado. */
+  vazio?: string;
 }) {
   const { data, mutate, isLoading } = useSWR<T[]>(endpoint, fetcher);
   const [busca, setBusca] = useState("");
@@ -215,8 +218,20 @@ export default function CrudManager<T extends Registro>({
             )}
             {!isLoading && itens.length === 0 && (
               <tr>
-                <td colSpan={colunas.length + 1} style={{ textAlign: "center", padding: 32, color: "var(--tinta-3)" }}>
-                  Nenhum registro encontrado.
+                <td colSpan={colunas.length + 1} style={{ textAlign: "center", padding: "40px 16px", color: "var(--tinta-3)" }}>
+                  {data && data.length > 0 ? (
+                    <>Nada encontrado para “{busca}”.</>
+                  ) : (
+                    <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
+                      <div style={{ fontSize: 26 }}>📋</div>
+                      <div style={{ fontWeight: 700, color: "var(--tinta-2)", maxWidth: 420 }}>
+                        {vazio ?? "Nada cadastrado aqui ainda."}
+                      </div>
+                      <button className="btn btn-primario" onClick={abrirNovo}>
+                        {textoNovo}
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             )}

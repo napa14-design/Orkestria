@@ -14,6 +14,7 @@ const GRUPOS: Grupo[] = [
   {
     rotulo: "Operação",
     itens: [
+      { href: "/inicio", rotulo: "Início" },
       { href: "/rotinas", rotulo: "Rotina do dia" },
       { href: "/acompanhamento", rotulo: "Acompanhamento" },
       { href: "/conferir", rotulo: "Conferir ficha" },
@@ -128,7 +129,7 @@ export default function AppShell({
           zIndex: 50,
         }}
       >
-        <Link href="/rotinas" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        <Link href="/inicio" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-horizontal-fundo-escuro.png"

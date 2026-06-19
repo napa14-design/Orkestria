@@ -31,6 +31,7 @@ export default function PaginaFuncionarios() {
       subtitulo="Equipe ASG/serviços gerais. A jornada líquida é calculada automaticamente."
       endpoint="/api/funcionarios"
       textoNovo="+ Novo funcionário"
+      vazio="Adicione a equipe (ASGs): horário, sede e escala. Depois é só montar a rotina arrastando tarefas."
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
         {

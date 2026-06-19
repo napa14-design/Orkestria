@@ -16,6 +16,7 @@ import FiltersBar from "@/components/agenda/FiltersBar";
 import ModalPlanejamento from "@/components/agenda/ModalPlanejamento";
 import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
+import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
@@ -572,6 +573,10 @@ export default function PaginaRotinas() {
         }}
         aoDuplicar={() => setPlanejamentoAberto(true)}
       />
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <AjudaAgenda />
+      </div>
 
       {modo === "semana" ? (
         <SemanaGrid

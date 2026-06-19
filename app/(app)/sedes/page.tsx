@@ -18,6 +18,7 @@ export default function PaginaSedes() {
       subtitulo="Unidades atendidas. Todo local, tarefa e funcionário pertence a uma sede."
       endpoint="/api/sedes"
       textoNovo="+ Nova sede"
+      vazio="Comece cadastrando a primeira sede — locais, tarefas e equipe pendem dela."
       campos={[
         { key: "nome_sede", rotulo: "Nome da sede", tipo: "texto", obrigatorio: true },
         { key: "cidade", rotulo: "Cidade", tipo: "texto" },
