@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-19 — Removida a cortina de entrada
+
+- A animação de cortina ao logar foi **removida** (decisão do time). O login
+  continua indo direto para `/inicio`, sem transição.
+- Apagado `components/CortinaEntrada.tsx`; removidos o uso no `AppShell`, o
+  bloco CSS `.cortina-*` em `globals.css` e o flag `sessionStorage` no login.
+- Arquivos: `components/AppShell.tsx`, `app/login/page.tsx`, `app/globals.css`,
+  `components/CortinaEntrada.tsx` (excluído).
+
+---
+
 ## 2026-06-19 — Cortina com cara de teatro (bandô drapeado)
 
 - A cortina de entrada ganhou um **bandô (sanca) com swags curvos no topo** —

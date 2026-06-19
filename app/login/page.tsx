@@ -44,7 +44,6 @@ export default function PaginaLogin() {
     setEnviando(true);
     try {
       await apiPost("/api/auth/login", { email, senha });
-      sessionStorage.setItem("ork:cortina", "1");
       router.push("/inicio");
       router.refresh();
     } catch (err) {
@@ -61,7 +60,6 @@ export default function PaginaLogin() {
       const { loginGoogleObterToken } = await import("@/lib/firebaseWeb");
       const idToken = await loginGoogleObterToken();
       await apiPost("/api/auth/google", { idToken });
-      sessionStorage.setItem("ork:cortina", "1");
       router.push("/inicio");
       router.refresh();
     } catch (err) {
