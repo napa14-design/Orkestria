@@ -135,6 +135,11 @@ export default function PaginaRotinas() {
     sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null,
     fetcher,
   );
+  // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
+  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(
+    sedeId ? `/api/execucoes?de=${data}&ate=${data}` : null,
+    fetcher,
+  );
   // Últimos 31 dias: base do cálculo de "periódica vencida".
   const { data: historico } = useSWR<RotinaPlanejada[]>(
     sedeId ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,
@@ -554,6 +559,12 @@ export default function PaginaRotinas() {
     return melhor;
   }, [historico]);
 
+  const nFaltas = (ausencias ?? []).length;
+  const faltamRegistrar = useMemo(() => {
+    const reg = new Set((execucoesDia ?? []).map((e) => e.rotina_id));
+    return (rotinas ?? []).filter((r) => r.status !== "cancelada" && !reg.has(r.id)).length;
+  }, [execucoesDia, rotinas]);
+
   const [repetindo, setRepetindo] = useState(false);
   async function repetirDiaAnterior() {
     if (!fonteRepetir || !sedeId) return;
@@ -630,8 +641,13 @@ export default function PaginaRotinas() {
               {repetindo ? "Repetindo…" : `↺ Repetir o dia anterior (${formatarDataBR(fonteRepetir.data)})`}
             </button>
           )}
-          <Link href="/ausencias" className="btn btn-mini btn-fantasma">
-            ⚠ Faltas{(ausencias?.length ?? 0) > 0 ? ` (${ausencias!.length})` : ""}
+          <Link
+            href="/ausencias"
+            className="btn btn-mini btn-fantasma"
+            style={nFaltas > 0 ? { borderColor: "var(--amarelo)", color: "var(--tinta)" } : undefined}
+            title={nFaltas > 0 ? `${nFaltas} ausência(s) hoje — redistribua as tarefas` : "Faltas e ausências do dia"}
+          >
+            {nFaltas > 0 ? `⚠ Faltas (${nFaltas})` : "Faltas"}
           </Link>
           {sedeId && (
             <a
@@ -644,9 +660,24 @@ export default function PaginaRotinas() {
               🖨 Imprimir fichas
             </a>
           )}
-          <Link href="/acompanhamento" className="btn btn-mini btn-fantasma">
-            ✅ Registrar o realizado
-          </Link>
+          {faltamRegistrar > 0 ? (
+            <Link
+              href="/acompanhamento"
+              className="btn btn-mini btn-primario"
+              style={{ textDecoration: "none" }}
+              title={`${faltamRegistrar} tarefa(s) sem o realizado lançado`}
+            >
+              ✅ Registrar o realizado ({faltamRegistrar})
+            </Link>
+          ) : (rotinas?.length ?? 0) > 0 ? (
+            <Link href="/acompanhamento" className="btn btn-mini btn-fantasma" style={{ textDecoration: "none" }}>
+              ✓ Realizado lançado
+            </Link>
+          ) : (
+            <Link href="/acompanhamento" className="btn btn-mini btn-fantasma">
+              ✅ Registrar o realizado
+            </Link>
+          )}
           <span style={{ marginLeft: "auto" }}>
             <AjudaAgenda />
           </span>

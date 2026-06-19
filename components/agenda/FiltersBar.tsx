@@ -120,15 +120,6 @@ export default function FiltersBar({
       >
         ⧉ Duplicar / Modelos
       </button>
-      <Link
-        href={`/api/fichas/pdf?data=${data}&sede=${sedeId}`}
-        target="_blank"
-        className="btn"
-        style={{ textDecoration: "none" }}
-        title="Fichas de rotina em PDF (layout fixo, prontas para leitura automática)"
-      >
-        🖨 Fichas
-      </Link>
       <Link href="/dashboard" className="btn btn-primario" style={{ textDecoration: "none" }}>
         Dashboard →
       </Link>

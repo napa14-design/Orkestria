@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-19 — Passos do dia inteligentes + favicon novo
+
+- **Passos inteligentes** na faixa da agenda: **Faltas** ganha destaque (âmbar)
+  e contagem quando há ausências no dia; **Registrar o realizado** vira botão
+  primário com a contagem de tarefas ainda não lançadas (`N a registrar`), e
+  vira "✓ Realizado lançado" quando tudo já foi lançado. Usa um novo SWR
+  `/api/execucoes?de&ate` para saber o que falta.
+- **Dedup:** removido o "🖨 Fichas" da barra de filtros (agora só na faixa).
+- **Favicon novo** (`app/icon.svg`): tile evergreen + O amaranto + 3 barras
+  marfim ascendentes (símbolo do Orkestria), sem a batuta que poluía no tamanho
+  pequeno.
+
+**Verificado (DATA_SOURCE=memory):** build/lint ok; faixa mostra "⚠ Faltas (1)"
+(ausência do dia) e "✅ Registrar o realizado (3)" em destaque (3 rotinas sem
+execução). Console limpo. Screenshot do favicon não capturou (timeout do
+ambiente) — geometria conferida; visível no painel de preview. `.env` restaurado.
+
+**Arquivos:** `app/(app)/rotinas/page.tsx`, `components/agenda/FiltersBar.tsx`,
+`app/icon.svg`.
+
+---
+
 ## 2026-06-19 — Faixa "Passos do dia" na agenda
 
 Reúne o fluxo diário do supervisor numa linha só, no topo da agenda (modo dia):
