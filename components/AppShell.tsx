@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SWRConfig } from "swr";
 import type { SessaoUsuario } from "@/lib/permissions";
+import CortinaEntrada from "@/components/CortinaEntrada";
 
 type Item = { href: string; rotulo: string; apenasAdmin?: boolean };
 type Grupo = { rotulo: string; itens: Item[] };
@@ -115,6 +116,7 @@ export default function AppShell({
       }}
     >
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <CortinaEntrada />
       <header
         className="nao-imprimir"
         style={{

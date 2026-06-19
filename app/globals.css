@@ -661,6 +661,46 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   }
 }
 
+/* ── cortina de entrada (abre revelando o sistema após o login) ──── */
+.cortina-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cortina-painel {
+  position: absolute;
+  top: -2%;
+  bottom: -2%;
+  width: 51%;
+  background-color: #7d0a2d; /* amaranto fundo */
+  /* pregas de veludo: faixas verticais claro/escuro */
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.34) 0px,
+    rgba(0, 0, 0, 0.04) 16px,
+    rgba(255, 255, 255, 0.11) 30px,
+    rgba(0, 0, 0, 0.04) 44px,
+    rgba(0, 0, 0, 0.34) 60px
+  );
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.55);
+  will-change: transform;
+  transition: transform 1.35s cubic-bezier(0.66, 0, 0.2, 1);
+}
+.cortina-painel.esq {
+  left: 0;
+  transform: translateX(0);
+  border-right: 3px solid rgba(214, 178, 92, 0.5); /* fio dourado no vão central */
+}
+.cortina-painel.dir {
+  right: 0;
+  transform: translateX(0);
+  border-left: 3px solid rgba(214, 178, 92, 0.5);
+}
+.cortina-painel.esq.abre { transform: translateX(-101%); }
+.cortina-painel.dir.abre { transform: translateX(101%); }
+
 /* ── scrollbar discreta ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--papel-2); }

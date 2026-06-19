@@ -44,7 +44,8 @@ export default function PaginaLogin() {
     setEnviando(true);
     try {
       await apiPost("/api/auth/login", { email, senha });
-      router.push("/rotinas");
+      sessionStorage.setItem("ork:cortina", "1");
+      router.push("/inicio");
       router.refresh();
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Falha ao entrar.");
@@ -60,7 +61,8 @@ export default function PaginaLogin() {
       const { loginGoogleObterToken } = await import("@/lib/firebaseWeb");
       const idToken = await loginGoogleObterToken();
       await apiPost("/api/auth/google", { idToken });
-      router.push("/rotinas");
+      sessionStorage.setItem("ork:cortina", "1");
+      router.push("/inicio");
       router.refresh();
     } catch (err) {
       // popup fechado/cancelado não é erro a exibir

@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-19 — Cortina de teatro abre ao entrar (pós-login)
+
+- Toque lúdico no tema "Partitura": ao logar, uma **cortina de veludo amaranto**
+  cobre a tela e **abre deslizando para os lados**, revelando a tela inicial.
+- Como funciona: o login marca `sessionStorage["ork:cortina"]` e manda para
+  `/inicio`; o componente `CortinaEntrada` (montado no `AppShell`) lê o flag no
+  mount, desenha as duas metades fechadas, dá um beat e as desliza para fora
+  (transição de 1,35s), depois se desmonta. Roda **uma vez por login** e
+  **respeita `prefers-reduced-motion`** (não anima).
+- Login agora vai para `/inicio` (era `/rotinas`) — coerente com a tela inicial
+  orientadora.
+- Arquivos: `components/CortinaEntrada.tsx` (novo), `components/AppShell.tsx`,
+  `app/login/page.tsx`, `app/globals.css` (estilos `.cortina-*`).
+
+---
+
 ## 2026-06-19 — Tela "Da ata ao sistema" (transparência para a direção)
 
 - Nova tela **`/da-ata`**: painel que mostra, lado a lado, cada ponto levantado
