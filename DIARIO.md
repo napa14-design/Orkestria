@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-19 — Cortina com cara de teatro (bandô drapeado)
+
+- A cortina de entrada ganhou um **bandô (sanca) com swags curvos no topo** —
+  a assinatura visual da cortina de teatro — desenhado em SVG (curvas de
+  verdade), que **sobe** (`translateY`) ao abrir, enquanto as laterais franzem
+  para os lados.
+- Laterais ganharam **brilho curvo (sheen)** e **sombra de drapeado** na borda
+  interna (radial-gradients) para tirar o aspecto chapado; barra inferior agora
+  **reta** (encosta no "chão"), em vez do serrilhado que parecia renda.
+- Detalhe técnico: o `<svg>` do bandô vai dentro de um `<div>` wrapper porque,
+  com `viewBox`, o SVG tende a se dimensionar pela proporção e não preenchia a
+  largura toda; o div dimensiona certo e o svg preenche 100%×100%.
+- Arquivos: `app/globals.css` (`.cortina-*`), `components/CortinaEntrada.tsx`.
+
+---
+
 ## 2026-06-19 — Cortina mais suave (veludo que franze)
 
 - Refino da cortina de entrada para um gesto mais macio e menos rígido:

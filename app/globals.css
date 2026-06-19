@@ -670,59 +670,79 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   overflow: hidden;
 }
 .cortina-painel {
-  --onda: 22px; /* profundidade da barra ondulada (hem) */
   position: absolute;
   top: -8px;
-  bottom: 0;
-  width: 53%; /* metades se sobrepõem um pouco no centro (sem vão) */
+  bottom: -2%; /* encosta no "chão" (sem serrilhado) */
+  width: 60%; /* metades se sobrepõem bastante no centro (drapeado, sem vão) */
   background-color: #861031; /* amaranto aveludado */
-  box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.42);
-  /* barra inferior ondulada em vez de reta */
-  -webkit-mask:
-    radial-gradient(var(--onda) at 50% 0, #0000 98%, #000) 0 100% / calc(2 * var(--onda)) var(--onda) repeat-x,
-    linear-gradient(#000 0 0) 0 0 / 100% calc(100% - var(--onda) + 1px) no-repeat;
-  mask:
-    radial-gradient(var(--onda) at 50% 0, #0000 98%, #000) 0 100% / calc(2 * var(--onda)) var(--onda) repeat-x,
-    linear-gradient(#000 0 0) 0 0 / 100% calc(100% - var(--onda) + 1px) no-repeat;
+  box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.5);
   will-change: transform;
   /* abertura macia e sem solavanco */
   transition: transform 1.8s cubic-bezier(0.3, 0.02, 0.12, 1);
 }
-/* pregas de veludo bem suaves + crease suave (sem linha dura) no centro */
+/* brilho curvo (sheen) + sombra de drapeado na borda interna + pregas suaves —
+   tira o aspecto chapado e dá volume arredondado ao tecido */
 .cortina-painel.esq {
   left: 0;
   transform-origin: left center;
   background-image:
-    linear-gradient(to right, rgba(0, 0, 0, 0) 78%, rgba(0, 0, 0, 0.32) 100%),
+    radial-gradient(135% 85% at 26% 20%, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 52%),
+    radial-gradient(95% 120% at 118% 48%, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0) 60%),
     repeating-linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.18) 0px,
-      rgba(0, 0, 0, 0) 26px,
-      rgba(255, 255, 255, 0.06) 46px,
-      rgba(0, 0, 0, 0) 66px,
-      rgba(0, 0, 0, 0.18) 88px
+      rgba(0, 0, 0, 0) 30px,
+      rgba(255, 255, 255, 0.06) 52px,
+      rgba(0, 0, 0, 0) 74px,
+      rgba(0, 0, 0, 0.18) 100px
     );
 }
 .cortina-painel.dir {
   right: 0;
   transform-origin: right center;
   background-image:
-    linear-gradient(to left, rgba(0, 0, 0, 0) 78%, rgba(0, 0, 0, 0.32) 100%),
+    radial-gradient(135% 85% at 74% 20%, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 52%),
+    radial-gradient(95% 120% at -18% 48%, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0) 60%),
     repeating-linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.18) 0px,
-      rgba(0, 0, 0, 0) 26px,
-      rgba(255, 255, 255, 0.06) 46px,
-      rgba(0, 0, 0, 0) 66px,
-      rgba(0, 0, 0, 0.18) 88px
+      rgba(0, 0, 0, 0) 30px,
+      rgba(255, 255, 255, 0.06) 52px,
+      rgba(0, 0, 0, 0) 74px,
+      rgba(0, 0, 0, 0.18) 100px
     );
 }
 /* ao abrir, a cortina desliza E franze para o lado (scaleX) — gesto de tecido */
 .cortina-painel.esq.abre { transform: translateX(-102%) scaleX(0.5); }
 .cortina-painel.dir.abre { transform: translateX(102%) scaleX(0.5); }
 
+/* bandô (sanca) com swags curvos no topo — a assinatura da cortina de teatro;
+   sobe ao abrir. Desenhado em SVG (curvas de verdade). */
+.cortina-bando {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 23%;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.4));
+  transform-origin: top center;
+  will-change: transform;
+  transition: transform 1.6s cubic-bezier(0.3, 0.02, 0.12, 1);
+}
+/* o <svg> com viewBox tende a se dimensionar pela proporção; forçamos preencher
+   o div (que dimensiona certo) em 100% × 100% */
+.cortina-bando svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cortina-bando.abre { transform: translateY(-112%); }
+
 @media (prefers-reduced-motion: reduce) {
-  .cortina-painel { transition: none; }
+  .cortina-painel,
+  .cortina-bando {
+    transition: none;
+  }
 }
 
 /* ── scrollbar discreta ──────────────────────────────────────────── */
