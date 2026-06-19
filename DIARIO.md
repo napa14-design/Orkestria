@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-19 — Cortina mais suave (veludo que franze)
+
+- Refino da cortina de entrada para um gesto mais macio e menos rígido:
+  removido o fio dourado reto do centro (agora um vinco suave por gradiente),
+  **barra inferior ondulada** em vez de reta (máscara radial), pregas de veludo
+  mais sutis, e ao abrir a cortina **franze para os lados** (`scaleX`) enquanto
+  desliza — com easing mais lento e macio (1,8s, `cubic-bezier(0.3,0.02,0.12,1)`).
+- Arquivos: `app/globals.css` (`.cortina-*`), `components/CortinaEntrada.tsx` (tempo).
+
+---
+
 ## 2026-06-19 — Cortina de teatro abre ao entrar (pós-login)
 
 - Toque lúdico no tema "Partitura": ao logar, uma **cortina de veludo amaranto**

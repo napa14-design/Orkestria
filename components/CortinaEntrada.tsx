@@ -22,8 +22,8 @@ export default function CortinaEntrada() {
     if (reduzir) return;
 
     setFase("fechada");
-    const t1 = setTimeout(() => setFase("abrindo"), 280); // beat fechada
-    const t2 = setTimeout(() => setFase("oculta"), 280 + 1350); // fim da abertura
+    const t1 = setTimeout(() => setFase("abrindo"), 340); // beat fechada
+    const t2 = setTimeout(() => setFase("oculta"), 340 + 1850); // fim da abertura
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
