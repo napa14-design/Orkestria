@@ -118,8 +118,8 @@ const BLOCOS: Bloco[] = [
       },
       {
         pediu: "Visão agregada de ociosidade por grupo (Sul 1/2/3).",
-        faz: "O cadastro de tipo/grupo está pronto; somar as unidades de um grupo no dashboard ainda está pendente.",
-        status: "parcial",
+        faz: "Pronto no painel “Panorama de sedes”: soma ocupação e ociosidade de todas as sedes por grupo ou por tipo, com ocupação média, sobrecarga e uma dica de remanejo (sede com mais folga × mais cheia).",
+        status: "entregue",
       },
     ],
   },
@@ -148,9 +148,8 @@ const BLOCOS: Bloco[] = [
     itens: [
       {
         pediu: "O ASG não usa celular: confirmar o feito numa ficha de papel e depois inserir no sistema.",
-        faz: "Ficha imprimível por funcionário/dia (checklist por ambiente + EPIs + assinatura), com QR e marcadores de canto. A leitura é por OMR (detecta o X marcado, como um gabarito) dentro do próprio sistema — sem serviço externo — e grava o realizado casando com a rotina planejada.",
+        faz: "Ficha imprimível por funcionário/dia (checklist por ambiente + EPIs + assinatura), com QR e marcadores de canto. A leitura é por OMR (detecta o X marcado, como um gabarito) dentro do próprio sistema — sem serviço externo — e grava o realizado casando com a rotina planejada. Validado em scan real (foto de celular): 12 tarefas + 10 EPIs lidos corretamente.",
         status: "entregue",
-        nota: "Falta calibrar o limiar com scans reais de impressora/scanner.",
       },
       {
         pediu: "Reconhecimento facial (API “Edison”) para o “ok” presencial.",

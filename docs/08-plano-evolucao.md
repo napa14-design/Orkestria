@@ -17,7 +17,7 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | **2** | Granularidade — snap reduzido p/ **15 min** (evidência da planilha real) | ✅ **feito** |
 | **3** | Calendário acadêmico / período letivo | ✅ **feito** |
 | 4 | Confirmação do executado (ficha de papel + OMR) | ✅ **feito** (ficha + leitura validadas em scan real) |
-| 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | 🟡 **parcial** (cadastro feito; visão agregada + RH pendentes) |
+| 5 | Ociosidade por sede/grupo (produto) | ✅ **feito** (cadastro + visão agregada `/panorama`) · RH fora do sistema (decisão de direção) |
 
 **Onda 1 (entregue):** o tempo previsto passou a ser
 **m² × intensidade do ambiente × tipo de serviço** (base 1 m² ≈ 1 min). A
@@ -29,18 +29,20 @@ tarefa pode terminar depois da saída, mas não pode iniciar às/após a saída.
 O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
 "Recalibrar" continua, pois mexe no `tempo_base_min`).
 
-**Onda 5 (parcial):** a Sede ganhou **`tipo_sede`** (educação infantil · escola
-· faculdade · administrativo · outros) e **`grupo`** (ex.: "Sul"), cadastráveis
-na tela de Sedes — base para comparar ociosidade entre unidades parecidas e para
-visões agregadas por grupo. A **folga-alvo já é por sede**
-(`folga_minima_percentual`), então a "ociosidade-alvo por tipo" se resolve hoje
-configurando o parâmetro de cada sede. **Pendente:** a **visão agregada** por
-tipo/grupo (dashboard/remanejo somando unidades). **5.2 (dados de RH):** segue
-**em estudo, sem decisão** — idade e sexo **continuam fora** do motor de
-produtividade/alocação (salvaguarda vigente); aptidões/restrições já cabem em
-`qualificacoes`. Antes de qualquer uso de atributos de pessoa em produtividade,
-passar pelo jurídico (Davi Rocha) — restrição preferencialmente por
-**treinamento**, não por sexo.
+**Onda 5 (feito — parte de produto):** a Sede ganhou **`tipo_sede`** (educação
+infantil · escola · faculdade · administrativo · outros) e **`grupo`** (ex.:
+"Sul"), cadastráveis na tela de Sedes. A **folga-alvo já é por sede**
+(`folga_minima_percentual`), então a "ociosidade-alvo por tipo" se resolve
+configurando o parâmetro de cada sede. A **visão agregada** foi entregue no
+painel **`/panorama`** (menu Painéis): soma ocupação e ociosidade de todas as
+sedes por **grupo** ou por **tipo**, com ocupação média (ponderada por
+funcionário), ociosidade total, sobrecarga, barras por sede e dica de remanejo
+(mais folga × mais cheia) — só leitura, reusa o cálculo do Dashboard.
+**5.2 (dados de RH) — fora do sistema:** por decisão de direção, atributos de RH
+(idade, sexo) **não entram** no produto; seguem **fora** do motor de
+produtividade/alocação (salvaguarda vigente). Aptidões/restrições já cabem em
+`qualificacoes`; restrição preferencialmente por **treinamento**, não por sexo.
+A discussão jurídica não é item de desenvolvimento.
 
 **Onda 4 (feito):** ciclo completo de confirmação por papel, **tudo dentro do
 Next/Vercel** (sem serviço externo). (4.1) **Ficha imprimível** via

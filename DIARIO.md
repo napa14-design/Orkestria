@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-22 — Onda 5 marcada como concluída (docs + tela "Da ata")
+
+- `docs/08`: Onda 5 passou de 🟡 parcial → ✅ **feito** (parte de produto:
+  cadastro de grupo/tipo + visão agregada `/panorama`); RH registrado como
+  **fora do sistema** (decisão de direção, não é item de dev).
+- Tela **`/da-ata`** atualizada: "visão agregada por grupo" virou **entregue**
+  (aponta o Panorama) e a confirmação por ficha/OMR ganhou a nota de **validado
+  em scan real**. Placar agora: **20 entregue · 0 parcial · 4 decisão** (24).
+- Sem mudança de código de produto — só docs/conteúdo da tela.
+- Arquivos: `docs/08-plano-evolucao.md`, `app/(app)/da-ata/page.tsx`.
+
+---
+
 ## 2026-06-22 — Panorama de sedes (visão agregada — Onda 5)
 
 - Novo painel **`/panorama`** (menu Painéis): agrega ocupação e ociosidade de
