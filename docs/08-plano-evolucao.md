@@ -16,7 +16,7 @@ A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
 | **1** | **Modelo de tempo + regra de horário** | ✅ **feito** |
 | **2** | Granularidade — snap reduzido p/ **15 min** (evidência da planilha real) | ✅ **feito** |
 | **3** | Calendário acadêmico / período letivo | ✅ **feito** |
-| 4 | Confirmação do executado (ficha de papel + OCR) | 🟡 **parcial** (ficha pronta; OCR = spike) |
+| 4 | Confirmação do executado (ficha de papel + OMR) | ✅ **feito** (ficha + leitura validadas em scan real) |
 | 5 | Ociosidade por sede/grupo + dados de RH (cautela jurídica) | 🟡 **parcial** (cadastro feito; visão agregada + RH pendentes) |
 
 **Onda 1 (entregue):** o tempo previsto passou a ser
@@ -42,20 +42,22 @@ produtividade/alocação (salvaguarda vigente); aptidões/restrições já cabem
 passar pelo jurídico (Davi Rocha) — restrição preferencialmente por
 **treinamento**, não por sexo.
 
-**Onda 4 (parcial):** a **ficha de confirmação imprimível** (4.1) está pronta e
-agora **OMR-ready** — `/rotinas/imprimir` traz, por funcionário/dia: **QR code**
-(identifica sede·data·funcionário → o leitor recupera as rotinas na mesma ordem
-de impressão, sem ler texto), **marcadores fiduciais** nos 4 cantos (alinhar/
-endireitar o scan), **caixas de marcação reais** (coluna "Feito" + EPIs), tipo
-de serviço por tarefa, anotações e assinaturas. O ASG só **confirma** (marca X).
-**Decisão de leitura:** escolhido **OMR clássico (OpenCV)** em vez de OCR de
-texto — como a ficha é estruturada por nós, basta detectar marcação (tecnologia
-madura, tipo gabarito). **Falta (spike 4.2):** o motor de leitura — OpenCV é
-Python/WASM, então roda fora do Next (worker Python ou OpenCV.js num route Node)
-recebendo o scan → casa com `rotinas_planejadas` → gera `execucoes_realizadas`.
-Precisa de **scans reais** para calibrar limiar de preenchimento e do método de
-deploy. A **confirmação automática de EPI** e o facial (4.3) dependem dessa
-ingestão.
+**Onda 4 (feito):** ciclo completo de confirmação por papel, **tudo dentro do
+Next/Vercel** (sem serviço externo). (4.1) **Ficha imprimível** via
+`/api/fichas/pdf` (serviço `services/fichaPdf.ts`, pdf-lib): uma página por
+funcionário/dia com **QR** (identifica sede·data·funcionário → o leitor recupera
+as rotinas na mesma ordem, sem ler texto), **4 marcadores fiduciais** nos cantos
+(endireitam o scan por homografia), **caixas reais** ("Feito" por tarefa + bloco
+de EPIs em 2 colunas), área de observações e assinaturas; ocupa a folha A4
+inteira. O ASG só **confirma** (marca X). (4.2) **Leitura OMR** em TypeScript no
+navegador (`lib/omr.ts` + jsQR), na tela **`/conferir`**: detecta QR, alinha
+pelos fiduciais e mede tinta nas caixas (limiar 0,12; marca fraca vira
+"revisar"). Geometria é **fonte única** (`lib/fichaGeometria.ts`) compartilhada
+por gerador e leitor. Casa com `rotinas_planejadas` e grava
+`execucoes_realizadas` (idempotente por rotina+data), com **EPIs confirmados**.
+**Validado em scan real (2026-06-22):** foto de celular (torta), 12 tarefas + 10
+EPIs lidos corretos, QR ok, e os 2 traços mais fracos sinalizados para revisão.
+**Pendente:** facial/Edison (4.3) — avaliação futura.
 
 **Onda 3 (entregue):** nova entidade **`periodos_letivos`** (calendário
 acadêmico por sede: nome, intervalo, dias com aula) com CRUD completo

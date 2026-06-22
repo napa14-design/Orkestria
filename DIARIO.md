@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-22 — OMR validado em scan real (fecha a Onda 4)
+
+- Teste de ponta a ponta com **scan real**: ficha impressa, preenchida à mão e
+  fotografada (celular, imagem torta 1070×1500). O leitor `lib/omr.ts` rodado
+  sobre a foto **acertou tudo**: QR decodificado (`ORK1|sede_aldeota|...|f1`),
+  **12 tarefas + 10 EPIs** lidos corretamente, alinhamento pelos fiduciais ok.
+- **Limiar 0,12 confirmado**: pegou até marcas fracas; os 2 traços mais fininhos
+  (1 tarefa + 1 EPI) foram lidos como marcados mas sinalizados **"revisar"** —
+  comportamento desejado (não chuta, pede conferência humana).
+- Recomendação de uso: orientar a equipe a fazer **X cheio dentro da caixa**
+  (ponto/risco fino cai em "revisar").
+- `docs/08`: Onda 4 (confirmação por ficha/OMR) passou de 🟡 parcial → ✅ **feito**,
+  com o parágrafo atualizado para o que foi entregue de fato (PDF + leitor TS no
+  navegador, sem serviço externo). Sem mudança de código — só validação e docs.
+
+---
+
 ## 2026-06-22 — Ficha ocupa a folha A4 inteira (+ área de observações)
 
 - O cartão da ficha passou a ocupar **a folha A4 inteira** (antes terminava no
