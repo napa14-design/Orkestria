@@ -9,7 +9,7 @@
  * ficha → ajuste só estas constantes.
  */
 import jsQR from "jsqr";
-import { CAIXA_LADO, EPI, FID, TAREFA } from "./fichaGeometria";
+import { CAIXA_LADO, epiPos, EPI_CAPACIDADE, FID, TAREFA } from "./fichaGeometria";
 
 // ── Geometria (pontos PDF) — importada da fonte única ────────────────────
 const FID_PDF = FID;
@@ -19,10 +19,7 @@ const LINHA_DELTA = TAREFA.delta;
 const CAIXA_LADO_PDF = CAIXA_LADO;
 const LIMIAR_MARCA = 0.12;
 
-// Bloco de EPIs no rodapé (caixas numa coluna fixa à esquerda).
-const EPI_X_PDF = EPI.x;
-const EPI_LINHA0_PDF = EPI.linha0; // EPI i → y = EPI_LINHA0 - EPI_DELTA*i
-const EPI_DELTA = EPI.delta;
+// Bloco de EPIs no rodapé: posições vêm de epiPos (fonte única).
 
 export interface LinhaOMR {
   linha: number;
@@ -327,18 +324,18 @@ export function lerFicha(
     }
   }
 
-  // Bloco de EPIs no rodapé (coluna fixa). Lido igual às tarefas.
+  // Bloco de EPIs no rodapé (em colunas). Posições vêm de epiPos (fonte única).
   const epis: LinhaOMR[] = [];
-  const maxE = opts.numEpis ?? 6;
+  const maxE = opts.numEpis ?? EPI_CAPACIDADE;
   let semBoxE = 0,
     comecouE = false;
   for (let i = 1; i <= maxE; i++) {
-    const cy = EPI_LINHA0_PDF - EPI_DELTA * i;
-    const fi = tinta(g, w, h, H, thr, EPI_X_PDF, cy, CAIXA_LADO_PDF, 0.55);
+    const { x: ex, y: cy } = epiPos(i - 1);
+    const fi = tinta(g, w, h, H, thr, ex, cy, CAIXA_LADO_PDF, 0.55);
     if (opts.numEpis) {
       epis.push({ linha: i, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });
     } else {
-      const fb = tinta(g, w, h, H, thr, EPI_X_PDF, cy, CAIXA_LADO_PDF * 1.6, 1.0);
+      const fb = tinta(g, w, h, H, thr, ex, cy, CAIXA_LADO_PDF * 1.6, 1.0);
       if (fb > 0.18) {
         comecouE = true;
         semBoxE = 0;

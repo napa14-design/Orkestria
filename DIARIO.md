@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-06-22 — Ficha: bloco de EPIs em 2 colunas + mais EPIs no exemplo
+
+- O bloco de EPIs da ficha virou **2 colunas** (cabe ~10 EPIs sem bater nas
+  assinaturas; antes só ~5 em coluna única). Geometria via novo helper
+  `epiPos(i)` em `lib/fichaGeometria.ts` (fonte única) — usado pelo **gerador**
+  (`services/fichaPdf.ts`) E pelo **leitor OMR** (`lib/omr.ts`), que continuam
+  alinhados por construção.
+- Dados de exemplo enriquecidos: de 1 para **8 EPIs** no catálogo (luvas, máscara
+  PFF2, botas, avental, óculos, touca, luvas de raspa, protetor auricular),
+  ligados às tarefas do funcionário-exemplo — a ficha de exemplo agora lista 8.
+- Verificado: ficha-gabarito gerada (`?marcar=todas`) renderizada em imagem
+  mostra os 8 EPIs em 2 colunas, todos marcados; ordem da tela Conferir bate com
+  a do gerador (rotinas por horário + união em ordem). EPI não bloqueia alocação
+  (`validations.ts:121`), então ligar EPIs às tarefas é seguro.
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `lib/omr.ts`,
+  `lib/memoryStore.ts`.
+
+---
+
 ## 2026-06-19 — Removida a cortina de entrada
 
 - A animação de cortina ao logar foi **removida** (decisão do time). O login

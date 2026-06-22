@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, EPI, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA } from "@/lib/fichaGeometria";
+import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -131,14 +131,15 @@ async function desenhaFicha(
     { x: x0 + 12, y: ultimaY - 14, size: 7.5, font: reg, color: CINZA3 },
   );
 
-  // EPIs no rodapé (coluna fixa)
+  // EPIs no rodapé (em colunas — cabe muito mais)
   if (f.epis.length) {
-    page.drawText("EPIS UTILIZADOS (marque o que usou):", { x: x0 + 12, y: EPI.linha0 + 4, size: 8, font: bold, color: ACENTO });
+    page.drawText("EPIS UTILIZADOS (marque o que usou):", { x: x0 + 12, y: EPI.linha0 + 6, size: 8, font: bold, color: ACENTO });
     f.epis.forEach((nome, idx) => {
-      const cy = EPI.linha0 - EPI.delta * (idx + 1);
-      page.drawRectangle({ x: EPI.x - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
-      if (marcarTodas) desenhaX(page, EPI.x, cy);
-      page.drawText(nome, { x: EPI.x + 14, y: cy - 3, size: 9, font: reg, color: TINTA });
+      const { x: cx, y: cy } = epiPos(idx);
+      page.drawRectangle({ x: cx - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
+      if (marcarTodas) desenhaX(page, cx, cy);
+      const larguraNome = (idx >= EPI.porColuna ? CARD.x1 : EPI.colX[1]) - (cx + 14) - 4;
+      page.drawText(trunc(reg, nome, 9, larguraNome), { x: cx + 14, y: cy - 3, size: 9, font: reg, color: TINTA });
     });
   }
 
