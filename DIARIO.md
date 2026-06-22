@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-22 — Ficha ocupa a folha A4 inteira (+ área de observações)
+
+- O cartão da ficha passou a ocupar **a folha A4 inteira** (antes terminava no
+  meio, com vão branco embaixo — ficava feio). `CARD.yBot` desceu de 250 → 42 e
+  os fiduciais de baixo acompanharam (`FID.BR/BL` → y56).
+- Conteúdo redistribuído ao longo da página: tabela de tarefas no topo (linhas
+  um pouco mais espaçadas, `TAREFA.delta` 21→24), **bloco de EPIs mais embaixo**
+  (`EPI.linha0` 388→350), nova área **"Observações / ocorrências do dia"** com
+  linhas para anotar preenchendo o rodapé, e **assinaturas na base** (`yBot+44`).
+- Geometria é fonte única: o leitor OMR (`lib/omr.ts`) acompanhou os fiduciais e
+  as caixas automaticamente (homografia agora usa cantos mais distantes — leitura
+  até mais robusta).
+- Verificado por imagem: ficha curta (2 tarefas) e ficha cheia (12 tarefas + 10
+  EPIs) — ambas preenchem a folha sem colisões e sem vão branco no fim.
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`.
+
+---
+
 ## 2026-06-22 — Ficha: bloco de EPIs em 2 colunas + mais EPIs no exemplo
 
 - O bloco de EPIs da ficha virou **2 colunas** (cabe ~10 EPIs sem bater nas

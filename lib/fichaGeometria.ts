@@ -9,21 +9,22 @@
  */
 export const PAGINA = { W: 595.28, H: 841.89 }; // A4
 
-export const CARD = { x0: 40, x1: 555, yBot: 250, yTop: 802 };
+// Cartão ocupa a folha A4 quase inteira (margens ~40pt).
+export const CARD = { x0: 40, x1: 555, yBot: 42, yTop: 802 };
 
 export const FID_LADO = 12; // lado do quadrado fiducial
-/** Centros dos 4 fiduciais (cantos do cartão). */
+/** Centros dos 4 fiduciais (cantos do cartão). Devem casar com fidRects(). */
 export const FID = {
   TL: [54, 788] as [number, number],
   TR: [541, 788] as [number, number],
-  BR: [541, 264] as [number, number],
-  BL: [54, 264] as [number, number],
+  BR: [541, 56] as [number, number],
+  BL: [54, 56] as [number, number],
 };
 
 export const CAIXA_LADO = 12; // lado das caixas de marcação
 
 /** Coluna "Feito" das tarefas: caixa i centrada em (x, linha0 - delta*i). */
-export const TAREFA = { x: 436, linha0: 690, delta: 21 };
+export const TAREFA = { x: 436, linha0: 690, delta: 24 };
 
 /**
  * Bloco de EPIs no rodapé, em colunas (cabe muito mais que uma coluna só).
@@ -31,8 +32,8 @@ export const TAREFA = { x: 436, linha0: 690, delta: 21 };
  * a próxima. `epiPos(i)` dá o centro da caixa i — usado pelo gerador E pelo leitor.
  */
 export const EPI = {
-  linha0: 388,
-  delta: 17,
+  linha0: 350,
+  delta: 21,
   porColuna: 5,
   colX: [76, 320] as number[],
 };

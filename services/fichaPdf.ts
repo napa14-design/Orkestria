@@ -143,8 +143,15 @@ async function desenhaFicha(
     });
   }
 
+  // Observações / ocorrências — preenche o rodapé com espaço útil para anotar
+  const obsTop = 228;
+  page.drawText("OBSERVAÇÕES / OCORRÊNCIAS DO DIA:", { x: x0 + 12, y: obsTop, size: 8, font: bold, color: ACENTO });
+  for (const ly of [210, 186, 162, 138, 114]) {
+    page.drawLine({ start: { x: x0 + 12, y: ly }, end: { x: x1 - 12, y: ly }, thickness: 0.5, color: LINHA });
+  }
+
   // assinaturas
-  const sy = yBot + 34;
+  const sy = yBot + 44;
   page.drawLine({ start: { x: x0 + 30, y: sy }, end: { x: x0 + 230, y: sy }, thickness: 0.8, color: TINTA });
   page.drawLine({ start: { x: x1 - 230, y: sy }, end: { x: x1 - 30, y: sy }, thickness: 0.8, color: TINTA });
   page.drawText("Assinatura do funcionário", { x: x0 + 130 - reg.widthOfTextAtSize("Assinatura do funcionário", 8) / 2, y: sy - 12, size: 8, font: reg, color: CINZA });
