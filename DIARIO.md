@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-06-22 — Panorama de sedes (visão agregada — Onda 5)
+
+- Novo painel **`/panorama`** (menu Painéis): agrega ocupação e ociosidade de
+  **todas as sedes**, agrupando por **grupo** (ex.: "Centro"/"Sul") ou por
+  **tipo de sede** (educação infantil, escola, faculdade…). Por grupo mostra:
+  ocupação média (ponderada por funcionário, com cor de classificação),
+  ociosidade prevista total, nº de sobrecarga, barras de ocupação por sede e uma
+  dica de remanejo (sede com mais folga × mais cheia).
+- Só **leitura** — reusa `jornadaLiquidaMin`/`classificarOcupacao` e os endpoints
+  existentes (`/api/sedes|funcionarios|rotinas|parametros`); não toca em dados de
+  pessoas nem muda cálculo. Sedes sem planejamento no período aparecem como "—".
+- Fecha a parte de produto da **Onda 5** (visão agregada). A discussão jurídica
+  de atributos de RH segue **fora do sistema**, por decisão de direção.
+- Verificado em memory: agrupou Centro/Sul e Faculdade/Escola/Educação infantil,
+  métricas corretas, console limpo.
+- Arquivos: `app/(app)/panorama/page.tsx` (novo), `components/AppShell.tsx`.
+
+---
+
 ## 2026-06-22 — OMR validado em scan real (fecha a Onda 4)
 
 - Teste de ponta a ponta com **scan real**: ficha impressa, preenchida à mão e
