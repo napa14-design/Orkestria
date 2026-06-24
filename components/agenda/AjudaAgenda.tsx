@@ -46,8 +46,10 @@ export default function AjudaAgenda() {
               para o bloco, mas os números (ocupação, ociosidade) usam o tempo exato.
             </Item>
             <Item>
-              <strong>Card:</strong> a <strong>faixa colorida à esquerda</strong> indica a
-              <em> categoria</em> da tarefa (limpeza, higienização, apoio…). O <strong>fundo</strong>
+              <strong>Card:</strong> mostra só o <strong>nome da tarefa</strong>. <strong>Clique</strong>
+              {" "}nele para abrir o <em>balãozinho</em> com horário, duração, local, categoria e
+              situação (e o botão Remover). A <strong>faixa colorida à esquerda</strong> indica a
+              <em> categoria</em> (limpeza, higienização, apoio…). O <strong>fundo</strong>
               mostra a <em>situação</em>: papel = planejada; e tom suave quando muda —
               <span style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="#e9f2ec" /> Realizada</span>

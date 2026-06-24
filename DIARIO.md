@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-06-24 — Agenda: card só com o nome + balãozinho de detalhes
+
+- A pedido: o card agora exibe **só o nome da tarefa** (em até 3 linhas, então
+  mostra o nome inteiro em vez de truncar). **Clicar** no card abre um
+  **balãozinho** (popover) com horário, duração, local, categoria (bolinha de
+  cor) e situação, além do botão **Remover**. Fecha no Fechar, no Esc, ao rolar
+  ou clicando fora.
+- `AgendaGrid`: estado `detalhe` + `LinhaDetalhe`/`ROTULO_STATUS`; conteúdo do
+  card reduzido ao nome (`-webkit-line-clamp`); `onClick` abre o popover. Ajuda
+  atualizada. Verificado no preview (firebase): clique mostra os dados certos.
+- Arquivos: `components/agenda/AgendaGrid.tsx`, `components/agenda/AjudaAgenda.tsx`.
+
+---
+
 ## 2026-06-24 — Agenda: escala vertical maior (fim das "fatias finas")
 
 - O "sobreposto/feio" relatado **não era sobreposição** (medido ao vivo: 0
