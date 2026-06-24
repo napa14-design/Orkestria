@@ -148,8 +148,19 @@ export async function aplicarModelo(
     ]);
 
   const resultado: ResultadoAplicacao = { criadas: 0, puladas: 0, detalhes: [] };
+  const chave = (f: string, t: string, i: string) => `${f}|${t}|${i}`;
   for (const data of datas) {
+    // Idempotência: não recria itens que já existem na data (rodar 2× é seguro).
+    const jaTem = new Set(
+      (await getRotinasByData(data, sedeId))
+        .filter((r) => r.status !== "cancelada")
+        .map((r) => chave(r.funcionario_id, r.tarefa_id, r.inicio_planejado)),
+    );
     for (const item of itens) {
+      if (jaTem.has(chave(item.funcionario_id, item.tarefa_id, item.inicio_planejado))) {
+        resultado.puladas++;
+        continue;
+      }
       try {
         await createRotina(
           {
@@ -157,6 +168,7 @@ export async function aplicarModelo(
             funcionario_id: item.funcionario_id,
             tarefa_id: item.tarefa_id,
             inicio_planejado: item.inicio_planejado,
+            duracao_min: item.duracao_min,
             observacao: `Modelo: ${nome}`,
           },
           supervisorId,
