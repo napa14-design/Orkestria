@@ -198,6 +198,25 @@ export default function AgendaGrid({
         {/* colunas dos funcionários */}
         {funcionarios.map((f, idxCol) => {
           const rotinasDoFunc = rotinas.filter((r) => r.funcionario_id === f.id);
+          // "Runs": tarefas iguais e contíguas (fim de uma = início da próxima)
+          // viram um bloco visual único — o nome aparece uma vez, sem barrinhas
+          // espremidas. As rotinas seguem individuais por baixo.
+          const ordenadas = [...rotinasDoFunc].sort((a, b) =>
+            a.inicio_planejado.localeCompare(b.inicio_planejado),
+          );
+          const runIdDe = new Map<string, string>();
+          let runAtual = "";
+          ordenadas.forEach((r, i) => {
+            const ant = ordenadas[i - 1];
+            if (ant && ant.tarefa_id === r.tarefa_id && ant.fim_planejado === r.inicio_planejado)
+              runIdDe.set(r.id, runAtual);
+            else {
+              runAtual = r.id;
+              runIdDe.set(r.id, r.id);
+            }
+          });
+          const fimDoRun = new Map<string, string>();
+          for (const r of ordenadas) fimDoRun.set(runIdDe.get(r.id) ?? r.id, r.fim_planejado);
           const entradaF = hhmmParaMin(f.entrada);
           const saidaF = hhmmParaMin(f.saida);
           const intIni = hhmmParaMin(f.intervalo_inicio);
@@ -364,18 +383,24 @@ export default function AgendaGrid({
                 )}
 
                 {/* cards de rotina */}
-                {rotinasDoFunc.map((r) => {
+                {ordenadas.map((r) => {
                   const ini = hhmmParaMin(r.inicio_planejado);
                   if (Number.isNaN(ini)) return null;
+                  const runId = runIdDe.get(r.id) ?? r.id;
+                  const ehInicioRun = runId === r.id; // 1º card do bloco (mostra o rótulo)
+                  const fimRun = fimDoRun.get(runId) ?? r.fim_planejado;
+                  const runUnico = ehInicioRun && fimRun === r.fim_planejado;
                   const topo = ((ini - inicioGrade) / blocoMin) * ALTURA_BLOCO;
                   const emResize = resize?.rotinaId === r.id;
                   // Altura pela duração REAL (não pelo bloco visual): rotas finas
                   // de 5–15 min encaixam sem sobrepor. Piso pequeno p/ clicabilidade.
                   const altura = emResize
                     ? resize.blocos * ALTURA_BLOCO
-                    : Math.max(13, (r.tempo_previsto_min / blocoMin) * ALTURA_BLOCO);
-                  const compacto = altura < 30;
-                  const medio = altura < 48;
+                    : Math.max(11, (r.tempo_previsto_min / blocoMin) * ALTURA_BLOCO);
+                  // O rótulo usa a altura do RUN inteiro (não da fatia).
+                  const alturaRun = ((hhmmParaMin(fimRun) - ini) / blocoMin) * ALTURA_BLOCO;
+                  const compacto = alturaRun < 30;
+                  const medio = alturaRun < 48;
                   const tarefa = tarefaPorId.get(r.tarefa_id);
                   const local = localPorId.get(r.local_id);
                   const cor = COR_STATUS[r.status] ?? COR_STATUS.planejada;
@@ -403,54 +428,62 @@ export default function AgendaGrid({
                         top: topo + 1,
                         left: 3,
                         right: 3,
-                        height: altura - 3,
+                        height: altura - 2,
+                        boxSizing: "border-box",
                         background: cor.fundo,
                         color: cor.texto,
-                        padding: "3px 8px",
-                        overflow: "hidden",
-                        zIndex: 5,
+                        padding: "2px 8px",
+                        // run-start deixa o rótulo transbordar sobre as fatias seguintes
+                        // (mesma cor → vira um bloco só); continuação fica limpa.
+                        overflow: ehInicioRun ? "visible" : "hidden",
+                        zIndex: ehInicioRun ? 6 : 5,
                         borderRadius: 3,
                         border: "1px solid rgba(0,0,0,0.22)",
+                        borderTop: ehInicioRun ? "1px solid rgba(0,0,0,0.22)" : "none",
                         borderLeft: "4px solid rgba(0,0,0,0.34)",
-                        boxShadow: "1.5px 1.5px 0 rgba(0,0,0,0.16)",
+                        boxShadow: ehInicioRun ? "1.5px 1.5px 0 rgba(0,0,0,0.16)" : "none",
                       }}
                       title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${r.inicio_planejado}–${r.fim_planejado}\nPrevisto real: ${formatarDuracao(r.tempo_previsto_min)} · Visual: ${formatarDuracao(r.tempo_visual_min)} (${r.blocos_ocupados} blocos)\nArraste para mover.`}
                     >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          aoRemover(r.id);
-                        }}
-                        aria-label="Remover tarefa"
-                        className="card-x"
-                        style={{
-                          position: "absolute",
-                          top: 2,
-                          right: 4,
-                          border: "none",
-                          background: "transparent",
-                          color: "inherit",
-                          fontSize: 13,
-                          fontWeight: 700,
-                        }}
-                      >
-                        ×
-                      </button>
-                      <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {tarefa?.nome_tarefa ?? "Tarefa"}
-                      </div>
-                      {!compacto && (
-                        <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
-                          {r.inicio_planejado}–{r.fim_planejado} · {formatarDuracao(r.tempo_previsto_min)}
-                        </div>
+                      {ehInicioRun && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              aoRemover(r.id);
+                            }}
+                            aria-label="Remover tarefa"
+                            className="card-x"
+                            style={{
+                              position: "absolute",
+                              top: 2,
+                              right: 4,
+                              border: "none",
+                              background: "transparent",
+                              color: "inherit",
+                              fontSize: 13,
+                              fontWeight: 700,
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {tarefa?.nome_tarefa ?? "Tarefa"}
+                          </div>
+                          {!compacto && (
+                            <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
+                              {r.inicio_planejado}–{fimRun} · {formatarDuracao(hhmmParaMin(fimRun) - ini)}
+                            </div>
+                          )}
+                          {!medio && local && (
+                            <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {local.nome_local} · {local.andar}
+                            </div>
+                          )}
+                        </>
                       )}
-                      {!medio && local && (
-                        <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {local.nome_local} · {local.andar}
-                        </div>
-                      )}
-                      {/* alça de redimensionamento */}
-                      {aoRedimensionar && (
+                      {/* alça de redimensionamento (só em blocos de fatia única) */}
+                      {aoRedimensionar && runUnico && (
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();

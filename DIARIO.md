@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-24 — Agenda: blocos mesclados (tarefas iguais e contíguas)
+
+- Depois do print da Tamires (Benfica): tarefas iguais repetidas em sequência
+  (ex.: "Limpeza entrada e caramanchão" 4× de 5–15 min) viravam várias barrinhas
+  de ~10px com texto espremido. Agora **tarefas iguais e contíguas** (fim de uma
+  = início da próxima) se **mesclam num bloco visual único**: o nome e o horário
+  do bloco inteiro aparecem **uma vez**, as fatias seguintes ficam sem texto e sem
+  borda de topo (vira um bloco só). As rotinas seguem individuais por baixo
+  (leitura OMR/realizado intactas).
+- Também: card com `box-sizing: border-box` (altura exata), piso mínimo 11px, e
+  a alça de redimensionar só em blocos de fatia única.
+- Verificado em produção (Tamires, 22 rotinas → 16 rótulos + 6 continuações):
+  coluna limpa, sem barrinhas sobrepostas. Console limpo.
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-24 — Agenda: cards por tempo exato (fim da sobreposição)
 
 - **Correção da coluna "empilhada"** (ex.: Tamires/Benfica): rotas finas de
