@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-06-24 — Importação completa dos 3 campi Christus no Firebase
+
+- A pedido (confirmação explícita), importados **todos os 3 campi** para o
+  Firestore de produção (`ociosidade-88ce4`): **3 sedes, 23 locais, 36
+  funcionários, 337 tarefas, 448 rotinas** (data de hoje). Substitui a carga
+  parcial anterior (christus_* antigos foram apagados antes).
+  - Christus — Dionísio Torres: 26 funcionários / 278 rotinas
+  - Christus — Eusébio: 6 funcionários / 108 rotinas
+  - Universidade Christus — Benfica: 4 funcionários / 62 rotinas
+- Parser one-off (Python) leu os 2 layouts das planilhas (DT com setor/POP;
+  Eusébio/Benfica com "FUNCIONÁRIO:"/m²); detecta a coluna de horário
+  dinamicamente. Gênero ausente em Eusébio/Benfica ficou **vazio** (sem chutar)
+  e anotado em observações. Escrita direta (sem validação/histórico).
+- **Reversível**: todos os ids têm prefixo `christus_` → dá para apagar tudo.
+  Scripts de carga foram temporários (não versionados).
+- Sem mudança de código — registro de operação de dados.
+
+---
+
 ## 2026-06-24 — Exemplo Christus DT carregado no Firebase de produção
 
 - A pedido (e com confirmação explícita), os registros de exemplo **`christus_*`**
