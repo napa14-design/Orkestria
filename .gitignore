@@ -9,3 +9,6 @@ build/
 next-env.d.ts
 .DS_Store
 credentials.json
+
+# projeto separado que roda nesta pasta
+jogo-monstrinhos/
