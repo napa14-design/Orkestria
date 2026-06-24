@@ -199,24 +199,38 @@ export default function AgendaGrid({
         {funcionarios.map((f, idxCol) => {
           const rotinasDoFunc = rotinas.filter((r) => r.funcionario_id === f.id);
           // "Runs": tarefas iguais e contíguas (fim de uma = início da próxima)
-          // viram um bloco visual único — o nome aparece uma vez, sem barrinhas
-          // espremidas. As rotinas seguem individuais por baixo.
+          // viram UM card único (altura cheia, sem linhas internas). As rotinas
+          // seguem individuais por baixo (leitura OMR/realizado intactas).
           const ordenadas = [...rotinasDoFunc].sort((a, b) =>
             a.inicio_planejado.localeCompare(b.inicio_planejado),
           );
-          const runIdDe = new Map<string, string>();
-          let runAtual = "";
-          ordenadas.forEach((r, i) => {
-            const ant = ordenadas[i - 1];
-            if (ant && ant.tarefa_id === r.tarefa_id && ant.fim_planejado === r.inicio_planejado)
-              runIdDe.set(r.id, runAtual);
-            else {
-              runAtual = r.id;
-              runIdDe.set(r.id, r.id);
+          type Run = {
+            id: string;
+            tarefa_id: string;
+            local_id: string;
+            status: StatusRotina;
+            inicio: string;
+            fim: string;
+            membros: RotinaPlanejada[];
+          };
+          const runs: Run[] = [];
+          for (const r of ordenadas) {
+            const ult = runs[runs.length - 1];
+            if (ult && ult.tarefa_id === r.tarefa_id && ult.fim === r.inicio_planejado) {
+              ult.fim = r.fim_planejado;
+              ult.membros.push(r);
+            } else {
+              runs.push({
+                id: r.id,
+                tarefa_id: r.tarefa_id,
+                local_id: r.local_id,
+                status: r.status,
+                inicio: r.inicio_planejado,
+                fim: r.fim_planejado,
+                membros: [r],
+              });
             }
-          });
-          const fimDoRun = new Map<string, string>();
-          for (const r of ordenadas) fimDoRun.set(runIdDe.get(r.id) ?? r.id, r.fim_planejado);
+          }
           const entradaF = hhmmParaMin(f.entrada);
           const saidaF = hhmmParaMin(f.saida);
           const intIni = hhmmParaMin(f.intervalo_inicio);
@@ -382,42 +396,36 @@ export default function AgendaGrid({
                   </div>
                 )}
 
-                {/* cards de rotina */}
-                {ordenadas.map((r) => {
-                  const ini = hhmmParaMin(r.inicio_planejado);
+                {/* blocos de rotina — tarefas iguais e contíguas viram 1 card */}
+                {runs.map((run) => {
+                  const ini = hhmmParaMin(run.inicio);
                   if (Number.isNaN(ini)) return null;
-                  const runId = runIdDe.get(r.id) ?? r.id;
-                  const ehInicioRun = runId === r.id; // 1º card do bloco (mostra o rótulo)
-                  const fimRun = fimDoRun.get(runId) ?? r.fim_planejado;
-                  const runUnico = ehInicioRun && fimRun === r.fim_planejado;
+                  const unico = run.membros.length === 1;
+                  const emResize = unico && resize?.rotinaId === run.id;
                   const topo = ((ini - inicioGrade) / blocoMin) * ALTURA_BLOCO;
-                  const emResize = resize?.rotinaId === r.id;
-                  // Altura pela duração REAL (não pelo bloco visual): rotas finas
-                  // de 5–15 min encaixam sem sobrepor. Piso pequeno p/ clicabilidade.
+                  const durMin = hhmmParaMin(run.fim) - ini;
+                  // Altura pela duração REAL do bloco inteiro (piso p/ clicabilidade).
                   const altura = emResize
                     ? resize.blocos * ALTURA_BLOCO
-                    : Math.max(11, (r.tempo_previsto_min / blocoMin) * ALTURA_BLOCO);
-                  // O rótulo usa a altura do RUN inteiro (não da fatia).
-                  const alturaRun = ((hhmmParaMin(fimRun) - ini) / blocoMin) * ALTURA_BLOCO;
-                  const compacto = alturaRun < 30;
-                  const medio = alturaRun < 48;
-                  const tarefa = tarefaPorId.get(r.tarefa_id);
-                  const local = localPorId.get(r.local_id);
-                  const cor = COR_STATUS[r.status] ?? COR_STATUS.planejada;
+                    : Math.max(11, (durMin / blocoMin) * ALTURA_BLOCO);
+                  const compacto = altura < 30;
+                  const medio = altura < 48;
+                  const visualBlocos = Math.max(1, Math.round(durMin / blocoMin));
+                  const tarefa = tarefaPorId.get(run.tarefa_id);
+                  const local = localPorId.get(run.local_id);
+                  const cor = COR_STATUS[run.status] ?? COR_STATUS.planejada;
                   return (
                     <div
-                      key={r.id}
+                      key={run.id}
                       className="agenda-card-tarefa pop-card"
-                      draggable={!emResize}
+                      draggable={unico && !emResize}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(
                           "text/plain",
-                          JSON.stringify({ tipo: "mover", rotina_id: r.id }),
+                          JSON.stringify({ tipo: "mover", rotina_id: run.id }),
                         );
                         e.dataTransfer.effectAllowed = "move";
-                        aoIniciarArrasto?.(
-                          Math.max(1, Math.round(r.tempo_visual_min / blocoMin)),
-                        );
+                        aoIniciarArrasto?.(visualBlocos);
                       }}
                       onDragEnd={() => {
                         setPrevia(null);
@@ -433,70 +441,60 @@ export default function AgendaGrid({
                         background: cor.fundo,
                         color: cor.texto,
                         padding: "2px 8px",
-                        // run-start deixa o rótulo transbordar sobre as fatias seguintes
-                        // (mesma cor → vira um bloco só); continuação fica limpa.
-                        overflow: ehInicioRun ? "visible" : "hidden",
-                        zIndex: ehInicioRun ? 6 : 5,
+                        overflow: "hidden",
+                        zIndex: 5,
                         borderRadius: 3,
                         border: "1px solid rgba(0,0,0,0.22)",
-                        borderTop: ehInicioRun ? "1px solid rgba(0,0,0,0.22)" : "none",
                         borderLeft: "4px solid rgba(0,0,0,0.34)",
-                        boxShadow: ehInicioRun ? "1.5px 1.5px 0 rgba(0,0,0,0.16)" : "none",
+                        boxShadow: "1.5px 1.5px 0 rgba(0,0,0,0.16)",
                       }}
-                      title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${r.inicio_planejado}–${r.fim_planejado}\nPrevisto real: ${formatarDuracao(r.tempo_previsto_min)} · Visual: ${formatarDuracao(r.tempo_visual_min)} (${r.blocos_ocupados} blocos)\nArraste para mover.`}
+                      title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${run.inicio}–${run.fim} · ${formatarDuracao(durMin)}${
+                        run.membros.length > 1 ? ` (${run.membros.length} blocos contíguos)` : ""
+                      }\nArraste para mover.`}
                     >
-                      {ehInicioRun && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              aoRemover(r.id);
-                            }}
-                            aria-label="Remover tarefa"
-                            className="card-x"
-                            style={{
-                              position: "absolute",
-                              top: 2,
-                              right: 4,
-                              border: "none",
-                              background: "transparent",
-                              color: "inherit",
-                              fontSize: 13,
-                              fontWeight: 700,
-                            }}
-                          >
-                            ×
-                          </button>
-                          <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {tarefa?.nome_tarefa ?? "Tarefa"}
-                          </div>
-                          {!compacto && (
-                            <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
-                              {r.inicio_planejado}–{fimRun} · {formatarDuracao(hhmmParaMin(fimRun) - ini)}
-                            </div>
-                          )}
-                          {!medio && local && (
-                            <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {local.nome_local} · {local.andar}
-                            </div>
-                          )}
-                        </>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          run.membros.forEach((m) => aoRemover(m.id));
+                        }}
+                        aria-label="Remover"
+                        className="card-x"
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          right: 4,
+                          border: "none",
+                          background: "transparent",
+                          color: "inherit",
+                          fontSize: 13,
+                          fontWeight: 700,
+                        }}
+                      >
+                        ×
+                      </button>
+                      <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {tarefa?.nome_tarefa ?? "Tarefa"}
+                      </div>
+                      {!compacto && (
+                        <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
+                          {run.inicio}–{run.fim} · {formatarDuracao(durMin)}
+                        </div>
                       )}
-                      {/* alça de redimensionamento (só em blocos de fatia única) */}
-                      {aoRedimensionar && runUnico && (
+                      {!medio && local && (
+                        <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {local.nome_local} · {local.andar}
+                        </div>
+                      )}
+                      {aoRedimensionar && unico && (
                         <div
                           onPointerDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            const blocosOrig = Math.max(
-                              1,
-                              Math.round(r.tempo_visual_min / blocoMin),
-                            );
                             setResize({
-                              rotinaId: r.id,
-                              blocosOrig,
+                              rotinaId: run.id,
+                              blocosOrig: visualBlocos,
                               yInicial: e.clientY,
-                              blocos: blocosOrig,
+                              blocos: visualBlocos,
                             });
                           }}
                           title="Arraste para mudar a duração (blocos de agenda)"

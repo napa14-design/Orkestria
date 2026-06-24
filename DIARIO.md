@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-24 — Agenda: bloco mesclado vira 1 card (sem linhas internas)
+
+- Refino da mescla: tarefas iguais e contíguas agora viram **um card único**
+  (altura cheia, borda única) em vez de fatias sobrepostas — some o efeito de
+  "linhas atravessando" o rótulo. `runs` por funcionário; cada run = 1 card com
+  nome + horário + duração do bloco. Blocos de fatia única mantêm arrastar/
+  redimensionar; blocos mesclados (multi-fatia) não redimensionam e o × remove
+  todas as fatias do bloco. Rotinas seguem individuais por baixo.
+- Verificado em produção (Tamires: 22 rotinas → **16 blocos, 0 sobreposições**).
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-24 — Agenda: blocos mesclados (tarefas iguais e contíguas)
 
 - Depois do print da Tamires (Benfica): tarefas iguais repetidas em sequência
