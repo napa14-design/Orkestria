@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-06-24 — Exemplo Christus DT carregado no Firebase de produção
+
+- A pedido (e com confirmação explícita), os registros de exemplo **`christus_*`**
+  foram gravados **direto no Firestore de produção** (`ociosidade-88ce4`) via
+  `firebase-admin` (service account do `.env`): **1 sede, 4 locais, 4 funcionários,
+  33 tarefas, 44 rotinas** (data 2026-06-24). Confirmado por leitura de volta.
+- Escrita **direta** (script one-off, igual ao seed): não passou por validações
+  de agenda nem gerou histórico/auditoria. **Reversível** — todos os ids têm
+  prefixo `christus_`; dá para apagar com um script de limpeza quando quiser.
+- O script de carga foi temporário (não versionado). Mesma origem dos dados do
+  seed em `lib/memoryStore.ts`.
+- Sem mudança de código nesta entrada — é registro de uma operação de dados.
+
+---
+
 ## 2026-06-24 — Ficha com linhas dinâmicas + exemplo real Christus DT no banco
 
 - **Ficha dinâmica:** o espaçamento das linhas de tarefa agora é função do total
