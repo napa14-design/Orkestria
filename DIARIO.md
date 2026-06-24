@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-06-24 — Rotas padrão das sedes Christus ativadas em produção
+
+- Com confirmação explícita, definidas as **rotas padrão das 3 sedes Christus**
+  no Firebase de produção (via API `/api/modelos` com `padrao+com_duracao`, a
+  partir do dia 24/06): christus_dt (278 itens), christus_eus (108), christus_ben
+  (62). Confirmado por leitura. Agora "⚡ Gerar o dia" funciona nessas sedes no ar.
+- Reversível pelos `sede_id` christus_*. Sem mudança de código.
+
+---
+
 ## 2026-06-24 — Rota padrão + "Gerar o dia" (rotina adaptativa)
 
 - A rotina deixa de ser só montada à mão: cada sede pode ter uma **rota padrão**
