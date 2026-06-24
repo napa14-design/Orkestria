@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-22 — Estudo das rotas reais Christus (docs/12)
+
+- Analisadas 3 planilhas de rota ASG (DT, Eusébio, Benfica): **37 rotas, 500+
+  linhas-tarefa**. Novo `docs/12-estudo-rotas-christus.md` consolida os padrões.
+- Confirmam o modelo atual (granularidade fina, presença/plantão, apoio
+  não-limpeza, periodicidade, deslocamento) e trazem 3 insumos novos: **POP**
+  (padrão de procedimento A–G, legenda inferida — confirmar com a DAC), **m² por
+  local** (Benfica — valores a validar) e **regras periódicas/condicionais** (OBS:
+  mensal, por dia da semana, entrada condicional).
+- Achado importante: os **3 arquivos têm layouts diferentes** (offset de coluna,
+  campos distintos) → um importador precisa ser afinado ao layout, tratado como
+  projeto próprio (testar em memory). Só estudo/documentação — nada de código.
+- Arquivo: `docs/12-estudo-rotas-christus.md` (novo).
+
+---
+
 ## 2026-06-22 — Onda 5 marcada como concluída (docs + tela "Da ata")
 
 - `docs/08`: Onda 5 passou de 🟡 parcial → ✅ **feito** (parte de produto:
