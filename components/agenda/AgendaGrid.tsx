@@ -9,7 +9,7 @@ import { jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import type { Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 
-export const ALTURA_BLOCO = 30; // px por bloco de agenda (menor: a grade agora é de 15 min)
+export const ALTURA_BLOCO_PADRAO = 30; // px por bloco (15 min) na densidade normal
 
 const COR_STATUS: Record<StatusRotina, { fundo: string; texto: string }> = {
   planejada: { fundo: "var(--azul)", texto: "#fff" },
@@ -42,6 +42,7 @@ export default function AgendaGrid({
   blocosArrasto,
   aoIniciarArrasto,
   aoTerminarArrasto,
+  alturaBloco = ALTURA_BLOCO_PADRAO,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -61,7 +62,11 @@ export default function AgendaGrid({
   blocosArrasto?: number | null;
   aoIniciarArrasto?: (blocos: number) => void;
   aoTerminarArrasto?: () => void;
+  /** Altura de cada bloco em px (densidade da grade). */
+  alturaBloco?: number;
 }) {
+  // Altura efetiva do bloco — todas as contas internas usam este valor.
+  const ALTURA_BLOCO = alturaBloco;
   // Fantasma de drop: célula(s) exatas onde a tarefa cairá se for solta.
   const [previa, setPrevia] = useState<{ funcionarioId: string; slot: number } | null>(null);
 
@@ -395,9 +400,13 @@ export default function AgendaGrid({
                         height: altura - 3,
                         background: cor.fundo,
                         color: cor.texto,
-                        padding: "4px 8px",
+                        padding: "3px 8px",
                         overflow: "hidden",
                         zIndex: 5,
+                        borderRadius: 3,
+                        border: "1px solid rgba(0,0,0,0.22)",
+                        borderLeft: "4px solid rgba(0,0,0,0.34)",
+                        boxShadow: "1.5px 1.5px 0 rgba(0,0,0,0.16)",
                       }}
                       title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${r.inicio_planejado}–${r.fim_planejado}\nPrevisto real: ${formatarDuracao(r.tempo_previsto_min)} · Visual: ${formatarDuracao(r.tempo_visual_min)} (${r.blocos_ocupados} blocos)\nArraste para mover.`}
                     >
@@ -407,6 +416,7 @@ export default function AgendaGrid({
                           aoRemover(r.id);
                         }}
                         aria-label="Remover tarefa"
+                        className="card-x"
                         style={{
                           position: "absolute",
                           top: 2,
@@ -414,7 +424,6 @@ export default function AgendaGrid({
                           border: "none",
                           background: "transparent",
                           color: "inherit",
-                          opacity: 0.7,
                           fontSize: 13,
                           fontWeight: 700,
                         }}
@@ -450,6 +459,7 @@ export default function AgendaGrid({
                             });
                           }}
                           title="Arraste para mudar a duração (blocos de agenda)"
+                          className="card-alca"
                           style={{
                             position: "absolute",
                             bottom: 0,
@@ -460,7 +470,6 @@ export default function AgendaGrid({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            opacity: 0.7,
                             fontSize: 8,
                             lineHeight: 1,
                             touchAction: "none",

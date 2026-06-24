@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-06-24 — Seed só com exemplo real + visual da agenda melhorada
+
+- **Seed limpo:** removidas as sedes fictícias de demonstração (Aldeota, Sede DT,
+  Sede Centro) e seus funcionários/locais/tarefas/rotinas/eventuais/qualificações/
+  ausências do `lib/memoryStore.ts`. O modo memory agora traz só o **catálogo
+  global** (categorias, requisitos, parâmetros) + o **exemplo real Christus DT**.
+- **Agenda — visualização:** (1) **× e alça** de redimensionar só aparecem no
+  **hover/foco** (cards limpos quando o dia está cheio); (2) card com **listra de
+  status** à esquerda (4px) + borda/sombra mais nítidas; (3) **tooltip** com nome
+  completo no hover (já existia, mantido); (4) novo **toggle de densidade**
+  ("⊖ Compactar / ⊕ Expandir") que reduz a altura do bloco (30→20px) pra ver o
+  dia inteiro com menos rolagem.
+- `AgendaGrid` ganhou prop `alturaBloco` (export renomeado p/ `ALTURA_BLOCO_PADRAO`).
+- Verificado em produção (Benfica, 62 cards): × oculto sem hover, listra 4px,
+  toggle 21→13px, console limpo.
+- Arquivos: `lib/memoryStore.ts`, `components/agenda/AgendaGrid.tsx`,
+  `app/(app)/rotinas/page.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-06-24 — Rotas padrão das sedes Christus ativadas em produção
 
 - Com confirmação explícita, definidas as **rotas padrão das 3 sedes Christus**

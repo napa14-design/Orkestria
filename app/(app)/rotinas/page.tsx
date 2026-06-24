@@ -597,6 +597,7 @@ export default function PaginaRotinas() {
     }
   }
 
+  const [denso, setDenso] = useState(false); // grade compacta (vê o dia todo com menos rolagem)
   const [gerando, setGerando] = useState(false);
   async function gerarDia() {
     if (!sedeId) return;
@@ -769,7 +770,15 @@ export default function PaginaRotinas() {
               ✅ Registrar o realizado
             </Link>
           )}
-          <span style={{ marginLeft: "auto" }}>
+          <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-mini btn-fantasma"
+              onClick={() => setDenso((v) => !v)}
+              title="Alterna a altura das linhas — compacto mostra o dia inteiro com menos rolagem"
+            >
+              {denso ? "⊕ Expandir" : "⊖ Compactar"}
+            </button>
             <AjudaAgenda />
           </span>
         </div>
@@ -903,6 +912,7 @@ export default function PaginaRotinas() {
           blocosArrasto={blocosArrasto}
           aoIniciarArrasto={setBlocosArrasto}
           aoTerminarArrasto={() => setBlocosArrasto(null)}
+          alturaBloco={denso ? 20 : 30}
         />
 
         <OccupancySummary
