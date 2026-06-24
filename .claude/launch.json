@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],
       "port": 3000
+    },
+    {
+      "name": "jogo-monstrinhos",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "jogo-monstrinhos", "-l", "4321"],
+      "port": 4321
     }
   ]
 }

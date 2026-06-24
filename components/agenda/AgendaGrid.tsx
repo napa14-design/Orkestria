@@ -7,17 +7,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
-import type { Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
+import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 
 export const ALTURA_BLOCO_PADRAO = 30; // px por bloco (15 min) na densidade normal
 
-const COR_STATUS: Record<StatusRotina, { fundo: string; texto: string }> = {
-  planejada: { fundo: "var(--azul)", texto: "#fff" },
-  realizada: { fundo: "var(--verde)", texto: "#fff" },
-  nao_realizada: { fundo: "var(--vermelho)", texto: "#fff" },
-  remanejada: { fundo: "var(--laranja)", texto: "#fff" },
-  cancelada: { fundo: "var(--cinza-bloco)", texto: "var(--tinta)" },
-  pendente: { fundo: "var(--laranja)", texto: "#fff" },
+/**
+ * Estilo do cartão por status. A direção "Partitura": cartão de papel (marfim),
+ * texto em tinta, e uma "espinha" colorida à esquerda. Em `planejada` (o normal)
+ * a espinha é a cor da CATEGORIA da tarefa; nas exceções (realizada/não/…) o
+ * cartão ganha um tom suave e a espinha vira a cor do status.
+ */
+const ESTILO_STATUS: Record<StatusRotina, { fundo: string; espinha?: string; selo?: string }> = {
+  planejada: { fundo: "var(--cartao)" },
+  realizada: { fundo: "#e9f2ec", espinha: "var(--verde)", selo: "✓ feita" },
+  nao_realizada: { fundo: "#fbe9e6", espinha: "var(--vermelho)", selo: "não feita" },
+  remanejada: { fundo: "#fdf1e3", espinha: "var(--laranja)", selo: "remanejada" },
+  pendente: { fundo: "#fdf1e3", espinha: "var(--laranja)" },
+  cancelada: { fundo: "var(--papel-2)", espinha: "var(--tinta-3)" },
 };
 
 interface DadosArrasto {
@@ -31,6 +37,7 @@ export default function AgendaGrid({
   rotinas,
   tarefas,
   locais,
+  categorias,
   blocoMin,
   funcionarioSelecionado,
   ausencias,
@@ -48,6 +55,7 @@ export default function AgendaGrid({
   rotinas: RotinaPlanejada[];
   tarefas: Tarefa[];
   locais: Local[];
+  categorias: Categoria[];
   blocoMin: number;
   funcionarioSelecionado: string | null;
   /** funcionario_id → rótulo da ausência (ex.: "Atestado"). */
@@ -108,6 +116,10 @@ export default function AgendaGrid({
 
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
+  const corCategoria = useMemo(
+    () => new Map(categorias.map((c) => [c.id, c.cor || "#3a6ea5"])),
+    [categorias],
+  );
 
   // Janela de horário da grade: do menor início ao maior fim entre os exibidos.
   const [inicioGrade, fimGrade] = useMemo(() => {
@@ -415,7 +427,8 @@ export default function AgendaGrid({
                   const visualBlocos = Math.max(1, Math.round(durMin / blocoMin));
                   const tarefa = tarefaPorId.get(run.tarefa_id);
                   const local = localPorId.get(run.local_id);
-                  const cor = COR_STATUS[run.status] ?? COR_STATUS.planejada;
+                  const est = ESTILO_STATUS[run.status] ?? ESTILO_STATUS.planejada;
+                  const espinha = est.espinha ?? corCategoria.get(tarefa?.categoria_id ?? "") ?? "#3a6ea5";
                   return (
                     <div
                       key={run.id}
@@ -440,15 +453,15 @@ export default function AgendaGrid({
                         right: 3,
                         height: altura - 2,
                         boxSizing: "border-box",
-                        background: cor.fundo,
-                        color: cor.texto,
+                        background: est.fundo,
+                        color: "var(--tinta)",
                         padding: "2px 8px",
                         overflow: "hidden",
                         zIndex: 5,
                         borderRadius: 3,
-                        border: "1px solid rgba(0,0,0,0.22)",
-                        borderLeft: "4px solid rgba(0,0,0,0.34)",
-                        boxShadow: "1.5px 1.5px 0 rgba(0,0,0,0.16)",
+                        border: "1px solid var(--linha)",
+                        borderLeft: `4px solid ${espinha}`,
+                        boxShadow: "1px 1.5px 0 rgba(34,49,39,0.10)",
                       }}
                       title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${run.inicio}–${run.fim} · ${formatarDuracao(durMin)}${
                         run.membros.length > 1 ? ` (${run.membros.length} blocos contíguos)` : ""
@@ -474,16 +487,17 @@ export default function AgendaGrid({
                       >
                         ×
                       </button>
-                      <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--tinta)" }}>
                         {tarefa?.nome_tarefa ?? "Tarefa"}
                       </div>
                       {!compacto && (
-                        <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
+                        <div className="num" style={{ fontSize: 10, color: "var(--tinta-2)" }}>
                           {run.inicio}–{run.fim} · {formatarDuracao(durMin)}
+                          {est.selo ? ` · ${est.selo}` : ""}
                         </div>
                       )}
                       {!medio && local && (
-                        <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ fontSize: 10, color: "var(--tinta-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {local.nome_local} · {local.andar}
                         </div>
                       )}

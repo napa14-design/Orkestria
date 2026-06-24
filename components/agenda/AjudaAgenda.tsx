@@ -46,13 +46,18 @@ export default function AjudaAgenda() {
               para o bloco, mas os números (ocupação, ociosidade) usam o tempo exato.
             </Item>
             <Item>
-              <strong>Cores do card (situação):</strong>
+              <strong>Card:</strong> a <strong>faixa colorida à esquerda</strong> indica a
+              <em> categoria</em> da tarefa (limpeza, higienização, apoio…). O <strong>fundo</strong>
+              mostra a <em>situação</em>: papel = planejada; e tom suave quando muda —
               <span style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="var(--azul)" /> Planejada</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="var(--verde)" /> Realizada</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="var(--vermelho)" /> Não realizada</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="var(--laranja)" /> Remanejada</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="#e9f2ec" /> Realizada</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="#fbe9e6" /> Não realizada</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Swatch cor="#fdf1e3" /> Remanejada</span>
               </span>
+            </Item>
+            <Item>
+              <strong>Blocos iguais e seguidos</strong> (ex.: a mesma limpeza em fatias de 15 min)
+              aparecem mesclados num bloco só, com o nome e o horário uma vez.
             </Item>
             <Item>
               <strong>Ocupação</strong> (resumo lateral e da equipe): quanto da jornada está preenchido.

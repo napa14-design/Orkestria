@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-24 — Redesign da agenda: cartões "Partitura" (papel + categoria)
+
+- Saímos do **muro de blocos azuis** para **cartões de papel (marfim) com texto
+  em tinta** e uma **espinha colorida à esquerda pela CATEGORIA** da tarefa
+  (limpeza, higienização, apoio…). O **status** deixou de ser o preenchimento e
+  virou **tom suave do fundo** (realizada=verde claro, não realizada=vermelho
+  claro, remanejada=âmbar) + selo. Bem mais leve e escaneável, fiel à marca.
+- `AgendaGrid` recebe `categorias` e mapeia `categoria_id→cor`; `ESTILO_STATUS`
+  define fundo/espinha/selo. Legenda da ajuda atualizada.
+- Verificado em memory: cartões marfim, 5 cores de espinha por categoria, tinta
+  escura. **Em produção a cor por categoria ainda não pinta** porque a coleção
+  `categorias` nunca foi importada para o Firebase (só existe no seed) — espinha
+  cai no azul padrão. Próximo passo: subir as categorias para a produção.
+- Arquivos: `components/agenda/AgendaGrid.tsx`, `components/agenda/AjudaAgenda.tsx`,
+  `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-24 — Intervalos de Eusébio/Benfica inferidos pelas lacunas
 
 - Com confirmação, gravados no Firebase os intervalos de **Eusébio (5) e Benfica

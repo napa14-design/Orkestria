@@ -901,6 +901,7 @@ export default function PaginaRotinas() {
           rotinas={rotinas ?? []}
           tarefas={tarefas ?? []}
           locais={locais ?? []}
+          categorias={categorias ?? []}
           blocoMin={blocoMin}
           funcionarioSelecionado={selecionado}
           ausencias={ausentesMap}
