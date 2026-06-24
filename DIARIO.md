@@ -7,6 +7,15 @@
 
 ---
 
+## 2026-06-24 — Removido placeholder "Beltrano" da produção
+
+- Com confirmação explícita, apagado do Firebase o funcionário **Beltrano**
+  (`christus_eus_f1`) — placeholder da aba "MODELO" do Eusébio que vazou na
+  importação — junto com suas 17 rotinas e 17 itens de rota padrão. Eusébio fica
+  com 5 funcionários reais. Operação de dados; sem mudança de código.
+
+---
+
 ## 2026-06-24 — Seed só com exemplo real + visual da agenda melhorada
 
 - **Seed limpo:** removidas as sedes fictícias de demonstração (Aldeota, Sede DT,
