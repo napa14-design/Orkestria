@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-24 — Intervalos reais da DT aplicados na produção
+
+- Com confirmação explícita, gravados no Firebase os **intervalos reais dos 26
+  funcionários da DT** (lanche + almoço + lanche, extraídos das planilhas) —
+  substituindo o almoço fixo 12:00–13:00. Eusébio/Benfica mantidos (planilhas não
+  expõem o almoço com clareza). Também **apagadas 4 rotinas com início duplicado**
+  (ruído do import). Confirmado por leitura (26/26 com intervalos; 0 duplicados).
+- Script de carga temporário (parser refinado p/ ignorar "apoio durante o
+  intervalo dos alunos" etc.). Operação de dados; sem mudança de código.
+
+---
+
 ## 2026-06-24 — Múltiplos intervalos por funcionário (lanches + almoço)
 
 - O funcionário passa a ter **vários intervalos no dia** (2 lanches + almoço, em
