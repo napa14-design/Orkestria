@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-06-24 — Intervalos de Eusébio/Benfica inferidos pelas lacunas
+
+- Com confirmação, gravados no Firebase os intervalos de **Eusébio (5) e Benfica
+  (4)**, inferidos pelas **lacunas das rotas** (maior folga = almoço; ~15min =
+  lanche), já que as planilhas deles não rotulam o almoço. Ex.: Benfica (turno
+  13:30–22:30) com almoço 16:00–18:00. Cobertura total agora: **DT 26/26, Eus
+  5/5, Ben 4/4** com intervalos. Operação de dados; sem mudança de código.
+
+---
+
 ## 2026-06-24 — Intervalos reais da DT aplicados na produção
 
 - Com confirmação explícita, gravados no Firebase os **intervalos reais dos 26
