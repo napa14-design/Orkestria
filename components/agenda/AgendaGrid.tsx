@@ -9,7 +9,7 @@ import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 
-export const ALTURA_BLOCO_PADRAO = 30; // px por bloco (15 min) na densidade normal
+export const ALTURA_BLOCO_PADRAO = 48; // px por bloco na densidade normal (mais respiro p/ tarefas curtas)
 
 /**
  * Estilo do cartão por status. A direção "Partitura": cartão de papel (marfim),
@@ -421,9 +421,9 @@ export default function AgendaGrid({
                   // Altura pela duração REAL do bloco inteiro (piso p/ clicabilidade).
                   const altura = emResize
                     ? resize.blocos * ALTURA_BLOCO
-                    : Math.max(11, (durMin / blocoMin) * ALTURA_BLOCO);
+                    : Math.max(14, (durMin / blocoMin) * ALTURA_BLOCO);
                   const compacto = altura < 30;
-                  const medio = altura < 48;
+                  const medio = altura < 50;
                   const visualBlocos = Math.max(1, Math.round(durMin / blocoMin));
                   const tarefa = tarefaPorId.get(run.tarefa_id);
                   const local = localPorId.get(run.local_id);

@@ -913,7 +913,7 @@ export default function PaginaRotinas() {
           blocosArrasto={blocosArrasto}
           aoIniciarArrasto={setBlocosArrasto}
           aoTerminarArrasto={() => setBlocosArrasto(null)}
-          alturaBloco={denso ? 20 : 30}
+          alturaBloco={denso ? 30 : 48}
         />
 
         <OccupancySummary

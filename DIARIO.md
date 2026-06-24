@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-24 — Agenda: escala vertical maior (fim das "fatias finas")
+
+- O "sobreposto/feio" relatado **não era sobreposição** (medido ao vivo: 0
+  sobreposições na coluna da Aurilene) — era **escala apertada**: ~1px/min fazia
+  tarefas de 20min virarem 18px e as de 10min ~13px, empilhadas e coladas.
+- Subimos a escala para ~1.6px/min: `ALTURA_BLOCO_PADRAO` 30→**48** e o toggle de
+  densidade 20/30→**30/48**. Agora 20min=30px (nome+horário), 10min=22px (1 linha),
+  com separação clara. Piso de altura 11→14. Verificado ao vivo (firebase): 19
+  cards da Aurilene, 0 sobreposição, espinhas coloridas por categoria.
+- Arquivos: `components/agenda/AgendaGrid.tsx`, `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-24 — Categorias subidas para a produção (cor por atividade)
 
 - Com confirmação, gravadas as **8 categorias** (c1–c8: limpeza, higienização,
