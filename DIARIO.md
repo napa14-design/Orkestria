@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-06-24 — Múltiplos intervalos por funcionário (lanches + almoço)
+
+- O funcionário passa a ter **vários intervalos no dia** (2 lanches + almoço, em
+  horários próprios), fiel às planilhas Christus — antes era um único intervalo
+  fixo. Novo campo `Funcionario.intervalos` (CSV de pares "HH:mm-HH:mm").
+- `lib/calculations.ts`: `intervalosDoFuncionario` + `minutosIntervalo`;
+  `jornadaLiquidaMin` desconta a soma de todos; `JornadaEfetiva`/`jornadaDoDia`
+  carregam `intervalos`. `lib/validations.ts`: bloqueio de alocação checa TODOS
+  os intervalos. `AgendaGrid`: desenha uma faixa por intervalo, rotulada
+  **Almoço** (≥45min) ou **Lanche**. Fallback p/ o intervalo único quando o
+  campo não existe.
+- Seed (memory) dos 4 Christus DT com os intervalos reais. Verificado: Aurilene
+  mostra Lanche/Almoço/Lanche e jornada líquida cai p/ 8h (600−120). Console limpo.
+- **Pendente:** reimportar os intervalos reais de TODOS os funcionários na
+  produção (Firebase) + limpar 2 rotinas com início duplicado — com confirmação.
+- Arquivos: `types/Funcionario.ts`, `lib/schema.ts`, `lib/calculations.ts`,
+  `lib/validations.ts`, `components/agenda/AgendaGrid.tsx`, `lib/memoryStore.ts`.
+
+---
+
 ## 2026-06-24 — Agenda: bloco mesclado vira 1 card (sem linhas internas)
 
 - Refino da mescla: tarefas iguais e contíguas agora viram **um card único**

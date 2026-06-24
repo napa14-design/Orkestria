@@ -5,7 +5,7 @@
  * horário. Aceita soltar tarefas novas (paleta) e mover cards existentes.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { jornadaLiquidaMin } from "@/lib/calculations";
+import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import type { Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 
@@ -233,8 +233,10 @@ export default function AgendaGrid({
           }
           const entradaF = hhmmParaMin(f.entrada);
           const saidaF = hhmmParaMin(f.saida);
-          const intIni = hhmmParaMin(f.intervalo_inicio);
-          const intFim = hhmmParaMin(f.intervalo_fim);
+          // Todos os intervalos do dia (lanches + almoço) em minutos.
+          const intervalosF = intervalosDoFuncionario(f)
+            .map((iv) => ({ ini: hhmmParaMin(iv.inicio), fim: hhmmParaMin(iv.fim) }))
+            .filter((iv) => !Number.isNaN(iv.ini) && !Number.isNaN(iv.fim));
           const selecionado = funcionarioSelecionado === f.id;
           const motivoAusencia = ausencias?.get(f.id);
 
@@ -314,8 +316,8 @@ export default function AgendaGrid({
                 {slots.map((min) => {
                   const foraJornada =
                     Number.isNaN(entradaF) || min < entradaF || min + blocoMin > saidaF;
-                  const noIntervalo =
-                    !Number.isNaN(intIni) && min >= intIni && min < intFim;
+                  const ivAtual = intervalosF.find((iv) => min >= iv.ini && min < iv.fim);
+                  const noIntervalo = !!ivAtual;
                   return (
                     <div
                       key={min}
@@ -332,12 +334,12 @@ export default function AgendaGrid({
                         borderTop: min % 60 === 0 ? "1px solid var(--tinta-3)" : undefined,
                       }}
                     >
-                      {noIntervalo && min === intIni && (
+                      {ivAtual && min === ivAtual.ini && (
                         <span
                           className="rotulo"
                           style={{ color: "var(--papel-3)", paddingLeft: 8, fontSize: 9, lineHeight: `${ALTURA_BLOCO}px` }}
                         >
-                          ▦ Intervalo
+                          ▦ {ivAtual.fim - ivAtual.ini >= 45 ? "Almoço" : "Lanche"}
                         </span>
                       )}
                     </div>

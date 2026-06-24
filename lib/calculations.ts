@@ -101,13 +101,53 @@ export function mediana(valores: number[]): number {
 }
 
 /** jornada_liquida = saida - entrada - intervalo (em minutos). */
+/**
+ * Intervalos do funcionário (lanches + almoço). Usa o campo `intervalos` (CSV
+ * de pares "HH:mm-HH:mm") quando presente; senão cai no intervalo único.
+ */
+export function intervalosDoFuncionario(
+  f: Pick<Funcionario, "intervalos" | "intervalo_inicio" | "intervalo_fim">,
+): Array<{ inicio: string; fim: string }> {
+  if (f.intervalos && f.intervalos.trim()) {
+    return f.intervalos
+      .split(";")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((par) => {
+        const [inicio, fim] = par.split("-");
+        return { inicio: (inicio ?? "").trim(), fim: (fim ?? "").trim() };
+      })
+      .filter((iv) => iv.inicio && iv.fim);
+  }
+  if (f.intervalo_inicio && f.intervalo_fim)
+    return [{ inicio: f.intervalo_inicio, fim: f.intervalo_fim }];
+  return [];
+}
+
+/** Total de minutos de intervalo no dia (soma de todos os intervalos). */
+export function minutosIntervalo(
+  f: Pick<Funcionario, "intervalos" | "intervalo_inicio" | "intervalo_fim" | "intervalo_min">,
+): number {
+  if (f.intervalos && f.intervalos.trim()) {
+    return intervalosDoFuncionario(f).reduce((s, iv) => {
+      const a = hhmmParaMin(iv.inicio);
+      const b = hhmmParaMin(iv.fim);
+      return s + (Number.isNaN(a) || Number.isNaN(b) ? 0 : Math.max(0, b - a));
+    }, 0);
+  }
+  return f.intervalo_min || 0;
+}
+
 export function jornadaLiquidaMin(
-  f: Pick<Funcionario, "entrada" | "saida" | "intervalo_min">,
+  f: Pick<
+    Funcionario,
+    "entrada" | "saida" | "intervalo_min" | "intervalos" | "intervalo_inicio" | "intervalo_fim"
+  >,
 ): number {
   const entrada = hhmmParaMin(f.entrada);
   const saida = hhmmParaMin(f.saida);
   if (Number.isNaN(entrada) || Number.isNaN(saida)) return 0;
-  return Math.max(0, saida - entrada - (f.intervalo_min || 0));
+  return Math.max(0, saida - entrada - minutosIntervalo(f));
 }
 
 /** Horário efetivo de um funcionário numa data (trata sábado e folgas). */
@@ -117,6 +157,7 @@ export interface JornadaEfetiva {
   intervalo_min: number;
   intervalo_inicio: string;
   intervalo_fim: string;
+  intervalos: string;
   trabalha: boolean;
 }
 
@@ -134,6 +175,7 @@ export function jornadaDoDia(f: Funcionario, dataISO: string): JornadaEfetiva {
       intervalo_min: 0,
       intervalo_inicio: "",
       intervalo_fim: "",
+      intervalos: "",
       trabalha,
     };
   }
@@ -143,6 +185,7 @@ export function jornadaDoDia(f: Funcionario, dataISO: string): JornadaEfetiva {
     intervalo_min: f.intervalo_min,
     intervalo_inicio: f.intervalo_inicio,
     intervalo_fim: f.intervalo_fim,
+    intervalos: f.intervalos ?? "",
     trabalha,
   };
 }

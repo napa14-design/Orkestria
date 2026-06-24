@@ -13,6 +13,7 @@ import type {
   Tarefa,
 } from "@/types";
 import {
+  intervalosDoFuncionario,
   jornadaLiquidaMin,
   ocupacaoPercentual,
   tempoPlanejadoMin,
@@ -60,18 +61,21 @@ export function validarAlocacao(args: {
     });
   }
 
-  const intIni = hhmmParaMin(f.intervalo_inicio);
-  const intFim = hhmmParaMin(f.intervalo_fim);
-  if (
-    !Number.isNaN(intIni) &&
-    !Number.isNaN(intFim) &&
-    intervalosSobrepoem(inicioMin, fimMin, intIni, intFim)
-  ) {
-    alertas.push({
-      nivel: "erro",
-      codigo: "INTERVALO",
-      mensagem: `Conflito com o intervalo de ${f.nome} (${f.intervalo_inicio}–${f.intervalo_fim}).`,
-    });
+  for (const iv of intervalosDoFuncionario(f)) {
+    const intIni = hhmmParaMin(iv.inicio);
+    const intFim = hhmmParaMin(iv.fim);
+    if (
+      !Number.isNaN(intIni) &&
+      !Number.isNaN(intFim) &&
+      intervalosSobrepoem(inicioMin, fimMin, intIni, intFim)
+    ) {
+      alertas.push({
+        nivel: "erro",
+        codigo: "INTERVALO",
+        mensagem: `Conflito com o intervalo de ${f.nome} (${iv.inicio}–${iv.fim}).`,
+      });
+      break;
+    }
   }
 
   for (const r of rotinasExistentes) {

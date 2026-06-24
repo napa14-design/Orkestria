@@ -85,6 +85,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("intervalo_min", "number"),
     col("intervalo_inicio"),
     col("intervalo_fim"),
+    col("intervalos"),
     col("escala"),
     col("entrada_sabado"),
     col("saida_sabado"),
