@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-06-24 — Categorias subidas para a produção (cor por atividade)
+
+- Com confirmação, gravadas as **8 categorias** (c1–c8: limpeza, higienização,
+  coleta, organização, reposição, limpeza terminal, externa, apoio) no Firebase —
+  faltavam (o import nunca levou a coleção). Agora a agenda real **colore a
+  espinha do card por tipo de atividade** e o filtro "Categoria" funciona.
+  Operação de dados; sem mudança de código.
+
+---
+
 ## 2026-06-24 — Redesign da agenda: cartões "Partitura" (papel + categoria)
 
 - Saímos do **muro de blocos azuis** para **cartões de papel (marfim) com texto
