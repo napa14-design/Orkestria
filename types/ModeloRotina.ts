@@ -12,6 +12,10 @@ export interface ModeloRotinaItem {
   local_id: string;
   /** Formato HH:mm */
   inicio_planejado: string;
+  /** Duração em min — preservada para tarefas de presença/manual (varia). */
+  duracao_min?: number;
+  /** Marca este modelo como a "rota padrão" da sede (só um padrão por sede). */
+  padrao?: boolean;
   criado_por: string;
   criado_em: string;
 }

@@ -145,6 +145,11 @@ export default function PaginaRotinas() {
     sedeId ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,
     fetcher,
   );
+  // Modelos da sede — saber se há "rota padrão" (gera o dia em 1 clique).
+  const { data: modelos, mutate: mutateModelos } = useSWR<
+    { nome_modelo: string; padrao: boolean }[]
+  >(sedeId ? `/api/modelos?sede=${sedeId}` : null, fetcher);
+  const temRotaPadrao = (modelos ?? []).some((m) => m.padrao);
 
   // Visão semanal: rotinas e ausências da semana inteira (seg–dom).
   const segunda = segundaDaSemana(data);
@@ -592,9 +597,75 @@ export default function PaginaRotinas() {
     }
   }
 
+  const [gerando, setGerando] = useState(false);
+  async function gerarDia() {
+    if (!sedeId) return;
+    setGerando(true);
+    try {
+      const r = await apiPost<{
+        semRota?: boolean;
+        geradas: number;
+        puladas: number;
+        detalhes: string[];
+      }>("/api/rotinas/gerar", { sede: sedeId, data });
+      await mutateRotinas();
+      if (r.semRota) {
+        setAlertas([
+          {
+            nivel: "alerta",
+            codigo: "GERAR",
+            mensagem: "Esta sede ainda não tem rota padrão. Monte um dia e salve como rota padrão.",
+          },
+        ]);
+      } else {
+        setAlertas([
+          {
+            nivel: "alerta",
+            codigo: "GERAR",
+            mensagem: `${r.geradas} tarefa(s) geradas da rota padrão${
+              r.puladas > 0 ? ` · ${r.puladas} puladas (já existiam, ausência ou conflito)` : ""
+            }. Revise as exceções abaixo.`,
+          },
+        ]);
+      }
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  const [salvandoPadrao, setSalvandoPadrao] = useState(false);
+  async function salvarRotaPadrao() {
+    if (!sedeId) return;
+    setSalvandoPadrao(true);
+    try {
+      const r = await apiPost<{ itens: number }>("/api/modelos", {
+        nome: "Rota padrão",
+        data_origem: data,
+        sede_id: sedeId,
+        padrao: true,
+        com_duracao: true,
+      });
+      await mutateModelos();
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "ROTA_PADRAO",
+          mensagem: `Rota padrão salva com ${r.itens} tarefa(s). A partir de agora, dias vazios podem ser gerados em 1 clique.`,
+        },
+      ]);
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setSalvandoPadrao(false);
+    }
+  }
+
   function concluirPlanejamento(mensagem: string) {
     setAlertas([{ nivel: "alerta", codigo: "PLANEJAMENTO", mensagem }]);
     void mutateRotinas();
+    void mutateModelos();
   }
 
   return (
@@ -631,6 +702,26 @@ export default function PaginaRotinas() {
           style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", marginBottom: 10 }}
         >
           <span className="rotulo" style={{ color: "var(--acento)" }}>Passos do dia</span>
+          {temRotaPadrao && (
+            <button
+              className="btn btn-mini btn-primario"
+              onClick={gerarDia}
+              disabled={gerando}
+              title="Gera o dia a partir da rota padrão da sede (não duplica o que já existe)"
+            >
+              {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
+            </button>
+          )}
+          {!temRotaPadrao && (rotinas?.length ?? 0) > 0 && (
+            <button
+              className="btn btn-mini"
+              onClick={salvarRotaPadrao}
+              disabled={salvandoPadrao}
+              title="Salva o dia atual como a rota padrão da sede — depois, dias vazios são gerados em 1 clique"
+            >
+              {salvandoPadrao ? "Salvando…" : "★ Salvar como rota padrão"}
+            </button>
+          )}
           {fonteRepetir && (
             <button
               className="btn btn-mini"
@@ -707,7 +798,22 @@ export default function PaginaRotinas() {
         </div>
       ) : (
         <>
-      {(rotinas?.length ?? 0) === 0 && fonteRepetir && (
+      {(rotinas?.length ?? 0) === 0 && temRotaPadrao && (
+        <div
+          className="painel entra"
+          style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+        >
+          <span style={{ flex: 1, minWidth: 220 }}>
+            <strong>Dia ainda vazio.</strong> Esta sede tem uma <strong>rota padrão</strong> — gere o dia
+            em 1 clique e depois ajuste só o que mudou (faltas, eventos…).
+          </span>
+          <button className="btn btn-primario" onClick={gerarDia} disabled={gerando}>
+            {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
+          </button>
+        </div>
+      )}
+
+      {(rotinas?.length ?? 0) === 0 && !temRotaPadrao && fonteRepetir && (
         <div
           className="painel entra"
           style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}

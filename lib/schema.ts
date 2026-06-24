@@ -244,6 +244,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("tarefa_id"),
     col("local_id"),
     col("inicio_planejado"),
+    col("duracao_min", "number"),
+    col("padrao", "boolean"),
     col("criado_por"),
     col("criado_em"),
   ],

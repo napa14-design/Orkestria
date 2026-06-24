@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-24 — Rota padrão + "Gerar o dia" (rotina adaptativa)
+
+- A rotina deixa de ser só montada à mão: cada sede pode ter uma **rota padrão**
+  e a agenda **gera o dia em 1 clique** a partir dela — o supervisor só revisa as
+  exceções (que os painéis já mostram). Reusa quase tudo que já existia.
+- **Rota padrão** (estende `modelos_rotina`): novos campos `padrao` (um por sede)
+  e `duracao_min` (snapshot fiel da duração). `salvarModelo` aceita
+  `{padrao, comDuracao}` e desmarca o padrão antigo; novo `getRotaPadrao`.
+- **Geração** (`gerarDiaDaRotaPadrao`, `POST /api/rotinas/gerar`): reproduz a rota
+  **fielmente** (tempo exato gravado — não re-encaixa na grade de 15 min, o que
+  criava sobreposições em rotas de 5/10 min), **idempotente** (não duplica) e
+  **adaptativa** (pula ausentes, folga pela escala e tarefas `depende_calendario`
+  fora do período letivo).
+- **UI** (`app/(app)/rotinas/page.tsx` + `ModalPlanejamento`): botão "⚡ Gerar o
+  dia da rota padrão" + sugestão no dia vazio; "★ Salvar como rota padrão";
+  checkbox no modal; cache de modelos revalidado.
+- Verificado em memory (sede Christus DT, 44 itens): gerar = 44/0; 2ª vez = 0/44
+  (idempotente); 0 sobreposições; tempos idênticos ao dia de origem; sábado pula
+  por escala. Build/console limpos. OMR/fichas intactos (geometria não muda).
+- **Falta o bootstrap em produção**: definir a rota padrão das 3 sedes Christus
+  no Firebase (1 clique por sede ou script) — será feito com confirmação.
+- Arquivos: `types/ModeloRotina.ts`, `lib/schema.ts`, `services/modelosService.ts`,
+  `app/api/rotinas/gerar/route.ts` (novo), `app/api/modelos/route.ts`,
+  `app/(app)/rotinas/page.tsx`, `components/agenda/ModalPlanejamento.tsx`,
+  `docs/02-modelo-de-dados.md`.
+
+---
+
 ## 2026-06-24 — Importação completa dos 3 campi Christus no Firebase
 
 - A pedido (confirmação explícita), importados **todos os 3 campi** para o

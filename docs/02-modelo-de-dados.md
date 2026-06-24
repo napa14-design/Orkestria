@@ -115,10 +115,19 @@ de linhas com o mesmo `nome_modelo` + `sede_id`.
 | sede_id | string | |
 | funcionario_id, tarefa_id, local_id | string | o que será recriado ao aplicar |
 | inicio_planejado | HH:mm | |
+| duracao_min | number | duração do item no snapshot (rota padrão); a geração reproduz fielmente sem recalcular |
+| padrao | boolean | marca este modelo como a **rota padrão** da sede (só um por sede) |
 | criado_por, criado_em | auditoria | |
 
 Aplicar um modelo recria as rotinas passando pelas validações normais —
 itens que conflitam na data de destino são pulados e contabilizados.
+
+**Rota padrão + "Gerar o dia":** o modelo marcado como `padrao` é a rota padrão
+da sede. Na agenda, um dia vazio oferece **"⚡ Gerar o dia da rota padrão"**, que
+reproduz a rota fielmente (tempo exato gravado em `duracao_min`, sem re-encaixar
+na grade), de forma **idempotente** (não duplica) e **adaptativa** (pula
+ausentes, dias de folga pela escala e tarefas `depende_calendario` fora do
+período letivo). Implementado em `gerarDiaDaRotaPadrao` (`services/modelosService.ts`).
 
 ### ausencias
 Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário

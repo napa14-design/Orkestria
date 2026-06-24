@@ -110,6 +110,7 @@ export default function ModalPlanejamento({
   const [ate, setAte] = useState("");
   const [dias, setDias] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [nomeNovoModelo, setNomeNovoModelo] = useState("");
+  const [padraoNovo, setPadraoNovo] = useState(false);
   const [modeloEscolhido, setModeloEscolhido] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -151,10 +152,13 @@ export default function ModalPlanejamento({
         nome: nomeNovoModelo,
         data_origem: dataAtual,
         sede_id: sedeId,
+        padrao: padraoNovo,
+        com_duracao: true,
       });
       await mutateModelos();
+      const nome = nomeNovoModelo;
       setNomeNovoModelo("");
-      return `Modelo "${nomeNovoModelo}" salvo com ${r.itens} tarefa(s).`;
+      return `Modelo "${nome}" salvo com ${r.itens} tarefa(s)${padraoNovo ? " (rota padrão da sede)" : ""}.`;
     });
   }
 
@@ -237,6 +241,10 @@ export default function ModalPlanejamento({
               Salvar
             </button>
           </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
+            <input type="checkbox" checked={padraoNovo} onChange={(e) => setPadraoNovo(e.target.checked)} />
+            Marcar como <strong>rota padrão</strong> da sede (usada no "Gerar o dia")
+          </label>
 
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <label className="campo" style={{ flex: 1 }}>
