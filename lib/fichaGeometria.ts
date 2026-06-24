@@ -23,8 +23,25 @@ export const FID = {
 
 export const CAIXA_LADO = 12; // lado das caixas de marcação
 
-/** Coluna "Feito" das tarefas: caixa i centrada em (x, linha0 - delta*i). */
-export const TAREFA = { x: 436, linha0: 690, delta: 24 };
+/**
+ * Coluna "Feito" das tarefas. O espaçamento entre linhas é **dinâmico**: com
+ * poucas tarefas as linhas ficam folgadas (deltaMax); com muitas (até ~20) elas
+ * se comprimem para caber acima do bloco de EPIs (deltaMin). Gerador e leitor
+ * usam `tarefaY(i, n)` — mesma conta dos dois lados, então nunca divergem.
+ */
+export const TAREFA = { x: 436, linha0: 686, deltaMax: 26, deltaMin: 14.5, floor: 392 };
+
+/** Espaçamento entre linhas de tarefa para um total de `n` tarefas. */
+export function deltaTarefas(n: number): number {
+  if (n <= 0) return TAREFA.deltaMax;
+  const ideal = (TAREFA.linha0 - TAREFA.floor) / n;
+  return Math.max(TAREFA.deltaMin, Math.min(TAREFA.deltaMax, ideal));
+}
+
+/** Centro Y da caixa "Feito" da tarefa `i` (1-based), dado o total `n`. */
+export function tarefaY(i: number, n: number): number {
+  return TAREFA.linha0 - deltaTarefas(n) * i;
+}
 
 /**
  * Bloco de EPIs no rodapé, em colunas (cabe muito mais que uma coluna só).

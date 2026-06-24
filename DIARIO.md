@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-06-24 — Ficha com linhas dinâmicas + exemplo real Christus DT no banco
+
+- **Ficha dinâmica:** o espaçamento das linhas de tarefa agora é função do total
+  (folgado com poucas, comprimido com muitas) — `deltaTarefas(n)`/`tarefaY(i,n)`
+  em `lib/fichaGeometria.ts`, usados pelo gerador (`services/fichaPdf.ts`) E pelo
+  leitor (`lib/omr.ts`). Resolve o caso de fichas com ~20 tarefas (antes só ~12
+  cabiam). Verificado: ficha de **19 tarefas** cabe numa folha A4.
+- **Exemplo real no banco (demo/memory):** nova sede **"Christus — Dionísio
+  Torres"** com 4 funcionários reais extraídos da planilha (Aurilene 19 tarefas,
+  Naiane pedagogia, Do Vale coleta, Orlando pintura/plantão), 4 locais (setores),
+  33 tarefas e 44 rotinas no dia. Gerado a partir do `.xlsx` via script (one-off)
+  e inserido no `lib/memoryStore.ts`.
+- **OMR validado na carga real:** gabarito da Aurilene (19 tarefas) lido 19/19 +
+  4/4 EPIs, QR ok, 0 revisar — leitura bate com a impressão na densidade alta.
+- PDFs em Downloads: `Fichas-Christus-DT.pdf` e `-Gabarito.pdf`.
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `lib/omr.ts`,
+  `lib/memoryStore.ts`.
+
+---
+
 ## 2026-06-22 — Estudo das rotas reais Christus (docs/12)
 
 - Analisadas 3 planilhas de rota ASG (DT, Eusébio, Benfica): **37 rotas, 500+

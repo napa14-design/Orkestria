@@ -9,13 +9,12 @@
  * ficha → ajuste só estas constantes.
  */
 import jsQR from "jsqr";
-import { CAIXA_LADO, epiPos, EPI_CAPACIDADE, FID, TAREFA } from "./fichaGeometria";
+import { CAIXA_LADO, epiPos, EPI_CAPACIDADE, FID, TAREFA, tarefaY } from "./fichaGeometria";
 
 // ── Geometria (pontos PDF) — importada da fonte única ────────────────────
 const FID_PDF = FID;
 const CAIXA_X_PDF = TAREFA.x;
-const LINHA0_PDF = TAREFA.linha0; // linha i → y = LINHA0 - DELTA*i
-const LINHA_DELTA = TAREFA.delta;
+// linha i → y = tarefaY(i, n) (espaçamento dinâmico pelo nº de tarefas)
 const CAIXA_LADO_PDF = CAIXA_LADO;
 const LIMIAR_MARCA = 0.12;
 
@@ -305,10 +304,12 @@ export function lerFicha(
 
   const linhas: LinhaOMR[] = [];
   const max = opts.numTarefas ?? opts.maxLinhas ?? 14;
+  // espaçamento das linhas é função do total de tarefas (igual ao gerador)
+  const nT = opts.numTarefas ?? max;
   let semBox = 0,
     comecou = false;
   for (let i = 1; i <= max; i++) {
-    const cy = LINHA0_PDF - LINHA_DELTA * i;
+    const cy = tarefaY(i, nT);
     const fi = tinta(g, w, h, H, thr, CAIXA_X_PDF, cy, CAIXA_LADO_PDF, 0.55);
     if (opts.numTarefas) {
       linhas.push({ linha: i, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });

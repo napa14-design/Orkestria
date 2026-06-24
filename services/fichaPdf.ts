@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA } from "@/lib/fichaGeometria";
+import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -104,9 +104,11 @@ async function desenhaFicha(
   }
   page.drawLine({ start: { x: x0, y: ty - 6 }, end: { x: x1, y: ty - 6 }, thickness: 0.5, color: LINHA });
 
+  const nT = f.tarefas.length;
+  const dT = deltaTarefas(nT);
   f.tarefas.forEach((t, idx) => {
     const i = idx + 1;
-    const cy = TAREFA.linha0 - TAREFA.delta * i; // centro da caixa
+    const cy = tarefaY(i, nT); // centro da caixa (espaçamento dinâmico)
     const baseY = cy - 4; // baseline do texto da linha
     page.drawText(`${t.ini}-${t.fim}`, { x: cols[0].x + 4, y: baseY, size: 8, font: reg, color: TINTA });
     const lab = trunc(bold, t.nome, 8, cols[1].w - 8);
@@ -121,11 +123,11 @@ async function desenhaFicha(
     page.drawText(t.dur, { x: cols[3].x + 4, y: baseY, size: 8, font: reg, color: TINTA });
     page.drawRectangle({ x: TAREFA.x - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
     if (marcarTodas) desenhaX(page, TAREFA.x, cy);
-    page.drawLine({ start: { x: x0, y: cy - 10 }, end: { x: x1, y: cy - 10 }, thickness: 0.5, color: LINHA });
+    page.drawLine({ start: { x: x0, y: cy - dT / 2 }, end: { x: x1, y: cy - dT / 2 }, thickness: 0.5, color: LINHA });
   });
 
   // instrução (abaixo da última linha)
-  const ultimaY = TAREFA.linha0 - TAREFA.delta * f.tarefas.length - 10;
+  const ultimaY = tarefaY(nT, nT) - dT / 2;
   page.drawText(
     "Marque um X dentro da caixa do que foi feito. Não escreva sobre os quadrados pretos dos cantos.",
     { x: x0 + 12, y: ultimaY - 14, size: 7.5, font: reg, color: CINZA3 },
