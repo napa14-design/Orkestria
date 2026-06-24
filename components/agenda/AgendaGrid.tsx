@@ -186,6 +186,7 @@ export default function AgendaGrid({
                 justifyContent: "center",
                 paddingTop: 2,
                 borderBottom: "1px solid var(--linha)",
+                borderTop: min % 60 === 0 ? "1px solid var(--tinta-3)" : undefined,
                 background: "var(--papel-2)",
               }}
             >
@@ -234,7 +235,7 @@ export default function AgendaGrid({
                   zIndex: 12,
                   cursor: "pointer",
                 }}
-                title="Clique para ver o resumo no painel lateral"
+                title={`${f.nome} — ${f.entrada}–${f.saida}. Clique para ver ocupação e ociosidade no painel lateral.`}
               >
                 <div style={{ fontFamily: "var(--fonte-display)", fontWeight: 700, fontSize: 13, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {f.nome}
@@ -295,6 +296,7 @@ export default function AgendaGrid({
                       style={{
                         height: ALTURA_BLOCO,
                         borderBottom: "1px solid var(--linha)",
+                        borderTop: min % 60 === 0 ? "1px solid var(--tinta-3)" : undefined,
                       }}
                     >
                       {noIntervalo && min === intIni && (
@@ -367,9 +369,13 @@ export default function AgendaGrid({
                   if (Number.isNaN(ini)) return null;
                   const topo = ((ini - inicioGrade) / blocoMin) * ALTURA_BLOCO;
                   const emResize = resize?.rotinaId === r.id;
+                  // Altura pela duração REAL (não pelo bloco visual): rotas finas
+                  // de 5–15 min encaixam sem sobrepor. Piso pequeno p/ clicabilidade.
                   const altura = emResize
                     ? resize.blocos * ALTURA_BLOCO
-                    : (r.tempo_visual_min / blocoMin) * ALTURA_BLOCO;
+                    : Math.max(13, (r.tempo_previsto_min / blocoMin) * ALTURA_BLOCO);
+                  const compacto = altura < 30;
+                  const medio = altura < 48;
                   const tarefa = tarefaPorId.get(r.tarefa_id);
                   const local = localPorId.get(r.local_id);
                   const cor = COR_STATUS[r.status] ?? COR_STATUS.planejada;
@@ -430,13 +436,15 @@ export default function AgendaGrid({
                       >
                         ×
                       </button>
-                      <div style={{ fontWeight: 700, fontSize: 12, lineHeight: 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: 700, fontSize: compacto ? 11 : 12, lineHeight: compacto ? 1.1 : 1.2, paddingRight: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {tarefa?.nome_tarefa ?? "Tarefa"}
                       </div>
-                      <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
-                        {r.inicio_planejado}–{r.fim_planejado} · {formatarDuracao(r.tempo_previsto_min)}
-                      </div>
-                      {altura >= ALTURA_BLOCO * 2 - 4 && local && (
+                      {!compacto && (
+                        <div className="num" style={{ fontSize: 10, opacity: 0.85 }}>
+                          {r.inicio_planejado}–{r.fim_planejado} · {formatarDuracao(r.tempo_previsto_min)}
+                        </div>
+                      )}
+                      {!medio && local && (
                         <div style={{ fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {local.nome_local} · {local.andar}
                         </div>

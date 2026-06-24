@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-24 — Agenda: cards por tempo exato (fim da sobreposição)
+
+- **Correção da coluna "empilhada"** (ex.: Tamires/Benfica): rotas finas de
+  5–15 min se sobrepunham porque o card era desenhado pelo **bloco visual de
+  15 min** (mín. 1 bloco). Agora o card usa a **altura/posição por tempo real**
+  (`tempo_previsto_min`), então tarefas curtas consecutivas **encaixam** sem
+  sobrepor. Verificado na produção (Benfica, 62 cards): de coluna toda sobreposta
+  → 2 sobreposições de 1–5px (resíduo de tarefas < 8 min com piso de clicabilidade).
+- Conteúdo do card **adapta à altura**: curto = só o nome; médio = + horário;
+  alto = + local. Tooltip mostra o detalhe completo.
+- Cabeçalho da coluna com **tooltip de nome completo + jornada**; **linhas de
+  hora** reforçadas (ajuda a alinhar entre colunas).
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-24 — Removido placeholder "Beltrano" da produção
 
 - Com confirmação explícita, apagado do Firebase o funcionário **Beltrano**
