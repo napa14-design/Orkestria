@@ -4,64 +4,37 @@
  * Tela principal: paleta de tarefas (esquerda) + agenda drag-and-drop
  * (centro) + resumo de ocupação (direita).
  *
- * Os conflitos são validados duas vezes: aqui no cliente, para resposta
- * imediata, e novamente no servidor antes de gravar.
+ * Container: cuida do estado de UI (filtros, seleção, modais) e das mutações.
+ * Os dados (SWR + derivações) vêm de useRotinaData; toolbar e modais são
+ * componentes próprios. Conflitos são validados aqui (resposta imediata) e de
+ * novo no servidor antes de gravar.
  */
-import Link from "next/link";
 import { useMemo, useState } from "react";
-import useSWR from "swr";
 import AgendaGrid from "@/components/agenda/AgendaGrid";
+import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import AlertPanel from "@/components/agenda/AlertPanel";
+import BarraPassosDoDia from "@/components/agenda/BarraPassosDoDia";
 import CoberturaPanel from "@/components/agenda/CoberturaPanel";
 import FiltersBar from "@/components/agenda/FiltersBar";
+import ModaisRotina from "@/components/agenda/ModaisRotina";
 import ModalPlanejamento from "@/components/agenda/ModalPlanejamento";
 import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
-import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
-import Modal from "@/components/Modal";
 import {
   blocosOcupados,
   funcionarioNoDia,
-  jornadaDoDia,
   PARAMETROS_PADRAO,
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
-import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
-import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO, minParaHHMM, somarDias } from "@/lib/dateUtils";
+import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
+import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao } from "@/lib/validations";
-import type {
-  AlertaValidacao,
-  Ausencia,
-  Categoria,
-  Funcionario,
-  Local,
-  ParametrosResolvidos,
-  PeriodoLetivo,
-  QualificacaoFuncionario,
-  Requisito,
-  RotinaPlanejada,
-  Sede,
-  Tarefa,
-  TempoPersonalizado,
-} from "@/types";
-
-const ROTULO_AUSENCIA: Record<string, string> = {
-  falta: "Falta",
-  atestado: "Atestado",
-  ferias: "Férias",
-  folga: "Folga",
-  outro: "Ausente",
-};
-
-/** Segunda-feira da semana que contém a data. */
-function segundaDaSemana(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  return somarDias(iso, -((d.getDay() + 6) % 7));
-}
+import { useRotinaData } from "./useRotinaData";
+import type { AlertaValidacao, RotinaPlanejada, Tarefa } from "@/types";
 
 interface RespostaRotina {
   rotina: RotinaPlanejada;
@@ -94,92 +67,31 @@ export default function PaginaRotinas() {
   } | null>(null);
   const [duracaoInput, setDuracaoInput] = useState("");
 
-  const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
-
-  const { data: funcionarios } = useSWR<Funcionario[]>(
-    sedeId ? `/api/funcionarios?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: tarefas } = useSWR<Tarefa[]>(
-    sedeId ? `/api/tarefas?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: locais } = useSWR<Local[]>(
-    sedeId ? `/api/locais?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
-  const { data: periodosLetivos } = useSWR<PeriodoLetivo[]>(
-    sedeId ? `/api/periodos-letivos?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(
-    sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
-  const { data: qualificacoes } = useSWR<QualificacaoFuncionario[]>(
-    sedeId ? `/api/qualificacoes?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: parametros } = useSWR<ParametrosResolvidos>(
-    sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(
-    sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null,
-    fetcher,
-  );
-  const { data: ausencias } = useSWR<Ausencia[]>(
-    sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null,
-    fetcher,
-  );
-  // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
-  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(
-    sedeId ? `/api/execucoes?de=${data}&ate=${data}` : null,
-    fetcher,
-  );
-  // Últimos 31 dias: base do cálculo de "periódica vencida".
-  const { data: historico } = useSWR<RotinaPlanejada[]>(
-    sedeId ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,
-    fetcher,
-  );
-  // Modelos da sede — saber se há "rota padrão" (gera o dia em 1 clique).
-  const { data: modelos, mutate: mutateModelos } = useSWR<
-    { nome_modelo: string; padrao: boolean }[]
-  >(sedeId ? `/api/modelos?sede=${sedeId}` : null, fetcher);
-  const temRotaPadrao = (modelos ?? []).some((m) => m.padrao);
-
-  // Visão semanal: rotinas e ausências da semana inteira (seg–dom).
-  const segunda = segundaDaSemana(data);
-  const datasSemana = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => somarDias(segunda, i)),
-    [segunda],
-  );
-  const { data: rotinasSemana } = useSWR<RotinaPlanejada[]>(
-    modo === "semana" && sedeId
-      ? `/api/rotinas?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}`
-      : null,
-    fetcher,
-  );
-  const { data: ausenciasSemana } = useSWR<Ausencia[]>(
-    modo === "semana" && sedeId
-      ? `/api/ausencias?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}`
-      : null,
-    fetcher,
-  );
-
-  // ausências do dia + folgas da escala (ambas bloqueiam a coluna na agenda)
-  const ausentesMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const a of ausencias ?? [])
-      m.set(a.funcionario_id, ROTULO_AUSENCIA[a.tipo] ?? "Ausente");
-    for (const f of funcionarios ?? []) {
-      if (!m.has(f.id) && !jornadaDoDia(f, data).trabalha) m.set(f.id, "Folga");
-    }
-    return m;
-  }, [ausencias, funcionarios, data]);
+  const {
+    sedes,
+    sedeId,
+    funcionarios,
+    tarefas,
+    locais,
+    categorias,
+    periodosLetivos,
+    temposPessoais,
+    requisitos,
+    qualificacoes,
+    parametros,
+    rotinas,
+    mutateRotinas,
+    historico,
+    mutateModelos,
+    temRotaPadrao,
+    datasSemana,
+    rotinasSemana,
+    ausenciasSemana,
+    ausentesMap,
+    fonteRepetir,
+    nFaltas,
+    faltamRegistrar,
+  } = useRotinaData(sedeEscolhida, data, modo);
 
   const params = parametros ?? PARAMETROS_PADRAO;
   const blocoMin = params.bloco_agenda_min || 30;
@@ -552,24 +464,6 @@ export default function PaginaRotinas() {
     }
   }
 
-  // Dia anterior com rotina (fonte do "repetir") — o mais recente antes de hoje.
-  const fonteRepetir = useMemo(() => {
-    const porData = new Map<string, number>();
-    for (const r of historico ?? []) {
-      if (r.status === "cancelada") continue;
-      porData.set(r.data, (porData.get(r.data) ?? 0) + 1);
-    }
-    let melhor: { data: string; n: number } | null = null;
-    for (const [d, n] of porData) if (!melhor || d > melhor.data) melhor = { data: d, n };
-    return melhor;
-  }, [historico]);
-
-  const nFaltas = (ausencias ?? []).length;
-  const faltamRegistrar = useMemo(() => {
-    const reg = new Set((execucoesDia ?? []).map((e) => e.rotina_id));
-    return (rotinas ?? []).filter((r) => r.status !== "cancelada" && !reg.has(r.id)).length;
-  }, [execucoesDia, rotinas]);
-
   const [repetindo, setRepetindo] = useState(false);
   async function repetirDiaAnterior() {
     if (!fonteRepetir || !sedeId) return;
@@ -669,6 +563,8 @@ export default function PaginaRotinas() {
     void mutateModelos();
   }
 
+  const temRotinas = (rotinas?.length ?? 0) > 0;
+
   return (
     <div>
       <FiltersBar
@@ -698,90 +594,23 @@ export default function PaginaRotinas() {
       />
 
       {modo === "dia" ? (
-        <div
-          className="painel"
-          style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", marginBottom: 10 }}
-        >
-          <span className="rotulo" style={{ color: "var(--acento)" }}>Passos do dia</span>
-          {temRotaPadrao && (
-            <button
-              className="btn btn-mini btn-primario"
-              onClick={gerarDia}
-              disabled={gerando}
-              title="Gera o dia a partir da rota padrão da sede (não duplica o que já existe)"
-            >
-              {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
-            </button>
-          )}
-          {!temRotaPadrao && (rotinas?.length ?? 0) > 0 && (
-            <button
-              className="btn btn-mini"
-              onClick={salvarRotaPadrao}
-              disabled={salvandoPadrao}
-              title="Salva o dia atual como a rota padrão da sede — depois, dias vazios são gerados em 1 clique"
-            >
-              {salvandoPadrao ? "Salvando…" : "★ Salvar como rota padrão"}
-            </button>
-          )}
-          {fonteRepetir && (
-            <button
-              className="btn btn-mini"
-              onClick={repetirDiaAnterior}
-              disabled={repetindo}
-              title={`Copia as tarefas de ${formatarDataBR(fonteRepetir.data)} para o dia aberto (conflitos são pulados)`}
-            >
-              {repetindo ? "Repetindo…" : `↺ Repetir o dia anterior (${formatarDataBR(fonteRepetir.data)})`}
-            </button>
-          )}
-          <Link
-            href="/ausencias"
-            className="btn btn-mini btn-fantasma"
-            style={nFaltas > 0 ? { borderColor: "var(--amarelo)", color: "var(--tinta)" } : undefined}
-            title={nFaltas > 0 ? `${nFaltas} ausência(s) hoje — redistribua as tarefas` : "Faltas e ausências do dia"}
-          >
-            {nFaltas > 0 ? `⚠ Faltas (${nFaltas})` : "Faltas"}
-          </Link>
-          {sedeId && (
-            <a
-              href={`/api/fichas/pdf?data=${data}&sede=${sedeId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-mini btn-fantasma"
-              style={{ textDecoration: "none" }}
-            >
-              🖨 Imprimir fichas
-            </a>
-          )}
-          {faltamRegistrar > 0 ? (
-            <Link
-              href="/acompanhamento"
-              className="btn btn-mini btn-primario"
-              style={{ textDecoration: "none" }}
-              title={`${faltamRegistrar} tarefa(s) sem o realizado lançado`}
-            >
-              ✅ Registrar o realizado ({faltamRegistrar})
-            </Link>
-          ) : (rotinas?.length ?? 0) > 0 ? (
-            <Link href="/acompanhamento" className="btn btn-mini btn-fantasma" style={{ textDecoration: "none" }}>
-              ✓ Realizado lançado
-            </Link>
-          ) : (
-            <Link href="/acompanhamento" className="btn btn-mini btn-fantasma">
-              ✅ Registrar o realizado
-            </Link>
-          )}
-          <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6, alignItems: "center" }}>
-            <button
-              type="button"
-              className="btn btn-mini btn-fantasma"
-              onClick={() => setDenso((v) => !v)}
-              title="Alterna a altura das linhas — compacto mostra o dia inteiro com menos rolagem"
-            >
-              {denso ? "⊕ Expandir" : "⊖ Compactar"}
-            </button>
-            <AjudaAgenda />
-          </span>
-        </div>
+        <BarraPassosDoDia
+          sedeId={sedeId}
+          data={data}
+          temRotaPadrao={temRotaPadrao}
+          temRotinas={temRotinas}
+          fonteRepetir={fonteRepetir}
+          nFaltas={nFaltas}
+          faltamRegistrar={faltamRegistrar}
+          denso={denso}
+          gerando={gerando}
+          salvandoPadrao={salvandoPadrao}
+          repetindo={repetindo}
+          aoGerarDia={gerarDia}
+          aoSalvarRotaPadrao={salvarRotaPadrao}
+          aoRepetirDiaAnterior={repetirDiaAnterior}
+          aoAlternarDenso={() => setDenso((v) => !v)}
+        />
       ) : (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <AjudaAgenda />
@@ -807,124 +636,124 @@ export default function PaginaRotinas() {
         </div>
       ) : (
         <>
-      {(rotinas?.length ?? 0) === 0 && temRotaPadrao && (
-        <div
-          className="painel entra"
-          style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
-        >
-          <span style={{ flex: 1, minWidth: 220 }}>
-            <strong>Dia ainda vazio.</strong> Esta sede tem uma <strong>rota padrão</strong> — gere o dia
-            em 1 clique e depois ajuste só o que mudou (faltas, eventos…).
-          </span>
-          <button className="btn btn-primario" onClick={gerarDia} disabled={gerando}>
-            {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
-          </button>
-        </div>
-      )}
+          {!temRotinas && temRotaPadrao && (
+            <div
+              className="painel entra"
+              style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+            >
+              <span style={{ flex: 1, minWidth: 220 }}>
+                <strong>Dia ainda vazio.</strong> Esta sede tem uma <strong>rota padrão</strong> — gere o dia
+                em 1 clique e depois ajuste só o que mudou (faltas, eventos…).
+              </span>
+              <button className="btn btn-primario" onClick={gerarDia} disabled={gerando}>
+                {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
+              </button>
+            </div>
+          )}
 
-      {(rotinas?.length ?? 0) === 0 && !temRotaPadrao && fonteRepetir && (
-        <div
-          className="painel entra"
-          style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
-        >
-          <span style={{ flex: 1, minWidth: 220 }}>
-            <strong>Dia ainda vazio.</strong> A rotina costuma repetir — comece copiando o dia anterior
-            ({formatarDataBR(fonteRepetir.data)} · {fonteRepetir.n} tarefa{fonteRepetir.n === 1 ? "" : "s"}) e ajuste o que mudou.
-          </span>
-          <button className="btn btn-primario" onClick={repetirDiaAnterior} disabled={repetindo}>
-            {repetindo ? "Repetindo…" : "↺ Repetir o dia anterior"}
-          </button>
-        </div>
-      )}
+          {!temRotinas && !temRotaPadrao && fonteRepetir && (
+            <div
+              className="painel entra"
+              style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+            >
+              <span style={{ flex: 1, minWidth: 220 }}>
+                <strong>Dia ainda vazio.</strong> A rotina costuma repetir — comece copiando o dia anterior
+                ({formatarDataBR(fonteRepetir.data)} · {fonteRepetir.n} tarefa{fonteRepetir.n === 1 ? "" : "s"}) e ajuste o que mudou.
+              </span>
+              <button className="btn btn-primario" onClick={repetirDiaAnterior} disabled={repetindo}>
+                {repetindo ? "Repetindo…" : "↺ Repetir o dia anterior"}
+              </button>
+            </div>
+          )}
 
-      <CoberturaPanel
-        funcionarios={efetivosVisiveis}
-        ausencias={ausentesMap}
-        rotinas={rotinas ?? []}
-        tarefas={tarefas ?? []}
-        parametros={params}
-        aoMover={mover}
-      />
+          <CoberturaPanel
+            funcionarios={efetivosVisiveis}
+            ausencias={ausentesMap}
+            rotinas={rotinas ?? []}
+            tarefas={tarefas ?? []}
+            parametros={params}
+            aoMover={mover}
+          />
 
-      <PendenciasPanel
-        tarefas={tarefas ?? []}
-        locais={locais ?? []}
-        rotinasDoDia={rotinas ?? []}
-        historico={historico ?? []}
-        data={data}
-        periodos={periodosLetivos ?? []}
-      />
+          <PendenciasPanel
+            tarefas={tarefas ?? []}
+            locais={locais ?? []}
+            rotinasDoDia={rotinas ?? []}
+            historico={historico ?? []}
+            data={data}
+            periodos={periodosLetivos ?? []}
+          />
 
-      {/* paginação de colunas — só aparece em sedes grandes */}
-      {funcionariosVisiveis.length > FUNC_POR_PAGINA && (
-        <div
-          className="painel entra"
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "6px 12px", marginBottom: 14 }}
-        >
-          <button
-            className="btn btn-mini"
-            disabled={paginaAtual === 0}
-            onClick={() => setPaginaFunc(paginaAtual - 1)}
-          >
-            ‹ Anteriores
-          </button>
-          <span className="rotulo">
-            Funcionários{" "}
-            <span className="num">
-              {paginaAtual * FUNC_POR_PAGINA + 1}–
-              {Math.min((paginaAtual + 1) * FUNC_POR_PAGINA, funcionariosVisiveis.length)}
-            </span>{" "}
-            de <span className="num">{funcionariosVisiveis.length}</span>
-          </span>
-          <button
-            className="btn btn-mini"
-            disabled={paginaAtual >= totalPaginasFunc - 1}
-            onClick={() => setPaginaFunc(paginaAtual + 1)}
-          >
-            Próximos ›
-          </button>
-        </div>
-      )}
+          {/* paginação de colunas — só aparece em sedes grandes */}
+          {funcionariosVisiveis.length > FUNC_POR_PAGINA && (
+            <div
+              className="painel entra"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "6px 12px", marginBottom: 14 }}
+            >
+              <button
+                className="btn btn-mini"
+                disabled={paginaAtual === 0}
+                onClick={() => setPaginaFunc(paginaAtual - 1)}
+              >
+                ‹ Anteriores
+              </button>
+              <span className="rotulo">
+                Funcionários{" "}
+                <span className="num">
+                  {paginaAtual * FUNC_POR_PAGINA + 1}–
+                  {Math.min((paginaAtual + 1) * FUNC_POR_PAGINA, funcionariosVisiveis.length)}
+                </span>{" "}
+                de <span className="num">{funcionariosVisiveis.length}</span>
+              </span>
+              <button
+                className="btn btn-mini"
+                disabled={paginaAtual >= totalPaginasFunc - 1}
+                onClick={() => setPaginaFunc(paginaAtual + 1)}
+              >
+                Próximos ›
+              </button>
+            </div>
+          )}
 
-      <div className="linha-rotina">
-        <TaskPalette
-          tarefas={tarefas ?? []}
-          locais={locais ?? []}
-          categorias={categorias ?? []}
-          blocoMin={blocoMin}
-          aoIniciarArrasto={setBlocosArrasto}
-          aoTerminarArrasto={() => setBlocosArrasto(null)}
-        />
+          <div className="linha-rotina">
+            <TaskPalette
+              tarefas={tarefas ?? []}
+              locais={locais ?? []}
+              categorias={categorias ?? []}
+              blocoMin={blocoMin}
+              aoIniciarArrasto={setBlocosArrasto}
+              aoTerminarArrasto={() => setBlocosArrasto(null)}
+            />
 
-        <AgendaGrid
-          funcionarios={efetivosPagina}
-          rotinas={rotinas ?? []}
-          tarefas={tarefas ?? []}
-          locais={locais ?? []}
-          categorias={categorias ?? []}
-          blocoMin={blocoMin}
-          funcionarioSelecionado={selecionado}
-          ausencias={ausentesMap}
-          aoSelecionarFuncionario={selecionarFuncionario}
-          aoSoltarNova={soltarNova}
-          aoMover={mover}
-          aoRemover={remover}
-          aoRedimensionar={redimensionar}
-          blocosArrasto={blocosArrasto}
-          aoIniciarArrasto={setBlocosArrasto}
-          aoTerminarArrasto={() => setBlocosArrasto(null)}
-          alturaBloco={denso ? 30 : 48}
-        />
+            <AgendaGrid
+              funcionarios={efetivosPagina}
+              rotinas={rotinas ?? []}
+              tarefas={tarefas ?? []}
+              locais={locais ?? []}
+              categorias={categorias ?? []}
+              blocoMin={blocoMin}
+              funcionarioSelecionado={selecionado}
+              ausencias={ausentesMap}
+              aoSelecionarFuncionario={selecionarFuncionario}
+              aoSoltarNova={soltarNova}
+              aoMover={mover}
+              aoRemover={remover}
+              aoRedimensionar={redimensionar}
+              blocosArrasto={blocosArrasto}
+              aoIniciarArrasto={setBlocosArrasto}
+              aoTerminarArrasto={() => setBlocosArrasto(null)}
+              alturaBloco={denso ? 30 : 48}
+            />
 
-        <OccupancySummary
-          funcionarios={efetivosVisiveis}
-          rotinas={rotinas ?? []}
-          tarefas={tarefas ?? []}
-          parametros={params}
-          selecionadoId={selecionado}
-          aoSelecionar={selecionarFuncionario}
-        />
-      </div>
+            <OccupancySummary
+              funcionarios={efetivosVisiveis}
+              rotinas={rotinas ?? []}
+              tarefas={tarefas ?? []}
+              parametros={params}
+              selecionadoId={selecionado}
+              aoSelecionar={selecionarFuncionario}
+            />
+          </div>
         </>
       )}
 
@@ -942,97 +771,14 @@ export default function PaginaRotinas() {
         aoDispensar={(i) => setAlertas((prev) => prev.filter((_, idx) => idx !== i))}
       />
 
-      <Modal
-        titulo="Autorizar conflito manualmente?"
-        aberto={!!confirmacao}
-        aoFechar={() => responderConfirmacao(false)}
-        larguraMax={460}
-      >
-        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 10 }}>
-          Esta alocação tem um conflito que você pode autorizar:
-        </p>
-        <div
-          style={{
-            background: "var(--papel-2)",
-            borderLeft: "4px solid var(--amarelo)",
-            borderRadius: 3,
-            padding: "8px 12px",
-            display: "grid",
-            gap: 4,
-            marginBottom: 12,
-          }}
-        >
-          {confirmacao?.mensagens.map((m, i) => (
-            <div key={i} style={{ fontSize: 13, color: "var(--tinta)" }}>
-              ⚠ {m}
-            </div>
-          ))}
-        </div>
-        <p style={{ fontSize: 12, color: "var(--tinta-3)", marginBottom: 16 }}>
-          Se autorizar, a rotina fica marcada como <strong>autorizada manualmente</strong> (e o
-          histórico registra isso).
-        </p>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button type="button" className="btn" onClick={() => responderConfirmacao(false)}>
-            Cancelar
-          </button>
-          <button type="button" className="btn btn-primario" onClick={() => responderConfirmacao(true)}>
-            Autorizar mesmo assim
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        titulo="Quanto tempo hoje?"
-        aberto={!!duracaoPrompt}
-        aoFechar={() => responderDuracao(null)}
-        larguraMax={420}
-      >
-        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 12 }}>
-          <strong>{duracaoPrompt?.nome}</strong> é uma atividade de duração variável (presença/
-          plantão ou tempo manual). Informe a duração <strong>deste dia</strong> — não muda a tarefa.
-        </p>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          {[15, 30, 60, 90, 120].map((m) => (
-            <button
-              key={m}
-              type="button"
-              className="btn btn-mini"
-              onClick={() => setDuracaoInput(String(m))}
-              style={{ fontWeight: 700, outline: Number(duracaoInput) === m ? "2px solid var(--acento)" : "none" }}
-            >
-              {formatarDuracao(m)}
-            </button>
-          ))}
-        </div>
-        <label className="campo" style={{ marginBottom: 16 }}>
-          <span className="rotulo">Duração (minutos)</span>
-          <input
-            type="number"
-            min="5"
-            step="5"
-            value={duracaoInput}
-            autoFocus
-            onChange={(e) => setDuracaoInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && Number(duracaoInput) > 0) responderDuracao(Number(duracaoInput));
-            }}
-          />
-        </label>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button type="button" className="btn" onClick={() => responderDuracao(null)}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primario"
-            disabled={!(Number(duracaoInput) > 0)}
-            onClick={() => responderDuracao(Number(duracaoInput))}
-          >
-            Colocar na agenda
-          </button>
-        </div>
-      </Modal>
+      <ModaisRotina
+        confirmacao={confirmacao}
+        aoResponderConfirmacao={responderConfirmacao}
+        duracaoPrompt={duracaoPrompt}
+        duracaoInput={duracaoInput}
+        aoMudarDuracaoInput={setDuracaoInput}
+        aoResponderDuracao={responderDuracao}
+      />
     </div>
   );
 }

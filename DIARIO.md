@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-24 — Refatoração: rotinas/page decomposto (branch própria)
+
+- Branch `refactor/rotinas-page`. A tela principal tinha **1038 linhas** (acima do
+  limite de 1k). Decomposta sem mudar comportamento:
+  - `app/(app)/rotinas/useRotinaData.ts`: todos os `useSWR` + derivações puras
+    (sedeId, ausentesMap, fonteRepetir, nFaltas, faltamRegistrar, semana).
+  - `components/agenda/BarraPassosDoDia.tsx`: a toolbar "Passos do dia".
+  - `components/agenda/ModaisRotina.tsx`: os 2 modais (autorizar conflito / duração).
+- Os handlers de mutação (otimistas) **ficaram no container** de propósito — são o
+  comportamento próprio da tela; um hook com ~20 deps seria pior que o problema.
+- `page.tsx` **1038 → 784 linhas**. Verificado no preview (firebase, 24/06): 55
+  cards, painéis, toolbar e clique→balão OK, console limpo. (Remover/adicionar não
+  testado ao vivo p/ não tocar dado de produção; handlers movidos verbatim.)
+
+---
+
 ## 2026-06-24 — Refatoração: AgendaGrid decomposto (revisão de qualidade)
 
 - Revisão de qualidade do código da sessão. O `AgendaGrid.tsx` tinha virado um
