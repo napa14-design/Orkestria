@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-24 — Agenda: grade estende até a última tarefa (fim do corte)
+
+- A grade ia só até a **maior saída** (`fimGrade` = max saída). Pela regra "pode
+  terminar depois da saída", tarefas que terminam após o expediente ficavam
+  desenhadas além da última linha e **cortadas embaixo**. Agora o `fimGrade` (e o
+  `inicioGrade`) também consideram os `inicio/fim_planejado` das rotinas, então a
+  grade engloba sempre a última tarefa. Verificado (firebase, DT 24/06):
+  **0 colunas com corte** (todas com folga ≥ 0). Console limpo.
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-24 — Agenda: faixas de pausa por minuto exato (fim da colisão)
 
 - O lanche (15min) era pintado na **célula inteira de 30min**, enquanto os cards

@@ -136,9 +136,18 @@ export default function AgendaGrid({
       if (!Number.isNaN(e)) ini = Math.min(ini, e);
       if (!Number.isNaN(s)) fim = Math.max(fim, s);
     }
+    // Tarefas podem terminar (e às vezes começar) fora do expediente — a regra é
+    // "pode terminar depois da saída". Estende a grade até englobar a última
+    // tarefa, senão o card que passa do turno fica cortado embaixo.
+    for (const r of rotinas) {
+      const e = hhmmParaMin(r.inicio_planejado);
+      const s = hhmmParaMin(r.fim_planejado);
+      if (!Number.isNaN(e)) ini = Math.min(ini, e);
+      if (!Number.isNaN(s)) fim = Math.max(fim, s);
+    }
     if (!Number.isFinite(ini) || !Number.isFinite(fim)) return [360, 1080]; // 06:00–18:00
     return [ini, fim];
-  }, [funcionarios]);
+  }, [funcionarios, rotinas]);
 
   const totalBlocos = Math.max(1, Math.ceil((fimGrade - inicioGrade) / blocoMin));
   const slots = useMemo(
