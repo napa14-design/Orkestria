@@ -347,6 +347,11 @@ export async function duplicarDia(
     const existentes = await getRotinasByData(dataDestino);
     const ocupados = existentes.filter((r) => r.status !== "cancelada");
     const presencaCache = new Map<string, boolean>();
+    // Idempotência: não recria uma rotina idêntica (mesmo funcionário+tarefa+
+    // início) que já exista no destino — blinda contra duplicar/gerar repetidos.
+    const chave = (r: { funcionario_id: string; tarefa_id: string; inicio_planejado: string }) =>
+      `${r.funcionario_id}|${r.tarefa_id}|${r.inicio_planejado}`;
+    const chavesExistentes = new Set(ocupados.map(chave));
 
     for (const r of origem) {
       // não copia para funcionário ausente na data de destino
@@ -356,6 +361,11 @@ export async function duplicarDia(
         presencaCache.set(r.funcionario_id, presente);
       }
       if (!presente) {
+        puladas++;
+        continue;
+      }
+      // já existe idêntica no destino → não duplica
+      if (chavesExistentes.has(chave(r))) {
         puladas++;
         continue;
       }
@@ -382,6 +392,7 @@ export async function duplicarDia(
       };
       await ds.criar("rotinas_planejadas", copia);
       ocupados.push(copia); // evita que duas cópias do mesmo lote se sobreponham
+      chavesExistentes.add(chave(copia));
       copiadas++;
     }
   }

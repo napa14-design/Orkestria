@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-25 — duplicarDia idempotente (guarda contra duplicata exata)
+
+- `duplicarDia` (endpoint "Repetir o dia anterior") agora pula rotina **idêntica**
+  já existente no destino (chave `funcionário|tarefa|início`), além do conflito de
+  horário que já existia. Fecha a porta no servidor para não reintroduzir as
+  duplicatas que infláram a ocupação — independente da versão publicada.
+- Os outros caminhos já tinham a mesma guarda: `aplicarModelo` e
+  `gerarDiaDaRotaPadrao`. Agora os 3 (gerar/aplicar/duplicar) são idempotentes.
+- Arquivo: `services/rotinasService.ts`.
+
+---
+
 ## 2026-06-25 — Limpeza: duplicatas de rotinas em 25/06 (ocupação 198%)
 
 - Usuário viu ocupação ~198% (vermelho geral). Diagnóstico: **não era erro de
