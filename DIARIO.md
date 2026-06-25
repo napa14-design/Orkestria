@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-06-24 — Refatoração: AgendaGrid decomposto (revisão de qualidade)
+
+- Revisão de qualidade do código da sessão. O `AgendaGrid.tsx` tinha virado um
+  monólito (render de ~480 linhas com merge de runs, card e popover inline).
+  **Decomposto sem mudar comportamento**: `lib/agenda.ts` (`agruparRuns` puro),
+  `components/agenda/CardRotina.tsx` (o card) e `components/agenda/BalaoDetalhe.tsx`
+  (o popover, que agora deriva a exibição do `Run` em vez de um objeto
+  pré-formatado). Removidos: mapa redundante `corCategoria`, lógica de remover
+  duplicada (agora `removerRun`), e o effect de Esc/scroll migrou pro balão.
+- `AgendaGrid` caiu de **698 → 449 linhas**; novos arquivos: CardRotina 138,
+  BalaoDetalhe 115, agenda 45. Verificado no preview (firebase, 24/06): 55 cards,
+  merge ok, 5 cores de categoria, alça de resize, clique→balão com dados certos,
+  Esc fecha, console limpo.
+- Pendência anotada (não desta branch): `rotinas/page.tsx` já tem 1038 linhas —
+  decompor numa branch própria.
+
+---
+
 ## 2026-06-24 — Agenda: card só com o nome + balãozinho de detalhes
 
 - A pedido: o card agora exibe **só o nome da tarefa** (em até 3 linhas, então

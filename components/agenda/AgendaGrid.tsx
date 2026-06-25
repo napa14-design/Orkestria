@@ -7,7 +7,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
+import { agruparRuns, type Run } from "@/lib/agenda";
 import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
+import CardRotina from "./CardRotina";
+import BalaoDetalhe from "./BalaoDetalhe";
 
 export const ALTURA_BLOCO_PADRAO = 48; // px por bloco na densidade normal (mais respiro p/ tarefas curtas)
 
@@ -25,25 +28,6 @@ const ESTILO_STATUS: Record<StatusRotina, { fundo: string; espinha?: string; sel
   pendente: { fundo: "#fdf1e3", espinha: "var(--laranja)" },
   cancelada: { fundo: "var(--papel-2)", espinha: "var(--tinta-3)" },
 };
-
-const ROTULO_STATUS: Record<StatusRotina, string> = {
-  planejada: "Planejada",
-  realizada: "Realizada",
-  nao_realizada: "Não realizada",
-  remanejada: "Remanejada",
-  pendente: "Pendente",
-  cancelada: "Cancelada",
-};
-
-/** Linha rótulo→valor do balãozinho de detalhes. */
-function LinhaDetalhe({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, margin: "3px 0" }}>
-      <span style={{ color: "var(--tinta-3)" }}>{rotulo}</span>
-      <span style={{ fontWeight: 600, textAlign: "right" }}>{valor}</span>
-    </div>
-  );
-}
 
 interface DadosArrasto {
   tipo: "nova" | "mover";
@@ -97,31 +81,10 @@ export default function AgendaGrid({
   // Fantasma de drop: célula(s) exatas onde a tarefa cairá se for solta.
   const [previa, setPrevia] = useState<{ funcionarioId: string; slot: number } | null>(null);
 
-  // ── balãozinho de detalhes (clique no card) ───────────────────────────
-  interface DetalheCard {
-    x: number;
-    y: number;
-    nome: string;
-    inicio: string;
-    fim: string;
-    dur: string;
-    local?: string;
-    categoria?: { nome: string; cor: string };
-    status: StatusRotina;
-    membros: string[];
-  }
-  const [detalhe, setDetalhe] = useState<DetalheCard | null>(null);
-  useEffect(() => {
-    if (!detalhe) return;
-    const fechar = (e: KeyboardEvent) => e.key === "Escape" && setDetalhe(null);
-    const fecharScroll = () => setDetalhe(null);
-    window.addEventListener("keydown", fechar);
-    window.addEventListener("scroll", fecharScroll, true);
-    return () => {
-      window.removeEventListener("keydown", fechar);
-      window.removeEventListener("scroll", fecharScroll, true);
-    };
-  }, [detalhe]);
+  // Balãozinho de detalhes (clique no card): guarda o run e a âncora; o
+  // BalaoDetalhe deriva o que exibe das entidades resolvidas.
+  const [detalhe, setDetalhe] = useState<{ run: Run; x: number; y: number } | null>(null);
+  const removerRun = (run: Run) => run.membros.forEach((m) => aoRemover(m.id));
 
   // ── redimensionamento por arrasto da alça inferior ────────────────────
   interface EstadoResize {
@@ -161,10 +124,6 @@ export default function AgendaGrid({
 
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
-  const corCategoria = useMemo(
-    () => new Map(categorias.map((c) => [c.id, c.cor || "#3a6ea5"])),
-    [categorias],
-  );
   const catPorId = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias]);
 
   // Janela de horário da grade: do menor início ao maior fim entre os exibidos.
@@ -255,40 +214,7 @@ export default function AgendaGrid({
 
         {/* colunas dos funcionários */}
         {funcionarios.map((f, idxCol) => {
-          const rotinasDoFunc = rotinas.filter((r) => r.funcionario_id === f.id);
-          // "Runs": tarefas iguais e contíguas (fim de uma = início da próxima)
-          // viram UM card único (altura cheia, sem linhas internas). As rotinas
-          // seguem individuais por baixo (leitura OMR/realizado intactas).
-          const ordenadas = [...rotinasDoFunc].sort((a, b) =>
-            a.inicio_planejado.localeCompare(b.inicio_planejado),
-          );
-          type Run = {
-            id: string;
-            tarefa_id: string;
-            local_id: string;
-            status: StatusRotina;
-            inicio: string;
-            fim: string;
-            membros: RotinaPlanejada[];
-          };
-          const runs: Run[] = [];
-          for (const r of ordenadas) {
-            const ult = runs[runs.length - 1];
-            if (ult && ult.tarefa_id === r.tarefa_id && ult.fim === r.inicio_planejado) {
-              ult.fim = r.fim_planejado;
-              ult.membros.push(r);
-            } else {
-              runs.push({
-                id: r.id,
-                tarefa_id: r.tarefa_id,
-                local_id: r.local_id,
-                status: r.status,
-                inicio: r.inicio_planejado,
-                fim: r.fim_planejado,
-                membros: [r],
-              });
-            }
-          }
+          const runs = agruparRuns(rotinas.filter((r) => r.funcionario_id === f.id));
           const entradaF = hhmmParaMin(f.entrada);
           const saidaF = hhmmParaMin(f.saida);
           // Todos os intervalos do dia (lanches + almoço) em minutos.
@@ -462,152 +388,39 @@ export default function AgendaGrid({
                   if (Number.isNaN(ini)) return null;
                   const unico = run.membros.length === 1;
                   const emResize = unico && resize?.rotinaId === run.id;
-                  const topo = ((ini - inicioGrade) / blocoMin) * ALTURA_BLOCO;
                   const durMin = hhmmParaMin(run.fim) - ini;
                   // Altura pela duração REAL do bloco inteiro (piso p/ clicabilidade).
                   const altura = emResize
                     ? resize.blocos * ALTURA_BLOCO
                     : Math.max(14, (durMin / blocoMin) * ALTURA_BLOCO);
-                  const compacto = altura < 30;
-                  const visualBlocos = Math.max(1, Math.round(durMin / blocoMin));
                   const tarefa = tarefaPorId.get(run.tarefa_id);
-                  const local = localPorId.get(run.local_id);
                   const est = ESTILO_STATUS[run.status] ?? ESTILO_STATUS.planejada;
-                  const espinha = est.espinha ?? corCategoria.get(tarefa?.categoria_id ?? "") ?? "#3a6ea5";
                   return (
-                    <div
+                    <CardRotina
                       key={run.id}
-                      className="agenda-card-tarefa pop-card"
-                      draggable={unico && !emResize}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(
-                          "text/plain",
-                          JSON.stringify({ tipo: "mover", rotina_id: run.id }),
-                        );
-                        e.dataTransfer.effectAllowed = "move";
-                        aoIniciarArrasto?.(visualBlocos);
-                      }}
-                      onDragEnd={() => {
+                      run={run}
+                      tarefa={tarefa}
+                      topo={((ini - inicioGrade) / blocoMin) * ALTURA_BLOCO}
+                      altura={altura}
+                      unico={unico}
+                      emResize={emResize}
+                      compacto={altura < 30}
+                      espinha={est.espinha ?? catPorId.get(tarefa?.categoria_id ?? "")?.cor ?? "#3a6ea5"}
+                      fundo={est.fundo}
+                      visualBlocos={Math.max(1, Math.round(durMin / blocoMin))}
+                      rotuloResize={emResize ? formatarDuracao(resize.blocos * blocoMin) : undefined}
+                      podeRedimensionar={!!aoRedimensionar && unico}
+                      aoIniciarArrasto={aoIniciarArrasto}
+                      aoTerminarArrasto={() => {
                         setPrevia(null);
                         aoTerminarArrasto?.();
                       }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                        const cat = tarefa?.categoria_id ? catPorId.get(tarefa.categoria_id) : undefined;
-                        setDetalhe({
-                          x: r.right,
-                          y: r.top,
-                          nome: tarefa?.nome_tarefa ?? "Tarefa",
-                          inicio: run.inicio,
-                          fim: run.fim,
-                          dur: formatarDuracao(durMin),
-                          local: local
-                            ? `${local.nome_local}${local.andar && local.andar !== "—" ? ` · ${local.andar}` : ""}`
-                            : undefined,
-                          categoria: cat ? { nome: cat.nome, cor: cat.cor || "#3a6ea5" } : undefined,
-                          status: run.status,
-                          membros: run.membros.map((m) => m.id),
-                        });
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: topo + 1,
-                        left: 3,
-                        right: 3,
-                        height: altura - 2,
-                        boxSizing: "border-box",
-                        background: est.fundo,
-                        color: "var(--tinta)",
-                        padding: "2px 8px",
-                        overflow: "hidden",
-                        zIndex: 5,
-                        borderRadius: 3,
-                        border: "1px solid var(--linha)",
-                        borderLeft: `4px solid ${espinha}`,
-                        boxShadow: "1px 1.5px 0 rgba(34,49,39,0.10)",
-                        cursor: "pointer",
-                      }}
-                      title={`${tarefa?.nome_tarefa ?? "Tarefa"} · ${run.inicio}–${run.fim} · ${formatarDuracao(durMin)}${
-                        run.membros.length > 1 ? ` (${run.membros.length} blocos contíguos)` : ""
-                      }\nArraste para mover.`}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          run.membros.forEach((m) => aoRemover(m.id));
-                        }}
-                        aria-label="Remover"
-                        className="card-x"
-                        style={{
-                          position: "absolute",
-                          top: 2,
-                          right: 4,
-                          border: "none",
-                          background: "transparent",
-                          color: "inherit",
-                          fontSize: 13,
-                          fontWeight: 700,
-                        }}
-                      >
-                        ×
-                      </button>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: compacto ? 11 : 12,
-                          lineHeight: 1.15,
-                          paddingRight: 14,
-                          color: "var(--tinta)",
-                          overflow: "hidden",
-                          display: "-webkit-box",
-                          WebkitBoxOrient: "vertical",
-                          WebkitLineClamp: compacto ? 1 : 3,
-                        }}
-                      >
-                        {tarefa?.nome_tarefa ?? "Tarefa"}
-                      </div>
-                      {aoRedimensionar && unico && (
-                        <div
-                          onPointerDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setResize({
-                              rotinaId: run.id,
-                              blocosOrig: visualBlocos,
-                              yInicial: e.clientY,
-                              blocos: visualBlocos,
-                            });
-                          }}
-                          title="Arraste para mudar a duração (blocos de agenda)"
-                          className="card-alca"
-                          style={{
-                            position: "absolute",
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: 9,
-                            cursor: "ns-resize",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 8,
-                            lineHeight: 1,
-                            touchAction: "none",
-                          }}
-                        >
-                          ⠿⠿
-                        </div>
-                      )}
-                      {emResize && (
-                        <div
-                          className="num"
-                          style={{ position: "absolute", bottom: 10, right: 6, fontSize: 10, fontWeight: 700 }}
-                        >
-                          {formatarDuracao(resize.blocos * blocoMin)}
-                        </div>
-                      )}
-                    </div>
+                      aoAbrirDetalhe={(r, ancora) => setDetalhe({ run: r, x: ancora.right, y: ancora.top })}
+                      aoRemoverRun={removerRun}
+                      aoIniciarResize={(r, clientY, vb) =>
+                        setResize({ rotinaId: r.id, blocosOrig: vb, yInicial: clientY, blocos: vb })
+                      }
+                    />
                   );
                 })}
               </div>
@@ -617,81 +430,19 @@ export default function AgendaGrid({
       </div>
 
       {detalhe && (
-        <>
-          <div onClick={() => setDetalhe(null)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div
-            role="dialog"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              left: Math.min(detalhe.x + 8, window.innerWidth - 256),
-              top: Math.max(8, Math.min(detalhe.y, window.innerHeight - 230)),
-              width: 240,
-              zIndex: 41,
-              background: "var(--cartao)",
-              border: "1px solid var(--tinta)",
-              borderRadius: 6,
-              boxShadow: "3px 4px 0 rgba(34,49,39,0.18)",
-              padding: "12px 14px",
-              color: "var(--tinta)",
-            }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, lineHeight: 1.25, fontFamily: "var(--fonte-serif, inherit)" }}>
-              {detalhe.nome}
-            </div>
-            <LinhaDetalhe rotulo="Horário" valor={`${detalhe.inicio}–${detalhe.fim}`} />
-            <LinhaDetalhe rotulo="Duração" valor={detalhe.dur} />
-            {detalhe.local && <LinhaDetalhe rotulo="Local" valor={detalhe.local} />}
-            {detalhe.categoria && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, margin: "3px 0", justifyContent: "flex-end" }}>
-                <span style={{ color: "var(--tinta-3)", marginRight: "auto" }}>Categoria</span>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: detalhe.categoria.cor, display: "inline-block" }} />
-                <span style={{ fontWeight: 600 }}>{detalhe.categoria.nome}</span>
-              </div>
-            )}
-            <LinhaDetalhe rotulo="Situação" valor={ROTULO_STATUS[detalhe.status]} />
-            {detalhe.membros.length > 1 && (
-              <LinhaDetalhe rotulo="Blocos" valor={`${detalhe.membros.length} contíguos`} />
-            )}
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button
-                onClick={() => {
-                  detalhe.membros.forEach((id) => aoRemover(id));
-                  setDetalhe(null);
-                }}
-                style={{
-                  flex: 1,
-                  border: "1px solid var(--linha)",
-                  background: "var(--papel)",
-                  color: "var(--vermelho)",
-                  borderRadius: 4,
-                  padding: "5px 0",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Remover
-              </button>
-              <button
-                onClick={() => setDetalhe(null)}
-                style={{
-                  flex: 1,
-                  border: "1px solid var(--linha)",
-                  background: "var(--papel)",
-                  color: "var(--tinta)",
-                  borderRadius: 4,
-                  padding: "5px 0",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </>
+        <BalaoDetalhe
+          run={detalhe.run}
+          x={detalhe.x}
+          y={detalhe.y}
+          tarefa={tarefaPorId.get(detalhe.run.tarefa_id)}
+          local={localPorId.get(detalhe.run.local_id)}
+          categoria={catPorId.get(tarefaPorId.get(detalhe.run.tarefa_id)?.categoria_id ?? "")}
+          aoRemover={(run) => {
+            removerRun(run);
+            setDetalhe(null);
+          }}
+          aoFechar={() => setDetalhe(null)}
+        />
       )}
     </div>
   );
