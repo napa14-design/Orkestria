@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-25 — Limpeza: tarefas de duração 0 na DT (cards espremidos)
+
+- Cards de **duração 0** apareciam espremidos (14px). Eram 4 rotinas: "Descer
+  garrafas de café para o cpa" (real, importada sem duração — bug) e "Encerramento
+  das atividades" (marcador de fim de turno). Com confirmação:
+  - "Descer garrafas" → **10min** (tarefa + 2 rotinas 16:50–17:00 + item do modelo).
+  - "Encerramento das atividades" → **removido** da agenda (2 rotinas), do catálogo
+    (tarefa t63) e da rota padrão (item de modelo), p/ não voltar ao gerar.
+- Verificado: 0 rotinas de duração 0 na DT. Operação de dados; sem mudança de código.
+
+---
+
 ## 2026-06-25 — duplicarDia idempotente (guarda contra duplicata exata)
 
 - `duplicarDia` (endpoint "Repetir o dia anterior") agora pula rotina **idêntica**
