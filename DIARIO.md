@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-06-25 — Limpeza: duplicatas de rotinas em 25/06 (ocupação 198%)
+
+- Usuário viu ocupação ~198% (vermelho geral). Diagnóstico: **não era erro de
+  cálculo** (fórmula `planejado/jornada` correta; sem deslocamento; 24/06 dava
+  76–111%). O dia **25/06** tinha **125 rotinas duplicadas exatas** (mesma
+  data|funcionário|tarefa|início) — o dia foi materializado mais de uma vez
+  (provável "Gerar o dia" + "Repetir" no Vercel ainda sem o fix de idempotência).
+- Com confirmação, removidas as 125 duplicatas (mantendo 1 de cada) nas sedes
+  Christus. Verificado: 25/06 DT = 278 rotinas, 0 duplicatas, ocupação 76–111%.
+  Operação de dados; sem mudança de código.
+- **Atenção:** enquanto o deploy do Vercel estiver atrás dos commits de
+  idempotência, gerar/repetir o mesmo dia pode reintroduzir duplicatas.
+
+---
+
 ## 2026-06-24 — Agenda: grade estende até a última tarefa (fim do corte)
 
 - A grade ia só até a **maior saída** (`fimGrade` = max saída). Pela regra "pode
