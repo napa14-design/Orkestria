@@ -296,36 +296,49 @@ export default function AgendaGrid({
                     aoMover(dados.rotina_id, f.id, inicio);
                 }}
               >
-                {/* células de fundo */}
+                {/* células de fundo (só marcam fora-da-jornada; as pausas são
+                    faixas absolutas por minuto exato, abaixo) */}
                 {slots.map((min) => {
                   const foraJornada =
                     Number.isNaN(entradaF) || min < entradaF || min + blocoMin > saidaF;
-                  const ivAtual = intervalosF.find((iv) => min >= iv.ini && min < iv.fim);
-                  const noIntervalo = !!ivAtual;
                   return (
                     <div
                       key={min}
-                      className={
-                        noIntervalo
-                          ? "celula-intervalo"
-                          : foraJornada
-                            ? "celula-fora-jornada"
-                            : undefined
-                      }
+                      className={foraJornada ? "celula-fora-jornada" : undefined}
                       style={{
                         height: ALTURA_BLOCO,
                         borderBottom: "1px solid var(--linha)",
                         borderTop: min % 60 === 0 ? "1px solid var(--tinta-3)" : undefined,
                       }}
+                    />
+                  );
+                })}
+
+                {/* faixas de pausa (lanche/almoço) — altura pela duração REAL, para
+                    não pintarem o bloco inteiro de 30min nem colidir com os cards */}
+                {intervalosF.map((iv) => {
+                  const dur = iv.fim - iv.ini;
+                  return (
+                    <div
+                      key={iv.ini}
+                      className="celula-intervalo"
+                      style={{
+                        position: "absolute",
+                        top: ((iv.ini - inicioGrade) / blocoMin) * ALTURA_BLOCO,
+                        left: 0,
+                        right: 0,
+                        height: (dur / blocoMin) * ALTURA_BLOCO,
+                        zIndex: 2,
+                        pointerEvents: "none",
+                        overflow: "hidden",
+                      }}
                     >
-                      {ivAtual && min === ivAtual.ini && (
-                        <span
-                          className="rotulo"
-                          style={{ color: "var(--papel-3)", paddingLeft: 8, fontSize: 9, lineHeight: `${ALTURA_BLOCO}px` }}
-                        >
-                          ▦ {ivAtual.fim - ivAtual.ini >= 45 ? "Almoço" : "Lanche"}
-                        </span>
-                      )}
+                      <span
+                        className="rotulo"
+                        style={{ color: "var(--papel-3)", paddingLeft: 8, fontSize: 9, lineHeight: `${Math.max(14, (dur / blocoMin) * ALTURA_BLOCO)}px` }}
+                      >
+                        ▦ {dur >= 45 ? "Almoço" : "Lanche"}
+                      </span>
                     </div>
                   );
                 })}

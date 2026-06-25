@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-24 — Agenda: faixas de pausa por minuto exato (fim da colisão)
+
+- O lanche (15min) era pintado na **célula inteira de 30min**, enquanto os cards
+  são posicionados por minuto. Aí a tarefa das 09:15 caía no meio da célula e
+  ficava **por cima da metade de baixo da faixa de lanche** (sobreposição).
+- Agora as faixas de pausa são **divs absolutas com altura pela duração real**
+  (lanche 15min = 24px, almoço 90min = 144px), abaixo dos cards. As células de
+  fundo só marcam fora-da-jornada. Verificado (firebase, DT 24/06): lanche=24px,
+  **0 colisões faixa×card**, rótulo visível. Console limpo.
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-24 — Refatoração: rotinas/page decomposto (branch própria)
 
 - Branch `refactor/rotinas-page`. A tela principal tinha **1038 linhas** (acima do
