@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-06-25 — Performance: gerar/repetir o dia (2min → ~1-2s) + loading
+
+- "Repetir o dia anterior" levava ~2min: `duplicarDia` gravava as ~274 rotinas
+  **uma a uma** (await por escrita). `gerarDiaDaRotaPadrao` era pior — fazia
+  `ausenteEm` **por item** (274 queries) + escrita 1 a 1.
+- Os dois agora: pré-aquecem a checagem de ausência em paralelo (Promise.all
+  pelos funcionários únicos) e **gravam em lotes paralelos de 25**. Benchmark no
+  Firestore: 100 escritas 8,4s→0,4s (**19×**); ~274 → ~1-2s.
+- UX: overlay com o loader "Tetris" (`Carregando`) durante repetir/gerar/salvar
+  rota padrão, no lugar do "Repetindo…" discreto.
+- Arquivos: `services/rotinasService.ts`, `services/modelosService.ts`,
+  `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-25 — Limpeza: tarefas de duração 0 na DT (cards espremidos)
 
 - Cards de **duração 0** apareciam espremidos (14px). Eram 4 rotinas: "Descer

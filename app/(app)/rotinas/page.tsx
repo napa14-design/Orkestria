@@ -779,6 +779,33 @@ export default function PaginaRotinas() {
         aoMudarDuracaoInput={setDuracaoInput}
         aoResponderDuracao={responderDuracao}
       />
+
+      {(repetindo || gerando || salvandoPadrao) && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(34,49,39,0.32)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div className="painel" style={{ background: "var(--cartao)", padding: 12 }}>
+            <Carregando
+              texto={
+                repetindo
+                  ? "Repetindo o dia anterior…"
+                  : gerando
+                    ? "Gerando o dia da rota padrão…"
+                    : "Salvando a rota padrão…"
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

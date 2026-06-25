@@ -15,7 +15,7 @@ import {
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao, validarRotina } from "@/lib/validations";
-import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
+import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -342,31 +342,31 @@ export async function duplicarDia(
   let copiadas = 0;
   let puladas = 0;
 
+  // Idempotência: não recria uma rotina idêntica (mesmo funcionário+tarefa+
+  // início) que já exista no destino — blinda contra duplicar/gerar repetidos.
+  const chave = (r: { funcionario_id: string; tarefa_id: string; inicio_planejado: string }) =>
+    `${r.funcionario_id}|${r.tarefa_id}|${r.inicio_planejado}`;
+  const idsFunc = [...new Set(origem.map((r) => r.funcionario_id))];
+
   for (const dataDestino of datasDestino) {
     if (dataDestino === dataOrigem) continue;
     const existentes = await getRotinasByData(dataDestino);
     const ocupados = existentes.filter((r) => r.status !== "cancelada");
-    const presencaCache = new Map<string, boolean>();
-    // Idempotência: não recria uma rotina idêntica (mesmo funcionário+tarefa+
-    // início) que já exista no destino — blinda contra duplicar/gerar repetidos.
-    const chave = (r: { funcionario_id: string; tarefa_id: string; inicio_planejado: string }) =>
-      `${r.funcionario_id}|${r.tarefa_id}|${r.inicio_planejado}`;
     const chavesExistentes = new Set(ocupados.map(chave));
 
+    // Presença de todos os funcionários numa só rodada (em vez de 1 query por vez).
+    const ausentes = await Promise.all(idsFunc.map((id) => ausenteEm(id, dataDestino)));
+    const presente = new Map(idsFunc.map((id, i) => [id, ausentes[i] === null]));
+
+    // Monta as cópias (lógica em memória, rápida); grava depois em lote.
+    const copias: RotinaPlanejada[] = [];
     for (const r of origem) {
-      // não copia para funcionário ausente na data de destino
-      let presente = presencaCache.get(r.funcionario_id);
-      if (presente === undefined) {
-        presente = (await ausenteEm(r.funcionario_id, dataDestino)) === null;
-        presencaCache.set(r.funcionario_id, presente);
-      }
-      if (!presente) {
+      if (!presente.get(r.funcionario_id)) {
         puladas++;
         continue;
       }
-      // já existe idêntica no destino → não duplica
       if (chavesExistentes.has(chave(r))) {
-        puladas++;
+        puladas++; // já existe idêntica no destino
         continue;
       }
       const ini = hhmmParaMin(r.inicio_planejado);
@@ -381,20 +381,26 @@ export async function duplicarDia(
         puladas++;
         continue;
       }
-      const copia = {
+      const copia: RotinaPlanejada = {
         ...r,
         id: novoId(),
         data: dataDestino,
-        status: "planejada" as StatusRotina,
+        status: "planejada",
         supervisor_id: supervisorId,
         criado_em: agora,
         atualizado_em: agora,
       };
-      await ds.criar("rotinas_planejadas", copia);
+      copias.push(copia);
       ocupados.push(copia); // evita que duas cópias do mesmo lote se sobreponham
       chavesExistentes.add(chave(copia));
-      copiadas++;
     }
+
+    // Grava em lotes paralelos — o gargalo era 1 escrita por vez (~2 min p/ um dia).
+    const LOTE = 25;
+    for (let i = 0; i < copias.length; i += LOTE) {
+      await Promise.all(copias.slice(i, i + LOTE).map((c) => ds.criar("rotinas_planejadas", c)));
+    }
+    copiadas += copias.length;
   }
   return { copiadas, puladas };
 }

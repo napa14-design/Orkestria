@@ -228,11 +228,17 @@ export async function gerarDiaDaRotaPadrao(
   const letivoFora = statusPeriodoLetivo(periodos, sedeId, data) === "fora";
   const agora = agoraISO();
 
+  // Presença de todos os funcionários numa só rodada (era 1 query por item).
+  const idsFunc = [...new Set(itens.map((i) => i.funcionario_id))];
+  const ausentes = await Promise.all(idsFunc.map((id) => ausenteEm(id, data)));
+  const ausente = new Map(idsFunc.map((id, i) => [id, ausentes[i] !== null]));
+
   const res: ResultadoGeracao = { geradas: 0, puladas: 0, detalhes: [] };
   const nota = (m: string) => {
     if (res.detalhes.length < 8) res.detalhes.push(m);
   };
 
+  const aCriar: RotinaPlanejada[] = [];
   for (const it of itens) {
     if (jaTem.has(chave(it.funcionario_id, it.tarefa_id, it.inicio_planejado))) {
       res.puladas++;
@@ -254,7 +260,7 @@ export async function gerarDiaDaRotaPadrao(
       nota(`${f.nome}: folga pela escala em ${data}`);
       continue;
     }
-    if (await ausenteEm(it.funcionario_id, data)) {
+    if (ausente.get(it.funcionario_id)) {
       res.puladas++;
       nota(`${f.nome}: ausente — redistribuir no Remanejo`);
       continue;
@@ -280,9 +286,15 @@ export async function gerarDiaDaRotaPadrao(
       criado_em: agora,
       atualizado_em: agora,
     };
-    await ds.criar("rotinas_planejadas", rotina);
-    res.geradas++;
+    aCriar.push(rotina);
   }
+
+  // Grava em lotes paralelos — escrita 1 a 1 levava ~2 min para um dia cheio.
+  const LOTE = 25;
+  for (let i = 0; i < aCriar.length; i += LOTE) {
+    await Promise.all(aCriar.slice(i, i + LOTE).map((r) => ds.criar("rotinas_planejadas", r)));
+  }
+  res.geradas = aCriar.length;
   return res;
 }
 
