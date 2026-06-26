@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-25 — Agenda: escala por minuto (desacoplada do tamanho do bloco)
+
+- Cards estavam apertados (~1,6px/min). A escala vertical agora é **por minuto**,
+  não por bloco: `alturaBloco = blocoMin × fator` (2,4 normal / 1,4 denso) → ~2,4px/min
+  fixo. Tarefa de 20min: 32→**48px**; 30min: 48→72. Efeito colateral bom: trocar o
+  `bloco_agenda_min` (ex.: 30→15) passa a mudar **só o snap do arrasto**, não o tamanho
+  do card nem a rolagem.
+- Arquivo: `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-06-25 — Agenda: tempo ocioso como faixa verde hachurada
 
 - A pedido: o **tempo ocioso** (lacunas dentro do expediente que não são pausa nem
