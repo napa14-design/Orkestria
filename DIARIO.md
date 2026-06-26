@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-06-25 — Agenda: régua mais leve (rótulo só em :00 e :30)
+
+- Com bloco de 15min a régua ficou densa. Agora o rótulo de hora aparece só nas
+  **marcas cheias**: :00 (negrito) e :30 (esmaecido); :15/:45 viram **linha-guia sem
+  texto**. Regra geral `min % 30 === 0` (independe do bloco). Mantém o snap fino sem
+  poluir. Verificado: régua alterna "06:00","","06:30","".
+- Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-06-25 — Bloco da agenda 30→15 min nas 3 sedes Christus (produção)
 
 - Com confirmação, gravado `bloco_agenda_min=15` (override por sede sobre o geral=30)

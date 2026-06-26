@@ -216,7 +216,13 @@ export default function AgendaGrid({
                 background: "var(--papel-2)",
               }}
             >
-              {min % 60 === 0 ? <strong>{minParaHHMM(min)}</strong> : minParaHHMM(min)}
+              {min % 60 === 0 ? (
+                <strong>{minParaHHMM(min)}</strong>
+              ) : min % 30 === 0 ? (
+                <span style={{ color: "var(--tinta-3)" }}>{minParaHHMM(min)}</span>
+              ) : (
+                ""
+              )}
             </div>
           ))}
         </div>
