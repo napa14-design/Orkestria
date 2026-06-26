@@ -204,7 +204,9 @@ export default function PaginaConferir() {
       <h1 style={{ fontSize: 28, fontWeight: 800 }}>Conferir ficha</h1>
       <p style={{ color: "var(--tinta-2)", marginTop: 2, marginBottom: 16 }}>
         Suba a foto ou o scan da ficha de papel. O navegador lê o QR e as marcações
-        de “Feito” e casa com a rotina do dia — você confere e salva.
+        de “Feito”, casa com a rotina do dia e, ao <strong>salvar</strong>, <strong>registra
+        o realizado</strong>: as tarefas marcadas ficam como <strong>feitas</strong> (verdes)
+        na agenda; as não marcadas, como não realizadas.
       </p>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
@@ -301,10 +303,19 @@ export default function PaginaConferir() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                 <strong>{feitas}</strong> de {linhas.length} tarefas feitas
                 {epiLinhas.length > 0 && <> · {epiLinhas.filter((e) => e.marcada).length}/{epiLinhas.length} EPIs</>}.
-                <button className="btn btn-primario" onClick={salvar} disabled={salvando || !!salvo}>
+                <button
+                  className="btn btn-primario"
+                  onClick={salvar}
+                  disabled={salvando || !!salvo}
+                  title="Grava o realizado e marca as tarefas feitas (verdes) na agenda do dia"
+                >
                   {salvando ? "Gravando…" : salvo ? "Gravado ✓" : "Salvar realizado"}
                 </button>
               </div>
+              <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 6 }}>
+                Ao salvar, as tarefas feitas são marcadas como <strong>realizadas</strong> na agenda
+                (reenviar a mesma ficha atualiza, não duplica).
+              </p>
               {salvo && <div className="alerta alerta-ok" style={{ marginTop: 10 }}>{salvo}</div>}
             </>
           ) : (

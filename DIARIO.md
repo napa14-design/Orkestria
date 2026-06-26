@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-06-25 — Conferir ficha: deixar claro que salva o realizado
+
+- A conferência por OMR (`/conferir`) **já** gravava o realizado e marcava a rotina
+  como `realizada` (`registrarExecucao` sincroniza o status), mas a tela passava a
+  impressão de "só conferir". Ajustada a copy: o texto da página + a dica no botão
+  "Salvar realizado" agora explicitam que salvar **marca as tarefas feitas (verdes)
+  na agenda** e que reenviar a mesma ficha atualiza (não duplica). Sem mudança de lógica.
+- Arquivo: `app/(app)/conferir/page.tsx`.
+
+---
+
 ## 2026-06-25 — Performance: gerar/repetir o dia (2min → ~1-2s) + loading
 
 - "Repetir o dia anterior" levava ~2min: `duplicarDia` gravava as ~274 rotinas
