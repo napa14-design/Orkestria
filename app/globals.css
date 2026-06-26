@@ -399,6 +399,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   );
 }
 
+/* tempo ocioso: lacuna livre no expediente — hachura verde suave (capacidade) */
+.faixa-ocioso {
+  background-color: rgba(47, 111, 79, 0.07);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(47, 111, 79, 0.18) 6px,
+    rgba(47, 111, 79, 0.18) 12px
+  );
+}
+
 /* ── responsividade ───────────────────────────────────────────────
    Alvo principal: notebooks ~1366×768. Abaixo de 1000px a tela de
    rotina empilha os painéis; abaixo de 720px tabelas viram cards. */

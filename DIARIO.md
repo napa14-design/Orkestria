@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-25 — Agenda: tempo ocioso como faixa verde hachurada
+
+- A pedido: o **tempo ocioso** (lacunas dentro do expediente que não são pausa nem
+  tarefa) agora aparece como **faixa verde clara hachurada** — sinaliza capacidade
+  livre. Calculado por funcionário subtraindo tarefas+pausas de [entrada, saída]
+  (mescla os ocupados e pega os buracos); desenhado como `div` absoluta por minuto
+  exato (z abaixo de pausas/cards). CSS `.faixa-ocioso`. Legenda da ajuda atualizada
+  (verde claro=ocioso, verde escuro=pausa, cinza=fora do turno).
+- Arquivos: `components/agenda/AgendaGrid.tsx`, `app/globals.css`, `components/agenda/AjudaAgenda.tsx`.
+
+---
+
 ## 2026-06-25 — Conferir ficha: deixar claro que salva o realizado
 
 - A conferência por OMR (`/conferir`) **já** gravava o realizado e marcava a rotina

@@ -233,6 +233,25 @@ export default function AgendaGrid({
           const selecionado = funcionarioSelecionado === f.id;
           const motivoAusencia = ausencias?.get(f.id);
 
+          // Ociosidade: lacunas DENTRO do expediente não ocupadas por tarefa nem
+          // pausa. Subtrai os blocos ocupados de [entrada, saída] (mescla antes).
+          const ociosos: Array<[number, number]> = [];
+          if (!motivoAusencia && !Number.isNaN(entradaF) && !Number.isNaN(saidaF)) {
+            const ocupados = [
+              ...runs.map((r) => [hhmmParaMin(r.inicio), hhmmParaMin(r.fim)] as [number, number]),
+              ...intervalosF.map((iv) => [iv.ini, iv.fim] as [number, number]),
+            ]
+              .map(([a, b]) => [Math.max(a, entradaF), Math.min(b, saidaF)] as [number, number])
+              .filter(([a, b]) => b > a)
+              .sort((x, y) => x[0] - y[0]);
+            let cursor = entradaF;
+            for (const [a, b] of ocupados) {
+              if (a > cursor) ociosos.push([cursor, a]);
+              cursor = Math.max(cursor, b);
+            }
+            if (cursor < saidaF) ociosos.push([cursor, saidaF]);
+          }
+
           return (
             <div
               key={f.id}
@@ -322,6 +341,25 @@ export default function AgendaGrid({
                     />
                   );
                 })}
+
+                {/* ociosidade: lacunas livres no expediente (verde hachurado) */}
+                {ociosos.map(([a, b]) => (
+                  <div
+                    key={`oc-${a}`}
+                    className="faixa-ocioso"
+                    title={`Tempo ocioso: ${minParaHHMM(a)}–${minParaHHMM(b)} (${formatarDuracao(b - a)})`}
+                    style={{
+                      position: "absolute",
+                      top: ((a - inicioGrade) / blocoMin) * ALTURA_BLOCO + 1,
+                      left: 3,
+                      right: 3,
+                      height: ((b - a) / blocoMin) * ALTURA_BLOCO - 2,
+                      zIndex: 1,
+                      pointerEvents: "none",
+                      borderRadius: 3,
+                    }}
+                  />
+                ))}
 
                 {/* faixas de pausa (lanche/almoço) — altura pela duração REAL, para
                     não pintarem o bloco inteiro de 30min nem colidir com os cards */}

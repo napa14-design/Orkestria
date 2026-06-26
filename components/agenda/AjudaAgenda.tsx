@@ -67,6 +67,11 @@ export default function AjudaAgenda() {
               (limites em Sistema → Parâmetros). <strong>Ociosidade</strong> é o tempo livre previsto.
             </Item>
             <Item>
+              <strong>Hachuras da coluna:</strong> <span style={{ color: "var(--verde)" }}>verde claro</span> =
+              <strong> tempo ocioso</strong> (livre no expediente, capacidade disponível);
+              verde escuro = <strong>pausa</strong> (lanche/almoço); cinza = <strong>fora do turno</strong>.
+            </Item>
+            <Item>
               <strong>Coluna listrada de vermelho:</strong> funcionário ausente ou de folga — não recebe
               tarefas (use o Remanejo entre sedes para cobrir).
             </Item>
