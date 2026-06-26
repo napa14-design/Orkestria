@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-06-25 — Bloco da agenda 30→15 min nas 3 sedes Christus (produção)
+
+- Com confirmação, gravado `bloco_agenda_min=15` (override por sede sobre o geral=30)
+  para DT, Eusébio e Benfica → **snap do arrasto em :00/:15/:30/:45**, casando com as
+  tarefas reais de 10–20min, e arredondamento visual mais fiel. Os cards **não
+  encolheram** (a escala é por minuto, desacoplada do bloco). Verificado: régua a cada
+  15min, cards no tamanho novo. Operação de dados.
+
+---
+
 ## 2026-06-25 — Agenda: escala por minuto (desacoplada do tamanho do bloco)
 
 - Cards estavam apertados (~1,6px/min). A escala vertical agora é **por minuto**,
