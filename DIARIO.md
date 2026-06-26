@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-06-25 — Painel de Capacitações (Painéis → Capacitações)
+
+- Nova página `/capacitacoes` (só leitura) — o "sistema de controle de treinamentos
+  + KPIs" pedido no diagnóstico de capacitação dos ASGs (relatório Região Sul). Agrega
+  `requisitos` (tipo treinamento/aptidão) + `qualificacoes_funcionario`: KPIs (ativos,
+  capacitados %, sem capacitação, vencendo 30d, vencidas), **cobertura por sede** (barras)
+  e tabela de **validades vencidas/vencendo**. EPI fora (não é capacitação possuída).
+  Cadastro reaproveita as telas existentes Requisitos + Qualificações; link no menu Painéis.
+- Estado vazio com orientação (em produção ainda não há capacitações registradas — bate
+  com o achado do relatório). Verificado: 40 ativos, 0% cobertura, aviso de vazio, console limpo.
+- Arquivos: `app/(app)/capacitacoes/page.tsx`, `components/AppShell.tsx`.
+
+---
+
 ## 2026-06-25 — Agenda: régua mais leve (rótulo só em :00 e :30)
 
 - Com bloco de 15min a régua ficou densa. Agora o rótulo de hora aparece só nas
