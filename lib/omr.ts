@@ -264,12 +264,39 @@ function confianca(fi: number): "alta" | "baixa" {
   return fi >= 0.2 || fi <= 0.05 ? "alta" : "baixa";
 }
 
-/** Decompõe o conteúdo do QR "ORK1|sede|data|funcionario". */
-export function parseQR(qr: string | null): { sede: string; data: string; funcionario: string } | null {
+export interface DadosQR {
+  sede: string;
+  data: string;
+  funcionario: string;
+  /** 1 = ORK1 (casa por posição); 2 = ORK2 (casa por código, com n impresso). */
+  versao: 1 | 2;
+  /** ORK2: nº de tarefas impressas (geometria) e códigos das linhas (ordem impressa). */
+  n?: number;
+  codigos?: string[];
+}
+
+/**
+ * Decompõe o QR. ORK1: `ORK1|sede|data|func` (casa por posição).
+ * ORK2: `ORK2|sede|data|func|n|cod1,cod2,…` (casa por código; blinda contra a
+ * rotina mudar depois de imprimir).
+ */
+export function parseQR(qr: string | null): DadosQR | null {
   if (!qr) return null;
   const p = qr.split("|");
-  if (p[0] !== "ORK1" || p.length < 4) return null;
-  return { sede: p[1], data: p[2], funcionario: p[3] };
+  if (p[0] === "ORK2" && p.length >= 6) {
+    return {
+      sede: p[1],
+      data: p[2],
+      funcionario: p[3],
+      versao: 2,
+      n: Number(p[4]) || 0,
+      codigos: (p[5] ?? "").split(",").filter(Boolean),
+    };
+  }
+  if (p[0] === "ORK1" && p.length >= 4) {
+    return { sede: p[1], data: p[2], funcionario: p[3], versao: 1 };
+  }
+  return null;
 }
 
 /**

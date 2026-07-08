@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas } from "@/lib/fichaGeometria";
+import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -215,7 +215,12 @@ export async function gerarFichasPdf(
         dur: formatarDuracao(r.tempo_previsto_min),
       };
     });
-    entradas.push({ nome: f.nome, sedeNome, dataBR, qr: `ORK1|${sedeId}|${data}|${f.id}`, tarefas: tarefasFicha, epis });
+    // QR ORK2: carrega o nº impresso de tarefas e os códigos das linhas (ordem
+    // impressa) — a conferência casa por código, não por posição, e usa este n
+    // na geometria (blindado contra a rotina mudar depois de imprimir).
+    const codigos = doFunc.map((r) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado));
+    const qr = `ORK2|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}`;
+    entradas.push({ nome: f.nome, sedeNome, dataBR, qr, tarefas: tarefasFicha, epis });
   }
 
   const doc = await PDFDocument.create();

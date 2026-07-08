@@ -7,6 +7,7 @@
  */
 import { useRef, useState } from "react";
 import { lerFicha, parseQR, type LinhaOMR, type ResultadoOMR } from "@/lib/omr";
+import { codigoLinha } from "@/lib/fichaGeometria";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
 import type { Funcionario, Requisito, RotinaPlanejada, Sede, Tarefa } from "@/types";
@@ -38,6 +39,8 @@ interface LinhaConferida {
   marcada: boolean;
   tinta: number;
   revisar: boolean;
+  /** ORK2: linha impressa cuja tarefa saiu da agenda depois — não é salva. */
+  removida?: boolean;
 }
 
 export default function PaginaConferir() {
@@ -50,6 +53,7 @@ export default function PaginaConferir() {
   const [epiLinhas, setEpiLinhas] = useState<{ nome: string; marcada: boolean; tinta: number; revisar: boolean }[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState("");
+  const [aviso, setAviso] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function imagemParaRGBA(bitmap: ImageBitmap) {
@@ -71,6 +75,7 @@ export default function PaginaConferir() {
     setLinhas([]);
     setEpiLinhas([]);
     setSalvo("");
+    setAviso("");
     setQrInfo(null);
     setFuncNome("");
     try {
@@ -119,9 +124,12 @@ export default function PaginaConferir() {
         }
       }
 
-      // 2ª passada determinística: mede exatamente o nº de tarefas e de EPIs
-      const def = doFunc.length
-        ? lerFicha(img, { numTarefas: doFunc.length, numEpis: episNomes.length })
+      // 2ª passada determinística. No ORK2 usamos o nº IMPRESSO de tarefas (vem
+      // no QR) — a geometria fica fiel à ficha mesmo que a rotina tenha mudado
+      // depois. No ORK1, o total atual (comportamento antigo, casa por posição).
+      const nTarefas = info.versao === 2 ? info.n ?? 0 : doFunc.length;
+      const def = nTarefas
+        ? lerFicha(img, { numTarefas: nTarefas, numEpis: episNomes.length })
         : prelim;
 
       setEpiLinhas(
@@ -133,22 +141,42 @@ export default function PaginaConferir() {
         })),
       );
 
-      const conferidas: LinhaConferida[] = (doFunc.length ? doFunc : []).map((r, i) => {
-        const l = def.tarefas[i];
-        const t = tPorId.get(r.tarefa_id);
-        return {
-          rotina: r,
-          nome: t?.nome_tarefa ?? "Tarefa",
-          local: r.inicio_planejado + "–" + r.fim_planejado,
-          marcada: l?.marcada ?? false,
-          tinta: l?.tinta ?? 0,
-          revisar: l?.confianca === "baixa",
-        };
+      const linhaDe = (r: RotinaPlanejada | undefined, l: LinhaOMR | undefined): LinhaConferida => ({
+        rotina: r,
+        nome: r ? tPorId.get(r.tarefa_id)?.nome_tarefa ?? "Tarefa" : "(tarefa saiu da agenda após a impressão)",
+        local: r ? `${r.inicio_planejado}–${r.fim_planejado}` : "—",
+        marcada: l?.marcada ?? false,
+        tinta: l?.tinta ?? 0,
+        revisar: l?.confianca === "baixa",
+        removida: !r,
       });
+
+      let conferidas: LinhaConferida[];
+      if (info.versao === 2) {
+        // Casa cada linha IMPRESSA (código no QR) com a rotina atual de mesmo código.
+        const cod = (r: RotinaPlanejada) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado);
+        const porCodigo = new Map(doFunc.map((r) => [cod(r), r]));
+        const codigos = info.codigos ?? [];
+        conferidas = codigos.map((c, i) => linhaDe(porCodigo.get(c), def.tarefas[i]));
+        const usados = new Set(codigos);
+        const novas = doFunc.filter((r) => !usados.has(cod(r)));
+        const saidas = conferidas.filter((c) => c.removida).length;
+        if (saidas || novas.length) {
+          setAviso(
+            `A rotina mudou desde a impressão da ficha: ${saidas} tarefa(s) saíram da agenda (não serão salvas) e ${novas.length} nova(s) não estão na ficha (marque na agenda). O restante casa certo pelo código.`,
+          );
+        }
+      } else {
+        // ORK1 (ficha antiga): casa por POSIÇÃO — pode desalinhar se a rotina mudou.
+        conferidas = doFunc.map((r, i) => linhaDe(r, def.tarefas[i]));
+        if (doFunc.length) {
+          setAviso("Ficha em formato antigo (casada por posição): se a rotina mudou depois de imprimir, confira cada linha antes de salvar.");
+        }
+      }
       setLinhas(conferidas);
-      if (!doFunc.length) {
+      if (conferidas.length === 0) {
         setErro(
-          `Ficha lida (funcionário ${info.funcionario}), mas não há rotinas planejadas para ${formatarDataBR(info.data)} nesta sede — mostrando só a leitura bruta.`,
+          `Ficha lida (funcionário ${info.funcionario}), mas não há rotinas para ${formatarDataBR(info.data)} nesta sede — mostrando só a leitura bruta.`,
         );
       }
     } catch (e) {
@@ -236,6 +264,10 @@ export default function PaginaConferir() {
             Leitura {qrInfo ? `· ${funcNome || qrInfo.funcionario} · ${formatarDataBR(qrInfo.data)}` : ""}
           </div>
 
+          {aviso && (
+            <div className="alerta alerta-aviso" style={{ marginBottom: 12, fontSize: 13 }}>⚠ {aviso}</div>
+          )}
+
           {linhas.length > 0 ? (
             <>
               <table className="tabela" style={{ fontSize: 13 }}>
@@ -248,29 +280,41 @@ export default function PaginaConferir() {
                 </thead>
                 <tbody>
                   {linhas.map((l, i) => (
-                    <tr key={i} style={l.revisar ? { background: "var(--papel-2)" } : undefined}>
+                    <tr
+                      key={i}
+                      style={{
+                        ...(l.revisar ? { background: "var(--papel-2)" } : {}),
+                        ...(l.removida ? { opacity: 0.5 } : {}),
+                      }}
+                    >
                       <td className="num">{l.local}</td>
                       <td style={{ fontWeight: 600 }}>
                         {l.nome}
-                        {l.revisar && (
+                        {l.removida && (
+                          <span className="selo selo-vermelho" style={{ marginLeft: 8 }} title="Saiu da agenda depois da impressão — não será salva">
+                            fora da agenda
+                          </span>
+                        )}
+                        {l.revisar && !l.removida && (
                           <span className="selo selo-amarelo" style={{ marginLeft: 8 }} title={`Leitura fraca (${(l.tinta * 100).toFixed(0)}%) — confira`}>
                             revisar
                           </span>
                         )}
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: l.removida ? "not-allowed" : "pointer" }}>
                           <input
                             type="checkbox"
                             checked={l.marcada}
+                            disabled={l.removida}
                             onChange={(e) =>
                               setLinhas((arr) =>
                                 arr.map((x, j) => (j === i ? { ...x, marcada: e.target.checked } : x)),
                               )
                             }
                           />
-                          <span style={{ fontSize: 12, color: l.marcada ? "var(--verde)" : "var(--tinta-3)" }}>
-                            {l.marcada ? "feito" : "não"}
+                          <span style={{ fontSize: 12, color: l.removida ? "var(--tinta-3)" : l.marcada ? "var(--verde)" : "var(--tinta-3)" }}>
+                            {l.removida ? "—" : l.marcada ? "feito" : "não"}
                           </span>
                         </label>
                       </td>

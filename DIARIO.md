@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-25 — OMR v2: conferência casa por código (não por posição)
+
+- A ficha casava marcações pela **ordem** das tarefas → se a rotina mudasse depois
+  de imprimir, gravava realizado errado **em silêncio** (identidade E geometria
+  desalinhavam, pois a geometria depende do total `n`). Novo QR **ORK2**
+  = `sede|data|func|n|codigos`: carrega o **nº impresso** e um **código estável por
+  linha** (`codigoLinha` = hash de func|tarefa|início, em `lib/fichaGeometria`).
+  Conferir casa **por código**, usa o `n` impresso na geometria, marca linhas que
+  saíram da agenda como "fora da agenda" (não salva) e **avisa** quando a rotina
+  mudou. Fichas **ORK1** antigas seguem lidas por posição, com aviso. Retrocompat total.
+- Verificado (memory): ficha ORK2 gera (PDF 257KB, válido), `/conferir` monta.
+  Scan físico não é testável aqui. ⚠️ Sempre **reiniciar o preview após build**
+  (rebuild com `next start` vivo desencontra chunks → "Application error").
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `lib/omr.ts`, `app/(app)/conferir/page.tsx`.
+
+---
+
 ## 2026-06-25 — Materialização de rotinas: robustez (lote + id determinístico)
 
 - **`salvarModelo`/`excluirModelo`** gravavam 1 a 1 e `salvarModelo` destruía o

@@ -7,6 +7,23 @@
  *
  * Convenção PDF: origem no canto inferior-esquerdo, y cresce para cima.
  */
+/**
+ * Código curto e ESTÁVEL de uma linha da ficha (6 chars base36), derivado de
+ * funcionário+tarefa+início. Vai no QR (ORK2) na ordem impressa; a conferência
+ * recomputa o mesmo código para casar cada marcação com a rotina certa — mesmo
+ * que a rotina do dia tenha mudado depois de imprimir (fim do "casa por posição").
+ * Gerador (fichaPdf) e leitor (conferir) importam esta função — nunca divergem.
+ */
+export function codigoLinha(funcId: string, tarefaId: string, inicio: string): string {
+  const s = `${funcId}|${tarefaId}|${inicio}`;
+  let h = 0x811c9dc5; // FNV-1a 32 bits
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36).padStart(6, "0").slice(-6);
+}
+
 export const PAGINA = { W: 595.28, H: 841.89 }; // A4
 
 // Cartão ocupa a folha A4 quase inteira (margens ~40pt).
