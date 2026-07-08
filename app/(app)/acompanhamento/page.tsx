@@ -22,6 +22,7 @@ import type {
   Funcionario,
   Local,
   ParametrosResolvidos,
+  Requisito,
   RotinaPlanejada,
   Sede,
   StatusRealizado,
@@ -53,6 +54,8 @@ interface FormExecucao {
   tempo_real_min: number;
   justificativa: string;
   observacao: string;
+  /** EPIs confirmados como usados (nomes). */
+  epis: string[];
 }
 
 const FORM_VAZIO: FormExecucao = {
@@ -62,6 +65,7 @@ const FORM_VAZIO: FormExecucao = {
   tempo_real_min: 0,
   justificativa: "",
   observacao: "",
+  epis: [],
 };
 
 export default function PaginaAcompanhamento() {
@@ -99,6 +103,7 @@ export default function PaginaAcompanhamento() {
     sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null,
     fetcher,
   );
+  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
@@ -119,6 +124,7 @@ export default function PaginaAcompanhamento() {
   const funcPorId = useMemo(() => new Map((funcionarios ?? []).map((f) => [f.id, f])), [funcionarios]);
   const tarefaPorId = useMemo(() => new Map((tarefas ?? []).map((t) => [t.id, t])), [tarefas]);
   const localPorId = useMemo(() => new Map((locais ?? []).map((l) => [l.id, l])), [locais]);
+  const reqPorId = useMemo(() => new Map((requisitos ?? []).map((r) => [r.id, r])), [requisitos]);
   const execucaoPorRotina = useMemo(
     () => new Map((execucoes ?? []).map((e) => [e.rotina_id, e])),
     [execucoes],
@@ -140,11 +146,24 @@ export default function PaginaAcompanhamento() {
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
 
   function abrirRegistro(rotina: RotinaPlanejada) {
+    // EPIs exigidos pela tarefa — pré-marcados como usados (o comum); o
+    // supervisor desmarca a exceção. Reabrindo, usa o que já foi confirmado.
+    const t = tarefaPorId.get(rotina.tarefa_id);
+    const exigidos: string[] = [];
+    for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
+      const req = reqPorId.get(id);
+      if (req?.tipo === "epi" && !exigidos.includes(req.nome)) exigidos.push(req.nome);
+    }
+    const exec = execucaoPorRotina.get(rotina.id);
+    const epis = exec?.epis_confirmados
+      ? exec.epis_confirmados.split(",").map((s) => s.trim()).filter(Boolean)
+      : exigidos;
     setForm({
       ...FORM_VAZIO,
       inicio_real: rotina.inicio_planejado,
       fim_real: rotina.fim_planejado,
       tempo_real_min: rotina.tempo_previsto_min,
+      epis,
     });
     setErro("");
     setRotinaAberta(rotina);
@@ -201,6 +220,18 @@ export default function PaginaAcompanhamento() {
       form.tempo_real_min > 0 &&
       exigeJustificativa(form.tempo_real_min, rotinaAberta.tempo_previsto_min, params));
 
+  // EPIs exigidos pela tarefa da rotina aberta (requisitos tipo "epi").
+  const episDaRotina = useMemo(() => {
+    if (!rotinaAberta) return [];
+    const t = tarefaPorId.get(rotinaAberta.tarefa_id);
+    const nomes: string[] = [];
+    for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
+      const req = reqPorId.get(id);
+      if (req?.tipo === "epi" && !nomes.includes(req.nome)) nomes.push(req.nome);
+    }
+    return nomes;
+  }, [rotinaAberta, tarefaPorId, reqPorId]);
+
   async function salvarExecucao(e: React.FormEvent) {
     e.preventDefault();
     if (!rotinaAberta) return;
@@ -216,6 +247,7 @@ export default function PaginaAcompanhamento() {
         tempo_real_min: statusCritico ? 0 : form.tempo_real_min,
         justificativa: form.justificativa,
         observacao: form.observacao,
+        epis_confirmados: statusCritico ? "" : form.epis.join(", "),
       });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
       setRotinaAberta(null);
@@ -525,6 +557,34 @@ export default function PaginaAcompanhamento() {
                   </div>
                 )}
               </>
+            )}
+
+            {!statusCritico && episDaRotina.length > 0 && (
+              <div className="campo" style={{ gridColumn: "1 / -1" }}>
+                <span className="rotulo">EPIs utilizados</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 4 }}>
+                  {episDaRotina.map((nome) => {
+                    const marcado = form.epis.includes(nome);
+                    return (
+                      <label key={nome} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              epis: e.target.checked
+                                ? [...f.epis, nome]
+                                : f.epis.filter((x) => x !== nome),
+                            }))
+                          }
+                        />
+                        {nome}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             <label className="campo" style={{ gridColumn: "1 / -1" }}>

@@ -32,6 +32,18 @@
 
 ---
 
+## 2026-06-25 — EPI no realizado manual (/acompanhamento)
+
+- Lacuna que sobrou no DIARIO: o realizado manual não registrava EPI (só a
+  conferência por ficha/OMR gravava `epis_confirmados`). Agora o modal de registro
+  mostra **"EPIs utilizados"** — checkboxes com os EPIs exigidos pela tarefa
+  (requisitos tipo epi), **pré-marcados** como usados (desmarca a exceção);
+  ao reabrir, carrega os já confirmados. Grava `epis_confirmados` (vazio se não
+  realizada). Verificado (memory): modal mostra "Luvas nitrílicas", salva e recarrega.
+- Arquivo: `app/(app)/acompanhamento/page.tsx`.
+
+---
+
 ## 2026-06-25 — Dashboard imprimível (relatório gerencial)
 
 - O Dashboard agora dobra como **relatório gerencial impresso**: botão "Imprimir / PDF",
