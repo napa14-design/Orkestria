@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-25 — Rota padrão respeita o dia da semana da tarefa
+
+- `gerarDiaDaRotaPadrao` e `aplicarModelo` agora **pulam** itens cuja tarefa é
+  `frequencia: "semanal"` e cujos `dias_semana` não incluem o dia gerado — usando o
+  campo que **já existe** (cadastro em Tarefas) + `parseDiasSemana`/`diaDaSemana`.
+  Sem campo novo, sem migração; retrocompat (tarefa sem `dias_semana` = todos os
+  dias). O "Ficou de fora hoje" segue apontando as semanais do dia ausentes da rota.
+- Verificado (memory): tarefa semanal com o dia excluído → 0 na geração (43); com o
+  dia incluído → gerada (44).
+- Arquivo: `services/modelosService.ts`.
+
+---
+
 ## 2026-06-25 — Histórico paginado por janela de tempo
 
 - `/api/historico` sem filtro de tabela lia a **coleção inteira** (a que mais cresce

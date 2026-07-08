@@ -12,7 +12,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
+import { diaDaSemana, hhmmParaMin, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
 import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
@@ -155,9 +155,14 @@ export async function aplicarModelo(
       { nivel: "erro", codigo: "MODELO_INEXISTENTE", mensagem: `Modelo "${nome}" não encontrado.` },
     ]);
 
+  // Catálogo de tarefas da sede — para respeitar a frequência semanal por data.
+  const tMap = new Map(
+    (await ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }])).map((t) => [t.id, t]),
+  );
   const resultado: ResultadoAplicacao = { criadas: 0, puladas: 0, detalhes: [] };
   const chave = (f: string, t: string, i: string) => `${f}|${t}|${i}`;
   for (const data of datas) {
+    const dow = diaDaSemana(data);
     // Idempotência: não recria itens que já existem na data (rodar 2× é seguro).
     const jaTem = new Set(
       (await getRotinasByData(data, sedeId))
@@ -168,6 +173,15 @@ export async function aplicarModelo(
       if (jaTem.has(chave(item.funcionario_id, item.tarefa_id, item.inicio_planejado))) {
         resultado.puladas++;
         continue;
+      }
+      // tarefa semanal só nos dias configurados
+      const tItem = tMap.get(item.tarefa_id);
+      if (tItem?.frequencia === "semanal") {
+        const dias = parseDiasSemana(tItem.dias_semana);
+        if (dias.length && !dias.includes(dow)) {
+          resultado.puladas++;
+          continue;
+        }
       }
       try {
         await createRotina(
@@ -235,6 +249,7 @@ export async function gerarDiaDaRotaPadrao(
   const lMap = new Map(locais.map((l) => [l.id, l]));
   const fMap = new Map(funcionarios.map((f) => [f.id, f]));
   const letivoFora = statusPeriodoLetivo(periodos, sedeId, data) === "fora";
+  const dow = diaDaSemana(data); // 0=dom … 6=sáb
   const agora = agoraISO();
 
   // Presença de todos os funcionários numa só rodada (era 1 query por item).
@@ -263,6 +278,15 @@ export async function gerarDiaDaRotaPadrao(
       res.puladas++;
       nota(`${it.inicio_planejado} ${t.nome_tarefa}: fora do período letivo`);
       continue;
+    }
+    // Tarefa semanal só entra nos dias configurados (ex.: "seg,qua,sex").
+    if (t.frequencia === "semanal") {
+      const dias = parseDiasSemana(t.dias_semana);
+      if (dias.length && !dias.includes(dow)) {
+        res.puladas++;
+        nota(`${it.inicio_planejado} ${t.nome_tarefa}: não é do dia da semana`);
+        continue;
+      }
     }
     if (!jornadaDoDia(f, data).trabalha) {
       res.puladas++;
