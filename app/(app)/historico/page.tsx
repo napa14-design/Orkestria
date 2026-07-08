@@ -34,9 +34,10 @@ function formatarQuando(iso: string): string {
 export default function PaginaHistorico() {
   const [tabela, setTabela] = useState("");
   const [busca, setBusca] = useState("");
+  const [dias, setDias] = useState(30); // janela de tempo (0 = tudo, pesado)
 
   const { data, isLoading } = useSWR<RegistroHistorico[]>(
-    `/api/historico${tabela ? `?tabela=${tabela}` : ""}`,
+    `/api/historico?dias=${dias}${tabela ? `&tabela=${tabela}` : ""}`,
     fetcher,
   );
 
@@ -61,6 +62,19 @@ export default function PaginaHistorico() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          {!tabela && (
+            <select
+              value={dias}
+              onChange={(e) => setDias(Number(e.target.value))}
+              title="Janela de tempo (evita ler todo o histórico)"
+              style={{ padding: "8px 10px", border: "1.5px solid var(--tinta)", borderRadius: 4, background: "var(--cartao)" }}
+            >
+              <option value={7}>Últimos 7 dias</option>
+              <option value={30}>Últimos 30 dias</option>
+              <option value={90}>Últimos 90 dias</option>
+              <option value={0}>Tudo (pesado)</option>
+            </select>
+          )}
           <select value={tabela} onChange={(e) => setTabela(e.target.value)} style={{ padding: "8px 10px", border: "1.5px solid var(--tinta)", borderRadius: 4, background: "var(--cartao)" }}>
             <option value="">Tudo</option>
             {Object.entries(ROTULO_TABELA).map(([valor, rotulo]) => (

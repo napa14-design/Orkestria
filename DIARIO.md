@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-06-25 — Histórico paginado por janela de tempo
+
+- `/api/historico` sem filtro de tabela lia a **coleção inteira** (a que mais cresce
+  — toda escrita loga). Agora, sem tabela, restringe por **janela de dias** em
+  `criado_em` (campo único → índice automático, sem índice composto): padrão **30
+  dias**, seletor 7/30/90/Tudo na tela. Filtro por tabela segue por campo único
+  (nunca combina os dois → sem índice composto). Verificado (memory): 44 entradas
+  na janela, ordenadas desc, todas dentro do período.
+- Arquivos: `app/api/historico/route.ts`, `app/(app)/historico/page.tsx`.
+
+---
+
 ## 2026-06-25 — OMR v2: conferência casa por código (não por posição)
 
 - A ficha casava marcações pela **ordem** das tarefas → se a rotina mudasse depois
