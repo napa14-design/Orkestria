@@ -16,7 +16,7 @@ import {
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
-import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -280,11 +280,21 @@ export default function PaginaDashboard() {
     );
   }
 
+  const sedeRotulo = sedeFiltro ? (sedes ?? []).find((s) => s.id === sedeFiltro)?.nome_sede ?? sedeFiltro : "Todas as sedes";
+
   return (
     <div className="entra">
-      {/* filtros */}
+      {/* cabeçalho que aparece só na impressão (relatório gerencial) */}
+      <div className="so-impressao" style={{ marginBottom: 12 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Relatório gerencial — Orkestria</h1>
+        <div className="num" style={{ color: "var(--tinta-2)", fontSize: 13, marginTop: 2 }}>
+          Período {formatarDataBR(de)}–{formatarDataBR(ate)} · {sedeRotulo}
+        </div>
+      </div>
+
+      {/* filtros (somem na impressão) */}
       <div
-        className="painel"
+        className="painel nao-imprimir"
         style={{ display: "flex", alignItems: "flex-end", gap: 14, padding: "12px 16px", marginBottom: 16, flexWrap: "wrap" }}
       >
         <div>
@@ -294,6 +304,9 @@ export default function PaginaDashboard() {
           </span>
         </div>
         <div style={{ flex: 1 }} />
+        <button className="btn" onClick={() => window.print()} disabled={(rotinas ?? []).length === 0}>
+          🖨 Imprimir / PDF
+        </button>
         <button className="btn" onClick={exportarCSV} disabled={(rotinas ?? []).length === 0}>
           ⬇ Exportar CSV
         </button>
@@ -365,25 +378,28 @@ export default function PaginaDashboard() {
         />
       </div>
 
-      {/* calibração da folga por sede a partir dos imprevistos */}
-      <CalibracaoFolga
-        servicosEventuais={eventuais ?? []}
-        funcionarios={funcionarios ?? []}
-        sedes={sedes ?? []}
-        de={de}
-        ate={ate}
-        sedeFiltro={sedeFiltro}
-      />
+      {/* ferramentas interativas — não fazem parte do relatório impresso */}
+      <div className="nao-imprimir">
+        {/* calibração da folga por sede a partir dos imprevistos */}
+        <CalibracaoFolga
+          servicosEventuais={eventuais ?? []}
+          funcionarios={funcionarios ?? []}
+          sedes={sedes ?? []}
+          de={de}
+          ate={ate}
+          sedeFiltro={sedeFiltro}
+        />
 
-      {/* tempos padrão para revisar (previsto × realidade) */}
-      <SugestoesAjuste
-        rotinas={rotinas ?? []}
-        execucoes={execucoes ?? []}
-        tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
-        locais={locais ?? []}
-        parametros={params}
-        aoAplicado={() => void mutateTarefas()}
-      />
+        {/* tempos padrão para revisar (previsto × realidade) */}
+        <SugestoesAjuste
+          rotinas={rotinas ?? []}
+          execucoes={execucoes ?? []}
+          tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
+          locais={locais ?? []}
+          parametros={params}
+          aoAplicado={() => void mutateTarefas()}
+        />
+      </div>
 
       {/* gráficos */}
       <div

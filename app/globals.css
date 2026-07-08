@@ -661,9 +661,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   100% { transform: translateY(0); opacity: 0; }
 }
 
+/* visível só na impressão (cabeçalho de relatório) */
+.so-impressao { display: none; }
+
 /* ── impressão (fichas de rotina) ────────────────────────────────── */
 @media print {
   .nao-imprimir { display: none !important; }
+  .so-impressao { display: block !important; }
   body {
     background: #fff !important;
     background-image: none !important;

@@ -32,6 +32,19 @@
 
 ---
 
+## 2026-06-25 — Dashboard imprimível (relatório gerencial)
+
+- O Dashboard agora dobra como **relatório gerencial impresso**: botão "Imprimir / PDF",
+  **cabeçalho só-impressão** (título + período + sede) e as ferramentas interativas
+  (filtros, Exportar CSV, CalibracaoFolga, SugestoesAjuste) escondidas na impressão
+  (`.nao-imprimir`). Sem lib de PDF — usa `@media print` + "Salvar como PDF" do navegador.
+  (O `/relatorios` mensal por funcionário, p/ o cliente assinar, já existia.)
+- Nova classe `.so-impressao` no globals (oculta na tela, visível na impressão).
+  Verificado: cabeçalho oculto na tela, botão presente, blocos `nao-imprimir` no lugar.
+- Arquivos: `app/(app)/dashboard/page.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-06-25 — OMR v2: conferência casa por código (não por posição)
 
 - A ficha casava marcações pela **ordem** das tarefas → se a rotina mudasse depois
