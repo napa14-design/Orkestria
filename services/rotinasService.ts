@@ -56,12 +56,30 @@ function exigirEscala(funcionario: Funcionario, data: string) {
   }
 }
 
+/**
+ * Id determinístico para rotinas MATERIALIZADAS (gerar/repetir/aplicar rota
+ * padrão). Como é derivado de data+funcionário+tarefa+início, dois cliques
+ * simultâneos gravam o MESMO doc (last-write-wins) em vez de duplicar — fecha a
+ * corrida que a checagem "lê-então-grava" não pega. Alocação manual mantém id
+ * aleatório (pode haver a mesma tarefa/hora só por materialização).
+ */
+export function idMaterializacao(
+  data: string,
+  funcionarioId: string,
+  tarefaId: string,
+  inicio: string,
+): string {
+  return `m_${data}_${funcionarioId}_${tarefaId}_${inicio.replace(/:/g, "")}`;
+}
+
 export interface NovaRotina {
   data: string;
   funcionario_id: string;
   tarefa_id: string;
   inicio_planejado: string;
   observacao?: string;
+  /** Id fixo (determinístico) — usado só pela materialização; manual usa aleatório. */
+  idFixo?: string;
   /** Autorização manual: rebaixa INTERVALO/SOBREPOSICAO de erro para alerta. */
   forcar?: boolean;
   /**
@@ -196,7 +214,7 @@ export async function createRotina(
 
   const agora = agoraISO();
   const rotina: RotinaPlanejada = {
-    id: novoId(),
+    id: entrada.idFixo ?? novoId(),
     data: entrada.data,
     funcionario_id: entrada.funcionario_id,
     sede_id: tarefa.sede_id,
@@ -383,7 +401,7 @@ export async function duplicarDia(
       }
       const copia: RotinaPlanejada = {
         ...r,
-        id: novoId(),
+        id: idMaterializacao(dataDestino, r.funcionario_id, r.tarefa_id, r.inicio_planejado),
         data: dataDestino,
         status: "planejada",
         supervisor_id: supervisorId,

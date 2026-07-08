@@ -7,6 +7,22 @@
 
 ---
 
+## 2026-06-25 — Materialização de rotinas: robustez (lote + id determinístico)
+
+- **`salvarModelo`/`excluirModelo`** gravavam 1 a 1 e `salvarModelo` destruía o
+  modelo antigo ANTES de recriar (falha no meio = rota padrão perdida). Agora:
+  helper `emLotes` (lotes paralelos de 25); `salvarModelo` **cria os novos → desmarca
+  padrão → remove os antigos por id**, nessa ordem (create-then-delete).
+- **Id determinístico** na materialização (`idMaterializacao` = `m_data_func_tarefa_inicio`):
+  gerar/repetir/aplicar usam id fixo → 2 cliques simultâneos gravam o MESMO doc
+  (last-write-wins) em vez de duplicar. Dedup por chave + preservação de status já
+  realizado seguem. Alocação manual mantém id aleatório.
+- Verificado (memory, via API): salvar 44→44 (overwrite ok), gerar 44/0 → re-gerar
+  0/44 (idempotente), 44 ids `m_…`, sem duplicar.
+- Arquivos: `services/modelosService.ts`, `services/rotinasService.ts`.
+
+---
+
 ## 2026-06-25 — Painel de Capacitações (Painéis → Capacitações)
 
 - Nova página `/capacitacoes` (só leitura) — o "sistema de controle de treinamentos

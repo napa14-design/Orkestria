@@ -17,7 +17,14 @@ import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
-import { createRotina, getRotinasByData } from "./rotinasService";
+import { createRotina, getRotinasByData, idMaterializacao } from "./rotinasService";
+
+/** Executa `fn` em lotes paralelos (evita centenas de escritas sequenciais). */
+async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25): Promise<void> {
+  for (let i = 0; i < itens.length; i += lote) {
+    await Promise.all(itens.slice(i, i + lote).map(fn));
+  }
+}
 
 export interface ResumoModelo {
   nome_modelo: string;
@@ -92,36 +99,37 @@ export async function salvarModelo(
       },
     ]);
 
-  await excluirModelo(nomeLimpo, sedeId); // sobrescreve o mesmo nome
   const ds = await getDataSource();
   const agora = agoraISO();
+  const todos = await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }]);
+  // Itens do mesmo nome: removidos DEPOIS de criar os novos, para não destruir a
+  // rota padrão se algo falhar no meio (create-then-delete, não delete-then-create).
+  const antigos = todos.filter((m) => m.nome_modelo === nomeLimpo);
 
-  // Só uma rota padrão por sede: desmarca as demais.
+  const novos: ModeloRotinaItem[] = rotinas.map((r) => ({
+    id: novoId(),
+    nome_modelo: nomeLimpo,
+    sede_id: sedeId,
+    funcionario_id: r.funcionario_id,
+    tarefa_id: r.tarefa_id,
+    local_id: r.local_id,
+    inicio_planejado: r.inicio_planejado,
+    // Snapshot fiel da duração planejada — a geração reproduz o dia exatamente,
+    // sem recalcular (evita divergência por fator de serviço/intensidade).
+    ...(opts.comDuracao ? { duracao_min: r.tempo_previsto_min } : {}),
+    ...(opts.padrao ? { padrao: true } : {}),
+    criado_por: autor,
+    criado_em: agora,
+  }));
+
+  // 1) cria os novos; 2) só uma rota padrão por sede (desmarca as demais);
+  // 3) remove os antigos do mesmo nome — tudo em lotes paralelos.
+  await emLotes(novos, (item) => ds.criar("modelos_rotina", item));
   if (opts.padrao) {
-    const outros = await ds.consultar("modelos_rotina", [
-      { campo: "sede_id", op: "==", valor: sedeId },
-    ]);
-    for (const m of outros) if (m.padrao) await ds.atualizar("modelos_rotina", m.id, { padrao: false });
+    const desmarcar = todos.filter((m) => m.padrao && m.nome_modelo !== nomeLimpo);
+    await emLotes(desmarcar, (m) => ds.atualizar("modelos_rotina", m.id, { padrao: false }));
   }
-
-  for (const r of rotinas) {
-    const item: ModeloRotinaItem = {
-      id: novoId(),
-      nome_modelo: nomeLimpo,
-      sede_id: sedeId,
-      funcionario_id: r.funcionario_id,
-      tarefa_id: r.tarefa_id,
-      local_id: r.local_id,
-      inicio_planejado: r.inicio_planejado,
-      // Snapshot fiel da duração planejada — a geração reproduz o dia exatamente,
-      // sem recalcular (evita divergência por fator de serviço/intensidade).
-      ...(opts.comDuracao ? { duracao_min: r.tempo_previsto_min } : {}),
-      ...(opts.padrao ? { padrao: true } : {}),
-      criado_por: autor,
-      criado_em: agora,
-    };
-    await ds.criar("modelos_rotina", item);
-  }
+  await emLotes(antigos, (m) => ds.excluir("modelos_rotina", m.id));
   return { itens: rotinas.length };
 }
 
@@ -170,6 +178,7 @@ export async function aplicarModelo(
             inicio_planejado: item.inicio_planejado,
             duracao_min: item.duracao_min,
             observacao: `Modelo: ${nome}`,
+            idFixo: idMaterializacao(data, item.funcionario_id, item.tarefa_id, item.inicio_planejado),
           },
           supervisorId,
         );
@@ -269,7 +278,7 @@ export async function gerarDiaDaRotaPadrao(
     const previsto = it.duracao_min ?? tempoPrevistoMin(t, lMap.get(it.local_id) ?? undefined);
     const fim = minParaHHMM(hhmmParaMin(it.inicio_planejado) + previsto);
     const rotina: RotinaPlanejada = {
-      id: novoId(),
+      id: idMaterializacao(data, it.funcionario_id, it.tarefa_id, it.inicio_planejado),
       data,
       funcionario_id: it.funcionario_id,
       sede_id: sedeId,
@@ -303,6 +312,6 @@ export async function excluirModelo(nome: string, sedeId: string): Promise<numbe
   const itens = (
     await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }])
   ).filter((m) => m.nome_modelo === nome);
-  for (const item of itens) await ds.excluir("modelos_rotina", item.id);
+  await emLotes(itens, (item) => ds.excluir("modelos_rotina", item.id));
   return itens.length;
 }
