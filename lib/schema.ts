@@ -97,6 +97,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
   sedes: [
     col("id"),
     col("nome_sede"),
+    col("codigo"),
     col("cidade"),
     col("endereco"),
     col("tipo_sede"),

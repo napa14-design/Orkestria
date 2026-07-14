@@ -3,6 +3,8 @@ import type { Auditoria, TipoSede } from "./comum";
 export interface Sede extends Auditoria {
   id: string;
   nome_sede: string;
+  /** Sigla da unidade como a operação a chama (ex.: DT, SUL 1, PQL 3). Opcional. */
+  codigo?: string;
   cidade: string;
   endereco: string;
   /**

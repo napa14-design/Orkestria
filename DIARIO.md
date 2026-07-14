@@ -32,6 +32,30 @@
 
 ---
 
+## 2026-07-14 — Estrutura real de sedes (17) + limpeza das fictícias
+
+- **Sede ganhou `codigo`** (a sigla que a operação usa: DT, SUL 1, PQL 3…) — tipo,
+  schema e tela de Sedes (aparece como selo ao lado do nome). `grupo` passa a guardar
+  a **região**, que é o que o `/panorama` agrega.
+- **Cadastradas as 17 sedes reais** (14 novas + 3 atualizadas **sem recriar**, para não
+  perder funcionários/rotinas/rota padrão):
+  - 🎓 **Universidade (UNI)**: ALD Aldeota · BN Benfica *(existente)* · DL Dom Luís ·
+    EUS Eusébio *(existente)* · PE Parque Ecológico · PQL 3 Parquelândia 3
+  - 🏫 **Colégio**: **RDT** DT *(existente)* · **RAL** BS, SP, PN · **RPQ** PQL 1, PQL 2,
+    PJV · **RSU** SUL 1, SUL 2, SUL 3, PSUL
+  - Decisões do usuário: BN e UNIBENFICA são **a mesma unidade**; DT2/PDT/IDIOMAS **não
+    existem**; EDV e Construtora **não são sedes**.
+- **Limpeza:** removidas as 3 sedes **fictícias** de demonstração que ainda estavam em
+  produção (`sede_aldeota`, `sede_centro`, `sede_dt`) e todo o dado pendurado nelas —
+  **36 documentos** (5 funcionários, 9 locais, 12 tarefas, 5 rotinas, 1 parâmetro, 1
+  ausência). Iam aparecer para o diretor e a "Sede Aldeota" fake conviveria com a
+  Aldeota real. Nada do Christus real foi tocado.
+- Verificado: 17 sedes, 0 fictícias, agrupamento UNI(6)/RAL(3)/RDT(1)/RPQ(3)/RSU(4),
+  siglas visíveis na tela.
+- Arquivos: `types/Sede.ts`, `lib/schema.ts`, `app/(app)/sedes/page.tsx` (+ operação de dados).
+
+---
+
 ## 2026-07-14 — Ficha: bloco de EPI colidia com as tarefas (geometria dinâmica)
 
 - **Bug:** o bloco de EPI tinha posição **fixa** (`EPI.linha0=350`, título em y=356),

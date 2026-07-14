@@ -21,6 +21,13 @@ export default function PaginaSedes() {
       vazio="Comece cadastrando a primeira sede — locais, tarefas e equipe pendem dela."
       campos={[
         { key: "nome_sede", rotulo: "Nome da sede", tipo: "texto", obrigatorio: true },
+        {
+          key: "codigo",
+          rotulo: "Sigla",
+          tipo: "texto",
+          ajuda: "Como a operação chama a unidade (ex.: DT, SUL 1, PQL 3)",
+          dica: "A sigla usada no dia a dia e nas planilhas. Aparece ao lado do nome nas listagens e relatórios.",
+        },
         { key: "cidade", rotulo: "Cidade", tipo: "texto" },
         { key: "endereco", rotulo: "Endereço", tipo: "texto", inteira: true },
         {
@@ -41,7 +48,16 @@ export default function PaginaSedes() {
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
       ]}
       colunas={[
-        { key: "nome_sede", rotulo: "Sede" },
+        {
+          key: "nome_sede",
+          rotulo: "Sede",
+          render: (s) => (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              {s.codigo && <span className="selo selo-cinza num">{s.codigo}</span>}
+              <strong>{s.nome_sede}</strong>
+            </span>
+          ),
+        },
         { key: "cidade", rotulo: "Cidade" },
         {
           key: "tipo_sede",
