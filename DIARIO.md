@@ -32,6 +32,22 @@
 
 ---
 
+## 2026-06-25 — Catálogo de requisitos na produção (treinamentos + EPIs)
+
+- Com confirmação, gravados no Firebase **9 treinamentos** (Integração admissional,
+  Produtos químicos/FISPQ, Boas práticas, Concorrente×Terminal, Biossegurança,
+  EPIs/NR-6, Resíduos/RSS, NR-32, Ergonomia) — base do Programa Permanente de
+  Capacitação. Falta o RH **atribuir** às pessoas (Qualificações) p/ a cobertura sair do 0%.
+- **Bug encontrado e corrigido:** produção tinha **0 requisitos**, mas **201 tarefas
+  referenciavam `rq3/rq4/rq5/rq9`** (EPIs) — referências quebradas (o import trouxe as
+  tarefas, nunca a coleção `requisitos`; mesmo caso das categorias). Efeito: ficha
+  impressa **sem bloco de EPI**, conferência sem EPIs, checkboxes de EPI invisíveis.
+  Gravados os **8 EPIs** (rq3–rq10) com os ids exatos. Verificado: **0 referências
+  quebradas**; **20 das 26 fichas** de 24/06 agora saem com EPI.
+- Catálogo final: **17 requisitos** (8 EPI + 9 treinamento). Operação de dados.
+
+---
+
 ## 2026-06-25 — EPI no realizado manual (/acompanhamento)
 
 - Lacuna que sobrou no DIARIO: o realizado manual não registrava EPI (só a
