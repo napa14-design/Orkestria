@@ -125,13 +125,19 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .btn-mini { padding: 4px 10px; font-size: 11px; }
 
 /* ── formulários ──────────────────────────────────────────────────── */
-.campo { display: flex; flex-direction: column; gap: 4px; }
+/* min-width:0 deixa o campo encolher dentro do grid/flex do pai (senão o
+   conteúdo do <select> define o piso da largura e estoura o modal). */
+.campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .campo input, .campo select, .campo textarea {
   padding: 8px 10px;
   background: var(--cartao);
   border: 1.5px solid var(--tinta);
   border-radius: var(--raio);
   color: var(--tinta);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .campo input:focus, .campo select:focus, .campo textarea:focus {
   outline: 2px solid var(--acento);
@@ -445,7 +451,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 .form-grade {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) — sem isso a coluna herda min-width:auto e um <select> com
+     opção longa (ex.: nome de tarefa) não encolhe: estoura a largura do modal. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
 }
 

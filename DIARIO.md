@@ -32,6 +32,24 @@
 
 ---
 
+## 2026-07-14 — Modais: select estourava a largura (fix global)
+
+- **Bug:** nos modais de cadastro, o `<select>` da coluna da direita (ex.: Tarefa em
+  "Tempos por pessoa") **vazava para fora** do modal, criando scroll horizontal.
+- **Causa (CSS Grid):** `.form-grade` usava `1fr 1fr`, e coluna `1fr` herda
+  `min-width: auto` — o select **não encolhe** abaixo da opção mais longa (nomes de
+  tarefa são enormes) e empurra a coluna para fora. Os controles também não tinham
+  `width: 100%` / `min-width: 0`.
+- **Correção (1 lugar, vale para TODOS os modais):** `grid-template-columns:
+  minmax(0, 1fr) minmax(0, 1fr)`; `.campo { min-width: 0 }`; e
+  `input/select/textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing:
+  border-box }`.
+- Verificado: "Tempos por pessoa" (4 campos) e "Funcionários" (15 campos) → **0 campos
+  estourando, 0 scroll horizontal**; o select agora termina exatamente na borda do form.
+- Arquivo: `app/globals.css`.
+
+---
+
 ## 2026-07-14 — Estrutura real de sedes (17) + limpeza das fictícias
 
 - **Sede ganhou `codigo`** (a sigla que a operação usa: DT, SUL 1, PQL 3…) — tipo,
