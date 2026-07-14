@@ -32,6 +32,26 @@
 
 ---
 
+## 2026-07-14 — Ficha: bloco de EPI colidia com as tarefas (geometria dinâmica)
+
+- **Bug:** o bloco de EPI tinha posição **fixa** (`EPI.linha0=350`, título em y=356),
+  mas a lista de tarefas é **dinâmica**. Com ~22 tarefas (Tamires) a lista descia até
+  y=367 e a instrução caía em y≈346 — **abaixo** do título dos EPIs → o "EPIS
+  UTILIZADOS" aparecia espremido/por cima do fim das tarefas.
+- **Correção (fonte única `lib/fichaGeometria.ts`, vale p/ gerador E leitor):** o topo
+  do bloco de EPI agora **acompanha o fim das tarefas** — `epiTopo(n)` entre um **teto**
+  (350: poucas tarefas → EPI logo abaixo, sem buraco) e um **piso** (302: muitas → desce
+  sem invadir Observações). `epiPos(i, n)` passou a receber `n` (o leitor já tinha).
+  `TAREFA.floor` 392→345 e `deltaMin` 14,5→13,2 (mínimo seguro: caixa de 12pt, leitor
+  amostra ±3,3pt do centro). Observações agora se posicionam abaixo do bloco anterior.
+- Verificado (cálculo + geração): **sem colisão de 4 a 27 tarefas** (folga ≥ 0; o caso
+  real, 22, ganhou 12pt); ficha gera PDF válido. Limite prático ≈ **27 tarefas/página**.
+- ⚠️ **Reimprima as fichas** feitas antes desta mudança — a geometria mudou e o leitor
+  novo procura os EPIs na posição nova.
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `lib/omr.ts`.
+
+---
+
 ## 2026-06-25 — Catálogo de requisitos na produção (treinamentos + EPIs)
 
 - Com confirmação, gravados no Firebase **9 treinamentos** (Integração admissional,

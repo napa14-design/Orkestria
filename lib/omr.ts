@@ -358,7 +358,7 @@ export function lerFicha(
   let semBoxE = 0,
     comecouE = false;
   for (let i = 1; i <= maxE; i++) {
-    const { x: ex, y: cy } = epiPos(i - 1);
+    const { x: ex, y: cy } = epiPos(i - 1, nT);
     const fi = tinta(g, w, h, H, thr, ex, cy, CAIXA_LADO_PDF, 0.55);
     if (opts.numEpis) {
       epis.push({ linha: i, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });

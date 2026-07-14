@@ -46,7 +46,12 @@ export const CAIXA_LADO = 12; // lado das caixas de marcação
  * se comprimem para caber acima do bloco de EPIs (deltaMin). Gerador e leitor
  * usam `tarefaY(i, n)` — mesma conta dos dois lados, então nunca divergem.
  */
-export const TAREFA = { x: 436, linha0: 686, deltaMax: 26, deltaMin: 14.5, floor: 392 };
+/**
+ * `deltaMin` 13,2pt é o mínimo seguro: a caixa tem 12pt e o leitor amostra só
+ * ±3,3pt do centro, então a tinta da caixa vizinha (a ≥7pt) nunca contamina.
+ * Abaixo disso a ficha começa a não caber (limite prático ≈ 27 tarefas/página).
+ */
+export const TAREFA = { x: 436, linha0: 686, deltaMax: 26, deltaMin: 13.2, floor: 345 };
 
 /** Espaçamento entre linhas de tarefa para um total de `n` tarefas. */
 export function deltaTarefas(n: number): number {
@@ -63,20 +68,32 @@ export function tarefaY(i: number, n: number): number {
 /**
  * Bloco de EPIs no rodapé, em colunas (cabe muito mais que uma coluna só).
  * O índice (0-based) preenche a 1ª coluna de cima para baixo e transborda para
- * a próxima. `epiPos(i)` dá o centro da caixa i — usado pelo gerador E pelo leitor.
+ * a próxima.
+ *
+ * O topo do bloco é **dinâmico**: acompanha o fim da lista de tarefas (que varia
+ * com `n`), entre um TETO (poucas tarefas → EPI logo abaixo delas, sem buraco) e
+ * um PISO (muitas tarefas → desce até aqui, sem invadir as Observações). Antes era
+ * fixo em 350 e, com ~22 tarefas, a lista descia e colidia com o título dos EPIs.
  */
 export const EPI = {
-  linha0: 350,
+  tetoTopo: 350, // mais alto que o bloco pode ficar (poucas tarefas)
+  pisoTopo: 302, // mais baixo (muitas tarefas) — abaixo disso invade Observações
   delta: 21,
   porColuna: 5,
   colX: [76, 320] as number[],
 };
 
-/** Centro da caixa de marcação do EPI de índice `i` (0-based). */
-export function epiPos(i: number): { x: number; y: number } {
+/** Topo do bloco de EPIs para um total de `n` tarefas (gerador E leitor). */
+export function epiTopo(n: number): number {
+  const ultimaSeparadora = tarefaY(n, n) - deltaTarefas(n) / 2;
+  return Math.max(EPI.pisoTopo, Math.min(EPI.tetoTopo, ultimaSeparadora - 32));
+}
+
+/** Centro da caixa de marcação do EPI de índice `i` (0-based), dado o total `n` de tarefas. */
+export function epiPos(i: number, n: number): { x: number; y: number } {
   const col = Math.min(Math.floor(i / EPI.porColuna), EPI.colX.length - 1);
   const row = i % EPI.porColuna;
-  return { x: EPI.colX[col], y: EPI.linha0 - EPI.delta * (row + 1) };
+  return { x: EPI.colX[col], y: epiTopo(n) - EPI.delta * (row + 1) };
 }
 
 /** Quantos EPIs cabem no bloco (todas as colunas cheias). */

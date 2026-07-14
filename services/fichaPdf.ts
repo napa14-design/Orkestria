@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, EPI, epiPos, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
+import { CARD, EPI, epiPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -133,11 +133,12 @@ async function desenhaFicha(
     { x: x0 + 12, y: ultimaY - 14, size: 7.5, font: reg, color: CINZA3 },
   );
 
-  // EPIs no rodapé (em colunas — cabe muito mais)
+  // EPIs no rodapé (em colunas). O topo acompanha o fim das tarefas — nunca colide.
+  const topoEpi = epiTopo(nT);
   if (f.epis.length) {
-    page.drawText("EPIS UTILIZADOS (marque o que usou):", { x: x0 + 12, y: EPI.linha0 + 6, size: 8, font: bold, color: ACENTO });
+    page.drawText("EPIS UTILIZADOS (marque o que usou):", { x: x0 + 12, y: topoEpi + 6, size: 8, font: bold, color: ACENTO });
     f.epis.forEach((nome, idx) => {
-      const { x: cx, y: cy } = epiPos(idx);
+      const { x: cx, y: cy } = epiPos(idx, nT);
       page.drawRectangle({ x: cx - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
       if (marcarTodas) desenhaX(page, cx, cy);
       const larguraNome = (idx >= EPI.porColuna ? CARD.x1 : EPI.colX[1]) - (cx + 14) - 4;
@@ -145,10 +146,11 @@ async function desenhaFicha(
     });
   }
 
-  // Observações / ocorrências — preenche o rodapé com espaço útil para anotar
-  const obsTop = 228;
+  // Observações / ocorrências — logo abaixo do que veio antes (EPIs ou tarefas).
+  const fimAcima = f.epis.length ? topoEpi - EPI.delta * EPI.porColuna : ultimaY - 24;
+  const obsTop = Math.max(178, Math.min(228, fimAcima - 24));
   page.drawText("OBSERVAÇÕES / OCORRÊNCIAS DO DIA:", { x: x0 + 12, y: obsTop, size: 8, font: bold, color: ACENTO });
-  for (const ly of [210, 186, 162, 138, 114]) {
+  for (const ly of [obsTop - 20, obsTop - 44, obsTop - 68]) {
     page.drawLine({ start: { x: x0 + 12, y: ly }, end: { x: x1 - 12, y: ly }, thickness: 0.5, color: LINHA });
   }
 
