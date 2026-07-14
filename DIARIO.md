@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-07-14 — Importador de planilha (+ modelo para o supervisor preencher)
+
+- Nova tela **`/importar`**: o supervisor baixa o modelo `.xlsx`, preenche a rota no
+  Excel e sobe. O sistema mostra um **preview sem gravar** (quantos funcionários,
+  locais, tarefas e rotinas seriam criados + erros linha a linha) e só então importa.
+- **O modelo é a própria rota: uma linha por tarefa.** Funcionários (jornada,
+  intervalos, turno), locais, tarefas (`tempo_base_min` = fim − início) e as rotinas
+  do dia são todos **derivados** dela — é como as planilhas reais do Christus já são
+  escritas. Não há coluna de duração nem de turno (seriam redundantes).
+- **Não duplica nada**: entidades casam por nome dentro da sede e as rotinas usam o
+  id determinístico (`idMaterializacao`) — reimportar a mesma planilha é seguro
+  (verificado: 2ª importação = 0 criados, 5 já existiam). Opcionalmente já salva a
+  rota como **rota padrão** da sede.
+- Validação (bloqueia): campo obrigatório vazio, hora fora de `HH:mm`, fim ≤ início,
+  saída ≤ entrada, duas tarefas sobrepostas da mesma pessoa. Avisos (não bloqueiam):
+  tarefa fora do expediente, jornadas/durações divergentes, categoria ou EPI que não
+  existe no catálogo (a linha entra sem eles). A linha de exemplo do modelo é
+  ignorada se o supervisor esquecer de apagá-la.
+- Só `.xlsx` — o CSV do Excel pt-BR usa `;` e quebraria o parser.
+- Arquivos: `lib/importacaoRota.ts` (colunas + derivação, puro),
+  `services/importacaoService.ts`, `app/api/importar/{modelo,analisar,aplicar}/route.ts`,
+  `app/(app)/importar/page.tsx`, `components/AppShell.tsx`. Dependência nova: `exceljs`.
+
+---
+
 ## 2026-06-25 — Rota padrão respeita o dia da semana da tarefa
 
 - `gerarDiaDaRotaPadrao` e `aplicarModelo` agora **pulam** itens cuja tarefa é

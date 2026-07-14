@@ -44,6 +44,7 @@ const GRUPOS: Grupo[] = [
   {
     rotulo: "Estrutura",
     itens: [
+      { href: "/importar", rotulo: "Importar rota (planilha)" },
       { href: "/sedes", rotulo: "Sedes" },
       { href: "/locais", rotulo: "Locais" },
       { href: "/tarefas", rotulo: "Tarefas" },
