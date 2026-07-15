@@ -70,7 +70,7 @@ export default function PaginaDashboard() {
     fetcher,
   );
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
-    `/api/execucoes?de=${de}&ate=${ate}`,
+    `/api/execucoes?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
   const { data: eventuais } = useSWR<ServicoEventual[]>(

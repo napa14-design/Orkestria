@@ -55,7 +55,7 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null, fetcher);
   const { data: ausencias } = useSWR<Ausencia[]>(sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null, fetcher);
   // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
-  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(sedeId ? `/api/execucoes?de=${data}&ate=${data}` : null, fetcher);
+  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
   // Últimos 31 dias: base do cálculo de "periódica vencida" e do "repetir".
   const { data: historico } = useSWR<RotinaPlanejada[]>(
     sedeId ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,

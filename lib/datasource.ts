@@ -8,11 +8,18 @@
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 /**
- * Condição de consulta. Para o Firestore, use SEMPRE condições sobre UM ÚNICO
- * campo (igualdade, ou um intervalo >=/<= no mesmo campo) — assim só o índice
- * automático de campo único é usado, sem precisar criar índices compostos.
- * Filtros secundários (ex.: sede além da data) devem ser feitos em memória
- * sobre o resultado já reduzido.
+ * Condição de consulta.
+ *
+ * Regra geral: prefira condições sobre UM ÚNICO campo (igualdade, ou um
+ * intervalo >=/<= no mesmo campo) — o Firestore resolve com o índice automático
+ * de campo único, sem configurar nada.
+ *
+ * EXCEÇÃO deliberada (caminho quente): as consultas por **sede + data** nas
+ * coleções que crescem sem limite no tempo (`rotinas_planejadas`,
+ * `execucoes_realizadas`) combinam `sede_id ==` com `data`/`data_execucao`.
+ * Sem isso, ver a agenda de UMA sede leria o dia das 17 (≈17× leituras). Esses
+ * dois casos têm índice composto declarado em `firestore.indexes.json` — ao
+ * adicionar uma nova consulta multi-campo, adicione o índice correspondente lá.
  */
 export type CondicaoConsulta = {
   campo: string;

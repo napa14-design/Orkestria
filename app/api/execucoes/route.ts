@@ -10,6 +10,7 @@ export async function GET(req: Request) {
       await getExecucoes(
         url.searchParams.get("de") ?? undefined,
         url.searchParams.get("ate") ?? undefined,
+        url.searchParams.get("sede") ?? undefined,
       ),
     );
   });

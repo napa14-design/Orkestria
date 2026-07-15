@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-07-15 — Corte de leituras do Firestore (escala: 17 sedes)
+
+- **Problema previsto**: no cota grátis (50k leituras/dia), o jeito atual estoura
+  com o efetivo real. Causa raiz: as consultas quentes filtravam **só por `data`**
+  e reduziam a sede **em memória** → ver a agenda de UMA sede lia o dia das 17
+  (~17× leituras). A agenda ainda puxa 31 dias de histórico por carga → chegava a
+  ~155k leituras **numa única abertura**.
+- **Correção central (índice composto sede + data)**: `getRotinasByData` e
+  `getRotinasPeriodo` agora combinam `sede_id ==` com `data` quando a sede é
+  informada (a UI já mandava `&sede=`, o serviço é que ignorava). Cai de ~5.000
+  para ~300 leituras por consulta na agenda/acompanhamento.
+- **Execuções**: `execucoes_realizadas` ganhou `sede_id` (desnormalizado da rotina
+  no `registrarExecucao`) + consulta composta (`sede_id` + `data_execucao`).
+  Dashboard/acompanhamento/agenda passam a mandar `&sede=`.
+- **Índices**: novo `firestore.indexes.json` (rotinas: `sede_id,data`; execuções:
+  `sede_id,data_execucao`). **Deploy uma vez**: `firebase deploy --only
+  firestore:indexes` (ou colar no Console). Sem isso, a consulta composta falha.
+- **`delete*` (funcionário/local/tarefa)** contavam vínculos lendo a **coleção
+  inteira** de rotinas → agora consultam pela FK (só os vínculos daquele registro).
+- Já estavam prontos e ajudam: `SWRConfig` global com `revalidateOnFocus:false`
+  (não rebusca tudo a cada foco de aba) e `keepPreviousData`.
+- **Backfill**: execuções antigas (se houver) não têm `sede_id` — a consulta por
+  sede não as pega até um backfill. Fase 2 mal usada em produção, então é seguro.
+- Verificado (memory): rotinas/execuções escopam por sede; execução nasce com
+  `sede_id` da rotina; sede inexistente → 0 (o filtro é aplicado na query).
+- Arquivos: `services/{rotinasService,execucoesService,funcionariosService,
+  locaisService,tarefasService}.ts`, `types/ExecucaoRealizada.ts`, `lib/schema.ts`,
+  `lib/datasource.ts`, `app/api/execucoes/route.ts`, `app/(app)/{dashboard,
+  acompanhamento}/page.tsx`, `app/(app)/rotinas/useRotinaData.ts`,
+  `firestore.indexes.json`, `CLAUDE.md`.
+
+---
+
 ## 2026-07-14 — Importador de planilha (+ modelo para o supervisor preencher)
 
 - Nova tela **`/importar`**: o supervisor baixa o modelo `.xlsx`, preenche a rota no

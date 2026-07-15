@@ -84,7 +84,7 @@ export default function PaginaAcompanhamento() {
     fetcher,
   );
   const { data: execucoes, mutate: mutateExecucoes } = useSWR<ExecucaoRealizada[]>(
-    `/api/execucoes?de=${data}&ate=${data}`,
+    sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null,
     fetcher,
   );
   const { data: funcionarios } = useSWR<Funcionario[]>(

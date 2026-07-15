@@ -181,6 +181,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
   execucoes_realizadas: [
     col("id"),
     col("rotina_id"),
+    col("sede_id"),
     col("data_execucao"),
     col("status_realizado"),
     col("inicio_real"),

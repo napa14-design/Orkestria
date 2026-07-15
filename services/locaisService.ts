@@ -56,13 +56,12 @@ export async function updateLocal(
 /** Bloqueado quando há tarefas ou histórico vinculados. */
 export async function deleteLocal(id: string): Promise<void> {
   const ds = await getDataSource();
+  // Consulta pela FK (índice de campo único) → lê só os vínculos DESTE local.
   const [tarefas, rotinas] = await Promise.all([
-    ds.listar("tarefas"),
-    ds.listar("rotinas_planejadas"),
+    ds.consultar("tarefas", [{ campo: "local_id", op: "==", valor: id }]),
+    ds.consultar("rotinas_planejadas", [{ campo: "local_id", op: "==", valor: id }]),
   ]);
-  const vinculos =
-    tarefas.filter((t) => t.local_id === id).length +
-    rotinas.filter((r) => r.local_id === id).length;
+  const vinculos = tarefas.length + rotinas.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {

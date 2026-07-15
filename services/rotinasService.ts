@@ -119,12 +119,12 @@ export async function getRotinasByData(
   sedeId?: string,
 ): Promise<RotinaPlanejada[]> {
   const ds = await getDataSource();
-  // Firestore: lê só as rotinas DESTA data (índice de campo único); a sede é
-  // filtrada em memória sobre esse conjunto já pequeno.
-  const doDia = await ds.consultar("rotinas_planejadas", [
-    { campo: "data", op: "==", valor: data },
-  ]);
-  return sedeId ? doDia.filter((r) => r.sede_id === sedeId) : doDia;
+  // Com sede: consulta composta (sede_id + data) → o Firestore lê SÓ as rotinas
+  // daquela sede naquele dia (índice composto em firestore.indexes.json), em vez
+  // de ler o dia de todas as 17 sedes e filtrar em memória (17× mais leituras).
+  const cond: Parameters<typeof ds.consultar>[1] = [{ campo: "data", op: "==", valor: data }];
+  if (sedeId) cond.unshift({ campo: "sede_id", op: "==", valor: sedeId });
+  return ds.consultar("rotinas_planejadas", cond);
 }
 
 export async function getRotinasPeriodo(
@@ -133,12 +133,14 @@ export async function getRotinasPeriodo(
   sedeId?: string,
 ): Promise<RotinaPlanejada[]> {
   const ds = await getDataSource();
-  // intervalo sobre o campo `data` (índice de campo único — sem índice composto)
-  const noPeriodo = await ds.consultar("rotinas_planejadas", [
+  // Com sede: composta (sede_id + intervalo em data) — mesmo índice composto
+  // (sede_id, data) cobre a igualdade e o range. Sem sede: range só em `data`.
+  const cond: Parameters<typeof ds.consultar>[1] = [
     { campo: "data", op: ">=", valor: de },
     { campo: "data", op: "<=", valor: ate },
-  ]);
-  return sedeId ? noPeriodo.filter((r) => r.sede_id === sedeId) : noPeriodo;
+  ];
+  if (sedeId) cond.unshift({ campo: "sede_id", op: "==", valor: sedeId });
+  return ds.consultar("rotinas_planejadas", cond);
 }
 
 export async function createRotina(

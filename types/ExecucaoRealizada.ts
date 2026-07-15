@@ -3,6 +3,12 @@ import type { StatusRealizado } from "./comum";
 export interface ExecucaoRealizada {
   id: string;
   rotina_id: string;
+  /**
+   * Sede da rotina (desnormalizada da rotina planejada). Serve só para a
+   * consulta composta (sede_id + data_execucao) reduzir leituras no Firestore —
+   * a fonte da verdade continua sendo a rotina.
+   */
+  sede_id: string;
   /** Formato YYYY-MM-DD */
   data_execucao: string;
   status_realizado: StatusRealizado;

@@ -19,10 +19,17 @@ const STATUS_ROTINA_POR_EXECUCAO: Record<StatusRealizado, StatusRotina> = {
   cancelada: "cancelada",
 };
 
-export async function getExecucoes(de?: string, ate?: string): Promise<ExecucaoRealizada[]> {
+export async function getExecucoes(
+  de?: string,
+  ate?: string,
+  sedeId?: string,
+): Promise<ExecucaoRealizada[]> {
   const ds = await getDataSource();
-  // intervalo sobre data_execucao (campo único — sem índice composto)
+  // Com sede: composta (sede_id + intervalo em data_execucao) → lê só as
+  // execuções daquela sede (índice composto em firestore.indexes.json). Sem
+  // sede: range só em data_execucao.
   const cond = [];
+  if (sedeId) cond.push({ campo: "sede_id", op: "==" as const, valor: sedeId });
   if (de) cond.push({ campo: "data_execucao", op: ">=" as const, valor: de });
   if (ate) cond.push({ campo: "data_execucao", op: "<=" as const, valor: ate });
   return cond.length
@@ -31,11 +38,13 @@ export async function getExecucoes(de?: string, ate?: string): Promise<ExecucaoR
 }
 
 export async function registrarExecucao(
-  dados: Omit<ExecucaoRealizada, "id" | "criado_em" | "atualizado_em">,
+  // sede_id é preenchida aqui a partir da rotina (o cliente não envia).
+  dados: Omit<ExecucaoRealizada, "id" | "sede_id" | "criado_em" | "atualizado_em">,
 ): Promise<ExecucaoRealizada> {
   const ds = await getDataSource();
   const rotina = await ds.obter("rotinas_planejadas", dados.rotina_id);
   if (!rotina) throw new Error("Rotina planejada não encontrada.");
+  const comSede = { ...dados, sede_id: rotina.sede_id };
 
   const parametros = await resolverParametros(rotina.sede_id);
   // Tarefa com "tempo é referência" não cobra desvio (execução varia muito).
@@ -60,29 +69,29 @@ export async function registrarExecucao(
   }
 
   const agora = agoraISO();
-  dados = { ...dados, epis_confirmados: dados.epis_confirmados ?? "" };
+  const registro = { ...comSede, epis_confirmados: comSede.epis_confirmados ?? "" };
 
   // Idempotência: uma execução por (rotina, data). Reenviar a mesma ficha
   // ATUALIZA o registro em vez de duplicar.
   const doRotina = await ds.consultar("execucoes_realizadas", [
-    { campo: "rotina_id", op: "==" as const, valor: dados.rotina_id },
+    { campo: "rotina_id", op: "==" as const, valor: registro.rotina_id },
   ]);
-  const existente = doRotina.find((e) => e.data_execucao === dados.data_execucao);
+  const existente = doRotina.find((e) => e.data_execucao === registro.data_execucao);
 
   let execucao: ExecucaoRealizada;
   if (existente) {
     execucao = await ds.atualizar("execucoes_realizadas", existente.id, {
-      ...dados,
+      ...registro,
       atualizado_em: agora,
     });
   } else {
-    execucao = { id: novoId(), ...dados, criado_em: agora, atualizado_em: agora };
+    execucao = { id: novoId(), ...registro, criado_em: agora, atualizado_em: agora };
     await ds.criar("execucoes_realizadas", execucao);
   }
 
   // Sincroniza o status da rotina planejada.
   await ds.atualizar("rotinas_planejadas", rotina.id, {
-    status: STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado],
+    status: STATUS_ROTINA_POR_EXECUCAO[registro.status_realizado],
     atualizado_em: agora,
   });
 

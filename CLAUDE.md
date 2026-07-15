@@ -75,6 +75,11 @@ bordas firmes, sombras duras e rótulos mono em caixa alta. Fontes: Fraunces
   projeto Firebase real do usuário.
 - `FirebaseDataSource` nunca foi testado contra um Firestore real (sem
   credenciais nesta máquina).
-- Consultas quentes já usam `DataSource.consultar` (Firestore `where` por campo
-  único — índice automático, sem índice composto). A tela de Histórico sem
-  filtro de tabela ainda lê a coleção inteira (ordenar+limitar exigiria índice).
+- Consultas quentes usam `DataSource.consultar` (Firestore `where`). O padrão é
+  campo único (índice automático); a **exceção** são as consultas por **sede +
+  data** em `rotinas_planejadas`/`execucoes_realizadas`, que usam índice composto
+  declarado em `firestore.indexes.json` — sem isso, ver uma sede leria o dia das
+  17 (≈17× leituras). **Deploy dos índices**: `firebase deploy --only
+  firestore:indexes` (ou colar os campos no Console → Firestore → Índices) —
+  necessário uma vez em produção. Ao criar nova consulta multi-campo, adicione o
+  índice lá. A tela de Histórico sem filtro de tabela ainda lê a coleção inteira.

@@ -73,13 +73,12 @@ export async function updateTarefa(
 /** Bloqueado quando há histórico — inativar preserva relatórios antigos. */
 export async function deleteTarefa(id: string): Promise<void> {
   const ds = await getDataSource();
+  // Consulta pela FK (índice de campo único) → lê só os vínculos DESTA tarefa.
   const [rotinas, modelos] = await Promise.all([
-    ds.listar("rotinas_planejadas"),
-    ds.listar("modelos_rotina"),
+    ds.consultar("rotinas_planejadas", [{ campo: "tarefa_id", op: "==", valor: id }]),
+    ds.consultar("modelos_rotina", [{ campo: "tarefa_id", op: "==", valor: id }]),
   ]);
-  const vinculos =
-    rotinas.filter((r) => r.tarefa_id === id).length +
-    modelos.filter((m) => m.tarefa_id === id).length;
+  const vinculos = rotinas.length + modelos.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {

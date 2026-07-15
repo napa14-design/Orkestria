@@ -53,13 +53,13 @@ export async function updateFuncionario(
 /** Bloqueado quando há histórico — inativar preserva relatórios antigos. */
 export async function deleteFuncionario(id: string): Promise<void> {
   const ds = await getDataSource();
+  // Consulta pela FK (índice de campo único) → lê só os vínculos DESTE
+  // funcionário, não as coleções inteiras (que crescem sem limite no tempo).
   const [rotinas, ausencias] = await Promise.all([
-    ds.listar("rotinas_planejadas"),
-    ds.listar("ausencias"),
+    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("ausencias", [{ campo: "funcionario_id", op: "==", valor: id }]),
   ]);
-  const vinculos =
-    rotinas.filter((r) => r.funcionario_id === id).length +
-    ausencias.filter((a) => a.funcionario_id === id).length;
+  const vinculos = rotinas.length + ausencias.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {

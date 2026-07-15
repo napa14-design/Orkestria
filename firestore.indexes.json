@@ -1,0 +1,22 @@
+{
+  "//": "Índices compostos do Firestore. Deploy: firebase deploy --only firestore:indexes (ou cole os campos no Console → Firestore → Índices). Cada índice deixa a consulta ler SÓ os documentos da sede pedida em vez da coleção inteira do dia — corta ~17× as leituras no caminho quente (agenda/acompanhamento/dashboard por sede).",
+  "indexes": [
+    {
+      "collectionGroup": "rotinas_planejadas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sede_id", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "execucoes_realizadas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sede_id", "order": "ASCENDING" },
+        { "fieldPath": "data_execucao", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
