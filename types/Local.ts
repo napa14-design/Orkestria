@@ -13,8 +13,9 @@ export interface Local extends Auditoria {
    * Intensidade de limpeza do ambiente — multiplica o tempo previsto das
    * tarefas deste local. Reflete o quanto o espaço "suja": banheiros e copas
    * são densos, áreas abertas são leves. Presets: leve 0,8 · normal 1,0 ·
-   * densa 1,5. Ausente/≤0 = 1 (sem efeito). Substitui o antigo fator que ficava
-   * na categoria.
+   * densa 1,5. Ausente/≤0 = usa o padrão do `tipo_local`
+   * (`FATOR_POR_TIPO_LOCAL`); preenchido, o valor digitado vence. Substitui o
+   * antigo fator que ficava na categoria.
    */
   fator_intensidade?: number;
   ativo: boolean;

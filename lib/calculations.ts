@@ -13,6 +13,7 @@ import type {
   PeriodoLetivo,
   RotinaPlanejada,
   Tarefa,
+  TipoLocal,
   TipoServico,
 } from "@/types";
 import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
@@ -43,13 +44,38 @@ export function statusPeriodoLetivo(
 }
 
 /**
+ * Fator sugerido pelo TIPO DE USO do local — "o local guia o nível de limpeza"
+ * (decisão da ata de 17/07/2026). Só vale como padrão: um fator digitado no
+ * cadastro sempre vence. Segue a orientação já publicada na tela de Locais
+ * (banheiros e copas densos · áreas abertas leves · o resto normal); corredor,
+ * escada e demais ficam em 1,0 até a operação calibrar.
+ */
+export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
+  banheiro: 1.5,
+  copa: 1.5,
+  area_externa: 0.8,
+  sala: 1,
+  corredor: 1,
+  area_comum: 1,
+  escada: 1,
+  recepcao: 1,
+  auditorio: 1,
+  almoxarifado: 1,
+  outros: 1,
+};
+
+/**
  * Fator de intensidade do AMBIENTE (local): o quanto o espaço suja e pesa na
- * limpeza. Ausente/≤0 → 1 (sem efeito). Presets: leve 0,8 · normal 1,0 ·
- * densa 1,5. Migrou da categoria para o local (decisão da ata de 16/06/2026).
+ * limpeza. Presets: leve 0,8 · normal 1,0 · densa 1,5. Migrou da categoria para
+ * o local (ata de 16/06/2026).
+ *
+ * Sem fator informado (ausente/≤0), cai no padrão do TIPO do local — antes caía
+ * sempre em 1. Locais que já têm fator gravado não mudam de comportamento.
  */
 export function fatorIntensidadeLocal(local: Local | undefined): number {
   const f = local?.fator_intensidade;
-  return typeof f === "number" && f > 0 ? f : 1;
+  if (typeof f === "number" && f > 0) return f;
+  return (local && FATOR_POR_TIPO_LOCAL[local.tipo_local]) || 1;
 }
 
 /**

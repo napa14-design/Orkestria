@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { fatorIntensidadeLocal } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import type { Local, Sede } from "@/types";
 
@@ -75,9 +76,10 @@ export default function PaginaLocais() {
           rotulo: "Intensidade (fator)",
           tipo: "numero",
           passo: "0.1",
-          padrao: 1,
-          ajuda: "Leve 0,8 · Normal 1,0 · Densa 1,5",
-          dica: "O quanto este ambiente \"suja\" e pesa na limpeza — multiplica o tempo previsto de TODAS as tarefas do local. Banheiros e copas são densos (1,5); salas comuns são normais (1,0); áreas abertas/externas são leves (0,8). Use 1 (ou deixe em branco) quando não quiser efeito. Antes esse fator ficava na Categoria; agora é por ambiente.",
+          // "" (e não 0) para o campo nascer VAZIO — vazio = herda do tipo.
+          padrao: "",
+          ajuda: "Em branco = o tipo do local decide",
+          dica: "O quanto este ambiente \"suja\" e pesa na limpeza — multiplica o tempo previsto de TODAS as tarefas do local. DEIXE EM BRANCO para o sistema usar o padrão do tipo de local (banheiro e copa 1,5 · área externa 0,8 · demais 1,0). Preencha só quando este ambiente fugir do padrão do tipo dele — o valor digitado sempre vence.",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
@@ -112,13 +114,19 @@ export default function PaginaLocais() {
         {
           key: "fator_intensidade",
           rotulo: "Intensidade",
+          // Mostra o fator EFETIVO (o digitado ou, em branco, o padrão do tipo).
           render: (l) => {
-            const f = l.fator_intensidade;
-            if (!f || f === 1)
+            const f = fatorIntensidadeLocal(l);
+            const doTipo = !l.fator_intensidade || l.fator_intensidade <= 0;
+            if (f === 1)
               return <span className="num" style={{ color: "var(--tinta-3)" }}>normal</span>;
             return (
-              <span className={`selo ${f > 1 ? "selo-laranja" : "selo-azul"} num`}>
+              <span
+                className={`selo ${f > 1 ? "selo-laranja" : "selo-azul"} num`}
+                title={doTipo ? "Padrão do tipo de local (nada digitado no cadastro)" : "Fator digitado no cadastro"}
+              >
                 {f > 1 ? "densa" : "leve"} ×{f.toLocaleString("pt-BR")}
+                {doTipo ? " *" : ""}
               </span>
             );
           },

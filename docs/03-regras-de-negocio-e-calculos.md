@@ -32,6 +32,9 @@ tempo_previsto_min         = base_da_regra × fator_intensidade_local × fator_t
                                  por_m2       → tempo_base_min × metragem_do_local (1 m² ≈ 1 min)
                                  por_unidade  → tempo_base_min × quantidade
                                fator_intensidade_local: leve 0,8 · normal 1,0 · densa 1,5 (cadastrado no Local)
+                                 → em branco no cadastro, sai do TIPO do local (banheiro/copa 1,5 ·
+                                   área externa 0,8 · demais 1,0) — "o local guia o nível de limpeza"
+                                   (ata 17/07); o valor digitado sempre vence
                                  → só incide em por_m2/por_unidade (limpeza dimensionada pela área);
                                    tarefas de tempo fixo/manual (café, recolhimento) NÃO recebem intensidade
                                fator_tipo_servico:      rotina 1,0 · pesada 1,5 · desincrustante 2,0 (na Tarefa)

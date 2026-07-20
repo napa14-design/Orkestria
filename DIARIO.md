@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-07-20 — O local guia o nível de limpeza (ata 17/07)
+
+- Decisão da reunião: **o tipo de uso do local puxa o fator automaticamente**,
+  mantendo o fator da tarefa (os dois multiplicam, com o local como prioritário).
+- `FATOR_POR_TIPO_LOCAL` em `lib/calculations.ts` (banheiro/copa 1,5 · área
+  externa 0,8 · demais 1,0 — segue a orientação que já estava publicada na tela
+  de Locais). `fatorIntensidadeLocal` usa esse padrão **só quando o cadastro está
+  em branco**; valor digitado sempre vence. Corredor e escada ficaram em 1,0 até
+  a operação calibrar — a formalização dos fatores é item do Murilo na ata.
+- O form não força mais `1` no campo (nascia preenchido, impedindo a herança);
+  agora nasce vazio e a listagem mostra o fator **efetivo**, com `*` quando veio
+  do tipo.
+- **Impacto conferido em produção antes de subir**: dos 23 locais, 0 mudam de
+  tempo — todos são `tipo_local: "outros"` (vieram do importador) e nenhum tem
+  fator explícito. A regra passa a valer conforme os supervisores classificarem
+  os locais, que é o comportamento desejado.
+- Não vaza para tarefa de tempo fixo/manual: a intensidade só incide em
+  `por_m2`/`por_unidade` (inalterado).
+- Arquivos: `lib/calculations.ts`, `app/(app)/locais/page.tsx`, `types/Local.ts`,
+  `docs/02-modelo-de-dados.md`, `docs/03-regras-de-negocio-e-calculos.md`.
+
+---
+
 ## 2026-07-20 — Coluna da esquerda fixa na rolagem (ata 17/07)
 
 - Pedido do Pedro Ícaro na demonstração: além do cabeçalho, **fixar a coluna da

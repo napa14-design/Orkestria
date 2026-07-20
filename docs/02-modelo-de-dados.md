@@ -64,7 +64,7 @@ sedes; a folga-alvo continua por sede (`folga_minima_percentual`).
 | nome_local | string | |
 | tipo_local | enum | sala · banheiro · corredor · area_comum · area_externa · copa · escada · recepcao · auditorio · almoxarifado · outros |
 | metragem | número | m²; 0 gera alerta |
-| fator_intensidade | número | intensidade do ambiente — multiplica o tempo das tarefas do local (leve 0,8 · normal 1,0 · densa 1,5). Ausente/≤0 = 1. **Substitui o antigo fator da categoria.** |
+| fator_intensidade | número | intensidade do ambiente — multiplica o tempo das tarefas do local (leve 0,8 · normal 1,0 · densa 1,5). Ausente/≤0 = **padrão do `tipo_local`** (banheiro/copa 1,5 · área externa 0,8 · demais 1,0); preenchido, o valor digitado vence. **Substitui o antigo fator da categoria.** |
 | ativo, observacoes, auditoria | | |
 
 ### tarefas
