@@ -4,7 +4,19 @@
 import { useMemo, useState } from "react";
 import { tempoPrevistoMin, blocosOcupados } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
-import type { Categoria, Local, Tarefa } from "@/types";
+import { sugerirPorHabilitacao } from "@/lib/validations";
+import type {
+  Categoria,
+  Funcionario,
+  Local,
+  NivelQualificacao,
+  QualificacaoFuncionario,
+  Requisito,
+  Tarefa,
+} from "@/types";
+
+/** Constante de módulo: um Set novo por render invalidaria a memoização. */
+const SEM_AUSENTES: { has(id: string): boolean } = { has: () => false };
 
 const COR_PRIORIDADE: Record<string, string> = {
   alta: "var(--vermelho)",
@@ -17,6 +29,11 @@ export default function TaskPalette({
   locais,
   categorias = [],
   blocoMin,
+  funcionarios = [],
+  qualificacoes = [],
+  requisitos = [],
+  data = "",
+  ausentes = SEM_AUSENTES,
   aoIniciarArrasto,
   aoTerminarArrasto,
 }: {
@@ -24,6 +41,17 @@ export default function TaskPalette({
   locais: Local[];
   categorias?: Categoria[];
   blocoMin: number;
+  /** Para sugerir quem chamar nas tarefas que exigem requisito (ata 17/07). */
+  funcionarios?: Funcionario[];
+  qualificacoes?: QualificacaoFuncionario[];
+  requisitos?: Requisito[];
+  data?: string;
+  /**
+   * Quem está ausente no dia (férias/atestado/folga) — fora das sugestões.
+   * Aceita Set ou Map (a agenda já tem um Map id→motivo, de referência estável;
+   * criar um Set novo a cada render invalidaria a memoização).
+   */
+  ausentes?: { has(id: string): boolean };
   /** Informa quantos blocos o item arrastado ocupa (para o fantasma da agenda). */
   aoIniciarArrasto?: (blocos: number) => void;
   aoTerminarArrasto?: () => void;
@@ -67,6 +95,33 @@ export default function TaskPalette({
       return true;
     });
   }, [tarefas, localPorId, busca, filtroAndar, filtroCategoria, filtroPrioridade]);
+
+  // Quem chamar primeiro nas tarefas que exigem requisito (ata 17/07). O nível
+  // só ORDENA a lista — quem decide se pode é o bloqueio, na hora de alocar.
+  // Depende de `tarefas` (não de `visiveis`): a sugestão não muda com busca/
+  // filtro, e recalcular a cada tecla digitada travaria a paleta.
+  const sugeridosPorTarefa = useMemo(() => {
+    const mapa = new Map<string, { id: string; nome: string; nivel: NivelQualificacao }[]>();
+    if (!data || !funcionarios.length || !requisitos.length) return mapa;
+    // Ausente no dia não é sugestão útil — a alocação recusaria.
+    const elegiveis = funcionarios.filter((f) => f.ativo && !ausentes.has(f.id));
+    for (const t of tarefas) {
+      if (!t.requisitos) continue;
+      const s = sugerirPorHabilitacao({
+        tarefa: t,
+        funcionarios: elegiveis,
+        qualificacoes,
+        requisitosCatalogo: requisitos,
+        data,
+      });
+      if (s.length)
+        mapa.set(
+          t.id,
+          s.slice(0, 3).map((x) => ({ id: x.funcionario.id, nome: x.funcionario.nome, nivel: x.nivel })),
+        );
+    }
+    return mapa;
+  }, [tarefas, funcionarios, qualificacoes, requisitos, data, ausentes]);
 
   return (
     <aside className="painel entra paleta-tarefas">
@@ -158,6 +213,30 @@ export default function TaskPalette({
                     <span style={{ fontSize: 10, color: "var(--tinta-3)", textTransform: "uppercase", letterSpacing: 0.3 }}>
                       {cat.nome}
                     </span>
+                  </div>
+                );
+              })()}
+              {(() => {
+                const sug = sugeridosPorTarefa.get(t.id);
+                if (!sug?.length) return null;
+                return (
+                  <div
+                    style={{ fontSize: 10, color: "var(--tinta-3)", marginTop: 4, lineHeight: 1.3 }}
+                    title="Quem já tem a habilitação exigida por esta tarefa, ordenado pelo degrau de habilitação. É só uma sugestão — qualquer pessoa habilitada pode receber a tarefa."
+                  >
+                    ★ Habilitados:{" "}
+                    {sug.map((s, i) => (
+                      <span key={s.id}>
+                        {i > 0 && ", "}
+                        {s.nome}
+                        {s.nivel !== "apto" && (
+                          <span style={{ opacity: 0.75 }}>
+                            {" "}
+                            ({s.nivel === "referencia" ? "referência" : "experiente"})
+                          </span>
+                        )}
+                      </span>
+                    ))}
                   </div>
                 );
               })()}

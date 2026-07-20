@@ -1,11 +1,25 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import type { QualificacaoFuncionario } from "@/types";
+import { NIVEL_ORDEM, type QualificacaoFuncionario } from "@/types";
 import { ErroValidacao } from "./erros";
 
 type Dados = Omit<
   QualificacaoFuncionario,
   "id" | "sede_id" | "criado_por" | "criado_em" | "atualizado_por" | "atualizado_em"
 >;
+
+/** O nível vem do cliente — só aceita os degraus conhecidos (vazio = apto). */
+function exigirNivelValido(nivel: unknown) {
+  if (nivel === undefined || nivel === null || nivel === "") return;
+  // hasOwn (e não `in`): `in` percorre o protótipo e aceitaria "toString".
+  if (!(typeof nivel === "string" && Object.hasOwn(NIVEL_ORDEM, nivel)))
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "NIVEL_INVALIDO",
+        mensagem: `Nível "${String(nivel)}" não existe. Use ${Object.keys(NIVEL_ORDEM).join(", ")}.`,
+      },
+    ]);
+}
 
 export async function getQualificacoes(sede?: string): Promise<QualificacaoFuncionario[]> {
   const ds = await getDataSource();
@@ -29,6 +43,7 @@ export async function createQualificacao(dados: Dados, autor: string): Promise<Q
     throw new ErroValidacao([
       { nivel: "erro", codigo: "FALTAM_CAMPOS", mensagem: "Informe funcionário e requisito." },
     ]);
+  exigirNivelValido(dados.nivel);
   const ds = await getDataSource();
   const funcionario = await ds.obter("funcionarios", dados.funcionario_id);
   if (!funcionario)
@@ -63,6 +78,7 @@ export async function updateQualificacao(
   mudancas: Partial<Dados>,
   autor: string,
 ): Promise<QualificacaoFuncionario> {
+  exigirNivelValido(mudancas.nivel);
   const ds = await getDataSource();
   const atual = await ds.obter("qualificacoes_funcionario", id);
   if (!atual) throw new Error("Qualificação não encontrada.");

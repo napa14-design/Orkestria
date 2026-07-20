@@ -6,12 +6,14 @@ import type {
   AlertaValidacao,
   Funcionario,
   Local,
+  NivelQualificacao,
   ParametrosResolvidos,
   QualificacaoFuncionario,
   Requisito,
   RotinaPlanejada,
   Tarefa,
 } from "@/types";
+import { NIVEL_ORDEM } from "@/types";
 import {
   intervalosDoFuncionario,
   jornadaLiquidaMin,
@@ -260,4 +262,61 @@ export function validarRotina(r: Partial<RotinaPlanejada>): AlertaValidacao[] {
 
 export function temErro(alertas: AlertaValidacao[]): boolean {
   return alertas.some((a) => a.nivel === "erro");
+}
+
+/**
+ * Quem chamar primeiro para uma tarefa que exige requisitos — pedido da ata de
+ * 17/07 ("direcionar a pessoa mais habilitada", ex.: montagem de palco).
+ *
+ * Espelha a MESMA regra de conformidade do bloqueio (posse + validade, EPI não
+ * conta), mas só ORDENA: não decide quem pode: quem tem a qualificação válida
+ * continua liberado, com ou sem nível. O nível efetivo é o MENOR entre os
+ * requisitos exigidos — de nada adianta ser referência numa habilitação e
+ * apenas apto na outra que a tarefa também pede.
+ *
+ * Devolve [] quando a tarefa não exige nada (não há o que sugerir).
+ */
+export function sugerirPorHabilitacao(args: {
+  tarefa: Tarefa;
+  funcionarios: Funcionario[];
+  qualificacoes: QualificacaoFuncionario[];
+  requisitosCatalogo: Requisito[];
+  data: string;
+}): { funcionario: Funcionario; nivel: NivelQualificacao }[] {
+  const exigidos = (args.tarefa.requisitos ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!exigidos.length) return [];
+  const catPorId = new Map(args.requisitosCatalogo.map((r) => [r.id, r]));
+  // MESMO critério do bloqueio (linhas acima): só EPI é dispensado. Requisito
+  // fora do catálogo ou com tipo em branco continua contando — divergir daqui
+  // faria a paleta sugerir alguém que a alocação recusaria.
+  const bloqueantes = exigidos.filter((id) => catPorId.get(id)?.tipo !== "epi");
+  if (!bloqueantes.length) return [];
+
+  // Índice (funcionário|requisito) → evita varrer todas as qualificações dentro
+  // do laço (a paleta chama isto para cada tarefa visível).
+  const porFuncReq = new Map<string, QualificacaoFuncionario>();
+  for (const q of args.qualificacoes) porFuncReq.set(`${q.funcionario_id}|${q.requisito_id}`, q);
+
+  const saida: { funcionario: Funcionario; nivel: NivelQualificacao }[] = [];
+  for (const f of args.funcionarios) {
+    let menor: NivelQualificacao | null = null;
+    let habilitado = true;
+    for (const reqId of bloqueantes) {
+      const q = porFuncReq.get(`${f.id}|${reqId}`);
+      if (!q || (q.validade && q.validade < args.data)) {
+        habilitado = false;
+        break;
+      }
+      // hasOwn: `in` aceitaria "toString" e derrubaria a ordenação com NaN.
+      const nv: NivelQualificacao =
+        q.nivel && Object.hasOwn(NIVEL_ORDEM, q.nivel) ? q.nivel : "apto";
+      if (!menor || NIVEL_ORDEM[nv] < NIVEL_ORDEM[menor]) menor = nv;
+    }
+    if (habilitado && menor) saida.push({ funcionario: f, nivel: menor });
+  }
+  return saida.sort(
+    (a, b) =>
+      NIVEL_ORDEM[b.nivel] - NIVEL_ORDEM[a.nivel] ||
+      a.funcionario.nome.localeCompare(b.funcionario.nome, "pt-BR"),
+  );
 }

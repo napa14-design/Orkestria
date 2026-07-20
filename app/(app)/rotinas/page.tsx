@@ -721,6 +721,11 @@ export default function PaginaRotinas() {
               locais={locais ?? []}
               categorias={categorias ?? []}
               blocoMin={blocoMin}
+              funcionarios={funcionarios ?? []}
+              qualificacoes={qualificacoes ?? []}
+              requisitos={requisitos ?? []}
+              data={data}
+              ausentes={ausentesMap}
               aoIniciarArrasto={setBlocosArrasto}
               aoTerminarArrasto={() => setBlocosArrasto(null)}
             />

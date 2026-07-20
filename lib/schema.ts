@@ -181,7 +181,6 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
   execucoes_realizadas: [
     col("id"),
     col("rotina_id"),
-    col("sede_id"),
     col("data_execucao"),
     col("status_realizado"),
     col("inicio_real"),
@@ -193,6 +192,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("supervisor_id"),
     col("criado_em"),
     col("atualizado_em"),
+    // Ver nota em qualificacoes_funcionario: campo novo sempre no FIM.
+    col("sede_id"),
   ],
   servicos_eventuais: [
     col("id"),
@@ -227,6 +228,9 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("validade"),
     col("observacao"),
     ...AUDITORIA,
+    // Campo novo vai no FIM: o Sheets grava por POSIÇÃO, então inserir no meio
+    // deslocaria as colunas das planilhas já preenchidas.
+    col("nivel"),
   ],
   parametros: [
     col("id"),

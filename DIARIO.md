@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-07-20 — Aptidão: nível de habilitação na qualificação (ata 17/07)
+
+- Pedido da operação: o sistema devia **direcionar a pessoa mais habilitada**
+  para uma atividade de evento (ex.: montagem de palco). Hoje a qualificação era
+  binária — só distinguia quem executa de quem não executa.
+- `QualificacaoFuncionario.nivel?` = `apto | experiente | referencia`
+  (vazio = apto). **Invariante que não pode cair**: o nível SÓ ordena sugestão —
+  não libera nem bloqueia. Quem tem a qualificação válida executa, seja qual for
+  o degrau; quem não tem continua bloqueado. `validarAlocacao` não foi tocada.
+- Nova função pura `sugerirPorHabilitacao` (`lib/validations.ts`) repete o mesmo
+  critério de conformidade do bloqueio (posse + validade, EPI não conta) e só
+  ordena. Nível efetivo = **menor** entre os requisitos exigidos.
+- Na paleta de tarefas, as que exigem requisito ganham "★ Habilitados: Fulano
+  (referência), …" (top 3). Custo zero de dados — a tela já carregava tudo.
+- **Guardrail jurídico** (anexo confidencial da ata): é degrau de HABILITAÇÃO,
+  nunca avaliação de desempenho. Os textos da UI dizem isso explicitamente.
+- Verificado: nível inválido → 422; vazio = apto; ordenação decrescente; **"apto"
+  PASSA** numa tarefa que exige o requisito e **"referência" é BLOQUEADO** quando
+  falta o requisito exigido (os dois sentidos da invariante).
+- **Achados da auditoria, corrigidos**: (a) `nivel in NIVEL_ORDEM` aceitava
+  chaves de protótipo — `"toString"` passava como nível válido e quebrava a
+  ordenação com `NaN`; agora `Object.hasOwn`. (b) A sugestão divergia do bloqueio
+  para requisito com `tipo` em branco (sugeria quem a alocação recusaria).
+  (c) `.find` linear dentro do laço + memo dependente da busca recalculava tudo a
+  cada tecla — virou índice `Map` e memo sobre `tarefas`. (d) Ausentes do dia
+  saíram das sugestões.
+- **Ordem de coluna no schema**: `nivel` (e o `sede_id` das execuções, de ontem)
+  foram para o FIM da tabela. O Google Sheets grava por POSIÇÃO — inserir coluna
+  no meio deslocaria os dados das planilhas já preenchidas. Firestore/memória não
+  se importam (campos por nome), mas a regra vale para todo campo novo.
+- Arquivos: `types/QualificacaoFuncionario.ts`, `lib/schema.ts`,
+  `lib/validations.ts`, `services/qualificacoesService.ts`,
+  `app/(app)/qualificacoes/page.tsx`, `components/agenda/TaskPalette.tsx`,
+  `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-07-20 — O local guia o nível de limpeza (ata 17/07)
 
 - Decisão da reunião: **o tipo de uso do local puxa o fator automaticamente**,

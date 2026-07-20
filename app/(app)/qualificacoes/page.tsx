@@ -9,6 +9,7 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
+import { NIVEIS_QUALIFICACAO, NIVEL_ORDEM } from "@/types";
 import type { Funcionario, QualificacaoFuncionario, Requisito, Sede } from "@/types";
 
 export default function PaginaQualificacoes() {
@@ -57,6 +58,15 @@ export default function PaginaQualificacoes() {
           ajuda: "Deixe vazio se não expira",
           dica: "Data até a qual o treinamento/aptidão é válido. Vazio = não expira. A partir do dia seguinte ao vencimento, a agenda volta a bloquear as tarefas que o exigem.",
         },
+        {
+          key: "nivel",
+          rotulo: "Nível de habilitação",
+          tipo: "select",
+          padrao: "apto",
+          opcoes: NIVEIS_QUALIFICACAO.map((n) => ({ valor: n.valor, rotulo: n.rotulo })),
+          ajuda: "Só ordena sugestões — não libera nem bloqueia nada",
+          dica: "Serve para o sistema SUGERIR quem chamar primeiro numa tarefa que exige este requisito (ex.: montagem de palco num evento). Não é avaliação de desempenho e não muda o bloqueio: quem tem a qualificação válida pode executar, seja apto, experiente ou referência.",
+        },
         { key: "observacao", rotulo: "Observações", tipo: "textarea", inteira: true },
       ]}
       colunas={[
@@ -76,6 +86,16 @@ export default function PaginaQualificacoes() {
           },
         },
         { key: "sede_id", rotulo: "Sede", render: (q) => nomeSede(q.sede_id) },
+        {
+          key: "nivel",
+          rotulo: "Nível",
+          render: (q) => {
+            const n = q.nivel && q.nivel in NIVEL_ORDEM ? q.nivel : "apto";
+            const rotulo = NIVEIS_QUALIFICACAO.find((x) => x.valor === n)?.rotulo ?? n;
+            const cor = n === "referencia" ? "selo-verde" : n === "experiente" ? "selo-azul" : "selo-cinza";
+            return <span className={`selo ${cor}`}>{rotulo}</span>;
+          },
+        },
         {
           key: "validade",
           rotulo: "Validade",
