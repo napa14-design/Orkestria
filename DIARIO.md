@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-07-20 — Ficha: declaração de EPIs no lugar da marcação item a item (ORK3)
+
+- Pedido da reunião: em vez de o funcionário **escolher** quais EPIs marcar, a
+  ficha traz uma **declaração** de que usou os EPIs corretos.
+- Cuidado deliberado com o anexo jurídico da ata (a ficha assinada é elemento
+  probatório): a declaração **não é genérica** — os EPIs saem **nominalmente
+  impressos** ao lado ("Declaro que utilizei os EPIs abaixo: …"), senão o
+  registro deixaria de dizer o que de fato foi usado.
+- **Versionamento**: o QR virou `ORK3` (mesmo formato do ORK2 + bloco de EPI de
+  uma caixa). O leitor escolhe a geometria pela versão, então **fichas ORK2 já
+  impressas continuam sendo lidas** pelo layout antigo — sem reimpressão urgente.
+- `declaracaoPos(n)` na geometria (fonte única) ocupa a posição da 1ª caixa do
+  layout antigo, então a âncora do bloco e as Observações seguem valendo.
+- **Caminho digital alinhado**: no acompanhamento, os checkboxes por EPI
+  **pré-marcados** (padrão frágil que eu mesmo tinha criado) viraram uma
+  declaração única, **desmarcada por padrão** — o formulário não afirma sozinho
+  algo que ninguém conferiu.
+- Verificado por **round-trip real** (PDF gerado → `pdftoppm` → OMR de produção):
+  QR ORK3 com n=19 e 19 códigos, 19 tarefas lidas, bloco de EPI = exatamente 1
+  caixa lida como marcada (tinta 0,531 vs limiar 0,12, confiança alta). Geometria
+  sem colisão de 1 a 27 tarefas. O leitor NOVO lê ficha ORK2 ANTIGA corretamente.
+- **Achados da auditoria, corrigidos**: (a) **bug sério** — uma segunda condição
+  ficou em `versao === 2`, então a ficha ORK3 caía no caminho ORK1 (casa por
+  POSIÇÃO) e perderia a proteção contra a rotina mudar depois de imprimir,
+  gravando o realizado na rotina errada em silêncio. (b) Os nomes de EPI eram
+  cortados em 2 linhas e o excedente **sumia sem aviso** — inaceitável numa
+  declaração que diz "os EPIs abaixo"; agora quebra em quantas linhas precisar.
+  (c) Registro antigo com lista parcial de EPIs podia ser sobrescrito sem o
+  supervisor notar — agora a tela mostra o que está gravado. (d) Código morto.
+- ⚠️ **Limitação conhecida (não corrigida nesta entrega)**: o QR não carrega os
+  NOMES dos EPIs — a conferência os reconstrói dos requisitos **atuais** das
+  tarefas. Se os requisitos mudarem entre imprimir e conferir, o
+  `epis_confirmados` gravado pode divergir da lista impressa e assinada. Já era
+  assim no ORK2 (e pior). Corrigir exigiria levar os nomes (ou um hash) no QR —
+  vale decidir com o Murilo, já que é ponto jurídico.
+- Arquivos: `lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `lib/omr.ts`,
+  `app/(app)/conferir/page.tsx`, `app/(app)/acompanhamento/page.tsx`.
+
+---
+
 ## 2026-07-20 — Rotinas por tipo de evento (ata 17/07)
 
 - **A principal lacuna apontada pela operação**: "não adianta organizar a rotina,

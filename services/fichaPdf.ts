@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, EPI, epiPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
+import { CARD, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -133,21 +133,43 @@ async function desenhaFicha(
     { x: x0 + 12, y: ultimaY - 14, size: 7.5, font: reg, color: CINZA3 },
   );
 
-  // EPIs no rodapé (em colunas). O topo acompanha o fim das tarefas — nunca colide.
+  // EPIs no rodapé — UMA declaração (ORK3), não uma caixa por item. Os nomes
+  // seguem impressos: a declaração precisa dizer o que de fato foi usado, senão
+  // o registro perde valor (a assinatura vale como prova).
   const topoEpi = epiTopo(nT);
+  let fimDeclaracao = topoEpi;
   if (f.epis.length) {
-    page.drawText("EPIS UTILIZADOS (marque o que usou):", { x: x0 + 12, y: topoEpi + 6, size: 8, font: bold, color: ACENTO });
-    f.epis.forEach((nome, idx) => {
-      const { x: cx, y: cy } = epiPos(idx, nT);
-      page.drawRectangle({ x: cx - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
-      if (marcarTodas) desenhaX(page, cx, cy);
-      const larguraNome = (idx >= EPI.porColuna ? CARD.x1 : EPI.colX[1]) - (cx + 14) - 4;
-      page.drawText(trunc(reg, nome, 9, larguraNome), { x: cx + 14, y: cy - 3, size: 9, font: reg, color: TINTA });
+    page.drawText("EPIS DESTE DIA", { x: x0 + 12, y: topoEpi + 6, size: 8, font: bold, color: ACENTO });
+    const { x: cx, y: cy } = declaracaoPos(nT);
+    page.drawRectangle({ x: cx - 6, y: cy - 6, width: CAIXA_LADO, height: CAIXA_LADO, borderColor: PRETO, borderWidth: 1.2 });
+    if (marcarTodas) desenhaX(page, cx, cy);
+    page.drawText("Declaro que utilizei os EPIs abaixo nas atividades de hoje:", {
+      x: cx + 14, y: cy - 3, size: 9, font: bold, color: TINTA,
     });
+    // Nomes quebrados por largura, SEM teto de linhas: a declaração diz "os
+    // EPIs abaixo", então omitir um item a esvaziaria. O bloco de Observações
+    // acompanha (fimDeclaracao é calculado a partir daqui).
+    const larguraMax = CARD.x1 - (x0 + 12) - 12;
+    const linhasNomes: string[] = [];
+    let atual = "";
+    for (const nome of f.epis) {
+      const tentativa = atual ? `${atual} · ${nome}` : nome;
+      if (reg.widthOfTextAtSize(tentativa, 8.5) > larguraMax && atual) {
+        linhasNomes.push(atual);
+        atual = nome;
+      } else atual = tentativa;
+    }
+    if (atual) linhasNomes.push(atual);
+    linhasNomes.forEach((linha, i) => {
+      page.drawText(trunc(reg, linha, 8.5, larguraMax), {
+        x: x0 + 12, y: cy - 18 - i * 11, size: 8.5, font: reg, color: TINTA,
+      });
+    });
+    fimDeclaracao = cy - 18 - linhasNomes.length * 11;
   }
 
   // Observações / ocorrências — logo abaixo do que veio antes (EPIs ou tarefas).
-  const fimAcima = f.epis.length ? topoEpi - EPI.delta * EPI.porColuna : ultimaY - 24;
+  const fimAcima = f.epis.length ? fimDeclaracao : ultimaY - 24;
   const obsTop = Math.max(178, Math.min(228, fimAcima - 24));
   page.drawText("OBSERVAÇÕES / OCORRÊNCIAS DO DIA:", { x: x0 + 12, y: obsTop, size: 8, font: bold, color: ACENTO });
   for (const ly of [obsTop - 20, obsTop - 44, obsTop - 68]) {
@@ -221,7 +243,10 @@ export async function gerarFichasPdf(
     // impressa) — a conferência casa por código, não por posição, e usa este n
     // na geometria (blindado contra a rotina mudar depois de imprimir).
     const codigos = doFunc.map((r) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado));
-    const qr = `ORK2|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}`;
+    // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A versão
+    // no QR é o que faz o leitor escolher a geometria certa — fichas ORK2 já
+    // impressas continuam sendo lidas pelo layout antigo.
+    const qr = `ORK3|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}`;
     entradas.push({ nome: f.nome, sedeNome, dataBR, qr, tarefas: tarefasFicha, epis });
   }
 

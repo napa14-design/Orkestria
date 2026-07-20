@@ -9,7 +9,7 @@
  * ficha → ajuste só estas constantes.
  */
 import jsQR from "jsqr";
-import { CAIXA_LADO, epiPos, EPI_CAPACIDADE, FID, TAREFA, tarefaY } from "./fichaGeometria";
+import { CAIXA_LADO, declaracaoPos, epiPos, EPI_CAPACIDADE, FID, TAREFA, tarefaY } from "./fichaGeometria";
 
 // ── Geometria (pontos PDF) — importada da fonte única ────────────────────
 const FID_PDF = FID;
@@ -268,9 +268,13 @@ export interface DadosQR {
   sede: string;
   data: string;
   funcionario: string;
-  /** 1 = ORK1 (casa por posição); 2 = ORK2 (casa por código, com n impresso). */
-  versao: 1 | 2;
-  /** ORK2: nº de tarefas impressas (geometria) e códigos das linhas (ordem impressa). */
+  /**
+   * 1 = ORK1 (casa por posição);
+   * 2 = ORK2 (casa por código, com n impresso; uma caixa por EPI);
+   * 3 = ORK3 (idem ORK2, mas o bloco de EPI é UMA declaração).
+   */
+  versao: 1 | 2 | 3;
+  /** ORK2/ORK3: nº de tarefas impressas (geometria) e códigos das linhas. */
   n?: number;
   codigos?: string[];
 }
@@ -283,12 +287,12 @@ export interface DadosQR {
 export function parseQR(qr: string | null): DadosQR | null {
   if (!qr) return null;
   const p = qr.split("|");
-  if (p[0] === "ORK2" && p.length >= 6) {
+  if ((p[0] === "ORK2" || p[0] === "ORK3") && p.length >= 6) {
     return {
       sede: p[1],
       data: p[2],
       funcionario: p[3],
-      versao: 2,
+      versao: p[0] === "ORK3" ? 3 : 2,
       n: Number(p[4]) || 0,
       codigos: (p[5] ?? "").split(",").filter(Boolean),
     };
@@ -305,7 +309,13 @@ export function parseQR(qr: string | null): DadosQR | null {
  */
 export function lerFicha(
   img: ImagemRGBA,
-  opts: { numTarefas?: number; numEpis?: number; maxLinhas?: number } = {},
+  opts: {
+    numTarefas?: number;
+    numEpis?: number;
+    maxLinhas?: number;
+    /** ORK3: o bloco de EPI é UMA declaração — lê só a caixa dela. */
+    declaracaoEpi?: boolean;
+  } = {},
 ): ResultadoOMR {
   const { width: w, height: h } = img;
   const g = cinza(img);
@@ -352,8 +362,22 @@ export function lerFicha(
     }
   }
 
-  // Bloco de EPIs no rodapé (em colunas). Posições vêm de epiPos (fonte única).
+  // Bloco de EPIs no rodapé. ORK3: UMA caixa (declaração). ORK2 e anteriores:
+  // uma caixa por EPI, em colunas. Posições sempre da geometria (fonte única).
   const epis: LinhaOMR[] = [];
+  if (opts.declaracaoEpi) {
+    const { x: dx, y: dy } = declaracaoPos(nT);
+    const fi = tinta(g, w, h, H, thr, dx, dy, CAIXA_LADO_PDF, 0.55);
+    epis.push({ linha: 1, marcada: fi > LIMIAR_MARCA, tinta: +fi.toFixed(3), confianca: confianca(fi) });
+    return {
+      ok: true,
+      qr,
+      tarefas: linhas,
+      epis,
+      feitas: linhas.filter((l) => l.marcada).length,
+      revisar: [...linhas, ...epis].filter((l) => l.confianca === "baixa").length,
+    };
+  }
   const maxE = opts.numEpis ?? EPI_CAPACIDADE;
   let semBoxE = 0,
     comecouE = false;

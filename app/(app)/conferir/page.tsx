@@ -51,6 +51,8 @@ export default function PaginaConferir() {
   const [funcNome, setFuncNome] = useState<string>("");
   const [linhas, setLinhas] = useState<LinhaConferida[]>([]);
   const [epiLinhas, setEpiLinhas] = useState<{ nome: string; marcada: boolean; tinta: number; revisar: boolean }[]>([]);
+  /** ORK3: a ficha traz UMA declaração, não uma caixa por EPI. */
+  const [epiDeclaracao, setEpiDeclaracao] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState("");
   const [aviso, setAviso] = useState("");
@@ -74,6 +76,7 @@ export default function PaginaConferir() {
     setBruto(null);
     setLinhas([]);
     setEpiLinhas([]);
+    setEpiDeclaracao(false);
     setSalvo("");
     setAviso("");
     setQrInfo(null);
@@ -127,19 +130,33 @@ export default function PaginaConferir() {
       // 2ª passada determinística. No ORK2 usamos o nº IMPRESSO de tarefas (vem
       // no QR) — a geometria fica fiel à ficha mesmo que a rotina tenha mudado
       // depois. No ORK1, o total atual (comportamento antigo, casa por posição).
-      const nTarefas = info.versao === 2 ? info.n ?? 0 : doFunc.length;
+      const nTarefas = info.versao >= 2 ? info.n ?? 0 : doFunc.length;
+      // ORK3: o bloco de EPI é UMA declaração ("usei os EPIs listados").
+      const declaracao = info.versao === 3;
       const def = nTarefas
-        ? lerFicha(img, { numTarefas: nTarefas, numEpis: episNomes.length })
+        ? lerFicha(img, {
+            numTarefas: nTarefas,
+            ...(declaracao ? { declaracaoEpi: true } : { numEpis: episNomes.length }),
+          })
         : prelim;
 
       setEpiLinhas(
-        episNomes.map((nome, i) => ({
-          nome,
-          marcada: def.epis[i]?.marcada ?? false,
-          tinta: def.epis[i]?.tinta ?? 0,
-          revisar: def.epis[i]?.confianca === "baixa",
-        })),
+        declaracao
+          ? // Uma linha só: a declaração vale por todos os EPIs do dia.
+            episNomes.map((nome) => ({
+              nome,
+              marcada: def.epis[0]?.marcada ?? false,
+              tinta: def.epis[0]?.tinta ?? 0,
+              revisar: def.epis[0]?.confianca === "baixa",
+            }))
+          : episNomes.map((nome, i) => ({
+              nome,
+              marcada: def.epis[i]?.marcada ?? false,
+              tinta: def.epis[i]?.tinta ?? 0,
+              revisar: def.epis[i]?.confianca === "baixa",
+            })),
       );
+      setEpiDeclaracao(declaracao);
 
       const linhaDe = (r: RotinaPlanejada | undefined, l: LinhaOMR | undefined): LinhaConferida => ({
         rotina: r,
@@ -152,7 +169,9 @@ export default function PaginaConferir() {
       });
 
       let conferidas: LinhaConferida[];
-      if (info.versao === 2) {
+      // >= 2: ORK2 e ORK3 trazem os códigos no QR e casam por CÓDIGO. Só o ORK1
+      // (fichas antigas) casa por posição.
+      if (info.versao >= 2) {
         // Casa cada linha IMPRESSA (código no QR) com a rotina atual de mesmo código.
         const cod = (r: RotinaPlanejada) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado);
         const porCodigo = new Map(doFunc.map((r) => [cod(r), r]));
@@ -325,28 +344,57 @@ export default function PaginaConferir() {
 
               {epiLinhas.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 6 }}>EPIs utilizados</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-                    {epiLinhas.map((e, i) => (
-                      <label key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                        <input
-                          type="checkbox"
-                          checked={e.marcada}
-                          onChange={(ev) =>
-                            setEpiLinhas((arr) => arr.map((x, j) => (j === i ? { ...x, marcada: ev.target.checked } : x)))
-                          }
-                        />
-                        {e.nome}
-                        {e.revisar && <span className="selo selo-amarelo">revisar</span>}
-                      </label>
-                    ))}
+                  <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 6 }}>
+                    {epiDeclaracao ? "Declaração de EPIs" : "EPIs utilizados"}
                   </div>
+                  {epiDeclaracao ? (
+                    // ORK3: uma marcação só, que vale por todos os EPIs do dia.
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={epiLinhas[0]?.marcada ?? false}
+                        onChange={(ev) =>
+                          setEpiLinhas((arr) => arr.map((x) => ({ ...x, marcada: ev.target.checked })))
+                        }
+                        style={{ marginTop: 3 }}
+                      />
+                      <span>
+                        O funcionário <strong>declarou</strong> que utilizou os EPIs das atividades
+                        de hoje: <em>{epiLinhas.map((e) => e.nome).join(", ")}</em>.
+                        {epiLinhas[0]?.revisar && (
+                          <span className="selo selo-amarelo" style={{ marginLeft: 6 }}>revisar</span>
+                        )}
+                      </span>
+                    </label>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+                      {epiLinhas.map((e, i) => (
+                        <label key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={e.marcada}
+                            onChange={(ev) =>
+                              setEpiLinhas((arr) => arr.map((x, j) => (j === i ? { ...x, marcada: ev.target.checked } : x)))
+                            }
+                          />
+                          {e.nome}
+                          {e.revisar && <span className="selo selo-amarelo">revisar</span>}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                 <strong>{feitas}</strong> de {linhas.length} tarefas feitas
-                {epiLinhas.length > 0 && <> · {epiLinhas.filter((e) => e.marcada).length}/{epiLinhas.length} EPIs</>}.
+                {epiLinhas.length > 0 &&
+                  (epiDeclaracao ? (
+                    <> · EPIs {epiLinhas[0]?.marcada ? "declarados" : "NÃO declarados"}</>
+                  ) : (
+                    <> · {epiLinhas.filter((e) => e.marcada).length}/{epiLinhas.length} EPIs</>
+                  ))}
+                .
                 <button
                   className="btn btn-primario"
                   onClick={salvar}

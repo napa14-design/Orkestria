@@ -146,8 +146,7 @@ export default function PaginaAcompanhamento() {
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
 
   function abrirRegistro(rotina: RotinaPlanejada) {
-    // EPIs exigidos pela tarefa — pré-marcados como usados (o comum); o
-    // supervisor desmarca a exceção. Reabrindo, usa o que já foi confirmado.
+    // EPIs exigidos pela tarefa — apenas para montar o texto da declaração.
     const t = tarefaPorId.get(rotina.tarefa_id);
     const exigidos: string[] = [];
     for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
@@ -155,9 +154,11 @@ export default function PaginaAcompanhamento() {
       if (req?.tipo === "epi" && !exigidos.includes(req.nome)) exigidos.push(req.nome);
     }
     const exec = execucaoPorRotina.get(rotina.id);
+    // Registro NOVO nasce sem declaração: quem confirma é o supervisor, não o
+    // formulário. Só um registro já gravado reabre com o que foi declarado.
     const epis = exec?.epis_confirmados
       ? exec.epis_confirmados.split(",").map((s) => s.trim()).filter(Boolean)
-      : exigidos;
+      : [];
     setForm({
       ...FORM_VAZIO,
       inicio_real: rotina.inicio_planejado,
@@ -559,31 +560,37 @@ export default function PaginaAcompanhamento() {
               </>
             )}
 
+            {/* Declaração única, DESMARCADA por padrão — igual à ficha de papel
+                (ORK3). Antes vinha tudo pré-marcado, o que fazia o registro
+                afirmar sozinho algo que ninguém conferiu. */}
             {!statusCritico && episDaRotina.length > 0 && (
               <div className="campo" style={{ gridColumn: "1 / -1" }}>
-                <span className="rotulo">EPIs utilizados</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 4 }}>
-                  {episDaRotina.map((nome) => {
-                    const marcado = form.epis.includes(nome);
-                    return (
-                      <label key={nome} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                        <input
-                          type="checkbox"
-                          checked={marcado}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              epis: e.target.checked
-                                ? [...f.epis, nome]
-                                : f.epis.filter((x) => x !== nome),
-                            }))
-                          }
-                        />
-                        {nome}
-                      </label>
-                    );
-                  })}
-                </div>
+                <span className="rotulo">Declaração de EPIs</span>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, marginTop: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={episDaRotina.every((n) => form.epis.includes(n))}
+                    onChange={(e) => setForm((f) => ({ ...f, epis: e.target.checked ? [...episDaRotina] : [] }))}
+                    style={{ marginTop: 3, width: "auto" }}
+                  />
+                  <span>
+                    O funcionário confirmou que utilizou os EPIs desta tarefa:{" "}
+                    <em>{episDaRotina.join(", ")}</em>.
+                  </span>
+                </label>
+                {/* Registro antigo pode ter lista PARCIAL (ou a lista do dia
+                    inteiro, vinda da ficha). Mostra o que está gravado para o
+                    supervisor não sobrescrever sem perceber. */}
+                {form.epis.length > 0 &&
+                  !(
+                    form.epis.length === episDaRotina.length &&
+                    episDaRotina.every((n) => form.epis.includes(n))
+                  ) && (
+                    <div className="alerta alerta-aviso" style={{ marginTop: 6, fontSize: 12 }}>
+                      Já gravado neste registro: <strong>{form.epis.join(", ")}</strong>. Marcar ou
+                      desmarcar acima substitui essa lista.
+                    </div>
+                  )}
               </div>
             )}
 

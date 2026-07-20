@@ -99,6 +99,19 @@ export function epiPos(i: number, n: number): { x: number; y: number } {
 /** Quantos EPIs cabem no bloco (todas as colunas cheias). */
 export const EPI_CAPACIDADE = EPI.porColuna * EPI.colX.length;
 
+/**
+ * ORK3 — caixa ÚNICA da declaração de EPIs (ata de 17/07: o funcionário não
+ * escolhe item a item; declara que usou os EPIs corretos, que vêm listados
+ * nominalmente ao lado para o registro continuar dizendo o que de fato foi
+ * usado).
+ *
+ * Ocupa exatamente a posição da 1ª caixa do layout antigo — assim a âncora do
+ * bloco (`epiTopo`) e as Observações abaixo seguem valendo sem recalibração.
+ */
+export function declaracaoPos(n: number): { x: number; y: number } {
+  return epiPos(0, n);
+}
+
 /** Posição (canto inferior-esquerdo) de cada fiducial para desenhar. */
 export function fidRects(): [number, number][] {
   const { x0, x1, yBot, yTop } = CARD;
