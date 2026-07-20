@@ -98,6 +98,7 @@ sedes; a folga-alvo continua por sede (`folga_minima_percentual`).
 | Campo | Tipo | Observação |
 |---|---|---|
 | rotina_id | string | FK para rotina planejada |
+| sede_id | string | desnormalizado da rotina — existe só para a consulta composta (sede + data_execucao) não ler o dia de todas as sedes. A fonte da verdade continua sendo a rotina. |
 | data_execucao | YYYY-MM-DD | |
 | status_realizado | enum | conforme_planejado · com_atraso · parcial · nao_realizada · remanejada · cancelada |
 | inicio_real, fim_real | HH:mm | opcionais |
@@ -117,10 +118,18 @@ de linhas com o mesmo `nome_modelo` + `sede_id`.
 | inicio_planejado | HH:mm | |
 | duracao_min | number | duração do item no snapshot (rota padrão); a geração reproduz fielmente sem recalcular |
 | padrao | boolean | marca este modelo como a **rota padrão** da sede (só um por sede) |
+| evento | boolean | marca o modelo como **rotina de um tipo de evento** (formatura, feira, prova). **Excludente com `padrao`** — se um evento virasse rota padrão, o "Gerar o dia" montaria a programação do evento todos os dias. |
 | criado_por, criado_em | auditoria | |
 
 Aplicar um modelo recria as rotinas passando pelas validações normais —
 itens que conflitam na data de destino são pulados e contabilizados.
+
+**Rotinas de evento:** o "tipo de evento" é o próprio `nome_modelo`
+("Formatura", "Feira de Ciências") com `evento = true`. O supervisor monta o
+primeiro evento na agenda, salva como modelo de evento e, nos seguintes, aplica
+**com antecedência** (no dia do evento não há tempo de programar). No dia:
+gera-se a rota padrão normalmente e aplica-se o evento por cima — o que
+conflitar de horário é pulado e informado.
 
 **Rota padrão + "Gerar o dia":** o modelo marcado como `padrao` é a rota padrão
 da sede. Na agenda, um dia vazio oferece **"⚡ Gerar o dia da rota padrão"**, que
@@ -128,6 +137,25 @@ reproduz a rota fielmente (tempo exato gravado em `duracao_min`, sem re-encaixar
 na grade), de forma **idempotente** (não duplica) e **adaptativa** (pula
 ausentes, dias de folga pela escala e tarefas `depende_calendario` fora do
 período letivo). Implementado em `gerarDiaDaRotaPadrao` (`services/modelosService.ts`).
+
+### qualificacoes_funcionario
+O que cada funcionário possui do catálogo `requisitos` (aptidão/treinamento).
+EPI não entra aqui — é exigido pela tarefa, não "possuído" pela pessoa.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| funcionario_id | string | |
+| requisito_id | string | FK para `requisitos` (tipo aptidao ou treinamento) |
+| sede_id | string | herdado do funcionário (filtro por sede) |
+| validade | YYYY-MM-DD | vazio = não expira; vencida **bloqueia** a alocação |
+| nivel | enum | `apto` · `experiente` · `referencia` (vazio = apto). **Só ordena sugestões** — quem tem a qualificação válida executa, seja qual for o nível. É degrau de HABILITAÇÃO, não avaliação de desempenho. |
+| observacao | string | |
+
+Uma tarefa exige requisitos pelo CSV de ids em `tarefas.requisitos`. Quem não
+tem (ou está vencido) é **bloqueado** na alocação — no cliente e no servidor.
+O `nivel` não participa desse bloqueio: ele alimenta a sugestão "★ Habilitados"
+na lista de tarefas, para direcionar quem chamar primeiro (ex.: montagem de
+palco num evento).
 
 ### ausencias
 Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário
