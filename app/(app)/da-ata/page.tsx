@@ -28,8 +28,8 @@ const BLOCOS: Bloco[] = [
       },
       {
         pediu: "O tipo de uso do local deveria puxar o nível de limpeza (laboratório, clínica, pátio são mais pesados só por serem aquilo).",
-        faz: "Já dá para marcar o local como mais denso (a intensidade agora mora no local). Puxar o nível automaticamente a partir do tipo de uso ainda é uma decisão de modelagem — não falta de trabalho.",
-        status: "decisao",
+        faz: "Feito (decisão fechada em 17/07): deixando o fator em branco no cadastro, ele sai do TIPO do local — banheiro e copa densos (1,5), área externa leve (0,8), demais normais. O fator da tarefa continua existindo e os dois multiplicam, com o local como prioritário. Quem digitar um valor sobrepõe o padrão.",
+        status: "entregue",
       },
       {
         pediu: "Contar o tempo de deslocamento/transição entre ambientes.",
@@ -185,6 +185,46 @@ const BLOCOS: Bloco[] = [
         pediu: "Relatório mensal por funcionário para o cliente assinar e login individual.",
         faz: "Relatório mensal pronto. Login com senha por usuário e “Entrar com Google” (só e-mails já cadastrados).",
         status: "entregue",
+      },
+    ],
+  },
+  {
+    titulo: "Demonstração às sedes (17/07)",
+    itens: [
+      {
+        pediu: "Eventos desmontam a rotina — e no dia do evento não há tempo de montar a programação.",
+        faz: "Cadastro de rotina por TIPO DE EVENTO: monte o 1º evento na agenda, salve como “modelo de evento” e nos próximos aplique com antecedência (na sexta, para o fim de semana). No dia, gere a rota padrão e aplique o evento por cima — o que conflita de horário é pulado e informado.",
+        status: "entregue",
+      },
+      {
+        pediu: "Direcionar a pessoa mais habilitada para a atividade do evento (ex.: montagem de palco).",
+        faz: "A qualificação ganhou um nível (apto · experiente · referência) e a lista de tarefas sugere quem chamar primeiro. É degrau de HABILITAÇÃO, não avaliação de desempenho: quem tem a qualificação válida executa, seja qual for o nível.",
+        status: "entregue",
+      },
+      {
+        pediu: "Na ficha, o funcionário não deve escolher item a item — deve declarar que usou os EPIs corretos.",
+        faz: "A ficha traz uma declaração única, com os EPIs listados nominalmente ao lado (o registro precisa dizer o que foi usado, porque a ficha assinada tem valor probatório). Fichas já impressas no formato antigo continuam sendo lidas.",
+        status: "entregue",
+      },
+      {
+        pediu: "Fixar também a coluna da esquerda ao rolar a agenda para o lado.",
+        faz: "A régua de horários (visão diária) e a coluna de nomes (visão semanal) ficam fixas na rolagem horizontal.",
+        status: "entregue",
+      },
+      {
+        pediu: "Substituir o cadastro por idade por “aptidão”, para evitar etarismo.",
+        faz: "O cadastro de funcionário nunca teve idade — a habilitação sempre foi modelada por qualificação/treinamento, que é exatamente o critério pedido. Nada a remover.",
+        status: "entregue",
+      },
+      {
+        pediu: "Remanejar automaticamente as tarefas de quem for deslocado para o evento.",
+        faz: "Confirmado no escopo do projeto, para uma etapa seguinte. Hoje a falta já aparece no painel de cobertura com sugestão de remanejo.",
+        status: "decisao",
+      },
+      {
+        pediu: "Formalizar a origem dos fatores de intensidade (0,8 · 1,0 · 1,5).",
+        faz: "Os números são arbitrados e ajustáveis no sistema — a formalização metodológica é decisão da direção com a operação, não de desenvolvimento.",
+        status: "decisao",
       },
     ],
   },
