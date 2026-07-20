@@ -7,7 +7,26 @@
 
 ---
 
-## 2026-07-15 — Corte de leituras do Firestore (escala: 17 sedes)
+## 2026-07-20 — Coluna da esquerda fixa na rolagem (ata 17/07)
+
+- Pedido do Pedro Ícaro na demonstração: além do cabeçalho, **fixar a coluna da
+  esquerda** para não perder a referência ao navegar entre funcionários.
+- **Visão diária** (`AgendaGrid`): a régua de horários virou `sticky left:0` com
+  `z-index 13` — acima dos cabeçalhos de funcionário (12), então as colunas
+  passam **por baixo** dela. As células já tinham fundo opaco (`--papel-2`),
+  requisito para o sticky não deixar vazar conteúdo.
+- **Visão semanal** (`SemanaGrid`): mesmo sintoma (a coluna "Funcionário" sumia).
+  Nova classe `.col-fixa` no `globals.css` — repete a regra de `:hover` porque um
+  `background` opaco mataria o realce da linha.
+- Verificado no navegador por medição de DOM: diária rolou 176px e a régua ficou
+  cravada na borda (coluna de funcionário 360→184); semanal rolou 300px com a
+  coluna fixa parada (outra coluna 427→127).
+- Arquivos: `components/agenda/AgendaGrid.tsx`, `components/agenda/SemanaGrid.tsx`,
+  `app/globals.css`.
+
+---
+
+## 2026-07-20 — Corte de leituras do Firestore (escala: 17 sedes)
 
 - **Problema previsto**: no cota grátis (50k leituras/dia), o jeito atual estoura
   com o efetivo real. Causa raiz: as consultas quentes filtravam **só por `data`**
@@ -40,7 +59,7 @@
 
 ---
 
-## 2026-07-14 — Importador de planilha (+ modelo para o supervisor preencher)
+## 2026-07-20 — Importador de planilha (+ modelo para o supervisor preencher)
 
 - Nova tela **`/importar`**: o supervisor baixa o modelo `.xlsx`, preenche a rota no
   Excel e sobe. O sistema mostra um **preview sem gravar** (quantos funcionários,

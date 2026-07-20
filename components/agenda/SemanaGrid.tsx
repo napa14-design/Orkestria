@@ -81,7 +81,7 @@ export default function SemanaGrid({
       <table className="tabela" style={{ minWidth: 900 }}>
         <thead>
           <tr>
-            <th style={{ width: 170 }}>Funcionário</th>
+            <th className="col-fixa" style={{ width: 170 }}>Funcionário</th>
             {datas.map((data) => {
               const d = new Date(`${data}T12:00:00`);
               const eHoje = data === hoje;
@@ -117,7 +117,7 @@ export default function SemanaGrid({
             const jornada = jornadaLiquidaMin(f);
             return (
               <tr key={f.id}>
-                <td>
+                <td className="col-fixa">
                   <strong>{f.nome}</strong>
                   <div className="num" style={{ fontSize: 10, color: "var(--tinta-3)" }}>
                     {f.entrada}–{f.saida} · líq. {formatarDuracao(jornada)}

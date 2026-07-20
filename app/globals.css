@@ -183,6 +183,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .tabela tbody tr:hover { background: var(--papel-2); }
 
+/* Primeira coluna fixa na rolagem horizontal (visão semanal da agenda).
+   Precisa de fundo opaco para o resto da linha passar por baixo; a regra de
+   hover é repetida senão a coluna fixa não acompanharia o realce da linha. */
+.tabela .col-fixa { position: sticky; left: 0; z-index: 2; background: var(--papel); }
+.tabela th.col-fixa { z-index: 3; background: var(--papel-2); }
+.tabela tbody tr:hover .col-fixa { background: var(--papel-2); }
+
 /* ── selos/badges ─────────────────────────────────────────────────── */
 .selo {
   display: inline-block;

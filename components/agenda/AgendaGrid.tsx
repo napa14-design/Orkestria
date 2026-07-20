@@ -182,8 +182,19 @@ export default function AgendaGrid({
   return (
     <div className="painel entra-2" style={{ flex: 1, overflow: "auto", maxHeight: "calc(100vh - 160px)" }}>
       <div style={{ display: "flex", minWidth: funcionarios.length * 190 + 64 }}>
-        {/* régua de horários */}
-        <div style={{ width: 64, flexShrink: 0, borderRight: "2px solid var(--tinta)" }}>
+        {/* régua de horários — fica fixa na rolagem horizontal (as colunas dos
+            funcionários passam POR BAIXO dela, por isso z-index > 12 e fundo
+            opaco nas células). */}
+        <div
+          style={{
+            width: 64,
+            flexShrink: 0,
+            borderRight: "2px solid var(--tinta)",
+            position: "sticky",
+            left: 0,
+            zIndex: 13,
+          }}
+        >
           <div
             style={{
               height: 56,
