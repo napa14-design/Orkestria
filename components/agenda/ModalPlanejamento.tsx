@@ -111,6 +111,7 @@ export default function ModalPlanejamento({
   const [dias, setDias] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [nomeNovoModelo, setNomeNovoModelo] = useState("");
   const [padraoNovo, setPadraoNovo] = useState(false);
+  const [eventoNovo, setEventoNovo] = useState(false);
   const [modeloEscolhido, setModeloEscolhido] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -154,11 +155,19 @@ export default function ModalPlanejamento({
         sede_id: sedeId,
         padrao: padraoNovo,
         com_duracao: true,
+        evento: eventoNovo,
       });
       await mutateModelos();
       const nome = nomeNovoModelo;
+      const eraEvento = eventoNovo;
+      // Zera os flags: o modal fica montado, e um "padrão" esquecido faria o
+      // PRÓXIMO modelo salvo roubar a rota padrão da sede sem ninguém notar.
       setNomeNovoModelo("");
-      return `Modelo "${nome}" salvo com ${r.itens} tarefa(s)${padraoNovo ? " (rota padrão da sede)" : ""}.`;
+      setPadraoNovo(false);
+      setEventoNovo(false);
+      return `Modelo "${nome}" salvo com ${r.itens} tarefa(s)${
+        padraoNovo ? " (rota padrão da sede)" : eraEvento ? " (modelo de evento)" : ""
+      }.`;
     });
   }
 
@@ -241,21 +250,69 @@ export default function ModalPlanejamento({
               Salvar
             </button>
           </div>
+          {/* Rota padrão e evento se excluem: a rota padrão alimenta o "Gerar o
+              dia"; o evento é aplicado sob demanda, na véspera. */}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
-            <input type="checkbox" checked={padraoNovo} onChange={(e) => setPadraoNovo(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={padraoNovo}
+              disabled={eventoNovo}
+              onChange={(e) => setPadraoNovo(e.target.checked)}
+            />
             Marcar como <strong>rota padrão</strong> da sede (usada no "Gerar o dia")
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
+            <input
+              type="checkbox"
+              checked={eventoNovo}
+              disabled={padraoNovo}
+              onChange={(e) => setEventoNovo(e.target.checked)}
+            />
+            É um <strong>modelo de evento</strong> (formatura, feira, prova…)
+          </label>
+          {eventoNovo && (
+            <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0, paddingLeft: 22 }}>
+              Programe o evento <strong>com antecedência</strong> (ex.: na sexta, para o fim de
+              semana). No dia, gere a rota padrão normalmente e aplique o evento por cima — o que
+              conflitar de horário é pulado e informado.
+            </p>
+          )}
 
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <label className="campo" style={{ flex: 1 }}>
               <span className="rotulo">Aplicar modelo existente</span>
               <select value={modeloEscolhido} onChange={(e) => setModeloEscolhido(e.target.value)}>
                 <option value="">— escolher —</option>
-                {(modelos ?? []).map((m) => (
-                  <option key={m.nome_modelo} value={m.nome_modelo}>
-                    {m.nome_modelo} ({m.itens} tarefas)
-                  </option>
-                ))}
+                {(() => {
+                  const todos = modelos ?? [];
+                  const rotulo = (m: ResumoModelo) =>
+                    `${m.nome_modelo} (${m.itens} tarefas${m.inicio ? ` · ${m.inicio}–${m.fim}` : ""})`;
+                  const rotas = todos.filter((m) => !m.evento);
+                  const eventos = todos.filter((m) => m.evento);
+                  return (
+                    <>
+                      {rotas.length > 0 && (
+                        <optgroup label="Rotas">
+                          {rotas.map((m) => (
+                            <option key={m.nome_modelo} value={m.nome_modelo}>
+                              {m.padrao ? "★ " : ""}
+                              {rotulo(m)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {eventos.length > 0 && (
+                        <optgroup label="Eventos">
+                          {eventos.map((m) => (
+                            <option key={m.nome_modelo} value={m.nome_modelo}>
+                              {rotulo(m)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
             </label>
             <button className="btn btn-primario" onClick={aplicarModelo} disabled={ocupado || !modeloEscolhido}>

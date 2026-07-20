@@ -31,8 +31,13 @@ export interface ResumoModelo {
   sede_id: string;
   itens: number;
   padrao: boolean;
+  /** Modelo de evento (formatura, feira…) — aplicado sob demanda, nunca no "Gerar o dia". */
+  evento: boolean;
   criado_por: string;
   criado_em: string;
+  /** Faixa de horário do modelo (menor início / maior fim) — só para exibição. */
+  inicio?: string;
+  fim?: string;
 }
 
 export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
@@ -41,21 +46,47 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
     ? await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }])
     : await ds.listar("modelos_rotina");
   const grupos = new Map<string, ResumoModelo>();
+  // Faixa de horário por grupo, em minutos (o fim usa a duração quando o
+  // modelo a preservou; sem ela, o próprio início é o melhor palpite).
+  const faixa = new Map<string, { ini: number; fim: number }>();
   for (const item of itens) {
     const chave = `${item.sede_id}::${item.nome_modelo}`;
     const atual = grupos.get(chave);
     if (atual) {
       atual.itens++;
       if (item.padrao) atual.padrao = true;
+      if (item.evento) atual.evento = true;
     } else
       grupos.set(chave, {
         nome_modelo: item.nome_modelo,
         sede_id: item.sede_id,
         itens: 1,
         padrao: item.padrao === true,
+        evento: item.evento === true,
         criado_por: item.criado_por,
         criado_em: item.criado_em,
       });
+
+    const ini = hhmmParaMin(item.inicio_planejado);
+    if (!Number.isNaN(ini)) {
+      // duração inválida (célula não numérica no Sheets) não pode virar NaN e
+      // contaminar o rótulo da faixa inteira.
+      const dur = Number(item.duracao_min);
+      const fim = ini + (Number.isFinite(dur) && dur > 0 ? dur : 0);
+      const f = faixa.get(chave);
+      if (!f) faixa.set(chave, { ini, fim });
+      else {
+        f.ini = Math.min(f.ini, ini);
+        f.fim = Math.max(f.fim, fim);
+      }
+    }
+  }
+  for (const [chave, g] of grupos) {
+    const f = faixa.get(chave);
+    if (f) {
+      g.inicio = minParaHHMM(f.ini);
+      g.fim = minParaHHMM(f.fim);
+    }
   }
   return [...grupos.values()].sort((a, b) => a.nome_modelo.localeCompare(b.nome_modelo));
 }
@@ -66,7 +97,9 @@ export async function getRotaPadrao(sedeId: string): Promise<ModeloRotinaItem[]>
   const itens = await ds.consultar("modelos_rotina", [
     { campo: "sede_id", op: "==", valor: sedeId },
   ]);
-  return itens.filter((m) => m.padrao === true);
+  // `!m.evento` é cinto de segurança: salvarModelo já impede padrão+evento, mas
+  // dado antigo/importado não pode fazer o "Gerar o dia" montar um evento.
+  return itens.filter((m) => m.padrao === true && !m.evento);
 }
 
 /**
@@ -80,12 +113,21 @@ export async function salvarModelo(
   dataOrigem: string,
   sedeId: string,
   autor: string,
-  opts: { padrao?: boolean; comDuracao?: boolean } = {},
+  opts: { padrao?: boolean; comDuracao?: boolean; evento?: boolean } = {},
 ): Promise<{ itens: number }> {
   const nomeLimpo = nome.trim();
   if (!nomeLimpo)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "MODELO_SEM_NOME", mensagem: "Informe um nome para o modelo." },
+    ]);
+  if (opts.padrao && opts.evento)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "MODELO_EVENTO_PADRAO",
+        mensagem:
+          "Um modelo de evento não pode ser a rota padrão da sede: o \"Gerar o dia\" passaria a montar a programação do evento todo dia.",
+      },
     ]);
   const rotinas = (await getRotinasByData(dataOrigem, sedeId)).filter(
     (r) => r.status !== "cancelada",
@@ -105,6 +147,16 @@ export async function salvarModelo(
   // Itens do mesmo nome: removidos DEPOIS de criar os novos, para não destruir a
   // rota padrão se algo falhar no meio (create-then-delete, não delete-then-create).
   const antigos = todos.filter((m) => m.nome_modelo === nomeLimpo);
+  // Sobrescrever o modelo que É a rota padrão sem remarcá-lo deixaria a sede sem
+  // rota padrão em silêncio (o "Gerar o dia" pararia de achar o quê gerar).
+  if (!opts.padrao && antigos.some((m) => m.padrao))
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "MODELO_SOBRESCREVE_PADRAO",
+        mensagem: `"${nomeLimpo}" é a rota padrão desta sede. Para substituí-la, marque também "rota padrão"; para criar outro modelo, use um nome diferente.`,
+      },
+    ]);
 
   const novos: ModeloRotinaItem[] = rotinas.map((r) => ({
     id: novoId(),
@@ -118,6 +170,7 @@ export async function salvarModelo(
     // sem recalcular (evita divergência por fator de serviço/intensidade).
     ...(opts.comDuracao ? { duracao_min: r.tempo_previsto_min } : {}),
     ...(opts.padrao ? { padrao: true } : {}),
+    ...(opts.evento ? { evento: true } : {}),
     criado_por: autor,
     criado_em: agora,
   }));

@@ -16,6 +16,15 @@ export interface ModeloRotinaItem {
   duracao_min?: number;
   /** Marca este modelo como a "rota padrão" da sede (só um padrão por sede). */
   padrao?: boolean;
+  /**
+   * Modelo de EVENTO (formatura, feira, prova) — a rotina exigida por aquele
+   * tipo de evento, aplicada com antecedência sobre o dia (ata de 17/07: no dia
+   * do evento o supervisor não tem tempo de montar a programação).
+   *
+   * Excludente com `padrao`: um evento nunca é a rota do dia a dia, senão o
+   * "Gerar o dia" passaria a produzir a programação do evento.
+   */
+  evento?: boolean;
   criado_por: string;
   criado_em: string;
 }

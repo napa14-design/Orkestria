@@ -62,11 +62,12 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
     fetcher,
   );
   // Modelos da sede — saber se há "rota padrão" (gera o dia em 1 clique).
-  const { data: modelos, mutate: mutateModelos } = useSWR<{ nome_modelo: string; padrao: boolean }[]>(
-    sedeId ? `/api/modelos?sede=${sedeId}` : null,
-    fetcher,
-  );
-  const temRotaPadrao = (modelos ?? []).some((m) => m.padrao);
+  const { data: modelos, mutate: mutateModelos } = useSWR<
+    { nome_modelo: string; padrao: boolean; evento?: boolean }[]
+  >(sedeId ? `/api/modelos?sede=${sedeId}` : null, fetcher);
+  // `!m.evento` espelha o filtro de `getRotaPadrao`: sem isso a tela ofereceria
+  // "Gerar o dia" e a geração devolveria "sem rota".
+  const temRotaPadrao = (modelos ?? []).some((m) => m.padrao && !m.evento);
 
   // Visão semanal: rotinas e ausências da semana inteira (seg–dom).
   const segunda = segundaDaSemana(data);

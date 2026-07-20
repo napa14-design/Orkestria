@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-07-20 — Rotinas por tipo de evento (ata 17/07)
+
+- **A principal lacuna apontada pela operação**: "não adianta organizar a rotina,
+  porque os eventos a desmontam". E no dia do evento o supervisor não tem tempo
+  de montar a programação — o lançamento precisa ser **prévio**.
+- Reuso do mecanismo de modelos (já cobria ~80%): `ModeloRotinaItem.evento?`
+  marca o modelo como **de evento**. O "tipo de evento" é o próprio nome do
+  modelo ("Formatura", "Feira de Ciências") — sem tabela nova.
+- Fluxo, sem editor novo: o supervisor monta o 1º evento na agenda normal (com
+  todas as validações ao vivo), salva marcando "modelo de evento" e, nos
+  próximos, **aplica com antecedência** (sexta → fim de semana). `aplicarModelo`
+  já fazia isso, passando por `createRotina` (ausência, conflito, requisitos).
+- **Invariante**: evento e rota padrão se excluem — senão o "Gerar o dia" passaria
+  a montar a programação do evento todo dia. Barrado no serviço
+  (`MODELO_EVENTO_PADRAO`), nos checkboxes e com um filtro defensivo em
+  `getRotaPadrao` (`padrao && !evento`) para o caso de dado antigo.
+- No dia do evento: gera a rota padrão normalmente e aplica o evento **por cima**
+  — o que conflitar de horário é pulado e informado (texto no modal explica).
+- O catálogo separa "Rotas" e "Eventos" em `<optgroup>` e mostra a faixa de
+  horário do modelo (menor início–maior fim).
+- Verificado: padrão+evento juntos → 422; "Gerar o dia" devolve `semRota` quando
+  só há evento (não confunde); aplicar em data futura cria; reaplicar cria 0
+  (idempotente); rota padrão e evento convivem no mesmo dia.
+- **Achados da auditoria, corrigidos**: (a) os checkboxes não eram resetados após
+  salvar e o modal fica montado — um "rota padrão" esquecido faria o PRÓXIMO
+  modelo **roubar a rota padrão da sede** (bug pré-existente, agora fechado).
+  (b) Salvar um modelo com o nome da rota padrão sem remarcá-la a apagava **em
+  silêncio**; agora dá erro explicando (`MODELO_SOBRESCREVE_PADRAO`).
+  (c) `temRotaPadrao` na tela não excluía evento — oferecia "Gerar o dia" e a
+  geração respondia "sem rota". (d) Duração inválida virava `NaN` no rótulo.
+- ⚠️ **Se algum dia rodar com `DATA_SOURCE=sheets`**: o campo novo só é lido
+  depois de rechamar `/api/setup` (o cabeçalho da aba precisa ganhar a coluna);
+  sem isso o flag é gravado e ignorado na leitura. No Firestore não se aplica.
+- Arquivos: `types/ModeloRotina.ts`, `lib/schema.ts`, `services/modelosService.ts`,
+  `app/api/modelos/route.ts`, `components/agenda/ModalPlanejamento.tsx`,
+  `app/(app)/rotinas/useRotinaData.ts`.
+
+---
+
 ## 2026-07-20 — Aptidão: nível de habilitação na qualificação (ata 17/07)
 
 - Pedido da operação: o sistema devia **direcionar a pessoa mais habilitada**

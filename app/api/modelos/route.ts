@@ -10,11 +10,11 @@ export async function GET(req: Request) {
   });
 }
 
-/** POST { nome, data_origem, sede_id, padrao?, com_duracao? } → salva o dia como modelo. */
+/** POST { nome, data_origem, sede_id, padrao?, com_duracao?, evento? } → salva o dia como modelo. */
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
-    const { nome, data_origem, sede_id, padrao, com_duracao } = await req.json();
+    const { nome, data_origem, sede_id, padrao, com_duracao, evento } = await req.json();
     if (!nome || !data_origem || !sede_id)
       return ok({ erro: "Informe nome, data_origem e sede_id." }, 400);
     if (!podeAlterarSede(sessao, sede_id))
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       await salvarModelo(nome, data_origem, sede_id, sessao.email, {
         padrao: !!padrao,
         comDuracao: !!com_duracao,
+        evento: !!evento,
       }),
       201,
     );
