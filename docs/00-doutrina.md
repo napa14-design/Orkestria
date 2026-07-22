@@ -35,6 +35,11 @@ Ferramenta de implantação **não** mora no fluxo da Agenda. Se voltar, volta n
 espaço de implantação — e nunca pode ser necessária para o caminho básico
 funcionar.
 
+**Dependência obrigatória de retorno:** toda ferramenta de implantação que
+voltar por demanda observada deve trazer, na mesma entrega, seu gatilho
+programável de aposentadoria. Sem o mecanismo que a faz desaparecer quando os
+dados amadurecem, a ferramenta não retorna ao `main`.
+
 ## Hipótese mensurável (é uma curva, não um umbral)
 
 > Um supervisor gera e valida um dia comum em **até 5 minutos**, decidindo

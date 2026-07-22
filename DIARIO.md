@@ -210,6 +210,32 @@
 
 ---
 
+## 2026-07-22 — Auditoria do ORK4: manter ORK3 no piloto
+
+- **Veredito**: **não integrar o ORK4** como está; o piloto segue com ORK3. A
+  análise completa está em [docs/14-auditoria-ork4.md](docs/14-auditoria-ork4.md).
+- O ORK4 (na branch `codex-desburocratizacao-full`) resolve uma limitação real —
+  o ORK3 não leva os nomes dos EPIs no QR, então a conferência os reconstrói do
+  catálogo atual e pode divergir do papel assinado se um requisito mudar entre
+  imprimir e ler. Mas cria dois riscos que pesam mais no piloto:
+  1. **QR mais denso no mesmo espaço físico**: o módulo impresso cai de ~0,333 mm
+     (sem nomes) para ~0,258 mm (4 EPIs) e ~0,221 mm (8 EPIs). O round-trip
+     digital passa, mas não há teste de papel impresso, fotocópia nem foto de
+     celular — justo na evidência que precisa ser mais confiável.
+  2. **Snapshot não autenticado**: o leitor passaria a aceitar a lista de EPIs
+     vinda do próprio QR, sem assinatura. Um QR fabricado poderia fornecer outra
+     lista para uma sede/data/funcionário reais. É uma regressão de segurança.
+- Condições para reconsiderar (em docs/14): autenticidade do snapshot, densidade
+  controlada com teste físico, e retrocompat automatizada ORK1–3. Até lá, o risco
+  do ORK3 se mitiga por processo: não renomear/remover EPI com ficha aberta.
+- **Doutrina** ganhou a regra que faltava: toda ferramenta de implantação que
+  voltar por demanda observada só retorna ao `main` **acompanhada do seu gatilho
+  programável de aposentadoria** — sem o off-switch, não entra
+  ([docs/00-doutrina.md](docs/00-doutrina.md)).
+- Arquivos: `docs/14-auditoria-ork4.md` (novo), `docs/00-doutrina.md`.
+
+---
+
 ## 2026-07-22 — Fundação de segurança e integridade (passo 1 do piloto)
 
 - **Contexto**: as 8 entregas de desburocratização do Codex (~5.300 linhas) foram
