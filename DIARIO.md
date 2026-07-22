@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-07-22 — Marcos da evolução mais didáticos para a direção
+
+- Os seis MARCOS da página "Da ata ao sistema" foram reescritos para o leitor
+  não-técnico (o diretor, que não estava nas conversas de desenvolvimento): cada
+  `impacto` abstrato virou cena ou número (40 tarefas → 35 cliques; "Maria · 9h30
+  · confirmar"; "as regras estão no sistema, não em quem saiu"), o jargão nosso é
+  ancorado na primeira menção ("a primeira tela do supervisor — a Central") e a
+  ideia-guia ("o sistema ganha capacidade por dentro, o supervisor vê menos por
+  fora") aterrissa no marco 06. Mesmo comprimento — âncora melhor, não texto a
+  mais.
+- Só a camada executiva curada mudou; a linha do tempo alimentada pelo DIARIO e
+  o resto da página seguem iguais. Arquivo: `app/(app)/da-ata/page.tsx`.
+
+---
+
 ## 2026-07-22 — Da ata ao sistema virou memória executiva completa
 
 - **Substituição, não nova aba**: `/da-ata` deixou de ser apenas a lista estática
