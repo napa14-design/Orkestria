@@ -22,6 +22,11 @@ export async function createFuncionario(
   const alertas = validarFuncionario(dados);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
   const ds = await getDataSource();
+  const sede = await ds.obter("sedes", dados.sede_id);
+  if (!sede)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "FUNCIONARIO_SEM_SEDE", mensagem: "Sede informada não existe." },
+    ]);
   const agora = agoraISO();
   return ds.criar("funcionarios", {
     id: novoId(),
@@ -41,8 +46,35 @@ export async function updateFuncionario(
   const ds = await getDataSource();
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
-  const alertas = validarFuncionario({ ...atual, ...mudancas });
+  const destino = { ...atual, ...mudancas };
+  const alertas = validarFuncionario(destino);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
+
+  if (destino.sede_id !== atual.sede_id) {
+    const [sede, rotinas, modelos, ausencias, qualificacoes, tempos, eventuais] = await Promise.all([
+      ds.obter("sedes", destino.sede_id),
+      ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("ausencias", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("qualificacoes_funcionario", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("tempos_personalizados", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("servicos_eventuais", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ]);
+    if (!sede)
+      throw new ErroValidacao([
+        { nivel: "erro", codigo: "FUNCIONARIO_SEM_SEDE", mensagem: "Sede informada não existe." },
+      ]);
+    const vinculos =
+      rotinas.length + modelos.length + ausencias.length + qualificacoes.length + tempos.length + eventuais.length;
+    if (vinculos > 0)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "FUNCIONARIO_SEDE_COM_VINCULOS",
+          mensagem: `Este funcionário tem ${vinculos} vínculo(s) operacional(is) e não pode mudar de sede sem uma migração assistida.`,
+        },
+      ]);
+  }
   return ds.atualizar("funcionarios", id, {
     ...mudancas,
     atualizado_por: autor,
@@ -55,17 +87,22 @@ export async function deleteFuncionario(id: string): Promise<void> {
   const ds = await getDataSource();
   // Consulta pela FK (índice de campo único) → lê só os vínculos DESTE
   // funcionário, não as coleções inteiras (que crescem sem limite no tempo).
-  const [rotinas, ausencias] = await Promise.all([
+  const [rotinas, modelos, ausencias, qualificacoes, tempos, eventuais] = await Promise.all([
     ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
     ds.consultar("ausencias", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("qualificacoes_funcionario", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("tempos_personalizados", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("servicos_eventuais", [{ campo: "funcionario_id", op: "==", valor: id }]),
   ]);
-  const vinculos = rotinas.length + ausencias.length;
+  const vinculos =
+    rotinas.length + modelos.length + ausencias.length + qualificacoes.length + tempos.length + eventuais.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {
         nivel: "erro",
         codigo: "POSSUI_HISTORICO",
-        mensagem: `Este funcionário tem ${vinculos} registro(s) de rotina/ausência. Excluir apagaria o histórico dos relatórios — use "Editar" e marque como Inativo.`,
+        mensagem: `Este funcionário tem ${vinculos} vínculo(s) operacional(is). Excluir deixaria registros órfãos — use "Editar" e marque como Inativo.`,
       },
     ]);
   }

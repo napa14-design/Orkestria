@@ -83,8 +83,16 @@ export async function updateAusencia(
     throw new ErroValidacao([
       { nivel: "erro", codigo: "PERIODO_INVALIDO", mensagem: "Período inválido." },
     ]);
+  const funcionarioId = mudancas.funcionario_id ?? atual.funcionario_id;
+  const funcionario = await ds.obter("funcionarios", funcionarioId);
+  if (!funcionario)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." },
+    ]);
   return ds.atualizar("ausencias", id, {
     ...mudancas,
+    funcionario_id: funcionarioId,
+    sede_id: funcionario.sede_id,
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });

@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-07-22 — Fundação de segurança e integridade (passo 1 do piloto)
+
+- **Contexto**: as 8 entregas de desburocratização do Codex (~5.300 linhas) foram
+  preservadas inteiras na branch `codex-desburocratizacao-full` e **não** viram
+  baseline. O `main` reconstrói só o essencial, sob a regra de
+  [docs/00-doutrina.md](docs/00-doutrina.md). Esta é a fundação — proteção
+  invisível que não burocratiza — trazida antes de qualquer fluxo de piloto.
+- **1a · Isolamento de leitura por sede**: `limitarSedeConsulta`
+  (`lib/permissions.ts`) clampa toda consulta de leitura à sede da sessão do
+  supervisor comum, mesmo se o `?sede=` for omitido ou adulterado. Admin,
+  visualizador e supervisor `geral` preservam o filtro pedido. Aplicado às 14
+  rotas GID de leitura. Verificado: supervisor não amplia escopo por nenhum
+  caminho; admin mantém acesso amplo.
+- **1b · Integridade de vínculos**: create/update passam a exigir que as FKs
+  existam e pertençam à sede — qualificação (requisito existe/ativo/não-EPI +
+  dedup), usuário (sede existe, admin não se auto-inativa), serviço eventual
+  (func/local/categoria da mesma sede), tempo personalizado (func/tarefa
+  existem), ausência (func existe), e funcionário/local/tarefa não trocam de
+  sede com vínculos vivos. Verificado: EPI, requisito inexistente e func
+  inexistente são barrados (422).
+- **Reconstruído, não extraído**: `tarefasService` recebeu só os *hunks* de
+  integridade — `aplicarKitTarefasLocal` e `replicarTarefaParaLocais` (kits e
+  replicação) **continuam só na branch**, como implantação sob demanda.
+- Arquivos: `lib/permissions.ts`, 14 rotas GET em `app/api/*`, e os services de
+  qualificações, usuários, funcionários, locais, serviços eventuais, tempos
+  personalizados, ausências e tarefas.
+- **A seguir**: passo 2 (auditoria aguardada + teste de latência do "Gerar o
+  dia"), depois Central enxuta, confirmação inline e resolução de exceção em uma
+  decisão. ORK4 fica em auditoria isolada (passo 7), sem compromisso de inclusão.
+
+---
+
 ## 2026-07-20 — Ficha: declaração de EPIs no lugar da marcação item a item (ORK3)
 
 - Pedido da reunião: em vez de o funcionário **escolher** quais EPIs marcar, a

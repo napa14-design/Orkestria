@@ -17,6 +17,30 @@ function validar(dados: Partial<DadosEventual>) {
   if (erros.length) throw new ErroValidacao(erros);
 }
 
+async function validarVinculos(dados: DadosEventual): Promise<void> {
+  const ds = await getDataSource();
+  const [sede, funcionario, local, categoria] = await Promise.all([
+    ds.obter("sedes", dados.sede_id),
+    dados.funcionario_id ? ds.obter("funcionarios", dados.funcionario_id) : Promise.resolve(null),
+    dados.local_id ? ds.obter("locais", dados.local_id) : Promise.resolve(null),
+    dados.categoria_id ? ds.obter("categorias", dados.categoria_id) : Promise.resolve(null),
+  ]);
+  const erros = [];
+  if (!sede)
+    erros.push({ nivel: "erro" as const, codigo: "SEDE_INEXISTENTE", mensagem: "Sede informada não existe." });
+  if (dados.funcionario_id && !funcionario)
+    erros.push({ nivel: "erro" as const, codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." });
+  else if (funcionario && funcionario.sede_id !== dados.sede_id)
+    erros.push({ nivel: "erro" as const, codigo: "FUNC_OUTRA_SEDE", mensagem: "Funcionário não pertence à sede informada." });
+  if (dados.local_id && !local)
+    erros.push({ nivel: "erro" as const, codigo: "LOCAL_INEXISTENTE", mensagem: "Local não existe." });
+  else if (local && local.sede_id !== dados.sede_id)
+    erros.push({ nivel: "erro" as const, codigo: "LOCAL_OUTRA_SEDE", mensagem: "Local não pertence à sede informada." });
+  if (dados.categoria_id && !categoria)
+    erros.push({ nivel: "erro" as const, codigo: "CATEGORIA_INEXISTENTE", mensagem: "Categoria não existe." });
+  if (erros.length) throw new ErroValidacao(erros);
+}
+
 /** Lista por intervalo de data (campo único) + filtro de sede em memória. */
 export async function getServicosEventuais(
   de?: string,
@@ -38,12 +62,8 @@ export async function createServicoEventual(
   autor: string,
 ): Promise<ServicoEventual> {
   validar(dados);
+  await validarVinculos(dados);
   const ds = await getDataSource();
-  const sede = await ds.obter("sedes", dados.sede_id);
-  if (!sede)
-    throw new ErroValidacao([
-      { nivel: "erro", codigo: "SEDE_INEXISTENTE", mensagem: "Sede informada não existe." },
-    ]);
   const agora = agoraISO();
   return ds.criar("servicos_eventuais", {
     id: novoId(),
@@ -64,7 +84,9 @@ export async function updateServicoEventual(
   const ds = await getDataSource();
   const atual = await ds.obter("servicos_eventuais", id);
   if (!atual) throw new Error("Registro não encontrado.");
-  validar({ ...atual, ...mudancas });
+  const destino = { ...atual, ...mudancas };
+  validar(destino);
+  await validarVinculos(destino);
   return ds.atualizar("servicos_eventuais", id, {
     ...mudancas,
     atualizado_por: autor,

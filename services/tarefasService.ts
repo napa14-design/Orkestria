@@ -60,6 +60,23 @@ export async function updateTarefa(
         { nivel: "erro", codigo: "TAREFA_SEM_LOCAL", mensagem: "Local informado não existe." },
       ]);
     sede_id = local.sede_id;
+    // Mudar de sede quebraria os vínculos existentes (rotina/modelo referenciam
+    // a tarefa por sede). Bloqueia — o caminho certo é criar tarefa no destino.
+    if (sede_id !== atual.sede_id) {
+      const [rotinas, modelos] = await Promise.all([
+        ds.consultar("rotinas_planejadas", [{ campo: "tarefa_id", op: "==", valor: id }]),
+        ds.consultar("modelos_rotina", [{ campo: "tarefa_id", op: "==", valor: id }]),
+      ]);
+      const vinculos = rotinas.length + modelos.length;
+      if (vinculos > 0)
+        throw new ErroValidacao([
+          {
+            nivel: "erro",
+            codigo: "TAREFA_SEDE_COM_VINCULOS",
+            mensagem: `Esta tarefa tem ${vinculos} rotina(s)/modelo(s) e não pode mudar para um local de outra sede. Crie uma nova tarefa no destino.`,
+          },
+        ]);
+    }
   }
 
   return ds.atualizar("tarefas", id, {
@@ -74,17 +91,18 @@ export async function updateTarefa(
 export async function deleteTarefa(id: string): Promise<void> {
   const ds = await getDataSource();
   // Consulta pela FK (índice de campo único) → lê só os vínculos DESTA tarefa.
-  const [rotinas, modelos] = await Promise.all([
+  const [rotinas, modelos, tempos] = await Promise.all([
     ds.consultar("rotinas_planejadas", [{ campo: "tarefa_id", op: "==", valor: id }]),
     ds.consultar("modelos_rotina", [{ campo: "tarefa_id", op: "==", valor: id }]),
+    ds.consultar("tempos_personalizados", [{ campo: "tarefa_id", op: "==", valor: id }]),
   ]);
-  const vinculos = rotinas.length + modelos.length;
+  const vinculos = rotinas.length + modelos.length + tempos.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {
         nivel: "erro",
         codigo: "POSSUI_HISTORICO",
-        mensagem: `Esta tarefa aparece em ${vinculos} rotina(s)/modelo(s). Excluir apagaria o histórico — use "Editar" e marque como Inativa.`,
+        mensagem: `Esta tarefa aparece em ${vinculos} rotina(s)/modelo(s)/tempo(s). Excluir apagaria o histórico — use "Editar" e marque como Inativa.`,
       },
     ]);
   }

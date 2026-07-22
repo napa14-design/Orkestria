@@ -1,6 +1,7 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hashSenha } from "@/lib/senha";
 import type { Usuario } from "@/types";
+import { ErroValidacao } from "./erros";
 
 /** Remove o hash de senha antes de devolver ao cliente. */
 function semSenha(u: Usuario): Usuario {
@@ -38,9 +39,25 @@ export async function getUsuarioPorEmail(email: string): Promise<Usuario | null>
 
 type DadosUsuario = Pick<Usuario, "nome" | "email" | "perfil" | "sede_id" | "ativo">;
 
+async function validarSedeUsuario(sedeId: string): Promise<void> {
+  if (sedeId === "geral") return;
+  const ds = await getDataSource();
+  const sede = await ds.obter("sedes", sedeId);
+  if (!sede) {
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "USUARIO_SEDE_INEXISTENTE",
+        mensagem: "A sede selecionada não existe mais. Escolha uma sede válida.",
+      },
+    ]);
+  }
+}
+
 export async function createUsuario(dados: DadosUsuario): Promise<Usuario> {
   const existente = await getUsuarioPorEmail(dados.email);
   if (existente) throw new Error(`Já existe um usuário ativo com o e-mail ${dados.email}.`);
+  await validarSedeUsuario(dados.sede_id);
   const ds = await getDataSource();
   const agora = agoraISO();
   const usuario: Usuario = {
@@ -57,6 +74,9 @@ export async function updateUsuario(
   mudancas: Partial<DadosUsuario>,
 ): Promise<Usuario> {
   const ds = await getDataSource();
+  const atual = await ds.obter("usuarios", id);
+  if (!atual) throw new Error("Usuário não encontrado.");
+  await validarSedeUsuario(mudancas.sede_id ?? atual.sede_id);
   return ds.atualizar("usuarios", id, { ...mudancas, atualizado_em: agoraISO() });
 }
 
