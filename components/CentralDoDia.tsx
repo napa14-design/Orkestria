@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import useSWR from "swr";
-import { fetcher } from "@/lib/clientApi";
+import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
 import type { CentralDiaDados, NivelCentralDia } from "@/types";
 import Carregando from "./Carregando";
@@ -14,10 +15,33 @@ const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
 };
 
 export default function CentralDoDia({ nome }: { nome: string }) {
+  const [resolvendo, setResolvendo] = useState(false);
+  const [erroAcao, setErroAcao] = useState("");
   const { data, error, isLoading, isValidating, mutate } = useSWR<CentralDiaDados>(
     "/api/central-dia",
     fetcher,
   );
+
+  async function confirmarAlocacao(rotinaId: string, funcionarioId: string) {
+    setResolvendo(true);
+    setErroAcao("");
+    try {
+      await apiPost("/api/central-dia/resolver", {
+        rotina_id: rotinaId,
+        funcionario_id: funcionarioId,
+      });
+      await mutate();
+    } catch (erro) {
+      setErroAcao(
+        erro instanceof ErroApi
+          ? erro.message
+          : "Não foi possível confirmar. A Central será atualizada.",
+      );
+      await mutate();
+    } finally {
+      setResolvendo(false);
+    }
+  }
 
   if (isLoading && !data) {
     return (
@@ -90,10 +114,42 @@ export default function CentralDoDia({ nome }: { nome: string }) {
           <h2>{data.proxima.titulo}</h2>
           <p>{data.proxima.descricao}</p>
         </div>
-        <Link className="btn btn-primario central-proxima-acao" href={data.proxima.href}>
-          {data.proxima.acao}
-          <span aria-hidden="true">→</span>
-        </Link>
+        {data.proxima.resolucao ? (
+          <div className="central-proxima-operacao">
+            <div className="central-proposta" aria-label="Alocação sugerida">
+              <span className="rotulo">Sem conflitos ou alertas</span>
+              <strong>{data.proxima.resolucao.funcionario_nome}</strong>
+              <small className="num">
+                {data.proxima.resolucao.inicio_planejado}–{data.proxima.resolucao.fim_planejado}
+              </small>
+            </div>
+            <button
+              className="btn btn-primario central-proxima-acao"
+              type="button"
+              disabled={resolvendo}
+              onClick={() =>
+                void confirmarAlocacao(
+                  data.proxima.resolucao!.rotina_id,
+                  data.proxima.resolucao!.funcionario_id,
+                )
+              }
+            >
+              {resolvendo ? "Confirmando..." : data.proxima.acao}
+              <span aria-hidden="true">→</span>
+            </button>
+            <Link className="central-proxima-alternativa" href={data.proxima.href}>
+              Escolher outra pessoa na Agenda
+            </Link>
+            {erroAcao && (
+              <small className="central-proxima-erro" role="alert">{erroAcao}</small>
+            )}
+          </div>
+        ) : (
+          <Link className="btn btn-primario central-proxima-acao" href={data.proxima.href}>
+            {data.proxima.acao}
+            <span aria-hidden="true">→</span>
+          </Link>
+        )}
       </main>
 
       {data.fila.length > 0 && (

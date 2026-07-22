@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-07-22 — Próxima exceção resolvida em uma decisão (passo 5)
+
+- **Decisão pronta, não modo novo**: quando uma tarefa de pessoa ausente ou fora
+  da escala tem substituta segura, a Central mostra pessoa + horário e permite
+  `Confirmar alocação` em um toque. Não há modal, tela ou fluxo intermediário.
+- **Zero alerta é o portão**: a sugestão reutiliza as regras da Agenda para
+  jornada, intervalos, sobreposição, gênero, janela, qualificação, cadastro e
+  carga. Até um alerta não bloqueante de sobrecarga remove o atalho e mantém
+  `Redistribuir` na Agenda como caminho manual completo.
+- **Servidor não confia no clique**: `/api/central-dia/resolver` recalcula a
+  próxima decisão e exige os mesmos ids antes de gravar. Proposta antiga ou
+  manipulada recebe `422`; visualizador recebe `403`; uma segunda validação
+  estrita fecha mudanças concorrentes entre o cálculo e a escrita.
+- **Aposentadoria executável**: `resolucao` só existe enquanto aquela rotina é a
+  primeira exceção e há candidato com zero alerta. Após confirmar, a rotina
+  deixa a condição, a contagem cai e a Central recalcula a próxima sozinha.
+- **Leituras contidas**: a carga comum da Central continua sem histórico. A
+  exceção consulta apenas tarefa, local, parâmetros e, quando necessários,
+  requisitos/qualificações da sede em foco. Mover rotina também deixou de ler o
+  dia de todas as sedes e agora rejeita vínculo funcionário↔rotina entre sedes.
+- **Portão da doutrina**: substitui abrir Agenda → localizar órfã → escolher
+  pessoa → confirmar; pertence à operação; reduz o caso seguro a uma decisão;
+  desaparece pelo predicado acima; e a Agenda segue suficiente sem o atalho.
+- **Validação**: `git diff --check` e build de produção com 67 páginas/rotas
+  aprovados. Em `DATA_SOURCE=memory`, `/inicio` retornou `200`; sem candidato
+  seguro não houve atalho; a proposta foi `Maria Apoio · 06:05`; confirmação
+  moveu a rotina e reduziu 19 pendências para 18; a próxima virou `christus_r2`;
+  visualizador recebeu `403`; corpo manipulado e repetição receberam `422`.
+  Nenhuma escrita ocorreu no Firebase.
+- **Arquivos principais**: `components/CentralDoDia.tsx`,
+  `app/api/central-dia/resolver/route.ts`, `services/centralDiaService.ts`,
+  `services/rotinasService.ts`, `types/CentralDia.ts` e `app/globals.css`.
+
+---
+
 ## 2026-07-22 — Realizado comum confirmado na linha (passo 4)
 
 - **Um toque substitui o formulário**: tarefas pendentes sem EPI agora exibem

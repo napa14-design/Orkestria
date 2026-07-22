@@ -253,9 +253,9 @@ export async function updateRotina(
       | "observacao"
       | "tempo_previsto_min"
     >
-  > & { forcar?: boolean },
+  > & { forcar?: boolean; bloquearAlertas?: boolean },
 ): Promise<ResultadoRotina> {
-  const { forcar, ...dados } = mudancas;
+  const { forcar, bloquearAlertas, ...dados } = mudancas;
   const ds = await getDataSource();
   const atual = await ds.obter("rotinas_planejadas", id);
   if (!atual) throw new Error("Rotina não encontrada.");
@@ -264,15 +264,26 @@ export async function updateRotina(
   const destinoData = dados.data ?? atual.data;
   const destinoInicio = dados.inicio_planejado ?? atual.inicio_planejado;
 
-  const [funcionario, tarefa, parametros, rotinasDoDia] = await Promise.all([
+  const [funcionario, tarefa, parametros] = await Promise.all([
     ds.obter("funcionarios", destinoFuncId),
     ds.obter("tarefas", atual.tarefa_id),
     resolverParametros(atual.sede_id),
-    getRotinasByData(destinoData),
   ]);
   if (!funcionario) throw new Error("Funcionário não encontrado.");
 
-  // Conformidade: ao mover (inclusive entre sedes), o destino também é validado.
+  // Conformidade: o destino é validado e deve permanecer na sede da rotina.
+  if (funcionario.sede_id !== atual.sede_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SEDE_DIVERGENTE",
+        mensagem: "A rotina e o funcionário precisam pertencer à mesma sede.",
+      },
+    ]);
+  // A rotina não pode sair da própria sede; portanto a validação lê somente o
+  // dia desta sede, nunca o conjunto de todas as sedes.
+  const rotinasDoDia = await getRotinasByData(destinoData, atual.sede_id);
+
   const exigeRequisitos = !!(tarefa?.requisitos ?? "").split(",").filter(Boolean).length;
   const [requisitosCatalogo, qualificacoesFuncionario] = await Promise.all([
     exigeRequisitos ? ds.listar("requisitos") : Promise.resolve([]),
@@ -324,7 +335,8 @@ export async function updateRotina(
     });
     const resultado = aplicarAutorizacaoManual(brutos, forcar);
     alertas = resultado.alertas;
-    if (temErro(alertas)) throw new ErroValidacao(alertas);
+    if (temErro(alertas) || (bloquearAlertas && alertas.length > 0))
+      throw new ErroValidacao(alertas);
   }
 
   const rotina = await ds.atualizar("rotinas_planejadas", id, {

@@ -1,12 +1,31 @@
-import { jornadaDoDia } from "@/lib/calculations";
+import {
+  funcionarioNoDia,
+  jornadaDoDia,
+  jornadaLiquidaMin,
+  tempoPlanejadoMin,
+} from "@/lib/calculations";
 import { getDataSource } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
-import { podeEscrever, type SessaoUsuario } from "@/lib/permissions";
-import type { AcaoCentralDia, CentralDiaDados } from "@/types";
+import {
+  podeAlterarSede,
+  podeEscrever,
+  type SessaoUsuario,
+} from "@/lib/permissions";
+import { validarAlocacao } from "@/lib/validations";
+import type {
+  AcaoCentralDia,
+  CentralDiaDados,
+  Funcionario,
+  ResolucaoCentralDia,
+  RotinaPlanejada,
+} from "@/types";
 import { getAusencias } from "./ausenciasService";
+import { ErroPermissao, ErroValidacao } from "./erros";
 import { getExecucoes } from "./execucoesService";
 import { getFuncionarios } from "./funcionariosService";
-import { getRotinasByData } from "./rotinasService";
+import { resolverParametros } from "./parametrosService";
+import { getQualificacoes } from "./qualificacoesService";
+import { getRotinasByData, updateRotina } from "./rotinasService";
 import { getTarefas } from "./tarefasService";
 
 function sedeDoEscopo(sessao: SessaoUsuario): string | undefined {
@@ -17,6 +36,93 @@ function sedeDoEscopo(sessao: SessaoUsuario): string | undefined {
 function minutosAgora(): number {
   const agora = new Date();
   return agora.getHours() * 60 + agora.getMinutes();
+}
+
+/**
+ * Escolhe uma única troca realmente segura. Qualquer alerta, inclusive
+ * sobrecarga, devolve a decisão para a Agenda em vez de decidir pelo operador.
+ */
+async function proporRedistribuicao(args: {
+  rotina: RotinaPlanejada;
+  funcionarios: Funcionario[];
+  disponiveisIds: Set<string>;
+  rotinasDoDia: RotinaPlanejada[];
+}): Promise<ResolucaoCentralDia | undefined> {
+  const { rotina, funcionarios, disponiveisIds, rotinasDoDia } = args;
+  const ds = await getDataSource();
+  const tarefa = await ds.obter("tarefas", rotina.tarefa_id);
+  if (!tarefa || !tarefa.ativo || tarefa.sede_id !== rotina.sede_id) return undefined;
+
+  const [local, parametros] = await Promise.all([
+    ds.obter("locais", tarefa.local_id),
+    resolverParametros(rotina.sede_id),
+  ]);
+  if (!local || !local.ativo || local.sede_id !== rotina.sede_id) return undefined;
+
+  const requisitosIds = (tarefa.requisitos ?? "").split(",").filter(Boolean);
+  const [requisitosCatalogo, qualificacoes] = await Promise.all([
+    requisitosIds.length ? ds.listar("requisitos") : Promise.resolve([]),
+    requisitosIds.length ? getQualificacoes(rotina.sede_id) : Promise.resolve([]),
+  ]);
+  const inicioMin = hhmmParaMin(rotina.inicio_planejado);
+  const fimMin = hhmmParaMin(rotina.fim_planejado);
+  if (Number.isNaN(inicioMin) || Number.isNaN(fimMin) || fimMin <= inicioMin) return undefined;
+
+  const candidatos = funcionarios
+    .filter(
+      (funcionario) =>
+        funcionario.sede_id === rotina.sede_id &&
+        funcionario.id !== rotina.funcionario_id &&
+        disponiveisIds.has(funcionario.id),
+    )
+    .map((funcionario) => {
+      const rotinasExistentes = rotinasDoDia.filter(
+        (item) => item.funcionario_id === funcionario.id && item.id !== rotina.id,
+      );
+      const efetivo = funcionarioNoDia(funcionario, rotina.data);
+      const alertas = validarAlocacao({
+        funcionario: efetivo,
+        rotinasExistentes,
+        inicioMin,
+        fimMin,
+        tarefa,
+        local,
+        parametros,
+        tempoPrevistoNovo: rotina.tempo_previsto_min,
+        requisitosCatalogo,
+        qualificacoesFuncionario: qualificacoes.filter(
+          (qualificacao) => qualificacao.funcionario_id === funcionario.id,
+        ),
+        data: rotina.data,
+      });
+      const jornada = jornadaLiquidaMin(efetivo);
+      return {
+        funcionario,
+        segura: alertas.length === 0,
+        carga: jornada > 0 ? tempoPlanejadoMin(rotinasExistentes) / jornada : Infinity,
+      };
+    })
+    .filter((candidato) => candidato.segura)
+    .sort(
+      (a, b) =>
+        a.carga - b.carga ||
+        a.funcionario.nome.localeCompare(b.funcionario.nome, "pt-BR"),
+    );
+
+  const escolhido = candidatos[0]?.funcionario;
+  if (!escolhido) return undefined;
+  const origem = funcionarios.find((funcionario) => funcionario.id === rotina.funcionario_id);
+  return {
+    tipo: "redistribuir_rotina",
+    rotina_id: rotina.id,
+    sede_id: rotina.sede_id,
+    funcionario_id: escolhido.id,
+    funcionario_nome: escolhido.nome,
+    funcionario_origem_nome: origem?.nome ?? "Pessoa indisponível",
+    tarefa_nome: tarefa.nome_tarefa,
+    inicio_planejado: rotina.inicio_planejado,
+    fim_planejado: rotina.fim_planejado,
+  };
 }
 
 /**
@@ -89,14 +195,33 @@ export async function getCentralDia(sessao: SessaoUsuario): Promise<CentralDiaDa
       const deAusentes = rotinasDeIndisponiveis.filter((rotina) =>
         ausentesIds.has(rotina.funcionario_id),
       ).length;
+      const primeiraRotina = [...rotinasDeIndisponiveis].sort(
+        (a, b) =>
+          a.inicio_planejado.localeCompare(b.inicio_planejado) || a.id.localeCompare(b.id),
+      )[0];
+      const resolucao = podeCorrigirCadastro
+        ? await proporRedistribuicao({
+            rotina: primeiraRotina,
+            funcionarios: funcionariosAtivos,
+            disponiveisIds,
+            rotinasDoDia: rotinasValidas,
+          })
+        : undefined;
       acoes.push({
         id: "agenda-indisponivel",
         nivel: "critico",
-        titulo: deAusentes > 0 ? "Há tarefas com pessoas ausentes" : "Há tarefas fora da escala",
-        descricao: `${rotinasDeIndisponiveis.length} bloco(s) precisam de outra pessoa antes da execução.`,
+        titulo: resolucao
+          ? "Quem assume a próxima tarefa?"
+          : deAusentes > 0
+            ? "Há tarefas com pessoas ausentes"
+            : "Há tarefas fora da escala",
+        descricao: resolucao
+          ? `“${resolucao.tarefa_nome}” era de ${resolucao.funcionario_origem_nome}. A troca proposta não gera conflito, sobrecarga ou alerta cadastral.`
+          : `${rotinasDeIndisponiveis.length} bloco(s) precisam de outra pessoa antes da execução.`,
         quantidade: rotinasDeIndisponiveis.length,
         href: "/rotinas",
-        acao: "Redistribuir",
+        acao: resolucao ? "Confirmar alocação" : "Redistribuir",
+        resolucao,
       });
     }
 
@@ -174,4 +299,38 @@ export async function getCentralDia(sessao: SessaoUsuario): Promise<CentralDiaDa
     proxima,
     fila,
   };
+}
+
+/**
+ * Confirma somente a proposta que ainda é a próxima decisão da Central.
+ * Recalcular aqui impede que um clique antigo ou corpo manipulado mova rotina.
+ */
+export async function resolverProximaExcecao(
+  sessao: SessaoUsuario,
+  rotinaId: string,
+  funcionarioId: string,
+) {
+  if (!podeEscrever(sessao)) throw new ErroPermissao();
+  const central = await getCentralDia(sessao);
+  const proposta = central.proxima.resolucao;
+  if (
+    !proposta ||
+    proposta.rotina_id !== rotinaId ||
+    proposta.funcionario_id !== funcionarioId
+  ) {
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "PROPOSTA_DESATUALIZADA",
+        mensagem: "A situação mudou. Atualize a Central para receber a próxima decisão segura.",
+      },
+    ]);
+  }
+  if (!podeAlterarSede(sessao, proposta.sede_id))
+    throw new ErroPermissao("Supervisores só redistribuem tarefas da própria sede.");
+
+  return updateRotina(proposta.rotina_id, {
+    funcionario_id: proposta.funcionario_id,
+    bloquearAlertas: true,
+  });
 }
