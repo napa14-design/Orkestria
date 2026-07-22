@@ -378,6 +378,44 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .barra-preenchimento { height: 100%; transition: width 0.3s ease; }
 
 /* ── agenda ───────────────────────────────────────────────────────── */
+.agenda-acoes-contextuais {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.agenda-acoes-rotulo {
+  color: var(--acento);
+  padding-right: 4px;
+}
+
+.agenda-acoes-utilidades {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.agenda-acao-alerta {
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--amarelo) 22%, var(--cartao));
+  border-color: var(--amarelo);
+}
+
+.agenda-proximo-passo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  border-left: 6px solid var(--acento);
+}
+
 .agenda-card-tarefa {
   border: 1.5px solid var(--tinta);
   border-radius: 3px;
@@ -486,6 +524,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .so-mobile { display: none; }
 
 @media (max-width: 1000px) {
+  .agenda-acoes-utilidades { margin-left: 0; }
   .linha-rotina { flex-direction: column; }
   .paleta-tarefas,
   .resumo-lateral {

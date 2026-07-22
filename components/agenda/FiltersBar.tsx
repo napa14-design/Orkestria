@@ -1,7 +1,6 @@
 "use client";
 
-/** Topo da tela de rotina: data, sede, turno e ações do dia. */
-import Link from "next/link";
+/** Topo da tela de rotina: contexto que define qual agenda está aberta. */
 import type { Sede } from "@/types";
 
 export default function FiltersBar({
@@ -16,7 +15,7 @@ export default function FiltersBar({
   aoMudarTurno,
   aoMudarModo,
   aoMudarBusca,
-  aoDuplicar,
+  aoPlanejarPeriodo,
 }: {
   data: string;
   sedeId: string;
@@ -29,7 +28,7 @@ export default function FiltersBar({
   aoMudarTurno: (v: string) => void;
   aoMudarModo: (v: "dia" | "semana") => void;
   aoMudarBusca: (v: string) => void;
-  aoDuplicar: () => void;
+  aoPlanejarPeriodo: () => void;
 }) {
   return (
     <div
@@ -113,16 +112,15 @@ export default function FiltersBar({
         />
       </label>
 
-      <button
-        className="btn"
-        onClick={aoDuplicar}
-        title="Duplicar este dia para outras datas ou salvar/aplicar modelos de rotina"
-      >
-        ⧉ Duplicar / Modelos
-      </button>
-      <Link href="/dashboard" className="btn btn-primario" style={{ textDecoration: "none" }}>
-        Dashboard →
-      </Link>
+      {modo === "semana" && (
+        <button
+          className="btn"
+          onClick={aoPlanejarPeriodo}
+          title="Duplicar dias ou aplicar modelos em datas futuras"
+        >
+          ⧉ Planejar período
+        </button>
+      )}
     </div>
   );
 }

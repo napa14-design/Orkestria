@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-07-22 — Agenda contextual: menos decisões simultâneas (passo 6)
+
+- **Uma preparação por vez**: `Gerar o dia` e `Repetir o dia anterior` deixaram
+  de aparecer também na barra. Num dia vazio, só o chamado principal adequado
+  ao estado da sede fica visível; a faixa de utilidades nem ocupa espaço antes
+  de existir rotina ou ausência concreta.
+- **Operação separada do planejamento**: `Duplicar / Modelos` saiu da visão
+  diária e virou `Planejar período`, disponível apenas na visão semanal. A
+  ferramenta continua completa, mas não compete com a terça-feira do
+  supervisor. O atalho redundante para Dashboard também saiu do cabeçalho — o
+  painel continua no menu global.
+- **Ações com gatilho de saída**: ausência só aparece quando `nFaltas > 0`;
+  confirmação só aparece quando há rotina encerrada sem realizado; impressão e
+  compactação só aparecem com dia montado; `Ensinar esta rota` desaparece assim
+  que a sede ganha uma rota padrão.
+- **Sem cobrança antes da hora**: a Agenda usava todas as rotinas sem execução
+  no contador de realizado, inclusive blocos futuros. A nova função pura
+  `rotinaAguardaConfirmacao` é compartilhada com a Central: dia passado cobra,
+  dia futuro não cobra e hoje só entra depois de `fim_planejado`.
+- **Portão da doutrina**: elimina ações duplicadas e irrelevantes da rotina;
+  mantém a operação diária separada do planejamento de período; reduz escolhas
+  antes de montar/fechar o dia; cada controle tem condição programável para
+  sumir; drag-and-drop e menu global continuam sendo o caminho básico.
+- **Direção visual**: a skill de frontend orientou uma faixa operacional
+  utilitária, densa e coerente com o sistema Partitura, em vez de outro painel
+  decorativo. O próximo passo mantém destaque único e as utilidades ficam
+  secundárias.
+- **Validação**: `git diff --check` e build de produção com 67 páginas/rotas
+  aprovados. Em `DATA_SOURCE=memory`, supervisor abriu `/rotinas` com `200` e
+  permaneceu em `christus_dt`; das 44 rotinas sem execução, somente as 36 já
+  encerradas apareceram como pendentes. Nenhuma escrita ocorreu no Firebase.
+- **Arquivos principais**: `app/(app)/rotinas/page.tsx`,
+  `app/(app)/rotinas/useRotinaData.ts`, `components/agenda/FiltersBar.tsx`,
+  `components/agenda/BarraPassosDoDia.tsx`, `lib/agenda.ts`,
+  `services/centralDiaService.ts` e `app/globals.css`.
+
+---
+
 ## 2026-07-22 — Próxima exceção resolvida em uma decisão (passo 5)
 
 - **Decisão pronta, não modo novo**: quando uma tarefa de pessoa ausente ou fora

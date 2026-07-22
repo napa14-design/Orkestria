@@ -4,6 +4,7 @@ import {
   jornadaLiquidaMin,
   tempoPlanejadoMin,
 } from "@/lib/calculations";
+import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import {
@@ -160,7 +161,7 @@ export async function getCentralDia(sessao: SessaoUsuario): Promise<CentralDiaDa
   const agoraMin = minutosAgora();
   const aguardandoConfirmacao = rotinasValidas.filter(
     (rotina) =>
-      !execucoesPorRotina.has(rotina.id) && hhmmParaMin(rotina.fim_planejado) <= agoraMin,
+      !execucoesPorRotina.has(rotina.id) && rotinaAguardaConfirmacao(rotina, data, agoraMin),
   );
 
   const acoes: AcaoCentralDia[] = [];

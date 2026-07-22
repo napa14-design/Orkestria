@@ -2,6 +2,23 @@
  * Lógica de exibição da agenda (pura, sem React) — testável isolada.
  */
 import type { RotinaPlanejada, StatusRotina } from "@/types";
+import { hhmmParaMin } from "./dateUtils";
+
+/**
+ * Uma rotina só cobra confirmação depois do fim planejado. Dias passados
+ * cobram tudo; dias futuros não cobram nada. A execução existente é filtrada
+ * por quem chama, mantendo esta regra pura e reutilizável.
+ */
+export function rotinaAguardaConfirmacao(
+  rotina: RotinaPlanejada,
+  hoje: string,
+  agoraMin: number,
+): boolean {
+  if (rotina.status === "cancelada") return false;
+  if (rotina.data < hoje) return true;
+  if (rotina.data > hoje) return false;
+  return hhmmParaMin(rotina.fim_planejado) <= agoraMin;
+}
 
 /**
  * Um "run" é um grupo de rotinas iguais e contíguas (mesma tarefa, fim de uma =

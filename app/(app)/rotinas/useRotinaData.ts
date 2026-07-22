@@ -7,9 +7,10 @@
  */
 import { useMemo } from "react";
 import useSWR from "swr";
+import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
-import { somarDias } from "@/lib/dateUtils";
+import { hojeISO, somarDias } from "@/lib/dateUtils";
 import type {
   Ausencia,
   Categoria,
@@ -106,8 +107,13 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   const nFaltas = (ausencias ?? []).length;
   const faltamRegistrar = useMemo(() => {
     const reg = new Set((execucoesDia ?? []).map((e) => e.rotina_id));
-    return (rotinas ?? []).filter((r) => r.status !== "cancelada" && !reg.has(r.id)).length;
-  }, [execucoesDia, rotinas]);
+    const hoje = hojeISO();
+    const agora = new Date();
+    const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+    return (rotinas ?? []).filter((r) => {
+      return !reg.has(r.id) && rotinaAguardaConfirmacao(r, hoje, agoraMin);
+    }).length;
+  }, [data, execucoesDia, rotinas]);
 
   return {
     sedes,

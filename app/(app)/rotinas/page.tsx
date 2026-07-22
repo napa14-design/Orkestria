@@ -590,32 +590,27 @@ export default function PaginaRotinas() {
           setBuscaFuncionario(v);
           setPaginaFunc(0);
         }}
-        aoDuplicar={() => setPlanejamentoAberto(true)}
+        aoPlanejarPeriodo={() => setPlanejamentoAberto(true)}
       />
 
-      {modo === "dia" ? (
+      {modo === "dia" && (temRotinas || nFaltas > 0) ? (
         <BarraPassosDoDia
           sedeId={sedeId}
           data={data}
           temRotaPadrao={temRotaPadrao}
           temRotinas={temRotinas}
-          fonteRepetir={fonteRepetir}
           nFaltas={nFaltas}
           faltamRegistrar={faltamRegistrar}
           denso={denso}
-          gerando={gerando}
           salvandoPadrao={salvandoPadrao}
-          repetindo={repetindo}
-          aoGerarDia={gerarDia}
           aoSalvarRotaPadrao={salvarRotaPadrao}
-          aoRepetirDiaAnterior={repetirDiaAnterior}
           aoAlternarDenso={() => setDenso((v) => !v)}
         />
-      ) : (
+      ) : modo === "semana" ? (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <AjudaAgenda />
         </div>
-      )}
+      ) : null}
 
       {modo === "semana" ? (
         <SemanaGrid
@@ -638,8 +633,7 @@ export default function PaginaRotinas() {
         <>
           {!temRotinas && temRotaPadrao && (
             <div
-              className="painel entra"
-              style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+              className="painel entra agenda-proximo-passo"
             >
               <span style={{ flex: 1, minWidth: 220 }}>
                 <strong>Dia ainda vazio.</strong> Esta sede tem uma <strong>rota padrão</strong> — gere o dia
@@ -653,8 +647,7 @@ export default function PaginaRotinas() {
 
           {!temRotinas && !temRotaPadrao && fonteRepetir && (
             <div
-              className="painel entra"
-              style={{ marginBottom: 14, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+              className="painel entra agenda-proximo-passo"
             >
               <span style={{ flex: 1, minWidth: 220 }}>
                 <strong>Dia ainda vazio.</strong> A rotina costuma repetir — comece copiando o dia anterior
