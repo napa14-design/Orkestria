@@ -1,7 +1,7 @@
 "use client";
 
 /** Dashboard de indicadores: ocupação, ociosidade, tempo por local/sede. */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import CalibracaoFolga from "@/components/CalibracaoFolga";
 import Carregando from "@/components/Carregando";
@@ -17,6 +17,7 @@ import {
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { usePreferenciaTela } from "@/lib/usePreferenciaTela";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -53,9 +54,9 @@ const COR_STATUS: Record<string, string> = {
 };
 
 export default function PaginaDashboard() {
-  const [de, setDe] = useState(diasAtras(6));
-  const [ate, setAte] = useState(hojeISO());
-  const [sedeFiltro, setSedeFiltro] = useState("");
+  const [de, setDe] = usePreferenciaTela("dashboard", "de", diasAtras(6));
+  const [ate, setAte] = usePreferenciaTela("dashboard", "ate", hojeISO());
+  const [sedeFiltro, setSedeFiltro] = usePreferenciaTela("dashboard", "sede", "");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);

@@ -123,7 +123,7 @@ export default function PaginaCapacitacoes() {
         <CartaoKpi rotulo="Vencidas" valor={String(d.nVencidas)} cor={d.nVencidas > 0 ? "var(--vermelho)" : "var(--tinta)"} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+      <div className="capacitacoes-grade">
         <ListaBarras titulo="Cobertura por sede" itens={barras} vazio="Sem funcionários ativos." />
 
         <div className="painel">

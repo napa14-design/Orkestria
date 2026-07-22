@@ -9,11 +9,15 @@
  * componentes próprios. Conflitos são validados aqui (resposta imediata) e de
  * novo no servidor antes de gravar.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AgendaGrid from "@/components/agenda/AgendaGrid";
 import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import AlertPanel from "@/components/agenda/AlertPanel";
+import BarraAcaoRapida, {
+  type EstadoSalvamentoAgenda,
+} from "@/components/agenda/BarraAcaoRapida";
 import BarraPassosDoDia from "@/components/agenda/BarraPassosDoDia";
+import CadastroRapidoAgenda from "@/components/agenda/CadastroRapidoAgenda";
 import CoberturaPanel from "@/components/agenda/CoberturaPanel";
 import FiltersBar from "@/components/agenda/FiltersBar";
 import ModaisRotina from "@/components/agenda/ModaisRotina";
@@ -23,6 +27,7 @@ import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
+import { useSessao } from "@/components/SessaoContext";
 import {
   blocosOcupados,
   funcionarioNoDia,
@@ -31,6 +36,12 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
+import { sugerirAlocacao } from "@/lib/agenda";
+import {
+  CHAVE_CONTEXTO_AGENDA,
+  lerContextoAgenda,
+  type ContextoAgendaPersistido,
+} from "@/lib/contextoAgenda";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao } from "@/lib/validations";
 import { useRotinaData } from "./useRotinaData";
@@ -41,13 +52,20 @@ interface RespostaRotina {
   alertas: AlertaValidacao[];
 }
 
+interface AcaoDesfazer {
+  rotulo: string;
+  executar: () => Promise<void>;
+}
+
 export default function PaginaRotinas() {
+  const sessao = useSessao();
   const [data, setData] = useState(hojeISO());
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [turno, setTurno] = useState("");
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [alertas, setAlertas] = useState<AlertaValidacao[]>([]);
   const [planejamentoAberto, setPlanejamentoAberto] = useState(false);
+  const [cadastroRapidoAberto, setCadastroRapidoAberto] = useState(false);
   const [modo, setModo] = useState<"dia" | "semana">("dia");
   // Blocos do item em arrasto — dimensiona o fantasma de drop na agenda.
   const [blocosArrasto, setBlocosArrasto] = useState<number | null>(null);
@@ -66,13 +84,145 @@ export default function PaginaRotinas() {
     resolver: (min: number | null) => void;
   } | null>(null);
   const [duracaoInput, setDuracaoInput] = useState("");
+  // "Carimbo" operacional: seleciona uma tarefa e aplica com cliques sucessivos na grade.
+  const [tarefaRapidaId, setTarefaRapidaId] = useState<string | null>(null);
+  const [estadoSalvamento, setEstadoSalvamento] =
+    useState<EstadoSalvamentoAgenda>("pronto");
+  const [salvoEm, setSalvoEm] = useState<string>();
+  const [acaoDesfazer, setAcaoDesfazer] = useState<AcaoDesfazer | null>(null);
+  const [desfazendo, setDesfazendo] = useState(false);
+  const [denso, setDenso] = useState(false); // grade compacta (vê o dia todo com menos rolagem)
+  const [modoFoco, setModoFoco] = useState(false);
+  const [contextoCarregado, setContextoCarregado] = useState(false);
+  const [contextoRetomado, setContextoRetomado] = useState(false);
+  const gravacoesPendentes = useRef(0);
+  const algumaGravacaoFalhou = useRef(false);
+  const [atalhoInicial, setAtalhoInicial] = useState<{
+    sede?: string;
+    funcionario?: string;
+    tarefa?: string;
+  } | null>(null);
+
+  // Retoma somente a sessão atual do navegador: evita misturar contexto entre
+  // usuários diferentes em computadores compartilhados.
+  useEffect(() => {
+    let ocultarAviso: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const contexto = lerContextoAgenda(
+        sessionStorage.getItem(CHAVE_CONTEXTO_AGENDA),
+      );
+      if (!contexto) {
+        sessionStorage.removeItem(CHAVE_CONTEXTO_AGENDA);
+        return;
+      }
+      if (typeof contexto.data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(contexto.data))
+        setData(contexto.data);
+      if (typeof contexto.turno === "string") setTurno(contexto.turno);
+      if (contexto.modo === "dia" || contexto.modo === "semana") setModo(contexto.modo);
+      if (typeof contexto.busca_funcionario === "string")
+        setBuscaFuncionario(contexto.busca_funcionario);
+      if (typeof contexto.pagina_funcionario === "number")
+        setPaginaFunc(Math.max(0, Math.floor(contexto.pagina_funcionario)));
+      if (
+        typeof contexto.funcionario_selecionado === "string" ||
+        contexto.funcionario_selecionado === null
+      )
+        setSelecionado(contexto.funcionario_selecionado);
+      if (typeof contexto.tarefa_rapida_id === "string" || contexto.tarefa_rapida_id === null)
+        setTarefaRapidaId(contexto.tarefa_rapida_id);
+      if (typeof contexto.grade_densa === "boolean") setDenso(contexto.grade_densa);
+      if (typeof contexto.modo_foco === "boolean") setModoFoco(contexto.modo_foco);
+      setContextoRetomado(true);
+      ocultarAviso = setTimeout(() => setContextoRetomado(false), 6000);
+    } catch {
+      sessionStorage.removeItem(CHAVE_CONTEXTO_AGENDA);
+    } finally {
+      setContextoCarregado(true);
+    }
+    return () => {
+      if (ocultarAviso) clearTimeout(ocultarAviso);
+    };
+  }, []);
+
+  // A busca global pode abrir a agenda já na sede e no contexto procurado.
+  // O alvo fica em ref até os dados da sede terminarem de carregar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const funcionario = params.get("funcionario") ?? undefined;
+    const tarefa = params.get("tarefa") ?? undefined;
+    const sede = params.get("sede");
+    if (!funcionario && !tarefa && !sede) return;
+    setAtalhoInicial({ sede: sede ?? undefined, funcionario, tarefa });
+    if (sede) setSedeEscolhida(sede);
+    setModo("dia");
+    params.delete("funcionario");
+    params.delete("tarefa");
+    params.delete("sede");
+    const restante = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${restante ? `?${restante}` : ""}${window.location.hash}`,
+    );
+  }, []);
+
+  useEffect(() => {
+    const abrirContextoDaBusca = (evento: Event) => {
+      const detalhe = (evento as CustomEvent<{
+        sede?: string;
+        funcionario?: string;
+        tarefa?: string;
+      }>).detail;
+      if (!detalhe) return;
+      setAtalhoInicial(detalhe);
+      if (detalhe.sede) setSedeEscolhida(detalhe.sede);
+      setModo("dia");
+    };
+    window.addEventListener("orkestria:abrir-agenda", abrirContextoDaBusca);
+    return () => window.removeEventListener("orkestria:abrir-agenda", abrirContextoDaBusca);
+  }, []);
+
+  useEffect(() => {
+    if (!contextoCarregado) return;
+    const contexto: ContextoAgendaPersistido = {
+      salvo_em: Date.now(),
+      data,
+      turno,
+      modo,
+      busca_funcionario: buscaFuncionario,
+      pagina_funcionario: paginaFunc,
+      funcionario_selecionado: selecionado,
+      tarefa_rapida_id: tarefaRapidaId,
+      grade_densa: denso,
+      modo_foco: modoFoco,
+    };
+    sessionStorage.setItem(CHAVE_CONTEXTO_AGENDA, JSON.stringify(contexto));
+  }, [
+    contextoCarregado,
+    data,
+    turno,
+    modo,
+    buscaFuncionario,
+    paginaFunc,
+    selecionado,
+    tarefaRapidaId,
+    denso,
+    modoFoco,
+  ]);
+
+  useEffect(() => {
+    document.body.classList.toggle("modo-foco-agenda", modoFoco);
+    return () => document.body.classList.remove("modo-foco-agenda");
+  }, [modoFoco]);
 
   const {
     sedes,
     sedeId,
     funcionarios,
     tarefas,
+    mutateTarefas,
     locais,
+    mutateLocais,
     categorias,
     periodosLetivos,
     temposPessoais,
@@ -96,6 +246,45 @@ export default function PaginaRotinas() {
   const params = parametros ?? PARAMETROS_PADRAO;
   const blocoMin = params.bloco_agenda_min || 30;
 
+  const tarefaRapida = tarefaRapidaId
+    ? (tarefas ?? []).find((t) => t.id === tarefaRapidaId)
+    : undefined;
+
+  useEffect(() => {
+    if (!tarefaRapidaId && !modoFoco) return;
+    const cancelarComEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (tarefaRapidaId) setTarefaRapidaId(null);
+      else setModoFoco(false);
+    };
+    window.addEventListener("keydown", cancelarComEsc);
+    return () => window.removeEventListener("keydown", cancelarComEsc);
+  }, [tarefaRapidaId, modoFoco]);
+
+  function iniciarSalvamento() {
+    if (gravacoesPendentes.current === 0) algumaGravacaoFalhou.current = false;
+    gravacoesPendentes.current += 1;
+    setEstadoSalvamento("salvando");
+  }
+
+  function finalizarSalvamento(sucesso: boolean) {
+    if (!sucesso) algumaGravacaoFalhou.current = true;
+    gravacoesPendentes.current = Math.max(0, gravacoesPendentes.current - 1);
+    if (gravacoesPendentes.current > 0) return;
+    if (algumaGravacaoFalhou.current) {
+      setEstadoSalvamento("erro");
+      return;
+    }
+    setSalvoEm(
+      new Intl.DateTimeFormat("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(new Date()),
+    );
+    setEstadoSalvamento("salvo");
+  }
+
   const FUNC_POR_PAGINA = 8;
 
   /** Todos os funcionários da sede/turno/busca — alimenta equipe e cobertura. */
@@ -110,6 +299,41 @@ export default function PaginaRotinas() {
       )
       .toSorted((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }, [funcionarios, turno, buscaFuncionario]);
+
+  useEffect(() => {
+    const atalho = atalhoInicial;
+    if (!atalho) return;
+    if (!atalho.funcionario && !atalho.tarefa) {
+      setAtalhoInicial(null);
+      return;
+    }
+    const restante = { ...atalho };
+
+    if (atalho.funcionario) {
+      const funcionario = (funcionarios ?? []).find((item) => item.id === atalho.funcionario);
+      if (funcionario) {
+        setTurno("");
+        setBuscaFuncionario(funcionario.nome);
+        setSelecionado(funcionario.id);
+        setTarefaRapidaId(null);
+        setPaginaFunc(0);
+        delete restante.funcionario;
+      }
+    }
+
+    if (atalho.tarefa) {
+      const tarefa = (tarefas ?? []).find((item) => item.id === atalho.tarefa);
+      if (tarefa) {
+        setTurno("");
+        setBuscaFuncionario("");
+        setTarefaRapidaId(tarefa.id);
+        delete restante.tarefa;
+      }
+    }
+
+    if (restante.funcionario === atalho.funcionario && restante.tarefa === atalho.tarefa) return;
+    setAtalhoInicial(restante.funcionario || restante.tarefa ? restante : null);
+  }, [atalhoInicial, funcionarios, tarefas]);
 
   /** Página de colunas exibida na agenda (8 por vez). */
   const totalPaginasFunc = Math.max(
@@ -135,6 +359,47 @@ export default function PaginaRotinas() {
     () => funcionariosVisiveis.map((f) => funcionarioNoDia(f, data)),
     [funcionariosVisiveis, data],
   );
+
+  const sugestaoRapida = useMemo(() => {
+    if (!tarefaRapida) return null;
+    return sugerirAlocacao({
+      tarefa: tarefaRapida,
+      local: (locais ?? []).find((l) => l.id === tarefaRapida.local_id),
+      funcionarios: efetivosVisiveis,
+      rotinas: rotinas ?? [],
+      parametros: params,
+      blocoMin,
+      data,
+      temposPersonalizados: temposPessoais ?? [],
+      requisitos: requisitos ?? [],
+      qualificacoes: qualificacoes ?? [],
+      ausentes: ausentesMap,
+    });
+  }, [
+    tarefaRapida,
+    locais,
+    efetivosVisiveis,
+    rotinas,
+    params,
+    blocoMin,
+    data,
+    temposPessoais,
+    requisitos,
+    qualificacoes,
+    ausentesMap,
+  ]);
+  const funcionarioSugerido = sugestaoRapida
+    ? efetivosVisiveis.find((f) => f.id === sugestaoRapida.funcionario_id)
+    : undefined;
+
+  useEffect(() => {
+    if (!sugestaoRapida) return;
+    setSelecionado(sugestaoRapida.funcionario_id);
+    const idx = funcionariosVisiveis.findIndex(
+      (f) => f.id === sugestaoRapida.funcionario_id,
+    );
+    if (idx >= 0) setPaginaFunc(Math.floor(idx / FUNC_POR_PAGINA));
+  }, [sugestaoRapida, funcionariosVisiveis]);
 
   /** Seleciona e garante que a coluna do funcionário esteja na página visível. */
   function selecionarFuncionario(id: string) {
@@ -286,6 +551,7 @@ export default function PaginaRotinas() {
       atualizado_em: "",
     };
     setSelecionado(funcionarioId);
+    iniciarSalvamento();
     try {
       let real: RotinaPlanejada | null = null;
       await mutateRotinas(
@@ -319,7 +585,18 @@ export default function PaginaRotinas() {
           revalidate: true,
         },
       );
+      const criada = real as RotinaPlanejada | null;
+      if (criada) {
+        setAcaoDesfazer({
+          rotulo: "adição da tarefa",
+          executar: async () => {
+            await apiDelete(`/api/rotinas/${criada.id}`);
+          },
+        });
+      }
+      finalizarSalvamento(true);
     } catch (err) {
+      finalizarSalvamento(false);
       mostrarErro(err);
     }
   }
@@ -349,6 +626,7 @@ export default function PaginaRotinas() {
     const fim = minParaHHMM(hhmmParaMin(inicio) + rotina.tempo_visual_min);
     const otimista = { ...rotina, funcionario_id: funcionarioId, inicio_planejado: inicio, fim_planejado: fim };
     setSelecionado(funcionarioId);
+    iniciarSalvamento();
     try {
       let real: RotinaPlanejada | null = null;
       await mutateRotinas(
@@ -377,13 +655,26 @@ export default function PaginaRotinas() {
           revalidate: true,
         },
       );
+      setAcaoDesfazer({
+        rotulo: "movimentação da tarefa",
+        executar: async () => {
+          await apiPut(`/api/rotinas/${rotina.id}`, {
+            funcionario_id: rotina.funcionario_id,
+            inicio_planejado: rotina.inicio_planejado,
+          });
+        },
+      });
+      finalizarSalvamento(true);
     } catch (err) {
+      finalizarSalvamento(false);
       mostrarErro(err);
     }
   }
 
   /** Redimensionamento pela alça do card; conflitos podem ser autorizados. */
   async function redimensionar(rotinaId: string, novoTempoMin: number) {
+    const rotinaAnterior = (rotinas ?? []).find((r) => r.id === rotinaId);
+    if (!rotinaAnterior || rotinaAnterior.tempo_previsto_min === novoTempoMin) return;
     const visual = tempoVisualMin(novoTempoMin, blocoMin);
     const aplicar = (forcar: boolean) => {
       let real: RotinaPlanejada | null = null;
@@ -424,22 +715,41 @@ export default function PaginaRotinas() {
         },
       );
     };
+    const registrarDesfazer = () =>
+      setAcaoDesfazer({
+        rotulo: "alteração da duração",
+        executar: async () => {
+          await apiPut(`/api/rotinas/${rotinaId}`, {
+            tempo_previsto_min: rotinaAnterior.tempo_previsto_min,
+          });
+        },
+      });
+    iniciarSalvamento();
     try {
       await aplicar(false);
+      registrarDesfazer();
+      finalizarSalvamento(true);
     } catch (err) {
       if (err instanceof ErroApi && (await pedirAutorizacao(err.alertas))) {
         try {
           await aplicar(true);
+          registrarDesfazer();
+          finalizarSalvamento(true);
         } catch (err2) {
+          finalizarSalvamento(false);
           mostrarErro(err2);
         }
         return;
       }
+      finalizarSalvamento(false);
       mostrarErro(err);
     }
   }
 
   async function remover(rotinaId: string) {
+    const rotinaRemovida = (rotinas ?? []).find((r) => r.id === rotinaId);
+    if (!rotinaRemovida) return;
+    iniciarSalvamento();
     try {
       await mutateRotinas(
         async (cur) => {
@@ -459,10 +769,87 @@ export default function PaginaRotinas() {
           revalidate: true,
         },
       );
+      setAcaoDesfazer({
+        rotulo: "remoção da tarefa",
+        executar: async () => {
+          await apiPost("/api/rotinas", {
+            data: rotinaRemovida.data,
+            funcionario_id: rotinaRemovida.funcionario_id,
+            tarefa_id: rotinaRemovida.tarefa_id,
+            inicio_planejado: rotinaRemovida.inicio_planejado,
+            duracao_min: rotinaRemovida.tempo_previsto_min,
+          });
+        },
+      });
+      finalizarSalvamento(true);
     } catch (err) {
+      finalizarSalvamento(false);
       mostrarErro(err);
     }
   }
+
+  async function desfazerUltimaAcao() {
+    const acao = acaoDesfazer;
+    if (!acao || desfazendo) return;
+    setDesfazendo(true);
+    iniciarSalvamento();
+    try {
+      await acao.executar();
+      await mutateRotinas();
+      setAcaoDesfazer(null);
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "DESFAZER",
+          mensagem: `A ${acao.rotulo} foi desfeita.`,
+        },
+      ]);
+      finalizarSalvamento(true);
+    } catch (err) {
+      finalizarSalvamento(false);
+      mostrarErro(err);
+    } finally {
+      setDesfazendo(false);
+    }
+  }
+
+  useEffect(() => {
+    const executarAtalho = (e: KeyboardEvent) => {
+      if (e.repeat || e.isComposing || e.defaultPrevented) return;
+      const alvo = e.target as HTMLElement | null;
+      const tag = alvo?.tagName ?? "";
+      const campoDeEdicao =
+        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || !!alvo?.isContentEditable;
+      const elementoInterativo = campoDeEdicao || tag === "BUTTON" || tag === "A";
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !campoDeEdicao) {
+        if (!acaoDesfazer || desfazendo || estadoSalvamento === "salvando") return;
+        e.preventDefault();
+        void desfazerUltimaAcao();
+        return;
+      }
+
+      if (
+        e.key === "Enter" &&
+        !elementoInterativo &&
+        sugestaoRapida &&
+        tarefaRapida &&
+        estadoSalvamento !== "salvando"
+      ) {
+        e.preventDefault();
+        void soltarNova(
+          tarefaRapida.id,
+          sugestaoRapida.funcionario_id,
+          sugestaoRapida.inicio,
+        );
+      }
+    };
+    window.addEventListener("keydown", executarAtalho);
+    return () => window.removeEventListener("keydown", executarAtalho);
+    // As funções operacionais fecham sobre o cache atual; os estados abaixo
+    // renovam o listener somente quando a ação disponível realmente muda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acaoDesfazer, desfazendo, estadoSalvamento, sugestaoRapida, tarefaRapida]);
 
   const [repetindo, setRepetindo] = useState(false);
   async function repetirDiaAnterior() {
@@ -491,7 +878,6 @@ export default function PaginaRotinas() {
     }
   }
 
-  const [denso, setDenso] = useState(false); // grade compacta (vê o dia todo com menos rolagem)
   const [gerando, setGerando] = useState(false);
   async function gerarDia() {
     if (!sedeId) return;
@@ -572,16 +958,29 @@ export default function PaginaRotinas() {
         sedeId={sedeId}
         turno={turno}
         sedes={sedes ?? []}
-        aoMudarData={setData}
+        aoMudarData={(novaData) => {
+          setData(novaData);
+          setTarefaRapidaId(null);
+          setAcaoDesfazer(null);
+          setEstadoSalvamento("pronto");
+        }}
         aoMudarSede={(v) => {
           setSedeEscolhida(v);
           setSelecionado(null);
+          setTarefaRapidaId(null);
+          setAcaoDesfazer(null);
+          setEstadoSalvamento("pronto");
           setBuscaFuncionario("");
           setPaginaFunc(0);
         }}
         modo={modo}
         busca={buscaFuncionario}
-        aoMudarModo={setModo}
+        contextoRetomado={contextoRetomado}
+        modoFoco={modoFoco}
+        aoMudarModo={(novoModo) => {
+          setModo(novoModo);
+          if (novoModo === "semana") setTarefaRapidaId(null);
+        }}
         aoMudarTurno={(v) => {
           setTurno(v);
           setPaginaFunc(0);
@@ -590,6 +989,7 @@ export default function PaginaRotinas() {
           setBuscaFuncionario(v);
           setPaginaFunc(0);
         }}
+        aoAlternarFoco={() => setModoFoco((atual) => !atual)}
         aoDuplicar={() => setPlanejamentoAberto(true)}
       />
 
@@ -682,6 +1082,7 @@ export default function PaginaRotinas() {
             historico={historico ?? []}
             data={data}
             periodos={periodosLetivos ?? []}
+            aoAlocarTarefa={(tarefaId) => setTarefaRapidaId(tarefaId)}
           />
 
           {/* paginação de colunas — só aparece em sedes grandes */}
@@ -715,6 +1116,31 @@ export default function PaginaRotinas() {
             </div>
           )}
 
+          <BarraAcaoRapida
+            tarefaNome={tarefaRapida?.nome_tarefa}
+            sugestao={
+              sugestaoRapida && funcionarioSugerido
+                ? `${funcionarioSugerido.nome} · ${sugestaoRapida.inicio}`
+                : undefined
+            }
+            estado={estadoSalvamento}
+            salvoEm={salvoEm}
+            podeDesfazer={!!acaoDesfazer}
+            desfazendo={desfazendo}
+            aoCancelarTarefa={() => setTarefaRapidaId(null)}
+            aoAplicarSugestao={
+              sugestaoRapida && tarefaRapida
+                ? () =>
+                    soltarNova(
+                      tarefaRapida.id,
+                      sugestaoRapida.funcionario_id,
+                      sugestaoRapida.inicio,
+                    )
+                : undefined
+            }
+            aoDesfazer={desfazerUltimaAcao}
+          />
+
           <div className="linha-rotina">
             <TaskPalette
               tarefas={tarefas ?? []}
@@ -726,6 +1152,12 @@ export default function PaginaRotinas() {
               requisitos={requisitos ?? []}
               data={data}
               ausentes={ausentesMap}
+              tarefaSelecionadaId={tarefaRapidaId}
+              aoSelecionarTarefa={(id) =>
+                setTarefaRapidaId((atual) => (atual === id ? null : id))
+              }
+              podeCriar={sessao.perfil !== "visualizador" && Boolean(sedeId)}
+              aoCriarTarefa={() => setCadastroRapidoAberto(true)}
               aoIniciarArrasto={setBlocosArrasto}
               aoTerminarArrasto={() => setBlocosArrasto(null)}
             />
@@ -739,6 +1171,8 @@ export default function PaginaRotinas() {
               blocoMin={blocoMin}
               funcionarioSelecionado={selecionado}
               ausencias={ausentesMap}
+              tarefaSelecionadaId={tarefaRapidaId}
+              sugestaoAlocacao={sugestaoRapida}
               aoSelecionarFuncionario={selecionarFuncionario}
               aoSoltarNova={soltarNova}
               aoMover={mover}
@@ -768,6 +1202,22 @@ export default function PaginaRotinas() {
         dataAtual={data}
         sedeId={sedeId}
         aoConcluir={concluirPlanejamento}
+      />
+
+      <CadastroRapidoAgenda
+        aberto={cadastroRapidoAberto}
+        sedeId={sedeId}
+        locais={locais ?? []}
+        categorias={categorias ?? []}
+        aoFechar={() => setCadastroRapidoAberto(false)}
+        aoLocalCriado={async () => {
+          await mutateLocais();
+        }}
+        aoTarefaCriada={async (tarefa) => {
+          await mutateTarefas();
+          setTarefaRapidaId(tarefa.id);
+          setModo("dia");
+        }}
       />
 
       <AlertPanel

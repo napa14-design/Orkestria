@@ -28,3 +28,23 @@ export interface ModeloRotinaItem {
   criado_por: string;
   criado_em: string;
 }
+
+/** DTO agregado devolvido pelo catálogo de modelos. */
+export interface ResumoModelo {
+  nome_modelo: string;
+  sede_id: string;
+  itens: number;
+  padrao: boolean;
+  evento: boolean;
+  criado_por: string;
+  criado_em: string;
+  inicio?: string;
+  fim?: string;
+}
+
+/** Resultado compartilhado pela API e pelo modal ao aplicar um modelo. */
+export interface ResultadoAplicacao {
+  criadas: number;
+  puladas: number;
+  detalhes: string[];
+}

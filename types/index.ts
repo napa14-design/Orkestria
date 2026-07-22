@@ -16,3 +16,4 @@ export * from "./ModeloRotina";
 export * from "./Ausencia";
 export * from "./PeriodoLetivo";
 export * from "./Historico";
+export * from "./CentralDia";

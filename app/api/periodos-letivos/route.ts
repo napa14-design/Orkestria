@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeGerenciarCatalogo } from "@/lib/permissions";
+import { limitarSedeConsulta, podeGerenciarCatalogo } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createPeriodoLetivo,
@@ -8,11 +8,15 @@ import {
 
 /** GET /api/periodos-letivos [?sede=] */
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
     const url = new URL(req.url);
+    const sedeId = limitarSedeConsulta(
+      sessao,
+      url.searchParams.get("sede") ?? undefined,
+    );
     return ok(
       await getPeriodosLetivos({
-        sedeId: url.searchParams.get("sede") ?? undefined,
+        sedeId,
       }),
     );
   });

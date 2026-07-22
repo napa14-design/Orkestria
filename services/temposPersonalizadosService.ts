@@ -42,6 +42,11 @@ export async function createTempoPersonalizado(dados: Dados, autor: string): Pro
     throw new ErroValidacao([
       { nivel: "erro", codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." },
     ]);
+  const tarefa = await ds.obter("tarefas", dados.tarefa_id);
+  if (!tarefa)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "TAREFA_INEXISTENTE", mensagem: "Tarefa não existe." },
+    ]);
   // um único tempo por (funcionário, tarefa)
   const existentes = await ds.consultar("tempos_personalizados", [
     { campo: "funcionario_id", op: "==", valor: dados.funcionario_id },
@@ -79,8 +84,32 @@ export async function updateTempoPersonalizado(
     throw new ErroValidacao([
       { nivel: "erro", codigo: "TEMPO_INVALIDO", mensagem: "Informe um tempo (minutos) maior que zero." },
     ]);
+  const funcionarioId = mudancas.funcionario_id ?? atual.funcionario_id;
+  const tarefaId = mudancas.tarefa_id ?? atual.tarefa_id;
+  const [funcionario, tarefa, existentes] = await Promise.all([
+    ds.obter("funcionarios", funcionarioId),
+    ds.obter("tarefas", tarefaId),
+    ds.consultar("tempos_personalizados", [
+      { campo: "funcionario_id", op: "==", valor: funcionarioId },
+    ]),
+  ]);
+  if (!funcionario)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." },
+    ]);
+  if (!tarefa)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "TAREFA_INEXISTENTE", mensagem: "Tarefa não existe." },
+    ]);
+  if (existentes.some((x) => x.id !== id && x.tarefa_id === tarefaId))
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DUPLICADO", mensagem: "Já existe um tempo para esta pessoa e tarefa." },
+    ]);
   return ds.atualizar("tempos_personalizados", id, {
     ...mudancas,
+    funcionario_id: funcionarioId,
+    tarefa_id: tarefaId,
+    sede_id: funcionario.sede_id,
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });

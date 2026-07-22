@@ -7,6 +7,418 @@
 
 ---
 
+## 2026-07-22 — Central global sem leitura histórica
+
+- **Central do dia por escopo**: admin e gerência no escopo geral não carregam
+  mais o histórico operacional de 31 dias nem períodos letivos para calcular
+  cobertura. Esse diagnóstico permanece completo para supervisor ou quando há
+  uma sede definida, evitando dezenas de milhares de leituras na abertura de
+  `/inicio` em produção.
+- **UI sem número enganoso**: quando a cobertura não foi calculada, a Central
+  mostra `—` e orienta que o diagnóstico é por sede, em vez de apresentar zero
+  como se todas as sedes estivessem cobertas.
+- **Busca global sob demanda**: abrir o `Ctrl+K` para navegar entre telas não
+  consulta mais funcionários, locais e tarefas. Os catálogos só são carregados
+  depois de dois caracteres de busca e uma única vez enquanto o app permanece
+  montado.
+- **Auditoria consciente**: documentado no decorator de histórico que a escrita
+  espera a auditoria e suas retentativas para não perder eventos em ambiente
+  serverless. A evolução segura de desempenho é gravação em lote/BulkWriter,
+  não retornar ao `fire-and-forget`.
+- **Validação**: `git diff --check`, `npm exec tsc -- --noEmit` e
+  `npm run build` aprovados, com 65 páginas/rotas geradas. Em servidor isolado
+  `DATA_SOURCE=memory`, o admin retornou escopo `geral` com
+  `cobertura_calculada=false`, enquanto o supervisor retornou
+  `christus_dt` com `cobertura_calculada=true`. Nenhuma escrita ocorreu no
+  Firebase.
+- **Arquivos principais**: `services/centralDiaService.ts`,
+  `components/CentralDoDia.tsx`, `components/BuscaGlobal.tsx`,
+  `types/CentralDia.ts` e `lib/historico.ts`.
+
+---
+
+## 2026-07-22 — Fluidez do app fora da Agenda
+
+- **Navegação mobile completa**: abaixo de 720 px o cabeçalho agora oferece um
+  menu lateral organizado por Operação, Painéis, Pessoas, Estrutura e Sistema,
+  com tela atual destacada, conta e saída. Busca e Registro rápido continuam
+  disponíveis no topo.
+- **Acompanhamento sem burocracia**: tarefas pendentes podem ser confirmadas
+  como realizadas conforme o planejamento diretamente na linha ou todas em
+  lote, com progresso e confirmação. Exceções continuam no formulário
+  completo, que ganhou `Registrar e abrir próxima`. EPIs nunca são confirmados
+  automaticamente pelas ações rápidas.
+- **Cadastros sem troca de tela**: dentro de Tarefas é possível criar local,
+  categoria ou requisito e receber o novo item já selecionado. Dentro de
+  Qualificações é possível criar funcionário essencial ou requisito do mesmo
+  modo. Permissões de sede e catálogos permanecem validadas pelas APIs.
+- **Contexto lembrado por usuário**: Acompanhamento, Dashboard, Panorama,
+  Produtividade e Relatórios guardam sede, datas, mês e dimensão escolhidos no
+  navegador, sem compartilhar preferências entre contas.
+- **Consistência e responsividade**: corrigida a visão mobile do Acompanhamento
+  que podia aparecer no desktop; Capacitações passa para uma coluna no celular;
+  Histórico reorganiza os filtros; Conferência, Importação e Relatórios ganharam
+  rolagem segura para tabelas. O CRUD agora confirma criação, edição e exclusão.
+- **Validação**: `git diff --check`, `npm exec tsc -- --noEmit` e
+  `npm run build` aprovados, com 65 páginas/rotas geradas. Em servidor isolado
+  `DATA_SOURCE=memory`, foram criados local, categoria, requisito e funcionário,
+  uma execução rápida foi registrada como `conforme_planejado` e supervisor
+  recebeu `403` ao tentar gerenciar categoria global. Nenhuma escrita ocorreu
+  no Firebase.
+- **Arquivos principais**: `components/AppShell.tsx`,
+  `components/CadastroVinculadoRapido.tsx`, `components/CrudManager.tsx`,
+  `app/(app)/acompanhamento/page.tsx`, `lib/usePreferenciaTela.ts` e
+  `app/globals.css`.
+
+---
+
+## 2026-07-22 — Memória operacional na Agenda
+
+- **Favoritas por coordenador e sede**: cada tarefa da paleta pode ser fixada
+  com uma estrela e recuperada pelo atalho `Favoritas`, reduzindo busca e
+  rolagem nas rotinas mais usadas.
+- **Recentes automáticas**: clique, teclado e início de arraste registram as
+  oito últimas tarefas usadas. O atalho `Recentes` mantém a ordem de uso e
+  permite retomar rapidamente uma sequência interrompida.
+- **Cadastro rápido com menos repetição**: ao criar uma tarefa pela Agenda, o
+  sistema lembra tempo, frequência e categoria do último cadastro bem-sucedido
+  e retoma esse padrão na próxima abertura. A pessoa pode voltar ao padrão
+  inicial de 30 minutos, diário e sem categoria com um clique.
+- **Isolamento em computador compartilhado**: as preferências ficam apenas no
+  navegador, em chave versionada por `usuário + sede`; não alteram cadastros,
+  não acessam o banco e não misturam escolhas entre contas ou unidades. A
+  leitura descarta conteúdo inválido e limita o tamanho das listas.
+- **Validação**: `npm exec tsc -- --noEmit`, `git diff --check` e
+  `npm run build` aprovados; o build gerou as 65 páginas e rotas da aplicação.
+- **Arquivos principais**: `lib/preferenciasOperacionais.ts`,
+  `components/agenda/TaskPalette.tsx`,
+  `components/agenda/CadastroRapidoAgenda.tsx` e `app/globals.css`.
+
+---
+
+## 2026-07-22 — Replicação de tarefas para vários locais
+
+- **Uma configuração, vários ambientes**: a tela de Tarefas ganhou a ação
+  `Replicar`. O usuário escolhe vários locais ativos da mesma sede e cria as
+  cópias em uma única operação, sem refazer categoria, tempo, frequência,
+  prioridade, requisitos e demais regras.
+- **Seleção rápida e legível**: o modal permite buscar por nome, andar ou tipo,
+  selecionar todos os destinos visíveis e mostra quais locais já possuem a
+  tarefa. Visualizadores e tarefas inativas não oferecem a ação.
+- **Proteção no servidor**: todos os destinos são validados antes da primeira
+  escrita; locais inativos, inexistentes ou de outra sede são rejeitados. A
+  tarefa de origem precisa estar ativa e o local original nunca vira destino.
+- **Operação idempotente**: o mesmo nome no mesmo local é tratado como já
+  existente, inclusive se a cópia estiver inativa, evitando duplicação ao
+  repetir a operação. Cada cópia usa `createTarefa`, mantendo sede herdada,
+  validações e auditoria automática.
+- **Validação**: `npm run build` aprovado com a nova rota
+  `/api/tarefas/[id]/replicar`. Em `DATA_SOURCE=memory`, uma tarefa foi copiada
+  para dois locais; a repetição criou zero, ignorou os dois destinos e preservou
+  regra de cálculo e frequência. Nenhuma operação foi feita no Firebase.
+- **Arquivos principais**: `components/ReplicarTarefa.tsx`,
+  `app/api/tarefas/[id]/replicar/route.ts`, `services/tarefasService.ts`, tela
+  de Tarefas e `app/globals.css`.
+
+---
+
+## 2026-07-22 — Prontidão da sede e kits de tarefas
+
+- **Prontidão acionável na Central**: sede, locais, tarefas e equipe agora
+  formam um medidor de quatro etapas. Cada etapa mostra quantidade, estado e a
+  ação direta necessária, inclusive encaminhando para kits quando já existem
+  locais mas ainda faltam tarefas.
+- **Kits por tipo de ambiente**: a lista de Locais ganhou `Preparar kit`.
+  Banheiros, salas, copas, recepções, áreas externas e demais tipos recebem
+  sugestões próprias de tarefas, tempos iniciais, frequência, prioridade e
+  marcação de circuito essencial quando aplicável.
+- **Escolha consciente**: o modal permite revisar e desmarcar cada sugestão;
+  deixa claro que tempos e frequências são pontos de partida editáveis, sem
+  transformar o kit em regra rígida.
+- **Sem duplicidade ou atalho arquitetural**: a nova rota valida permissão pela
+  sede, ignora tarefas de mesmo nome já existentes no local e cria cada item
+  pelo serviço normal de tarefas, preservando sede herdada, validação e
+  auditoria automática. Categorias existentes são reaproveitadas por nome.
+- **Validação**: `npm run build` aprovado, incluindo a rota
+  `/api/locais/[id]/kit`. Teste com `DATA_SOURCE=memory` criou duas tarefas na
+  primeira aplicação e, nas repetições, criou zero e ignorou as duas já
+  existentes. Nenhuma operação foi feita no Firebase.
+- **Arquivos principais**: `lib/kitsTarefas.ts`,
+  `components/KitTarefasLocal.tsx`, `app/api/locais/[id]/kit/route.ts`,
+  `services/tarefasService.ts`, `services/centralDiaService.ts`,
+  `components/CentralDoDia.tsx`, `types/CentralDia.ts`, tela de Locais e
+  `app/globals.css`.
+
+---
+
+## 2026-07-22 — Cadastros rápidos dentro do fluxo operacional
+
+- **Modo rápido nos cadastros principais**: locais, tarefas e funcionários agora
+  abrem mostrando somente o necessário para começar. Exceções e configurações
+  avançadas ficam em “Mais opções” e reaparecem automaticamente na edição.
+- **Sede sem clique desnecessário**: quando o usuário só pode operar uma sede,
+  o vínculo é preenchido automaticamente e o seletor fica protegido. A API
+  continua validando a permissão e a hierarquia definitivamente.
+- **Criação contextual na Agenda**: a paleta ganhou `＋ Criar`. O supervisor
+  cadastra uma tarefa rápida sem abandonar o dia e, se o ambiente ainda não
+  existir, cria o local dentro do mesmo fluxo. A nova tarefa volta selecionada
+  como carimbo para ser posicionada com um clique na grade.
+- **Sem caminho paralelo**: tarefas e locais rápidos usam as rotas
+  `/api/tarefas` e `/api/locais`; portanto passam pelas mesmas validações,
+  herança de sede e auditoria dos cadastros completos.
+- **Continuidade e permissões**: os três formulários preservam rascunhos durante
+  a sessão. Visualizadores não veem mais botões de criação, edição, exclusão ou
+  seleção em massa que não poderiam concluir.
+- **Validação**: `npm run build` aprovado com 65 rotas, lint e TypeScript. A
+  automação visual foi interrompida ao detectar uso humano simultâneo do
+  navegador e não efetuou gravações no Firebase.
+- **Arquivos principais**: `components/agenda/CadastroRapidoAgenda.tsx`,
+  `components/agenda/TaskPalette.tsx`, `components/CrudManager.tsx`,
+  `components/SessaoContext.tsx`, `app/(app)/rotinas/page.tsx`,
+  `app/(app)/rotinas/useRotinaData.ts`, páginas de locais/tarefas/funcionários e
+  `app/globals.css`.
+
+---
+
+## 2026-07-21 — Integridade de usuários e ações em massa
+
+- **Contas com sede válida por construção**: criação e edição de usuários agora
+  recusam uma sede inexistente no serviço. Administradores também não conseguem
+  inativar a própria conta acidentalmente.
+- **Correção guiada da base atual**: a Central do dia identifica contas ativas
+  com vínculo órfão, coloca a ocorrência como prioridade crítica e abre a tela
+  de usuários já filtrada. A sede inválida também recebe um selo visual na lista.
+- **Saúde coerente**: contas ativas passaram a compor o indicador de saúde e uma
+  central com pendências nunca mais exibe 100%, evitando uma mensagem
+  contraditória para quem precisa decidir rapidamente.
+- **Ações em massa nos cadastros**: listas com campo de status permitem selecionar
+  registros visíveis e ativar ou inativar em lote, com confirmação contextual,
+  progresso, resultado parcial e preservação das validações e da auditoria já
+  existentes em cada alteração.
+- **Validação**: `npm run build` aprovado com 65 rotas; filtro, seleção, modal de
+  confirmação e responsividade foram exercitados em desktop e 390×800. O teste
+  visual não confirmou nenhuma escrita no Firebase.
+- **Arquivos principais**: `components/CrudManager.tsx`, `app/globals.css`,
+  `app/(app)/usuarios/page.tsx`, `services/usuariosService.ts`,
+  `services/centralDiaService.ts` e `app/api/usuarios/[id]/route.ts`.
+
+---
+
+## 2026-07-21 — Central do dia e isolamento real por sede
+
+- **Página inicial orientada a exceções**: a antiga lista de atalhos virou uma
+  Central do dia com próxima ação dominante, fila curta, pulso da operação e
+  atalhos específicos para supervisor, administrador e gerência.
+- **Cobertura operacional compartilhada**: o cálculo de tarefas críticas,
+  diárias, de dia fixo e periódicas foi extraído para uma função pura usada
+  tanto pela agenda quanto pela Central. Tarefas atribuídas a funcionários
+  ausentes deixam de contar como cobertas.
+- **Saúde dos cadastros**: a Central aponta locais sem metragem, tarefas sem
+  categoria ou tempo válido, jornadas incompletas, qualificações vencidas/a
+  vencer e calendário acadêmico ausente; cada ocorrência abre o cadastro já no
+  filtro correspondente.
+- **Isolamento de leitura por sede**: supervisores agora são limitados no
+  servidor à sede da própria sessão mesmo quando omitem ou adulteram `?sede=`.
+  A regra cobre funcionários, locais, tarefas, rotinas, ausências, realizados,
+  eventuais, modelos, qualificações, tempos, calendário, parâmetros, sedes e
+  geração de fichas PDF.
+- **Vínculo órfão visível**: o teste no Firebase real encontrou a conta
+  `Supervisora Aldeota` apontando para uma sede inexistente. A Central agora
+  bloqueia o falso “tudo em ordem” e orienta a correção pelo administrador; o
+  banco não foi alterado automaticamente.
+- **Validação**: `npm run build` aprovado com 65 rotas; fluxo exercitado como
+  administrador e supervisor; UI verificada em 1366×768, 680×800 e 390×800 sem
+  rolagem horizontal e sem erros no console.
+- **Arquivos principais**: `components/CentralDoDia.tsx`,
+  `services/centralDiaService.ts`, `app/api/central-dia/route.ts`,
+  `lib/pendenciasCobertura.ts`, `lib/permissions.ts`, rotas de API com escopo de
+  sede, `components/CrudManager.tsx`, telas de tarefas/funcionários/
+  qualificações, `app/(app)/inicio/page.tsx` e `app/globals.css`.
+
+---
+
+## 2026-07-21 — Cadastros interligados e operacionais
+
+- **Trilha contextual**: as telas de cadastro agora exibem o fluxo permanente
+  `Sedes → Locais → Tarefas → Equipe` e atalhos para categorias, EPIs e
+  requisitos, qualificações, tempos e calendário, respeitando o perfil.
+- **Entidades conectadas**: sede abre seus locais; local abre suas tarefas;
+  tarefa e funcionário abrem a agenda no contexto certo; categorias, EPIs e
+  requisitos mostram as tarefas que os utilizam.
+- **Listas para decidir rápido**: o CRUD compartilhado ganhou filtros de status,
+  recortes específicos por tela, ordenação, quantidade visível e pesquisa por
+  nomes relacionados — como sede, local, categoria e requisito.
+- **Formulários legíveis**: cadastros longos foram divididos em seções de negócio
+  (identificação, vínculo, cálculo, recorrência, restrições e publicação). Tarefas,
+  locais, categorias e requisitos também podem ser duplicados para acelerar
+  registros parecidos, sempre exigindo revisão antes de salvar.
+- **Exclusão segura**: o `confirm()` nativo foi substituído por uma confirmação
+  contextual que mostra o nome do registro e preserva na própria tela os erros
+  de vínculo retornados pelo servidor.
+- **Uso móvel**: tabelas viram cartões com rótulos e ações distribuídas; o menu
+  principal é compactado no celular, mantendo busca, registro rápido e a trilha
+  estrutural. Validado em 1366×768 e 680×800.
+- **Arquivos principais**: `components/CrudManager.tsx`,
+  `components/CadastroNavegacao.tsx`, `components/AppShell.tsx`, páginas de
+  sedes, locais, tarefas, funcionários, categorias, requisitos e qualificações,
+  além de `app/globals.css`.
+
+---
+
+## 2026-07-21 — Busca global e cadastros rápidos
+
+- **Busca global (`Ctrl+K`)**: o cabeçalho agora localiza telas, funcionários,
+  tarefas e locais sem navegar pelos menus. A consulta de entidades só ocorre
+  quando a busca é aberta e, para supervisores, fica limitada à própria sede.
+- **Abertura no contexto certo**: funcionário abre a agenda já filtrada e
+  selecionada naquela pessoa; tarefa ativa diretamente o modo rápido com a
+  melhor sugestão; local abre seu cadastro já filtrado. A troca também funciona
+  quando o usuário já está dentro da agenda.
+- **Cadastros em sequência**: o CRUD compartilhado ganhou contagem de registros,
+  resultado do filtro, busca local pelo atalho `/`, limpeza com `Esc` e o botão
+  `Salvar e adicionar outro`, mantendo o formulário aberto para cargas em lote.
+- **Menos escolhas repetidas**: campos de seleção com uma única opção disponível
+  — especialmente a sede do supervisor — já nascem preenchidos. A pesquisa
+  local também ignora diferenças de acentuação.
+- **Validação visual e funcional**: os fluxos foram exercitados como supervisor
+  em viewport de notebook (1366×768), incluindo `Ctrl+K`, foco em funcionário,
+  ativação de tarefa, filtro por URL, atalhos do cadastro e preenchimento
+  automático da sede.
+- **Arquivos principais**: `components/BuscaGlobal.tsx`, `components/AppShell.tsx`,
+  `components/CrudManager.tsx`, `lib/navegacao.ts`, `app/(app)/rotinas/page.tsx`
+  e `app/globals.css`.
+
+---
+
+## 2026-07-21 — Captura global, fila curta, modo foco e rascunhos
+
+- **`+ Registrar` global**: supervisores/administradores ganharam um menu fixo
+  no cabeçalho (`Alt+R`) para registrar ausência, eventual/imprevisto, abrir a
+  rotina ou atualizar o realizado. Visualizador não recebe ações de escrita;
+  remanejo entre sedes continua exclusivo do administrador.
+- **Entrada direta**: os atalhos de ausência e eventual já abrem o formulário
+  novo, sem exigir localizar e clicar novamente no botão da página. Eventual
+  recebe data de hoje e a única/própria sede como padrões quando disponíveis.
+- **Rascunhos contra interrupção**: novos registros de ausência e eventual são
+  preservados no `sessionStorage`; ao voltar, o formulário informa `Rascunho
+  retomado` e permite continuar ou descartar. Salvar remove o rascunho.
+- **Fila curta**: o painel de pendências ganhou `Resolver próxima`, priorizando
+  crítica → diária → dia fixo → periódica e ativando diretamente a sugestão de
+  alocação, sem abrir a lista inteira.
+- **Modo foco**: a agenda pode esconder o cabeçalho e ocupar a tela; o estado é
+  retomado junto ao restante do contexto e `Esc` sai do foco quando não há
+  tarefa rápida ativa.
+- **Arquivos principais**: `components/AcaoRapidaGlobal.tsx`, `AppShell.tsx`,
+  `CrudManager.tsx`, `components/agenda/PendenciasPanel.tsx`, `FiltersBar.tsx`,
+  `app/(app)/rotinas/page.tsx`, páginas de ausências/eventuais,
+  `lib/contextoAgenda.ts` e `app/globals.css`.
+
+---
+
+## 2026-07-21 — UX resiliente a interrupções por sede
+
+- **Escopo confirmado**: coordenadores e supervisores operam a própria sede; a
+  retomada não persiste nem amplia escopo de sede, que continua vindo da sessão
+  e das permissões do servidor.
+- **Retomar sem reconstruir contexto**: durante a sessão atual do navegador, a
+  agenda preserva por até 12h data, turno, visão, busca, página/funcionário,
+  densidade e tarefa do modo rápido. Ao voltar, restaura tudo e sinaliza
+  `Contexto retomado`; `sessionStorage` evita cruzar contexto entre sessões.
+- **Atalho na tela inicial**: quando existe trabalho recente, `/inicio` mostra
+  `Continuar de onde parei`, com data, turno e visão, levando à agenda que fará
+  a restauração automática.
+- **Operação por atalho**: `Enter` aplica a sugestão quando o foco não está em
+  campo/controle; `Ctrl+Z` desfaz a última alteração; `Esc` já encerra o modo
+  rápido. Os atalhos ficam visíveis nos próprios botões.
+- **Menos conteúdo antes da pauta**: cobertura de ausência passou a iniciar
+  compacta, mantendo o alerta e a contagem visíveis sem empurrar a grade; o
+  detalhe abre em `Resolver`.
+- **Arquivos principais**: `lib/contextoAgenda.ts`,
+  `app/(app)/rotinas/page.tsx`, `app/(app)/inicio/page.tsx`,
+  `components/agenda/RetomarAgenda.tsx`, `FiltersBar.tsx`,
+  `BarraAcaoRapida.tsx`, `CoberturaPanel.tsx` e `app/globals.css`.
+
+---
+
+## 2026-07-21 — Pendências acionáveis e sugestão assistida de encaixe
+
+- **Pendência virou ação**: tarefas críticas, diárias, de dia fixo e periódicas
+  vencidas ganharam o botão `Alocar`, que ativa diretamente o modo rápido sem
+  obrigar o supervisor a reencontrar a tarefa na paleta.
+- **Melhor encaixe sugerido**: novo cálculo puro prioriza maior nível de
+  habilitação quando a tarefa exige requisito, depois menor carga já planejada
+  e o primeiro horário livre. Ausências, jornada, intervalos, sobreposição,
+  gênero e requisitos usam a mesma validação definitiva da agenda.
+- **Decisão continua humana**: a sugestão não grava sozinha; mostra funcionário
+  e horário, destaca a célula na pauta e oferece `Aplicar sugestão`. O
+  supervisor ainda pode clicar em qualquer outro encaixe.
+- **Sugestão contínua**: após cada alocação, a recomendação é recalculada com a
+  agenda atualizada, acelerando distribuições repetidas sem concentrar carga.
+- **Arquivos principais**: `lib/agenda.ts`, `app/(app)/rotinas/page.tsx`,
+  `components/agenda/PendenciasPanel.tsx`, `AgendaGrid.tsx`,
+  `BarraAcaoRapida.tsx` e `app/globals.css`.
+
+---
+
+## 2026-07-21 — Agenda rápida por clique, salvamento visível e desfazer
+
+- **Modo rápido (“carimbo”)**: além do drag-and-drop, o supervisor pode clicar
+  em uma tarefa da paleta e depois clicar sucessivamente nos horários da grade.
+  A tarefa permanece ativa para alocações repetidas e `Esc` encerra o modo. O
+  fluxo reutiliza a mesma validação pura e a mesma API já usadas pelo arraste.
+- **Execução mais ágil**: o seletor de data ganhou botões de dia anterior,
+  `Hoje` e próximo dia; a paleta e as células receberam operação por teclado,
+  foco visível e instruções contextuais.
+- **Confiança no salvamento**: nova faixa operacional informa `Salvando…`,
+  horário do último salvamento ou falha, inclusive quando há várias gravações
+  rápidas em paralelo.
+- **Desfazer**: a última adição, movimentação, alteração de duração ou remoção
+  pode ser revertida. A reversão passa novamente pela API e pelas validações do
+  servidor, preservando integridade e histórico.
+- **Arquivos principais**: `app/(app)/rotinas/page.tsx`,
+  `components/agenda/BarraAcaoRapida.tsx`, `AgendaGrid.tsx`, `TaskPalette.tsx`,
+  `FiltersBar.tsx` e `app/globals.css`.
+
+---
+
+## 2026-07-21 — Auditoria de arquitetura: vínculos, sedes, ORK4 e duas atas
+
+- **Arquitetura preservada**: interface → API → serviços → `DataSource`; a
+  auditoria não encontrou serviço de produção órfão nem acesso do frontend ao
+  banco. O `omr-service/` Python continua apenas como referência histórica de
+  calibração; o leitor oficial é `lib/omr.ts`, executado no navegador.
+- **Brecha entre sedes fechada**: rotas de edição agora verificam também o
+  destino, não só a sede atual. Supervisor não consegue mover local,
+  funcionário, tarefa, rotina, ausência, qualificação, tempo personalizado ou
+  eventual para outra sede. Local/tarefa/funcionário com vínculos não muda de
+  sede sem migração assistida, preservando as FKs e o histórico.
+- **Qualificações íntegras**: requisito precisa existir, estar ativo e não ser
+  EPI; atualização revalida funcionário+requisito, impede duplicidade e sempre
+  herda `sede_id` do funcionário. Tempos e ausências receberam a mesma herança
+  defensiva; eventuais validam sede, funcionário, local e categoria.
+- **ORK4**: o QR passou a carregar um snapshot codificado dos nomes de EPIs
+  exatamente como foram impressos. Se o catálogo mudar antes da conferência, o
+  sistema avisa e grava a lista assinada, não a lista atual. Retrocompatibilidade
+  mantida para ORK1, ORK2 e ORK3.
+- **Auditoria de escritas**: o histórico deixou de ser fire-and-forget; a
+  requisição aguarda a gravação e há 3 tentativas para falhas transitórias.
+  Limite explícito: Sheets não oferece transação atômica conjunta com o dado.
+- **Duas atas consolidadas**: criados os registros de 16/06 e 17/07; a tela
+  `/da-ata` agora identifica as duas reuniões e documentos/backlog deixaram de
+  anunciar EPI e índices como pendentes.
+- **Verificado em memória**: tentativa do supervisor de trocar sede → 403;
+  mudança de local vinculado pelo admin → 422; qualificação com EPI/requisito
+  inexistente → 422; qualificação válida → 201; histórico disponível
+  imediatamente; PDF → 200. Round-trip do QR real (PDF → PNG → jsQR): `ORK4`,
+  19 tarefas e 4 EPIs preservados. `tsc --noEmit` e build de produção aprovados.
+- Arquivos principais: `services/{locais,funcionarios,tarefas,qualificacoes,
+  ausencias,temposPersonalizados,servicosEventuais}Service.ts`, `app/api/**/[id]`,
+  `services/fichaPdf.ts`, `lib/{omr,historico}.ts`,
+  `app/(app)/{conferir,da-ata}/page.tsx`, `docs/05`, `docs/08`, `docs/09`,
+  `docs/10-ata-2026-06-16.md`, `docs/13-ata-2026-07-17.md`.
+
+---
+
 ## 2026-07-20 — Ficha: declaração de EPIs no lugar da marcação item a item (ORK3)
 
 - Pedido da reunião: em vez de o funcionário **escolher** quais EPIs marcar, a

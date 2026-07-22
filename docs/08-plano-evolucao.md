@@ -6,6 +6,9 @@
 > **decisão** precisa estar tomada antes de começar.
 > Esforço: **P** pequeno (dias) · **M** médio (1–2 semanas) · **G** grande (projeto).
 
+> A demonstração de 17/07/2026 e seus encaminhamentos estão consolidados em
+> `docs/13-ata-2026-07-17.md`.
+
 ## Atualização pós-ata de alinhamento (16/06/2026)
 
 A reunião conceitual (Murilo/Filipe/Guilherme) reorganizou as evoluções em
@@ -47,10 +50,10 @@ A discussão jurídica não é item de desenvolvimento.
 **Onda 4 (feito):** ciclo completo de confirmação por papel, **tudo dentro do
 Next/Vercel** (sem serviço externo). (4.1) **Ficha imprimível** via
 `/api/fichas/pdf` (serviço `services/fichaPdf.ts`, pdf-lib): uma página por
-funcionário/dia com **QR** (identifica sede·data·funcionário → o leitor recupera
-as rotinas na mesma ordem, sem ler texto), **4 marcadores fiduciais** nos cantos
-(endireitam o scan por homografia), **caixas reais** ("Feito" por tarefa + bloco
-de EPIs em 2 colunas), área de observações e assinaturas; ocupa a folha A4
+funcionário/dia com **QR ORK4** (identifica sede·data·funcionário, códigos das
+rotinas e preserva os nomes de EPIs impressos), **4 marcadores fiduciais** nos
+cantos (endireitam o scan por homografia), **caixas reais** ("Feito" por tarefa +
+declaração única de EPIs), área de observações e assinaturas; ocupa a folha A4
 inteira. O ASG só **confirma** (marca X). (4.2) **Leitura OMR** em TypeScript no
 navegador (`lib/omr.ts` + jsQR), na tela **`/conferir`**: detecta QR, alinha
 pelos fiduciais e mede tinta nas caixas (limiar 0,12; marca fraca vira
@@ -164,7 +167,7 @@ também alimenta o buffer da Fase A (folga por sede).
 |---|---|---|---|
 | **Matriz de aptidão (restrição médica/NR)** ✅ | catálogo `requisitos` + `qualificacoes_funcionario`; bloqueia alocação sem o requisito | categoria de atividade | M |
 | **Treinamento como pré-requisito (com validade)** ✅ | validade na qualificação; vencido volta a bloquear | matriz aptidão | M |
-| **EPI por atividade** ◐ | EPI exigido pela tarefa (selo/lembrete) entregue; a *confirmação de uso* é Fase F | confirmação (Fase F) | M |
+| **EPI por atividade** ✅ | EPI exigido pela tarefa + declaração na ficha ORK4; nomes impressos preservados no QR | confirmação por ficha | M |
 
 ## Fase F — Direção (mudam o alcance; decisões maiores)
 

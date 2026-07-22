@@ -54,7 +54,7 @@ geolocalização, QR Code, IA, integrações complexas.
 | F3-1 | Implementar `FirebaseDataSource` (mesma interface `DataSource`) | ✔ entregue |
 | F3-2 | Migração de dados Sheets/memória → Firestore (`POST /api/migrar-firebase`) | ✔ entregue |
 | F3-3 | Firebase Authentication (substitui cookie HMAC + senha única) | |
-| F3-4 | Consultas indexadas por data/sede nas rotinas (performance) | |
+| F3-4 | Consultas indexadas por data/sede nas rotinas (performance) | ✔ entregue (`firestore.indexes.json`) |
 | F3-5 | Histórico de alterações (coleção `historico`) | |
 | F3-6 | Backup automático (exportação agendada do Firestore) e relatórios gerenciais | |
 

@@ -8,7 +8,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { apiDelete, apiPost, ErroApi, fetcher } from "@/lib/clientApi";
-import type { ResumoModelo, ResultadoAplicacao } from "@/services/modelosService";
+import type { ResumoModelo, ResultadoAplicacao } from "@/types";
 
 const DIAS_SEMANA = [
   { idx: 1, rotulo: "Seg" },

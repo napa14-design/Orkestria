@@ -1,7 +1,15 @@
 "use client";
 
+import Link from "next/link";
+import { useRef, useState } from "react";
 import useSWR from "swr";
+import CadastroVinculadoRapido, {
+  type RegistroVinculado,
+  type TipoVinculoRapido,
+} from "@/components/CadastroVinculadoRapido";
 import CrudManager from "@/components/CrudManager";
+import ReplicarTarefa from "@/components/ReplicarTarefa";
+import { useSessao } from "@/components/SessaoContext";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
@@ -41,10 +49,28 @@ const RESTRICOES_GENERO = [
 ];
 
 export default function PaginaTarefas() {
+  const sessao = useSessao();
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
-  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
-  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  const { data: locais, mutate: mutateLocais } = useSWR<Local[]>("/api/locais", fetcher);
+  const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
+  const { data: categorias, mutate: mutateCategorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const { data: requisitos, mutate: mutateRequisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  const [tarefaParaReplicar, setTarefaParaReplicar] = useState<Tarefa | null>(null);
+  const [vinculoRapido, setVinculoRapido] = useState<TipoVinculoRapido | null>(null);
+  const preencherVinculoRef = useRef<((valor: string) => void) | null>(null);
+
+  function abrirVinculo(tipo: TipoVinculoRapido, definirValor: (valor: string) => void) {
+    preencherVinculoRef.current = definirValor;
+    setVinculoRapido(tipo);
+  }
+
+  async function vinculoCriado(registro: RegistroVinculado, tipo: TipoVinculoRapido) {
+    if (tipo === "local") await mutateLocais();
+    if (tipo === "categoria") await mutateCategorias();
+    if (tipo === "requisito") await mutateRequisitos();
+    preencherVinculoRef.current?.(registro.id);
+    preencherVinculoRef.current = null;
+  }
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const localPorId = (id: string) => locais?.find((l) => l.id === id);
@@ -53,12 +79,46 @@ export default function PaginaTarefas() {
     (csv ?? "").split(",").filter(Boolean).map((id) => requisitos?.find((r) => r.id === id)).filter(Boolean) as Requisito[];
 
   return (
+    <>
     <CrudManager<Tarefa>
       titulo="Tarefas"
       subtitulo="Serviços atribuíveis. A sede é herdada automaticamente do local selecionado."
       endpoint="/api/tarefas"
+      chaveRascunho="tarefas"
       textoNovo="+ Nova tarefa"
       vazio="Cadastre os serviços que a equipe executa. Cada tarefa pertence a um local (a sede vem dele)."
+      permitirDuplicar
+      rotuloRegistro={(t) => t.nome_tarefa}
+      textoBusca={(t) => {
+        const local = localPorId(t.local_id);
+        const categoria = categoriaPorId(t.categoria_id);
+        return `${local?.nome_local ?? ""} ${local ? nomeSede(local.sede_id) : ""} ${categoria?.nome ?? ""} ${requisitosDe(t.requisitos).map((r) => r.nome).join(" ")}`;
+      }}
+      filtrosRapidos={[
+        { valor: "criticas", rotulo: "Críticas", testar: (t) => Boolean(t.critica) },
+        { valor: "diarias", rotulo: "Diárias", testar: (t) => t.frequencia === "diaria" },
+        { valor: "com_requisitos", rotulo: "Com requisitos/EPI", testar: (t) => Boolean(t.requisitos) },
+        { valor: "sem_categoria", rotulo: "Sem categoria", testar: (t) => !t.categoria_id },
+        {
+          valor: "sem_tempo",
+          rotulo: "Sem tempo válido",
+          testar: (t) =>
+            t.tempo_base_min <= 0 ||
+            (t.regra_calculo === "por_unidade" && t.quantidade <= 0),
+        },
+      ]}
+      acoesExtra={(t) => (
+        <>
+          {sessao.perfil !== "visualizador" && t.ativo && (
+            <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setTarefaParaReplicar(t)}>
+              Replicar
+            </button>
+          )}{" "}
+          <Link className="btn btn-mini btn-fantasma" href={`/rotinas?sede=${encodeURIComponent(t.sede_id)}&tarefa=${encodeURIComponent(t.id)}`}>
+            Usar na agenda →
+          </Link>
+        </>
+      )}
       campos={[
         {
           key: "nome_tarefa",
@@ -66,6 +126,8 @@ export default function PaginaTarefas() {
           tipo: "texto",
           obrigatorio: true,
           dica: "O nome do serviço que será feito, como aparecerá na agenda. Ex.: \"Limpeza concorrente\", \"Higienização de banheiro\", \"Coleta de resíduos\".",
+          secao: "Identificação e local",
+          descricaoSecao: "Defina o que será feito e onde; a sede é herdada automaticamente do local.",
         },
         {
           key: "categoria_id",
@@ -75,12 +137,16 @@ export default function PaginaTarefas() {
             .filter((c) => c.ativo)
             .map((c) => ({ valor: c.id, rotulo: c.nome })),
           ajuda: "Catálogo gerenciado em Categorias (admin)",
+          acaoAuxiliar: sessao.perfil === "administrador"
+            ? { rotulo: "Criar categoria sem sair", executar: (definir) => abrirVinculo("categoria", definir) }
+            : undefined,
           dica: "A categoria de atividade que agrupa esta tarefa (ex.: Higienização, Coleta). Usada nos filtros da paleta e na recalibração em cascata. O catálogo é gerenciado na tela Categorias.",
         },
         {
           key: "tipo_tarefa",
           rotulo: "Tipo (texto livre)",
           tipo: "texto",
+          avancado: true,
           ajuda: "Rótulo livre opcional — prefira a Categoria acima",
           dica: "Campo de texto livre legado, anterior à camada de Categorias. Pode usar para uma observação fina de tipo, mas o agrupamento oficial agora é a Categoria.",
         },
@@ -94,6 +160,9 @@ export default function PaginaTarefas() {
             rotulo: `${l.nome_local} (${l.andar}) — ${nomeSede(l.sede_id)}`,
           })),
           ajuda: "Obrigatório — a sede vem do local",
+          acaoAuxiliar: sessao.perfil !== "visualizador"
+            ? { rotulo: "Criar local sem sair", executar: (definir) => abrirVinculo("local", definir) }
+            : undefined,
           inteira: true,
           dica: "Onde a tarefa é executada. Ao escolher o local, o sistema já sabe automaticamente a sede e a metragem (m²) dele — por isso não existe tarefa sem local.",
         },
@@ -104,12 +173,15 @@ export default function PaginaTarefas() {
           obrigatorio: true,
           opcoes: REGRAS,
           dica: "Como o sistema descobre quanto tempo a tarefa leva. • FIXO: sempre o mesmo tempo (ex.: repor material = 15 min). • POR M²: multiplica o tempo pela metragem do local (ex.: 1 min/m² numa sala de 80 m² = 80 min). • POR UNIDADE: multiplica pela quantidade (ex.: 20 min × 3 banheiros = 60 min). • MANUAL: você digita o tempo na mão.",
+          secao: "Cálculo do tempo",
+          descricaoSecao: "Configure a fórmula que transforma o ambiente em duração prevista.",
         },
         {
           key: "tipo_servico",
           rotulo: "Tipo de serviço",
           tipo: "select",
           padrao: "rotina",
+          avancado: true,
           opcoes: TIPOS_SERVICO,
           ajuda: "Multiplica o tempo previsto pela natureza do esforço",
           dica: "A natureza do esforço de limpeza, que multiplica o tempo previsto. • ROTINA: manutenção do dia a dia (×1,0). • PESADA: limpeza reforçada/profunda (×1,5). • DESINCRUSTANTE: remover sujeira aderida/encardido (×2,0). Combina-se com a intensidade do ambiente (cadastrada no Local): o tempo final = m² × intensidade do local × tipo de serviço.",
@@ -128,6 +200,7 @@ export default function PaginaTarefas() {
           rotulo: "Quantidade",
           tipo: "numero",
           padrao: 1,
+          mostrarSe: (f) => f.regra_calculo === "por_unidade",
           ajuda: "Usada na regra por unidade",
           dica: "Só é usada quando a regra é POR UNIDADE: quantas unidades existem (ex.: 3 banheiros, 5 lixeiras). Nas outras regras pode deixar 1 — não afeta o cálculo.",
         },
@@ -138,6 +211,8 @@ export default function PaginaTarefas() {
           opcoes: FREQUENCIAS,
           padrao: "diaria",
           dica: "Com que regularidade a tarefa deveria ser feita. Ajuda o painel \"Ficou de fora hoje\" a avisar quando uma tarefa diária não foi alocada ou uma semanal/mensal está vencida. Não cria a tarefa sozinho — é o supervisor que monta a agenda.",
+          secao: "Agenda e restrições",
+          descricaoSecao: "Quando a tarefa vence, sua prioridade e quem pode executá-la.",
         },
         {
           key: "dias_semana",
@@ -161,6 +236,7 @@ export default function PaginaTarefas() {
           rotulo: "Restrição de gênero",
           tipo: "select",
           padrao: "",
+          avancado: true,
           opcoes: RESTRICOES_GENERO,
           ajuda: "Ex.: banheiro feminino → só ASG mulheres podem ser alocadas",
           dica: "Restringe quem pode executar a tarefa por gênero. Ex.: limpeza de banheiro feminino marcada como \"Apenas mulheres\" — a agenda bloqueia alocar essa tarefa para um homem. Deixe \"Sem restrição\" quando qualquer ASG pode fazer.",
@@ -169,12 +245,14 @@ export default function PaginaTarefas() {
           key: "janela_inicio",
           rotulo: "Janela: início",
           tipo: "hora",
+          avancado: true,
           dica: "Se a tarefa só pode ocorrer num horário específico, informe o início da janela (ex.: 13:00 para limpar o refeitório só após o almoço). Deixe vazio se pode ser feita a qualquer hora do expediente.",
         },
         {
           key: "janela_fim",
           rotulo: "Janela: fim",
           tipo: "hora",
+          avancado: true,
           dica: "Fim da janela em que a tarefa pode ocorrer. A agenda bloqueia alocar a tarefa fora desse intervalo. Preencha junto com a Janela: início.",
         },
         {
@@ -182,13 +260,17 @@ export default function PaginaTarefas() {
           rotulo: "Tempo é só referência",
           tipo: "checkbox",
           padrao: false,
+          avancado: true,
           dica: "Marque quando o tempo previsto é apenas uma base e a execução varia muito (ex.: montagem de palco). Assim o sistema NÃO cobra justificativa de desvio, não inclui a tarefa no \"Top desvios\" nem nas sugestões de ajuste — evita poluir os indicadores com falsos desvios.",
+          secao: "Comportamento operacional",
+          descricaoSecao: "Exceções que mudam alertas, cobertura e leitura dos indicadores.",
         },
         {
           key: "presenca",
           rotulo: "Presença / plantão",
           tipo: "checkbox",
           padrao: false,
+          avancado: true,
           dica: "Marque para atividades de permanência (ex.: acompanhar alunos no intervalo, plantão). É tempo ocupado e necessário: o sistema NÃO cobra desvio (a duração varia por contexto, não é erro de estimativa). Diferente de \"tempo é referência\" só no sentido — aqui é tempo de permanência, não de produção.",
         },
         {
@@ -196,6 +278,7 @@ export default function PaginaTarefas() {
           rotulo: "Crítica (circuito essencial)",
           tipo: "checkbox",
           padrao: false,
+          avancado: true,
           dica: "Marque tarefas que NÃO podem deixar de ser feitas (ex.: higienização de banheiro). Quando uma crítica fica sem alocação no dia, o painel \"Ficou de fora hoje\" mostra um alerta de “Circuito essencial descoberto” em destaque máximo (vermelho), separado das demais pendências. Diferente de prioridade, que só ordena.",
         },
         {
@@ -203,19 +286,32 @@ export default function PaginaTarefas() {
           rotulo: "Depende do calendário acadêmico",
           tipo: "checkbox",
           padrao: false,
+          avancado: true,
           dica: "Marque para tarefas que só fazem sentido em período letivo (ex.: limpeza de sala de aula). Fora do período (férias/recesso), elas deixam de ser cobradas no painel \"Ficou de fora hoje\". O calendário é cadastrado em Estrutura → Calendário acadêmico, por sede.",
         },
         {
           key: "requisitos",
           rotulo: "Requisitos de execução",
           tipo: "multiselect",
+          avancado: true,
           inteira: true,
           opcoes: (requisitos ?? []).filter((r) => r.ativo).map((r) => ({ valor: r.id, rotulo: r.nome })),
           ajuda: "Catálogo gerenciado em Requisitos (admin)",
+          acaoAuxiliar: sessao.perfil === "administrador"
+            ? { rotulo: "Criar requisito sem sair", executar: (definir) => abrirVinculo("requisito", definir) }
+            : undefined,
           dica: "Aptidões/treinamentos que o executante precisa ter (a agenda bloqueia quem não tem ou está vencido) e EPIs exigidos (lembrete). Selecione os que esta tarefa demanda.",
         },
-        { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
-        { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
+        {
+          key: "ativo",
+          rotulo: "Ativa",
+          tipo: "checkbox",
+          padrao: true,
+          avancado: true,
+          secao: "Publicação",
+          descricaoSecao: "Revise e disponibilize a tarefa para a agenda.",
+        },
+        { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true, avancado: true },
       ]}
       colunas={[
         { key: "nome_tarefa", rotulo: "Tarefa" },
@@ -327,5 +423,24 @@ export default function PaginaTarefas() {
         },
       ]}
     />
+    <ReplicarTarefa
+      tarefa={tarefaParaReplicar}
+      locais={locais ?? []}
+      tarefas={tarefas ?? []}
+      aoFechar={() => setTarefaParaReplicar(null)}
+      aoConcluir={async () => {
+        await mutateTarefas();
+      }}
+    />
+    <CadastroVinculadoRapido
+      tipo={vinculoRapido}
+      sedes={sedes ?? []}
+      aoFechar={() => {
+        setVinculoRapido(null);
+        preencherVinculoRef.current = null;
+      }}
+      aoCriado={vinculoCriado}
+    />
+    </>
   );
 }

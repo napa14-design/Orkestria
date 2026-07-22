@@ -17,6 +17,7 @@ import {
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO, somarDias } from "@/lib/dateUtils";
+import { usePreferenciaTela } from "@/lib/usePreferenciaTela";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -69,12 +70,18 @@ const FORM_VAZIO: FormExecucao = {
 };
 
 export default function PaginaAcompanhamento() {
-  const [data, setData] = useState(hojeISO());
-  const [sedeEscolhida, setSedeEscolhida] = useState("");
+  const [data, setData] = usePreferenciaTela("acompanhamento", "data", hojeISO());
+  const [sedeEscolhida, setSedeEscolhida] = usePreferenciaTela("acompanhamento", "sede", "");
   const [rotinaAberta, setRotinaAberta] = useState<RotinaPlanejada | null>(null);
   const [form, setForm] = useState<FormExecucao>(FORM_VAZIO);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [processandoRapidoId, setProcessandoRapidoId] = useState("");
+  const [confirmarLoteAberto, setConfirmarLoteAberto] = useState(false);
+  const [salvandoLote, setSalvandoLote] = useState(false);
+  const [progressoLote, setProgressoLote] = useState(0);
+  const [erroLote, setErroLote] = useState("");
+  const [mensagem, setMensagem] = useState<{ texto: string; erro?: boolean } | null>(null);
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -144,6 +151,64 @@ export default function PaginaAcompanhamento() {
   );
 
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
+
+  function dadosConformePlanejado(rotina: RotinaPlanejada) {
+    return {
+      rotina_id: rotina.id,
+      data_execucao: data,
+      status_realizado: "conforme_planejado" as StatusRealizado,
+      inicio_real: rotina.inicio_planejado,
+      fim_real: rotina.fim_planejado,
+      tempo_real_min: rotina.tempo_previsto_min,
+      justificativa: "",
+      observacao: "Registro rápido: realizado conforme o planejamento.",
+      epis_confirmados: "",
+    };
+  }
+
+  async function confirmarRapido(rotina: RotinaPlanejada) {
+    setProcessandoRapidoId(rotina.id);
+    setMensagem(null);
+    try {
+      await apiPost("/api/execucoes", dadosConformePlanejado(rotina));
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+      setMensagem({ texto: "Execução confirmada conforme o planejamento." });
+    } catch (err) {
+      setMensagem({
+        texto: err instanceof ErroApi ? err.message : "Não foi possível confirmar a execução.",
+        erro: true,
+      });
+    } finally {
+      setProcessandoRapidoId("");
+    }
+  }
+
+  async function confirmarPendentesEmLote() {
+    const alvo = linhas.filter((rotina) => !execucaoPorRotina.has(rotina.id));
+    if (alvo.length === 0) return;
+    setSalvandoLote(true);
+    setProgressoLote(0);
+    setErroLote("");
+    const falhas: string[] = [];
+    for (const rotina of alvo) {
+      try {
+        await apiPost("/api/execucoes", dadosConformePlanejado(rotina));
+      } catch (err) {
+        falhas.push(
+          `${tarefaPorId.get(rotina.tarefa_id)?.nome_tarefa ?? "Tarefa"}: ${err instanceof ErroApi ? err.message : "falhou"}`,
+        );
+      }
+      setProgressoLote((atual) => atual + 1);
+    }
+    await Promise.all([mutateRotinas(), mutateExecucoes()]);
+    setSalvandoLote(false);
+    if (falhas.length > 0) {
+      setErroLote(`${alvo.length - falhas.length} confirmada(s). ${falhas.length} falharam: ${falhas.join(" · ")}`);
+      return;
+    }
+    setConfirmarLoteAberto(false);
+    setMensagem({ texto: `${alvo.length} execução(ões) confirmada(s) conforme o planejamento.` });
+  }
 
   function abrirRegistro(rotina: RotinaPlanejada) {
     // EPIs exigidos pela tarefa — apenas para montar o texto da declaração.
@@ -237,6 +302,12 @@ export default function PaginaAcompanhamento() {
     e.preventDefault();
     if (!rotinaAberta) return;
     setErro("");
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const abrirProxima = submitter?.dataset.proxima === "true";
+    const indiceAtual = linhas.findIndex((rotina) => rotina.id === rotinaAberta.id);
+    const proxima = linhas
+      .slice(indiceAtual + 1)
+      .find((rotina) => !execucaoPorRotina.has(rotina.id));
     setSalvando(true);
     try {
       await apiPost("/api/execucoes", {
@@ -251,7 +322,8 @@ export default function PaginaAcompanhamento() {
         epis_confirmados: statusCritico ? "" : form.epis.join(", "),
       });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
-      setRotinaAberta(null);
+      if (abrirProxima && proxima) abrirRegistro(proxima);
+      else setRotinaAberta(null);
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Erro ao registrar.");
     } finally {
@@ -276,6 +348,19 @@ export default function PaginaAcompanhamento() {
         {pendentes > 0 && (
           <span className="selo selo-laranja">{pendentes} sem registro</span>
         )}
+        {pendentes > 1 && (
+          <button
+            type="button"
+            className="btn btn-primario"
+            onClick={() => {
+              setErroLote("");
+              setProgressoLote(0);
+              setConfirmarLoteAberto(true);
+            }}
+          >
+            ✓ Confirmar {pendentes} sem desvio
+          </button>
+        )}
         <button className="btn" onClick={exportarCSV} disabled={linhas.length === 0}>
           ⬇ Exportar CSV
         </button>
@@ -296,6 +381,13 @@ export default function PaginaAcompanhamento() {
           </select>
         </label>
       </div>
+
+      {mensagem && (
+        <div className={`alerta ${mensagem.erro ? "alerta-erro" : "alerta-ok"} acompanhamento-mensagem`} role="status">
+          {mensagem.texto}
+          <button type="button" aria-label="Fechar mensagem" onClick={() => setMensagem(null)}>×</button>
+        </div>
+      )}
 
       {/* dias anteriores com tarefas sem status */}
       {diasPendentes.length > 0 && (
@@ -320,7 +412,7 @@ export default function PaginaAcompanhamento() {
       )}
 
       {/* visão mobile: cards empilhados (supervisor andando pelo prédio) */}
-      <div className="so-mobile" style={{ display: "grid", gap: 10 }}>
+      <div className="so-mobile acompanhamento-mobile">
         {linhas.length === 0 && (
           <div className="painel" style={{ padding: 24, textAlign: "center", color: "var(--tinta-3)" }}>
             Nenhuma rotina planejada para esta data/sede.
@@ -368,13 +460,21 @@ export default function PaginaAcompanhamento() {
                   </>
                 )}
               </div>
-              <button
-                className={`btn btn-mini ${exec ? "btn-fantasma" : "btn-primario"}`}
-                style={{ width: "100%", justifyContent: "center", marginTop: 10 }}
-                onClick={() => abrirRegistro(r)}
-              >
-                {exec ? "Reabrir registro" : "Registrar execução"}
-              </button>
+              <div className="acompanhamento-acoes-linha">
+                {!exec && (
+                  <button
+                    type="button"
+                    className="btn btn-mini btn-primario"
+                    disabled={processandoRapidoId === r.id}
+                    onClick={() => void confirmarRapido(r)}
+                  >
+                    {processandoRapidoId === r.id ? "Confirmando…" : "✓ Conforme"}
+                  </button>
+                )}
+                <button type="button" className="btn btn-mini btn-fantasma" onClick={() => abrirRegistro(r)}>
+                  {exec ? "Reabrir registro" : "Detalhar / exceção"}
+                </button>
+              </div>
             </div>
           );
         })}
@@ -454,11 +554,20 @@ export default function PaginaAcompanhamento() {
                     <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <button
-                      className={`btn btn-mini ${exec ? "btn-fantasma" : "btn-primario"}`}
-                      onClick={() => abrirRegistro(r)}
-                    >
-                      {exec ? "Reabrir" : "Registrar"}
+                    {!exec && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-mini btn-primario"
+                          disabled={processandoRapidoId === r.id}
+                          onClick={() => void confirmarRapido(r)}
+                        >
+                          {processandoRapidoId === r.id ? "Confirmando…" : "✓ Conforme"}
+                        </button>{" "}
+                      </>
+                    )}
+                    <button type="button" className="btn btn-mini btn-fantasma" onClick={() => abrirRegistro(r)}>
+                      {exec ? "Reabrir" : "Exceção"}
                     </button>
                   </td>
                 </tr>
@@ -561,7 +670,7 @@ export default function PaginaAcompanhamento() {
             )}
 
             {/* Declaração única, DESMARCADA por padrão — igual à ficha de papel
-                (ORK3). Antes vinha tudo pré-marcado, o que fazia o registro
+                (ORK4). Antes vinha tudo pré-marcado, o que fazia o registro
                 afirmar sozinho algo que ninguém conferiu. */}
             {!statusCritico && episDaRotina.length > 0 && (
               <div className="campo" style={{ gridColumn: "1 / -1" }}>
@@ -630,9 +739,49 @@ export default function PaginaAcompanhamento() {
               <button type="submit" className="btn btn-primario" disabled={salvando}>
                 {salvando ? "Registrando…" : "Registrar execução"}
               </button>
+              {linhas.some(
+                (rotina, indice) =>
+                  indice > linhas.findIndex((item) => item.id === rotinaAberta.id) &&
+                  !execucaoPorRotina.has(rotina.id),
+              ) && (
+                <button type="submit" className="btn btn-primario" data-proxima="true" disabled={salvando}>
+                  Registrar e abrir próxima →
+                </button>
+              )}
             </div>
           </form>
         )}
+      </Modal>
+
+      <Modal
+        titulo="Confirmar pendências sem desvio"
+        aberto={confirmarLoteAberto}
+        aoFechar={() => !salvandoLote && setConfirmarLoteAberto(false)}
+        larguraMax={520}
+      >
+        <div className="acompanhamento-lote">
+          <span className="num" aria-hidden="true">✓</span>
+          <div>
+            <strong>{pendentes} tarefas serão registradas como realizadas conforme o planejamento.</strong>
+            <p>
+              Horário e duração previstos serão usados. EPIs não serão confirmados automaticamente;
+              tarefas com exceção devem ser registradas individualmente.
+            </p>
+          </div>
+        </div>
+        {salvandoLote && (
+          <div className="crud-progresso-massa" role="status">
+            <div><span style={{ width: `${pendentes > 0 ? (progressoLote / pendentes) * 100 : 0}%` }} /></div>
+            <small>Confirmando {progressoLote} de {pendentes}…</small>
+          </div>
+        )}
+        {erroLote && <div className="alerta alerta-erro" style={{ marginTop: 12 }}>{erroLote}</div>}
+        <div className="crud-confirmacao-acoes">
+          <button type="button" className="btn" disabled={salvandoLote} onClick={() => setConfirmarLoteAberto(false)}>Cancelar</button>
+          <button type="button" className="btn btn-primario" disabled={salvandoLote || pendentes === 0} onClick={() => void confirmarPendentesEmLote()}>
+            {salvandoLote ? "Confirmando…" : `Confirmar ${pendentes}`}
+          </button>
+        </div>
       </Modal>
     </div>
   );

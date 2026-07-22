@@ -5,11 +5,12 @@
  * (a partir das execuções) em folhas imprimíveis, uma por funcionário, com
  * totais e linhas de assinatura para o cliente assinar.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { usePreferenciaTela } from "@/lib/usePreferenciaTela";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -37,8 +38,8 @@ function intervaloDoMes(mes: string): [string, string] {
 }
 
 export default function PaginaRelatorios() {
-  const [mes, setMes] = useState(hojeISO().slice(0, 7));
-  const [sedeEscolhida, setSedeEscolhida] = useState("");
+  const [mes, setMes] = usePreferenciaTela("relatorios", "mes", hojeISO().slice(0, 7));
+  const [sedeEscolhida, setSedeEscolhida] = usePreferenciaTela("relatorios", "sede", "");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -182,6 +183,7 @@ export default function PaginaRelatorios() {
                 </div>
               </div>
 
+              <div className="tabela-rolavel relatorio-tabela">
               <table className="tabela" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
@@ -206,6 +208,7 @@ export default function PaginaRelatorios() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               <div style={{ display: "flex", gap: 32, padding: "28px 16px 16px", fontSize: 11, color: "var(--tinta-2)" }}>
                 <div style={{ flex: 1, borderTop: "1px solid var(--tinta)", paddingTop: 4, textAlign: "center" }}>

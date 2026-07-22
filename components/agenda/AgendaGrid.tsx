@@ -44,6 +44,8 @@ export default function AgendaGrid({
   blocoMin,
   funcionarioSelecionado,
   ausencias,
+  tarefaSelecionadaId,
+  sugestaoAlocacao,
   aoSelecionarFuncionario,
   aoSoltarNova,
   aoMover,
@@ -63,6 +65,10 @@ export default function AgendaGrid({
   funcionarioSelecionado: string | null;
   /** funcionario_id → rótulo da ausência (ex.: "Atestado"). */
   ausencias?: Map<string, string>;
+  /** Tarefa ativa no modo rápido; um clique em uma célula cria a alocação. */
+  tarefaSelecionadaId?: string | null;
+  /** Melhor encaixe calculado para destacar na pauta. */
+  sugestaoAlocacao?: { funcionario_id: string; inicio: string } | null;
   aoSelecionarFuncionario: (id: string) => void;
   aoSoltarNova: (tarefaId: string, funcionarioId: string, inicio: string) => void;
   aoMover: (rotinaId: string, funcionarioId: string, inicio: string) => void;
@@ -125,6 +131,9 @@ export default function AgendaGrid({
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
   const catPorId = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias]);
+  const tarefaSelecionada = tarefaSelecionadaId
+    ? tarefaPorId.get(tarefaSelecionadaId)
+    : undefined;
 
   // Janela de horário da grade: do menor início ao maior fim entre os exibidos.
   const [inicioGrade, fimGrade] = useMemo(() => {
@@ -180,7 +189,7 @@ export default function AgendaGrid({
   }
 
   return (
-    <div className="painel entra-2" style={{ flex: 1, overflow: "auto", maxHeight: "calc(100vh - 160px)" }}>
+    <div className="painel entra-2 agenda-grade-scroll" style={{ flex: 1, overflow: "auto", maxHeight: "calc(100vh - 160px)" }}>
       <div style={{ display: "flex", minWidth: funcionarios.length * 190 + 64 }}>
         {/* régua de horários — fica fixa na rolagem horizontal (as colunas dos
             funcionários passam POR BAIXO dela, por isso z-index > 12 e fundo
@@ -346,10 +355,33 @@ export default function AgendaGrid({
                 {slots.map((min) => {
                   const foraJornada =
                     Number.isNaN(entradaF) || min < entradaF || min + blocoMin > saidaF;
+                  const horario = minParaHHMM(min);
+                  const ehSugestao =
+                    !!tarefaSelecionada &&
+                    sugestaoAlocacao?.funcionario_id === f.id &&
+                    sugestaoAlocacao.inicio === horario;
                   return (
                     <div
                       key={min}
-                      className={foraJornada ? "celula-fora-jornada" : undefined}
+                      className={`${foraJornada ? "celula-fora-jornada" : ""}${
+                        tarefaSelecionada ? " agenda-celula-alocavel" : ""
+                      }${ehSugestao ? " agenda-celula-sugerida" : ""}`}
+                      role={tarefaSelecionada ? "button" : undefined}
+                      tabIndex={tarefaSelecionada ? 0 : undefined}
+                      aria-label={
+                        tarefaSelecionada
+                          ? `${ehSugestao ? "Melhor encaixe. " : ""}Adicionar ${tarefaSelecionada.nome_tarefa} para ${f.nome} às ${horario}`
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (tarefaSelecionada) aoSoltarNova(tarefaSelecionada.id, f.id, horario);
+                      }}
+                      onKeyDown={(e) => {
+                        if (tarefaSelecionada && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          aoSoltarNova(tarefaSelecionada.id, f.id, horario);
+                        }
+                      }}
                       style={{
                         height: ALTURA_BLOCO,
                         borderBottom: "1px solid var(--linha)",

@@ -1,4 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
+import { limitarSedeConsulta } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createParametro,
@@ -7,14 +8,22 @@ import {
 } from "@/services/parametrosService";
 
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
     const url = new URL(req.url);
+    const sede = limitarSedeConsulta(
+      sessao,
+      url.searchParams.get("sede") ?? undefined,
+    );
     // ?resolvidos=1&sede=X → parâmetros já mesclados (global + sede)
     if (url.searchParams.get("resolvidos")) {
-      const sede = url.searchParams.get("sede") ?? undefined;
       return ok(await resolverParametros(sede));
     }
-    return ok(await getParametros());
+    const parametros = await getParametros();
+    return ok(
+      sede
+        ? parametros.filter((item) => item.sede_id === "geral" || item.sede_id === sede)
+        : parametros,
+    );
   });
 }
 

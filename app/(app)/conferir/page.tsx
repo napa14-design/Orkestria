@@ -51,7 +51,7 @@ export default function PaginaConferir() {
   const [funcNome, setFuncNome] = useState<string>("");
   const [linhas, setLinhas] = useState<LinhaConferida[]>([]);
   const [epiLinhas, setEpiLinhas] = useState<{ nome: string; marcada: boolean; tinta: number; revisar: boolean }[]>([]);
-  /** ORK3: a ficha traz UMA declaração, não uma caixa por EPI. */
+  /** ORK3/ORK4: a ficha traz UMA declaração, não uma caixa por EPI. */
   const [epiDeclaracao, setEpiDeclaracao] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState("");
@@ -82,6 +82,7 @@ export default function PaginaConferir() {
     setQrInfo(null);
     setFuncNome("");
     try {
+      const avisos: string[] = [];
       const bitmap = await createImageBitmap(fonte);
       const img = await imagemParaRGBA(bitmap);
 
@@ -114,7 +115,7 @@ export default function PaginaConferir() {
         .sort((a, b) => a.inicio_planejado.localeCompare(b.inicio_planejado));
 
       // EPIs do dia: união (em ordem) dos requisitos tipo "epi" das tarefas
-      const episNomes: string[] = [];
+      const episAtuais: string[] = [];
       const vistos = new Set<string>();
       for (const r of doFunc) {
         const t = tPorId.get(r.tarefa_id);
@@ -122,17 +123,25 @@ export default function PaginaConferir() {
           const req = reqPorId.get(id);
           if (req?.tipo === "epi" && !vistos.has(req.nome)) {
             vistos.add(req.nome);
-            episNomes.push(req.nome);
+            episAtuais.push(req.nome);
           }
         }
+      }
+      // ORK4 grava o que estava impresso. ORK1/2/3 mantêm o comportamento
+      // histórico e reconstroem a lista a partir do catálogo atual.
+      const episNomes = info.versao >= 4 ? info.episImpressos ?? [] : episAtuais;
+      if (info.versao >= 4 && JSON.stringify(episNomes) !== JSON.stringify(episAtuais)) {
+        avisos.push(
+          "Os requisitos de EPI mudaram desde a impressão; o registro usará a lista impressa preservada no QR.",
+        );
       }
 
       // 2ª passada determinística. No ORK2 usamos o nº IMPRESSO de tarefas (vem
       // no QR) — a geometria fica fiel à ficha mesmo que a rotina tenha mudado
       // depois. No ORK1, o total atual (comportamento antigo, casa por posição).
       const nTarefas = info.versao >= 2 ? info.n ?? 0 : doFunc.length;
-      // ORK3: o bloco de EPI é UMA declaração ("usei os EPIs listados").
-      const declaracao = info.versao === 3;
+      // ORK3/ORK4: o bloco de EPI é UMA declaração ("usei os EPIs listados").
+      const declaracao = info.versao >= 3;
       const def = nTarefas
         ? lerFicha(img, {
             numTarefas: nTarefas,
@@ -169,7 +178,7 @@ export default function PaginaConferir() {
       });
 
       let conferidas: LinhaConferida[];
-      // >= 2: ORK2 e ORK3 trazem os códigos no QR e casam por CÓDIGO. Só o ORK1
+      // >= 2: ORK2/ORK3/ORK4 trazem os códigos no QR e casam por CÓDIGO. Só o ORK1
       // (fichas antigas) casa por posição.
       if (info.versao >= 2) {
         // Casa cada linha IMPRESSA (código no QR) com a rotina atual de mesmo código.
@@ -181,7 +190,7 @@ export default function PaginaConferir() {
         const novas = doFunc.filter((r) => !usados.has(cod(r)));
         const saidas = conferidas.filter((c) => c.removida).length;
         if (saidas || novas.length) {
-          setAviso(
+          avisos.push(
             `A rotina mudou desde a impressão da ficha: ${saidas} tarefa(s) saíram da agenda (não serão salvas) e ${novas.length} nova(s) não estão na ficha (marque na agenda). O restante casa certo pelo código.`,
           );
         }
@@ -189,9 +198,10 @@ export default function PaginaConferir() {
         // ORK1 (ficha antiga): casa por POSIÇÃO — pode desalinhar se a rotina mudou.
         conferidas = doFunc.map((r, i) => linhaDe(r, def.tarefas[i]));
         if (doFunc.length) {
-          setAviso("Ficha em formato antigo (casada por posição): se a rotina mudou depois de imprimir, confira cada linha antes de salvar.");
+          avisos.push("Ficha em formato antigo (casada por posição): se a rotina mudou depois de imprimir, confira cada linha antes de salvar.");
         }
       }
+      setAviso(avisos.join(" "));
       setLinhas(conferidas);
       if (conferidas.length === 0) {
         setErro(
@@ -289,6 +299,7 @@ export default function PaginaConferir() {
 
           {linhas.length > 0 ? (
             <>
+              <div className="tabela-rolavel">
               <table className="tabela" style={{ fontSize: 13 }}>
                 <thead>
                   <tr>
@@ -341,6 +352,7 @@ export default function PaginaConferir() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {epiLinhas.length > 0 && (
                 <div style={{ marginTop: 12 }}>
@@ -348,7 +360,7 @@ export default function PaginaConferir() {
                     {epiDeclaracao ? "Declaração de EPIs" : "EPIs utilizados"}
                   </div>
                   {epiDeclaracao ? (
-                    // ORK3: uma marcação só, que vale por todos os EPIs do dia.
+                    // ORK3/ORK4: uma marcação só, que vale por todos os EPIs do dia.
                     <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13 }}>
                       <input
                         type="checkbox"

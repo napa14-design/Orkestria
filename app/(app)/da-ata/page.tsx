@@ -2,8 +2,8 @@ import Link from "next/link";
 
 /**
  * "Da ata ao sistema" — painel de transparência para a direção: cada pedido
- * levantado na reunião de alinhamento (16/06/2026) e na pré-análise, lado a
- * lado com o que o Orkestria faz em resposta. Conteúdo fiel a docs/08 e docs/09.
+ * levantado nas reuniões de 16/06 e 17/07/2026, lado a lado com o que o
+ * Orkestria faz em resposta. Conteúdo consolidado em docs/10 e docs/13.
  */
 
 type Status = "entregue" | "parcial" | "decisao";
@@ -263,7 +263,7 @@ export default function PaginaDaAta() {
   return (
     <div className="entra" style={{ maxWidth: 1040, margin: "0 auto" }}>
       <div className="rotulo" style={{ color: "var(--acento)" }}>
-        Reunião de alinhamento · 16/06/2026
+        Reuniões de alinhamento · 16/06 e 17/07/2026
       </div>
       <h1 style={{ fontSize: 30, fontWeight: 800, marginTop: 2 }}>Da ata ao sistema</h1>
       <p style={{ color: "var(--tinta-2)", marginTop: 6, marginBottom: 18, maxWidth: 720 }}>
@@ -370,7 +370,7 @@ export default function PaginaDaAta() {
         Compromissos que atravessam tudo: planejamento, não punição · planejar ≠ avaliar ·
         idade e sexo fora do motor de produtividade · números sempre ajustáveis pela operação,
         nunca inventados pelo sistema · toda alteração registrada no histórico. Detalhe técnico em{" "}
-        <code>docs/08</code> e <code>docs/09</code>.{" "}
+        <code>docs/10</code> e <code>docs/13</code>.{" "}
         <Link href="/inicio" style={{ color: "var(--acento)" }}>
           ← voltar ao início
         </Link>

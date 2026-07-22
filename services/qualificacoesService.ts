@@ -45,10 +45,29 @@ export async function createQualificacao(dados: Dados, autor: string): Promise<Q
     ]);
   exigirNivelValido(dados.nivel);
   const ds = await getDataSource();
-  const funcionario = await ds.obter("funcionarios", dados.funcionario_id);
+  const [funcionario, requisito] = await Promise.all([
+    ds.obter("funcionarios", dados.funcionario_id),
+    ds.obter("requisitos", dados.requisito_id),
+  ]);
   if (!funcionario)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." },
+    ]);
+  if (!requisito)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "REQUISITO_INEXISTENTE", mensagem: "Requisito não existe." },
+    ]);
+  if (!requisito.ativo)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "REQUISITO_INATIVO", mensagem: "Requisito está inativo." },
+    ]);
+  if (requisito.tipo === "epi")
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "QUALIFICACAO_EPI",
+        mensagem: "EPI é exigido pela tarefa e confirmado na ficha; não é uma qualificação possuída pelo funcionário.",
+      },
     ]);
   const existentes = await ds.consultar("qualificacoes_funcionario", [
     { campo: "funcionario_id", op: "==", valor: dados.funcionario_id },
@@ -82,8 +101,44 @@ export async function updateQualificacao(
   const ds = await getDataSource();
   const atual = await ds.obter("qualificacoes_funcionario", id);
   if (!atual) throw new Error("Qualificação não encontrada.");
+  const funcionarioId = mudancas.funcionario_id ?? atual.funcionario_id;
+  const requisitoId = mudancas.requisito_id ?? atual.requisito_id;
+  const [funcionario, requisito, existentes] = await Promise.all([
+    ds.obter("funcionarios", funcionarioId),
+    ds.obter("requisitos", requisitoId),
+    ds.consultar("qualificacoes_funcionario", [
+      { campo: "funcionario_id", op: "==", valor: funcionarioId },
+    ]),
+  ]);
+  if (!funcionario)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "FUNC_INEXISTENTE", mensagem: "Funcionário não existe." },
+    ]);
+  if (!requisito)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "REQUISITO_INEXISTENTE", mensagem: "Requisito não existe." },
+    ]);
+  if (!requisito.ativo)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "REQUISITO_INATIVO", mensagem: "Requisito está inativo." },
+    ]);
+  if (requisito.tipo === "epi")
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "QUALIFICACAO_EPI",
+        mensagem: "EPI é exigido pela tarefa e confirmado na ficha; não é uma qualificação.",
+      },
+    ]);
+  if (existentes.some((q) => q.id !== id && q.requisito_id === requisitoId))
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DUPLICADO", mensagem: "Este funcionário já tem essa qualificação." },
+    ]);
   return ds.atualizar("qualificacoes_funcionario", id, {
     ...mudancas,
+    funcionario_id: funcionarioId,
+    requisito_id: requisitoId,
+    sede_id: funcionario.sede_id,
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });

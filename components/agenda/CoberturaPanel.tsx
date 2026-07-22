@@ -31,6 +31,7 @@ export default function CoberturaPanel({
   aoMover: (rotinaId: string, funcionarioId: string, inicio: string) => void;
 }) {
   const [destinos, setDestinos] = useState<Record<string, string>>({});
+  const [aberto, setAberto] = useState(false);
 
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
   const funcPorId = useMemo(
@@ -74,12 +75,26 @@ export default function CoberturaPanel({
       className="painel entra"
       style={{ marginBottom: 14, borderLeft: "6px solid var(--vermelho)" }}
     >
-      <div className="painel-cabecalho" style={{ padding: "10px 14px" }}>
+      <button
+        type="button"
+        className="painel-cabecalho"
+        aria-expanded={aberto}
+        onClick={() => setAberto((atual) => !atual)}
+        style={{
+          width: "100%",
+          padding: "9px 14px",
+          color: "inherit",
+          cursor: "pointer",
+          border: "none",
+          borderBottom: aberto ? "2px solid var(--tinta)" : "none",
+        }}
+      >
         <span className="rotulo" style={{ color: "var(--vermelho)" }}>
           ⚠ Cobertura de ausência — {orfas.length} tarefa(s) sem responsável
         </span>
-      </div>
-      <div style={{ padding: "10px 14px", display: "grid", gap: 8 }}>
+        <span className="rotulo">{aberto ? "▲ fechar" : "▼ resolver"}</span>
+      </button>
+      {aberto && <div style={{ padding: "10px 14px", display: "grid", gap: 8 }}>
         {orfas.map((r) => {
           const tarefa = tarefaPorId.get(r.tarefa_id);
           const ausente = funcPorId.get(r.funcionario_id);
@@ -132,7 +147,7 @@ export default function CoberturaPanel({
           (conflito, intervalo, expediente). Se conflitar, arraste o card manualmente
           para outro horário do colega.
         </p>
-      </div>
+      </div>}
     </div>
   );
 }

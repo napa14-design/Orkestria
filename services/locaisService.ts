@@ -44,8 +44,30 @@ export async function updateLocal(
   const ds = await getDataSource();
   const atual = await ds.obter("locais", id);
   if (!atual) throw new Error("Local não encontrado.");
-  const alertas = validarLocal({ ...atual, ...mudancas });
+  const destino = { ...atual, ...mudancas };
+  const alertas = validarLocal(destino);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
+
+  if (destino.sede_id !== atual.sede_id) {
+    const [sede, tarefas, rotinas] = await Promise.all([
+      ds.obter("sedes", destino.sede_id),
+      ds.consultar("tarefas", [{ campo: "local_id", op: "==", valor: id }]),
+      ds.consultar("rotinas_planejadas", [{ campo: "local_id", op: "==", valor: id }]),
+    ]);
+    if (!sede)
+      throw new ErroValidacao([
+        { nivel: "erro", codigo: "LOCAL_SEM_SEDE", mensagem: "Sede informada não existe." },
+      ]);
+    const vinculos = tarefas.length + rotinas.length;
+    if (vinculos > 0)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "LOCAL_SEDE_COM_VINCULOS",
+          mensagem: `Este local tem ${vinculos} tarefa(s)/rotina(s) vinculada(s) e não pode mudar de sede. Crie outro local na sede de destino e migre os cadastros conscientemente.`,
+        },
+      ]);
+  }
   return ds.atualizar("locais", id, {
     ...mudancas,
     atualizado_por: autor,
@@ -57,11 +79,13 @@ export async function updateLocal(
 export async function deleteLocal(id: string): Promise<void> {
   const ds = await getDataSource();
   // Consulta pela FK (índice de campo único) → lê só os vínculos DESTE local.
-  const [tarefas, rotinas] = await Promise.all([
+  const [tarefas, rotinas, modelos, eventuais] = await Promise.all([
     ds.consultar("tarefas", [{ campo: "local_id", op: "==", valor: id }]),
     ds.consultar("rotinas_planejadas", [{ campo: "local_id", op: "==", valor: id }]),
+    ds.consultar("modelos_rotina", [{ campo: "local_id", op: "==", valor: id }]),
+    ds.consultar("servicos_eventuais", [{ campo: "local_id", op: "==", valor: id }]),
   ]);
-  const vinculos = tarefas.length + rotinas.length;
+  const vinculos = tarefas.length + rotinas.length + modelos.length + eventuais.length;
   if (vinculos > 0) {
     throw new ErroValidacao([
       {

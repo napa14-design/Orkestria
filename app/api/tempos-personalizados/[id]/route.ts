@@ -22,7 +22,14 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const { id } = await ctx.params;
     await exigirAcesso((s) => podeAlterarSede(sessao, s), id);
-    return ok(await updateTempoPersonalizado(id, await req.json(), sessao.email));
+    const mudancas = await req.json();
+    if (mudancas.funcionario_id) {
+      const ds = await getDataSource();
+      const destino = await ds.obter("funcionarios", mudancas.funcionario_id);
+      if (destino && !podeAlterarSede(sessao, destino.sede_id))
+        throw new ErroPermissao("Supervisores não podem mover tempos para outra sede.");
+    }
+    return ok(await updateTempoPersonalizado(id, mudancas, sessao.email));
   });
 }
 

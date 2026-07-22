@@ -7,7 +7,7 @@
  * substitui a avaliação de gestão. Tarefas de referência/presença ficam de fora
  * (a variação é esperada).
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
 import {
@@ -18,6 +18,7 @@ import {
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import { formatarDuracao, hojeISO, somarDias } from "@/lib/dateUtils";
+import { usePreferenciaTela } from "@/lib/usePreferenciaTela";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -30,9 +31,9 @@ import type {
 const REALIZADAS = ["conforme_planejado", "com_atraso", "parcial"];
 
 export default function PaginaProdutividade() {
-  const [de, setDe] = useState(somarDias(hojeISO(), -29));
-  const [ate, setAte] = useState(hojeISO());
-  const [sedeFiltro, setSedeFiltro] = useState("");
+  const [de, setDe] = usePreferenciaTela("produtividade", "de", somarDias(hojeISO(), -29));
+  const [ate, setAte] = usePreferenciaTela("produtividade", "ate", hojeISO());
+  const [sedeFiltro, setSedeFiltro] = usePreferenciaTela("produtividade", "sede", "");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);

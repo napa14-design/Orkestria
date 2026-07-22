@@ -6,13 +6,14 @@
  * unidades parecidas e enxergar onde há folga × sobrecarga (apoio ao remanejo).
  * Só leitura — agrega o que já existe (cadastro de sede + rotinas).
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import { classificarOcupacao, jornadaLiquidaMin, PARAMETROS_PADRAO } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { usePreferenciaTela } from "@/lib/usePreferenciaTela";
 import type { Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede } from "@/types";
 
 function diasAtras(n: number): string {
@@ -49,9 +50,10 @@ type MetricaSede = {
 };
 
 export default function PaginaPanorama() {
-  const [de, setDe] = useState(diasAtras(6));
-  const [ate, setAte] = useState(hojeISO());
-  const [dim, setDim] = useState<"grupo" | "tipo">("grupo");
+  const [de, setDe] = usePreferenciaTela("panorama", "de", diasAtras(6));
+  const [ate, setAte] = usePreferenciaTela("panorama", "ate", hojeISO());
+  const [dimPreferida, setDim] = usePreferenciaTela("panorama", "dimensao", "grupo");
+  const dim: "grupo" | "tipo" = dimPreferida === "tipo" ? "tipo" : "grupo";
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);

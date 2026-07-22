@@ -1,6 +1,6 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createTempoPersonalizado,
@@ -8,8 +8,9 @@ import {
 } from "@/services/temposPersonalizadosService";
 
 export async function GET(req: Request) {
-  return comSessao(async () => {
-    const sede = new URL(req.url).searchParams.get("sede") ?? undefined;
+  return comSessao(async (sessao) => {
+    const solicitada = new URL(req.url).searchParams.get("sede") ?? undefined;
+    const sede = limitarSedeConsulta(sessao, solicitada);
     return ok(await getTemposPersonalizados(sede));
   });
 }

@@ -61,7 +61,7 @@ export default function PaginaHistorico() {
             Toda criação, alteração e exclusão fica registrada automaticamente, com autor e horário.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="historico-filtros">
           {!tabela && (
             <select
               value={dias}

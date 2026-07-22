@@ -50,6 +50,22 @@ export default function PaginaUsuarios() {
       subtitulo="Quem acessa o sistema. O perfil define as permissões; a sede limita o alcance dos supervisores. Acesso restrito a administradores."
       endpoint="/api/usuarios"
       textoNovo="+ Novo usuário"
+      filtrosRapidos={[
+        {
+          valor: "sede_invalida",
+          rotulo: "Sede inexistente",
+          testar: (u) =>
+            u.ativo &&
+            u.sede_id !== "geral" &&
+            Boolean(sedes) &&
+            !sedes!.some((s) => s.id === u.sede_id),
+        },
+        {
+          valor: "supervisores",
+          rotulo: "Supervisores",
+          testar: (u) => u.perfil === "supervisor",
+        },
+      ]}
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
         {
@@ -94,7 +110,23 @@ export default function PaginaUsuarios() {
             </span>
           ),
         },
-        { key: "sede_id", rotulo: "Sede", render: (u) => nomeSede(u.sede_id) },
+        {
+          key: "sede_id",
+          rotulo: "Sede",
+          render: (u) => {
+            const invalida =
+              u.sede_id !== "geral" &&
+              Boolean(sedes) &&
+              !sedes!.some((s) => s.id === u.sede_id);
+            return invalida ? (
+              <span className="selo selo-vermelho" title={`Vínculo inválido: ${u.sede_id}`}>
+                sede inexistente
+              </span>
+            ) : (
+              nomeSede(u.sede_id)
+            );
+          },
+        },
         {
           key: "ativo",
           rotulo: "Status",

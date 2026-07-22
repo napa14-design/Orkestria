@@ -1,19 +1,23 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createAusencia, getAusencias } from "@/services/ausenciasService";
 
 /** GET /api/ausencias?data=YYYY-MM-DD | ?de=&ate= [&sede=] */
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
     const url = new URL(req.url);
+    const sedeId = limitarSedeConsulta(
+      sessao,
+      url.searchParams.get("sede") ?? undefined,
+    );
     return ok(
       await getAusencias({
         data: url.searchParams.get("data") ?? undefined,
         de: url.searchParams.get("de") ?? undefined,
         ate: url.searchParams.get("ate") ?? undefined,
-        sedeId: url.searchParams.get("sede") ?? undefined,
+        sedeId,
       }),
     );
   });

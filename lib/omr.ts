@@ -272,11 +272,14 @@ export interface DadosQR {
    * 1 = ORK1 (casa por posição);
    * 2 = ORK2 (casa por código, com n impresso; uma caixa por EPI);
    * 3 = ORK3 (idem ORK2, mas o bloco de EPI é UMA declaração).
+   * 4 = ORK4 (idem ORK3 + snapshot dos nomes de EPIs impressos).
    */
-  versao: 1 | 2 | 3;
-  /** ORK2/ORK3: nº de tarefas impressas (geometria) e códigos das linhas. */
+  versao: 1 | 2 | 3 | 4;
+  /** ORK2+: nº de tarefas impressas (geometria) e códigos das linhas. */
   n?: number;
   codigos?: string[];
+  /** ORK4: nomes exatamente como foram impressos, protegidos de alterações futuras. */
+  episImpressos?: string[];
 }
 
 /**
@@ -287,14 +290,24 @@ export interface DadosQR {
 export function parseQR(qr: string | null): DadosQR | null {
   if (!qr) return null;
   const p = qr.split("|");
-  if ((p[0] === "ORK2" || p[0] === "ORK3") && p.length >= 6) {
+  if ((p[0] === "ORK2" || p[0] === "ORK3" || p[0] === "ORK4") && p.length >= 6) {
+    let episImpressos: string[] | undefined;
+    if (p[0] === "ORK4") {
+      try {
+        const decodificados = decodeURIComponent(p[6] ?? "");
+        episImpressos = decodificados ? decodificados.split("\u001f").filter(Boolean) : [];
+      } catch {
+        return null;
+      }
+    }
     return {
       sede: p[1],
       data: p[2],
       funcionario: p[3],
-      versao: p[0] === "ORK3" ? 3 : 2,
+      versao: p[0] === "ORK4" ? 4 : p[0] === "ORK3" ? 3 : 2,
       n: Number(p[4]) || 0,
       codigos: (p[5] ?? "").split(",").filter(Boolean),
+      episImpressos,
     };
   }
   if (p[0] === "ORK1" && p.length >= 4) {
@@ -313,7 +326,7 @@ export function lerFicha(
     numTarefas?: number;
     numEpis?: number;
     maxLinhas?: number;
-    /** ORK3: o bloco de EPI é UMA declaração — lê só a caixa dela. */
+    /** ORK3/ORK4: o bloco de EPI é UMA declaração — lê só a caixa dela. */
     declaracaoEpi?: boolean;
   } = {},
 ): ResultadoOMR {
@@ -362,7 +375,7 @@ export function lerFicha(
     }
   }
 
-  // Bloco de EPIs no rodapé. ORK3: UMA caixa (declaração). ORK2 e anteriores:
+  // Bloco de EPIs no rodapé. ORK3/ORK4: UMA caixa (declaração). ORK2 e anteriores:
   // uma caixa por EPI, em colunas. Posições sempre da geometria (fonte única).
   const epis: LinhaOMR[] = [];
   if (opts.declaracaoEpi) {

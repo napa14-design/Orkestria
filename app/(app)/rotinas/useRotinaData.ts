@@ -44,8 +44,8 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
 
   const { data: funcionarios } = useSWR<Funcionario[]>(sedeId ? `/api/funcionarios?sede=${sedeId}` : null, fetcher);
-  const { data: tarefas } = useSWR<Tarefa[]>(sedeId ? `/api/tarefas?sede=${sedeId}` : null, fetcher);
-  const { data: locais } = useSWR<Local[]>(sedeId ? `/api/locais?sede=${sedeId}` : null, fetcher);
+  const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>(sedeId ? `/api/tarefas?sede=${sedeId}` : null, fetcher);
+  const { data: locais, mutate: mutateLocais } = useSWR<Local[]>(sedeId ? `/api/locais?sede=${sedeId}` : null, fetcher);
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: periodosLetivos } = useSWR<PeriodoLetivo[]>(sedeId ? `/api/periodos-letivos?sede=${sedeId}` : null, fetcher);
   const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null, fetcher);
@@ -114,7 +114,9 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
     sedeId,
     funcionarios,
     tarefas,
+    mutateTarefas,
     locais,
+    mutateLocais,
     categorias,
     periodosLetivos,
     temposPessoais,

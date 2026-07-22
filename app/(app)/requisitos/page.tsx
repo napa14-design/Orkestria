@@ -5,6 +5,7 @@
  * Catálogo global (admin). Usado pelas tarefas (o que exigem) e pelas
  * qualificações dos funcionários (o que possuem).
  */
+import Link from "next/link";
 import CrudManager from "@/components/CrudManager";
 import type { Requisito } from "@/types";
 
@@ -23,10 +24,22 @@ const SELO_TIPO: Record<string, string> = {
 export default function PaginaRequisitos() {
   return (
     <CrudManager<Requisito>
-      titulo="Requisitos de execução"
+      titulo="EPIs e requisitos"
       subtitulo="Catálogo de aptidões, treinamentos e EPIs. As tarefas exigem requisitos; os funcionários possuem aptidões/treinamentos (com validade). Aptidão e treinamento faltando bloqueiam a alocação."
       endpoint="/api/requisitos"
       textoNovo="+ Novo requisito"
+      permitirDuplicar
+      rotuloRegistro={(r) => r.nome}
+      filtrosRapidos={[
+        { valor: "epis", rotulo: "EPIs", testar: (r) => r.tipo === "epi" },
+        { valor: "treinamentos", rotulo: "Treinamentos", testar: (r) => r.tipo === "treinamento" },
+        { valor: "aptidoes", rotulo: "Aptidões", testar: (r) => r.tipo === "aptidao" },
+      ]}
+      acoesExtra={(r) => (
+        <Link className="btn btn-mini btn-fantasma" href={`/tarefas?busca=${encodeURIComponent(r.nome)}`}>
+          Ver tarefas →
+        </Link>
+      )}
       campos={[
         {
           key: "nome",
@@ -34,6 +47,8 @@ export default function PaginaRequisitos() {
           tipo: "texto",
           obrigatorio: true,
           dica: "Ex.: “Manuseio de produtos químicos”, “NR-35 (altura)”, “Luvas nitrílicas”.",
+          secao: "Identificação do requisito",
+          descricaoSecao: "Dê um nome curto, reconhecível e específico para uso nas tarefas.",
         },
         {
           key: "tipo",
@@ -51,7 +66,14 @@ export default function PaginaRequisitos() {
           inteira: true,
           dica: "Detalhe opcional do requisito.",
         },
-        { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+        {
+          key: "ativo",
+          rotulo: "Ativo",
+          tipo: "checkbox",
+          padrao: true,
+          secao: "Disponibilidade",
+          descricaoSecao: "Itens inativos deixam de aparecer em novos vínculos, preservando o histórico.",
+        },
       ]}
       colunas={[
         { key: "nome", rotulo: "Requisito", render: (r) => <strong>{r.nome}</strong> },

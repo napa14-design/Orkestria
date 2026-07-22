@@ -133,7 +133,7 @@ async function desenhaFicha(
     { x: x0 + 12, y: ultimaY - 14, size: 7.5, font: reg, color: CINZA3 },
   );
 
-  // EPIs no rodapé — UMA declaração (ORK3), não uma caixa por item. Os nomes
+  // EPIs no rodapé — UMA declaração (ORK3/ORK4), não uma caixa por item. Os nomes
   // seguem impressos: a declaração precisa dizer o que de fato foi usado, senão
   // o registro perde valor (a assinatura vale como prova).
   const topoEpi = epiTopo(nT);
@@ -243,10 +243,11 @@ export async function gerarFichasPdf(
     // impressa) — a conferência casa por código, não por posição, e usa este n
     // na geometria (blindado contra a rotina mudar depois de imprimir).
     const codigos = doFunc.map((r) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado));
-    // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A versão
-    // no QR é o que faz o leitor escolher a geometria certa — fichas ORK2 já
-    // impressas continuam sendo lidas pelo layout antigo.
-    const qr = `ORK3|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}`;
+    // ORK4 = ORK3 + snapshot dos nomes de EPIs exatamente como foram impressos.
+    // Assim uma alteração futura no catálogo não muda o conteúdo jurídico que
+    // será gravado ao conferir a ficha. ORK1/2/3 antigos continuam compatíveis.
+    const episSnapshot = encodeURIComponent(epis.join("\u001f"));
+    const qr = `ORK4|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}|${episSnapshot}`;
     entradas.push({ nome: f.nome, sedeNome, dataBR, qr, tarefas: tarefasFicha, epis });
   }
 

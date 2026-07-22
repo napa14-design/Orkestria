@@ -211,6 +211,7 @@ export default function PaginaImportar() {
             <strong>Importação concluída.</strong>
             {resultado.rotaPadrao > 0 && ` Rota padrão salva com ${resultado.rotaPadrao} tarefa(s).`}
           </div>
+          <div className="tabela-rolavel">
           <table className="tabela" style={{ fontSize: 13 }}>
             <thead>
               <tr><th>O quê</th><th style={{ width: 110 }}>Criados</th><th style={{ width: 150 }}>Já existiam</th></tr>
@@ -222,6 +223,7 @@ export default function PaginaImportar() {
               <tr><td><strong>Rotinas do dia</strong></td><td className="num"><strong>{resultado.rotinas.criadas}</strong></td><td className="num">{resultado.rotinas.jaExistiam}</td></tr>
             </tbody>
           </table>
+          </div>
           {resultado.avisos.length > 0 && (
             <div className="alerta alerta-aviso" style={{ marginTop: 12 }}>
               <ul style={{ margin: "0 0 0 18px", fontSize: 13 }}>

@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createServicoEventual,
@@ -7,13 +7,17 @@ import {
 } from "@/services/servicosEventuaisService";
 
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
     const url = new URL(req.url);
+    const sede = limitarSedeConsulta(
+      sessao,
+      url.searchParams.get("sede") ?? undefined,
+    );
     return ok(
       await getServicosEventuais(
         url.searchParams.get("de") ?? undefined,
         url.searchParams.get("ate") ?? undefined,
-        url.searchParams.get("sede") ?? undefined,
+        sede,
       ),
     );
   });

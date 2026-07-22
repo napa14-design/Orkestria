@@ -38,19 +38,33 @@ export async function updateSede(
 /** Bloqueado quando a sede tem qualquer cadastro vinculado. */
 export async function deleteSede(id: string): Promise<void> {
   const ds = await getDataSource();
-  const [funcionarios, locais] = await Promise.all([
-    ds.listar("funcionarios"),
-    ds.listar("locais"),
-  ]);
-  const vinculos =
-    funcionarios.filter((f) => f.sede_id === id).length +
-    locais.filter((l) => l.sede_id === id).length;
+  const tabelas = [
+    "usuarios",
+    "funcionarios",
+    "locais",
+    "tarefas",
+    "rotinas_planejadas",
+    "execucoes_realizadas",
+    "servicos_eventuais",
+    "tempos_personalizados",
+    "qualificacoes_funcionario",
+    "parametros",
+    "modelos_rotina",
+    "ausencias",
+    "periodos_letivos",
+  ] as const;
+  const listas = await Promise.all(
+    tabelas.map((tabela) =>
+      ds.consultar(tabela, [{ campo: "sede_id", op: "==", valor: id }]),
+    ),
+  );
+  const vinculos = listas.reduce((total, lista) => total + lista.length, 0);
   if (vinculos > 0) {
     throw new ErroValidacao([
       {
         nivel: "erro",
         codigo: "POSSUI_HISTORICO",
-        mensagem: `Esta sede tem ${vinculos} funcionário(s)/local(is) vinculado(s). Use "Editar" e marque como Inativa.`,
+        mensagem: `Esta sede tem ${vinculos} vínculo(s) em cadastros/operações. Use "Editar" e marque como Inativa.`,
       },
     ]);
   }

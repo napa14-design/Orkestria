@@ -13,7 +13,7 @@ import {
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { diaDaSemana, hhmmParaMin, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
-import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
+import type { ModeloRotinaItem, ResumoModelo, ResultadoAplicacao, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -24,20 +24,6 @@ async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25)
   for (let i = 0; i < itens.length; i += lote) {
     await Promise.all(itens.slice(i, i + lote).map(fn));
   }
-}
-
-export interface ResumoModelo {
-  nome_modelo: string;
-  sede_id: string;
-  itens: number;
-  padrao: boolean;
-  /** Modelo de evento (formatura, feira…) — aplicado sob demanda, nunca no "Gerar o dia". */
-  evento: boolean;
-  criado_por: string;
-  criado_em: string;
-  /** Faixa de horário do modelo (menor início / maior fim) — só para exibição. */
-  inicio?: string;
-  fim?: string;
 }
 
 export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
@@ -184,12 +170,6 @@ export async function salvarModelo(
   }
   await emLotes(antigos, (m) => ds.excluir("modelos_rotina", m.id));
   return { itens: rotinas.length };
-}
-
-export interface ResultadoAplicacao {
-  criadas: number;
-  puladas: number;
-  detalhes: string[];
 }
 
 /** Aplica o modelo em uma ou mais datas; conflitos são pulados, não erram. */

@@ -2,6 +2,7 @@
 
 /** Topo da tela de rotina: data, sede, turno e ações do dia. */
 import Link from "next/link";
+import { hojeISO, somarDias } from "@/lib/dateUtils";
 import type { Sede } from "@/types";
 
 export default function FiltersBar({
@@ -11,11 +12,14 @@ export default function FiltersBar({
   sedes,
   modo,
   busca,
+  contextoRetomado = false,
+  modoFoco = false,
   aoMudarData,
   aoMudarSede,
   aoMudarTurno,
   aoMudarModo,
   aoMudarBusca,
+  aoAlternarFoco,
   aoDuplicar,
 }: {
   data: string;
@@ -24,11 +28,15 @@ export default function FiltersBar({
   sedes: Sede[];
   modo: "dia" | "semana";
   busca: string;
+  /** Indica por alguns segundos que o estado anterior da sessão foi restaurado. */
+  contextoRetomado?: boolean;
+  modoFoco?: boolean;
   aoMudarData: (v: string) => void;
   aoMudarSede: (v: string) => void;
   aoMudarTurno: (v: string) => void;
   aoMudarModo: (v: "dia" | "semana") => void;
   aoMudarBusca: (v: string) => void;
+  aoAlternarFoco: () => void;
   aoDuplicar: () => void;
 }) {
   return (
@@ -44,13 +52,29 @@ export default function FiltersBar({
       }}
     >
       <div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>Rotina do dia</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>Rotina do dia</h1>
+          {contextoRetomado && (
+            <span className="selo contexto-retomado" role="status">
+              ↺ Contexto retomado
+            </span>
+          )}
+        </div>
         <span className="rotulo" style={{ color: "var(--acento)" }}>
           arraste tarefas para a agenda · salvamento automático
         </span>
       </div>
 
       <div style={{ flex: 1 }} />
+
+      <button
+        type="button"
+        className={`btn btn-mini${modoFoco ? " btn-primario" : ""}`}
+        onClick={aoAlternarFoco}
+        title={modoFoco ? "Sair do modo foco (Esc)" : "Ocultar navegação e ampliar a agenda"}
+      >
+        {modoFoco ? "◉ Sair do foco" : "◎ Modo foco"}
+      </button>
 
       <div className="campo">
         <span className="rotulo">Visão</span>
@@ -73,10 +97,43 @@ export default function FiltersBar({
         </div>
       </div>
 
-      <label className="campo">
+      <div className="campo">
         <span className="rotulo">Data</span>
-        <input type="date" value={data} onChange={(e) => aoMudarData(e.target.value)} />
-      </label>
+        <div className="controle-data-rapido">
+          <button
+            type="button"
+            className="btn btn-mini"
+            aria-label="Dia anterior"
+            title="Dia anterior"
+            onClick={() => aoMudarData(somarDias(data, -1))}
+          >
+            ‹
+          </button>
+          <input
+            aria-label="Data da agenda"
+            type="date"
+            value={data}
+            onChange={(e) => aoMudarData(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn btn-mini"
+            onClick={() => aoMudarData(hojeISO())}
+            disabled={data === hojeISO()}
+          >
+            Hoje
+          </button>
+          <button
+            type="button"
+            className="btn btn-mini"
+            aria-label="Próximo dia"
+            title="Próximo dia"
+            onClick={() => aoMudarData(somarDias(data, 1))}
+          >
+            ›
+          </button>
+        </div>
+      </div>
 
       <label className="campo">
         <span className="rotulo">Sede</span>

@@ -6,15 +6,9 @@
  * vencidas em relação ao último planejamento.
  */
 import { useMemo, useState } from "react";
-import { statusPeriodoLetivo } from "@/lib/calculations";
-import { diaDaSemana, DIAS_SEMANA, parseDiasSemana } from "@/lib/dateUtils";
+import { diaDaSemana, DIAS_SEMANA } from "@/lib/dateUtils";
+import { calcularPendenciasCobertura } from "@/lib/pendenciasCobertura";
 import type { Local, PeriodoLetivo, RotinaPlanejada, Tarefa } from "@/types";
-
-const JANELA_DIAS: Record<string, number> = {
-  semanal: 7,
-  quinzenal: 14,
-  mensal: 30,
-};
 
 export default function PendenciasPanel({
   tarefas,
@@ -23,6 +17,7 @@ export default function PendenciasPanel({
   historico,
   data,
   periodos = [],
+  aoAlocarTarefa,
 }: {
   tarefas: Tarefa[];
   locais: Local[];
@@ -32,87 +27,40 @@ export default function PendenciasPanel({
   data: string;
   /** Períodos letivos cadastrados (calendário acadêmico por sede). */
   periodos?: PeriodoLetivo[];
+  /** Ativa a tarefa no modo rápido e calcula o melhor encaixe disponível. */
+  aoAlocarTarefa?: (tarefaId: string) => void;
 }) {
   const [aberto, setAberto] = useState(false);
 
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
-  const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas, letivasSemCalendario } = useMemo(() => {
-    const alocadasHoje = new Set(rotinasDoDia.map((r) => r.tarefa_id));
-    const dowHoje = diaDaSemana(data);
-    const ultimaData = new Map<string, string>();
-    for (const r of historico) {
-      if (r.status === "cancelada") continue;
-      const atual = ultimaData.get(r.tarefa_id);
-      if (!atual || r.data > atual) ultimaData.set(r.tarefa_id, r.data);
-    }
-
-    const criticas: Array<{ tarefa: Tarefa; motivo: string }> = [];
-    const diarias: Tarefa[] = [];
-    const doDia: Tarefa[] = [];
-    const periodicas: Array<{ tarefa: Tarefa; ultima: string | null }> = [];
-    const semCal: Tarefa[] = [];
-    for (const t of tarefas) {
-      if (!t.ativo || alocadasHoje.has(t.id)) continue;
-
-      // Calendário acadêmico: tarefas letivas só são cobradas em período letivo.
-      let avisoSemCalendario = false;
-      if (t.depende_calendario) {
-        const st = statusPeriodoLetivo(periodos, t.sede_id, data);
-        if (st === "fora") continue; // férias/recesso → não é exigida hoje
-        avisoSemCalendario = st === "sem_calendario";
-      }
-
-      const dias = t.frequencia === "semanal" ? parseDiasSemana(t.dias_semana) : [];
-
-      // decide se a tarefa é esperada hoje e por qual regra
-      let regra: "diaria" | "doDia" | "periodica" | null = null;
-      let ultima: string | null = null;
-      if (t.frequencia === "diaria") {
-        regra = "diaria";
-      } else if (dias.length) {
-        if (dias.includes(dowHoje)) regra = "doDia";
-      } else if (t.frequencia in JANELA_DIAS) {
-        ultima = ultimaData.get(t.id) ?? null;
-        const limite = JANELA_DIAS[t.frequencia];
-        const diasDesde = ultima
-          ? Math.floor(
-              (new Date(`${data}T12:00:00`).getTime() -
-                new Date(`${ultima}T12:00:00`).getTime()) /
-                86_400_000,
-            )
-          : Infinity;
-        if (diasDesde >= limite) regra = "periodica";
-      }
-      if (!regra) continue;
-
-      // devida hoje, mas a sede não tem calendário cadastrado → sinaliza
-      if (avisoSemCalendario) semCal.push(t);
-
-      // tarefas críticas saem dos baldes normais e vão para o circuito essencial
-      if (t.critica) {
-        const motivo =
-          regra === "diaria" ? "diária" : regra === "doDia" ? "dia fixo" : t.frequencia;
-        criticas.push({ tarefa: t, motivo });
-        continue;
-      }
-      if (regra === "diaria") diarias.push(t);
-      else if (regra === "doDia") doDia.push(t);
-      else periodicas.push({ tarefa: t, ultima });
-    }
-    return {
-      criticasSemCobertura: criticas,
-      diariasFaltando: diarias,
-      devidasHoje: doDia,
-      periodicasVencidas: periodicas,
-      letivasSemCalendario: semCal,
-    };
-  }, [tarefas, rotinasDoDia, historico, data, periodos]);
+  const {
+    criticasSemCobertura,
+    diariasFaltando,
+    devidasHoje,
+    periodicasVencidas,
+    letivasSemCalendario,
+  } = useMemo(
+    () =>
+      calcularPendenciasCobertura({
+        tarefas,
+        rotinasDoDia,
+        historico,
+        data,
+        periodos,
+      }),
+    [tarefas, rotinasDoDia, historico, data, periodos],
+  );
 
   const rotuloLocal = (t: Tarefa) => {
     const l = localPorId.get(t.local_id);
     return l ? `${l.nome_local} · ${l.andar}` : "";
   };
+
+  function iniciarAlocacao(tarefaId: string) {
+    aoAlocarTarefa?.(tarefaId);
+    setAberto(false);
+  }
 
   // Aviso forte: tarefa letiva sendo cobrada sem calendário cadastrado na sede.
   const avisoCalendario =
@@ -151,6 +99,11 @@ export default function PendenciasPanel({
   }
 
   const temCritica = criticasSemCobertura.length > 0;
+  const proximaTarefa =
+    criticasSemCobertura[0]?.tarefa ??
+    diariasFaltando[0] ??
+    devidasHoje[0] ??
+    periodicasVencidas[0]?.tarefa;
 
   return (
     <>
@@ -159,21 +112,30 @@ export default function PendenciasPanel({
       className="painel entra"
       style={{ marginBottom: 14, borderLeft: `6px solid ${temCritica ? "var(--vermelho)" : "var(--laranja)"}` }}
     >
-      <button
-        onClick={() => setAberto(!aberto)}
+      <div
         style={{
           width: "100%",
-          border: "none",
-          background: "transparent",
           padding: "8px 14px",
-          textAlign: "left",
-          fontSize: 13,
           display: "flex",
           alignItems: "center",
           gap: 8,
+          flexWrap: "wrap",
         }}
       >
-        <span style={{ flex: 1 }}>
+        <button
+          type="button"
+          onClick={() => setAberto(!aberto)}
+          aria-expanded={aberto}
+          style={{
+            flex: 1,
+            minWidth: 240,
+            border: "none",
+            background: "transparent",
+            textAlign: "left",
+            fontSize: 13,
+            color: "inherit",
+          }}
+        >
           {temCritica ? "⛔ " : "⚠ "}
           <strong>{temCritica ? "Circuito essencial descoberto:" : "Ficou de fora hoje:"}</strong>{" "}
           {[
@@ -184,9 +146,21 @@ export default function PendenciasPanel({
           ]
             .filter(Boolean)
             .join(" · ")}
-        </span>
-        <span className="rotulo">{aberto ? "▲ fechar" : "▼ detalhar"}</span>
-      </button>
+          <span className="rotulo" style={{ marginLeft: 8 }}>
+            {aberto ? "▲ fechar" : "▼ detalhar"}
+          </span>
+        </button>
+        {proximaTarefa && (
+          <button
+            type="button"
+            className={`btn btn-mini${temCritica ? " btn-primario" : ""}`}
+            onClick={() => iniciarAlocacao(proximaTarefa.id)}
+            title={`Receber sugestão para ${proximaTarefa.nome_tarefa}`}
+          >
+            Resolver próxima →
+          </button>
+        )}
+      </div>
       {aberto && (
         <div style={{ padding: "0 14px 12px", display: "grid", gap: 4, fontSize: 13 }}>
           {temCritica && (
@@ -205,46 +179,66 @@ export default function PendenciasPanel({
                 ⛔ Circuito essencial — cobrir com prioridade
               </span>
               {criticasSemCobertura.map(({ tarefa, motivo }) => (
-                <div key={tarefa.id}>
-                  <span className="selo selo-vermelho" style={{ marginRight: 8 }}>{motivo}</span>
-                  <strong>{tarefa.nome_tarefa}</strong>{" "}
-                  <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(tarefa)}</span>
+                <div key={tarefa.id} className="linha-pendencia-acao">
+                  <span style={{ flex: 1, minWidth: 180 }}>
+                    <span className="selo selo-vermelho" style={{ marginRight: 8 }}>{motivo}</span>
+                    <strong>{tarefa.nome_tarefa}</strong>{" "}
+                    <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(tarefa)}</span>
+                  </span>
+                  <button type="button" className="btn btn-mini btn-primario" onClick={() => iniciarAlocacao(tarefa.id)}>
+                    Alocar →
+                  </button>
                 </div>
               ))}
             </div>
           )}
           {diariasFaltando.map((t) => (
-            <div key={t.id}>
-              <span className="selo selo-laranja" style={{ marginRight: 8 }}>diária</span>
-              <strong>{t.nome_tarefa}</strong>{" "}
-              <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(t)}</span>
+            <div key={t.id} className="linha-pendencia-acao">
+              <span style={{ flex: 1, minWidth: 180 }}>
+                <span className="selo selo-laranja" style={{ marginRight: 8 }}>diária</span>
+                <strong>{t.nome_tarefa}</strong>{" "}
+                <span style={{ color: "var(--tinta-3)" }}>— {rotuloLocal(t)}</span>
+              </span>
+              <button type="button" className="btn btn-mini" onClick={() => iniciarAlocacao(t.id)}>
+                Alocar →
+              </button>
             </div>
           ))}
           {devidasHoje.map((t) => (
-            <div key={t.id}>
-              <span className="selo selo-azul" style={{ marginRight: 8 }}>
-                {DIAS_SEMANA[diaDaSemana(data)]}
+            <div key={t.id} className="linha-pendencia-acao">
+              <span style={{ flex: 1, minWidth: 180 }}>
+                <span className="selo selo-azul" style={{ marginRight: 8 }}>
+                  {DIAS_SEMANA[diaDaSemana(data)]}
+                </span>
+                <strong>{t.nome_tarefa}</strong>{" "}
+                <span style={{ color: "var(--tinta-3)" }}>
+                  — {rotuloLocal(t)} · dia fixo da semana
+                </span>
               </span>
-              <strong>{t.nome_tarefa}</strong>{" "}
-              <span style={{ color: "var(--tinta-3)" }}>
-                — {rotuloLocal(t)} · dia fixo da semana
-              </span>
+              <button type="button" className="btn btn-mini" onClick={() => iniciarAlocacao(t.id)}>
+                Alocar →
+              </button>
             </div>
           ))}
           {periodicasVencidas.map(({ tarefa, ultima }) => (
-            <div key={tarefa.id}>
-              <span className="selo selo-vermelho" style={{ marginRight: 8 }}>
-                {tarefa.frequencia}
+            <div key={tarefa.id} className="linha-pendencia-acao">
+              <span style={{ flex: 1, minWidth: 180 }}>
+                <span className="selo selo-vermelho" style={{ marginRight: 8 }}>
+                  {tarefa.frequencia}
+                </span>
+                <strong>{tarefa.nome_tarefa}</strong>{" "}
+                <span style={{ color: "var(--tinta-3)" }}>
+                  — {rotuloLocal(tarefa)} ·{" "}
+                  {ultima ? `último planejamento em ${ultima}` : "nunca planejada"}
+                </span>
               </span>
-              <strong>{tarefa.nome_tarefa}</strong>{" "}
-              <span style={{ color: "var(--tinta-3)" }}>
-                — {rotuloLocal(tarefa)} ·{" "}
-                {ultima ? `último planejamento em ${ultima}` : "nunca planejada"}
-              </span>
+              <button type="button" className="btn btn-mini" onClick={() => iniciarAlocacao(tarefa.id)}>
+                Alocar →
+              </button>
             </div>
           ))}
           <p style={{ fontSize: 11, color: "var(--tinta-3)", marginTop: 4 }}>
-            Arraste essas tarefas da paleta à esquerda para a agenda de alguém.
+            Use “Alocar” para receber o melhor encaixe sugerido ou arraste a tarefa manualmente.
           </p>
         </div>
       )}

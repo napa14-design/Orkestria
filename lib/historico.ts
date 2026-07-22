@@ -4,7 +4,13 @@
  * requisição atual (lib/contextoUsuario.ts).
  *
  * Ponto único de auditoria — nenhum serviço ou rota precisa logar nada.
- * O log é gravado em segundo plano para não atrasar a operação principal.
+ * DECISÃO DE ARQUITETURA: o log é aguardado e tentado novamente em falhas
+ * transitórias. Isso acrescenta uma escrita ao caminho crítico, inclusive nos
+ * lotes, mas evita perder auditoria quando uma requisição serverless termina.
+ * A otimização futura correta é batch/BulkWriter com dado + log, não voltar a
+ * fire-and-forget. Fontes que não oferecem transação conjunta (Sheets) ainda
+ * não conseguem atomicidade perfeita, mas a requisição não termina antes da
+ * tentativa de auditoria.
  */
 import { usuarioAtual } from "./contextoUsuario";
 import type { CondicaoConsulta, DataSource } from "./datasource";
@@ -49,7 +55,7 @@ export class HistoricoDataSource implements DataSource {
 
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
     const resultado = await this.interno.criar(tabela, registro);
-    this.logar(
+    await this.logar(
       tabela,
       (registro as { id: string }).id,
       "criar",
@@ -67,32 +73,42 @@ export class HistoricoDataSource implements DataSource {
     const campos = Object.keys(mudancas)
       .filter((c) => !["atualizado_por", "atualizado_em"].includes(c))
       .join(", ");
-    this.logar(tabela, id, "atualizar", campos);
+    await this.logar(tabela, id, "atualizar", campos);
     return resultado;
   }
 
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     await this.interno.excluir(tabela, id);
-    this.logar(tabela, id, "excluir", "");
+    await this.logar(tabela, id, "excluir", "");
   }
 
-  private logar(
+  private async logar(
     tabela: NomeTabela,
     registroId: string,
     acao: "criar" | "atualizar" | "excluir",
     resumo: string,
-  ): void {
+  ): Promise<void> {
     if (tabela === "historico") return; // sem recursão
-    void this.interno
-      .criar("historico", {
-        id: crypto.randomUUID(),
-        tabela,
-        registro_id: registroId,
-        acao,
-        resumo,
-        usuario: usuarioAtual(),
-        criado_em: new Date().toISOString(),
-      })
-      .catch((e) => console.error("[historico]", e));
+    const registro = {
+      id: crypto.randomUUID(),
+      tabela,
+      registro_id: registroId,
+      acao,
+      resumo,
+      usuario: usuarioAtual(),
+      criado_em: new Date().toISOString(),
+    };
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        await this.interno.criar("historico", registro);
+        return;
+      } catch (e) {
+        if (tentativa === 3) {
+          console.error("[historico] falhou após 3 tentativas", e);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, tentativa * 40));
+      }
+    }
   }
 }

@@ -109,12 +109,12 @@ Restam poucos itens em aberto, listados na seção 5.
   tarefa a quem não tem a aptidão exigida.
 - **Treinamento como pré-requisito, com validade** — ✅ **Entregue.** Treinamento
   vencido volta a bloquear automaticamente.
-- **EPI por atividade** — ◐ **Parcial.** A tarefa já declara o EPI exigido (fica
-  visível como lembrete). A *confirmação de que o EPI foi usado* depende do canal
-  com o funcionário (app/QR — seção 5).
-- **Confirmação da atividade pelo funcionário (app/QR)** — ⚖ pendente (seção 5).
-- **Inserção das fichas de papel** — hoje o lançamento é feito no Acompanhamento;
-  a digitação direta pelo funcionário virá com o app/QR.
+- **EPI por atividade** — ✅ **Entregue.** A tarefa declara o EPI exigido e a
+  ficha ORK4 registra uma declaração única com os nomes impressos preservados no QR.
+- **Confirmação da atividade pelo funcionário** — ✅ entregue por ficha de papel
+  assinada + leitura OMR; confirmação direta em app individual permanece futura.
+- **Inserção das fichas de papel** — ✅ feita na tela Conferir ficha, que lê QR,
+  tarefas e declaração de EPI e grava `execucoes_realizadas`.
 
 ### Tema 8 — Produtividade, pessoas e dados sensíveis
 - **Score de produtividade por funcionário** — ✅ **Entregue.** Tela de
@@ -179,7 +179,7 @@ Sobraram poucos itens. Explicando cada um de forma simples:
 | B | Categoria + intensidade no cálculo | ✅ concluída (1 decisão em aberto: tipo de uso) |
 | C | Serviços eventuais + buffer | ✅ concluída |
 | D | Deslocamento, tempo por pessoa, criticidade | ✅ concluída |
-| E | Conformidade (aptidão, treinamento, EPI) | ✅ concluída (EPI: confirmação de uso pendente) |
+| E | Conformidade (aptidão, treinamento, EPI) | ✅ concluída (confirmação por ficha ORK4) |
 | F | Produtividade, remanejo entre sedes, login | ✅ concluída |
 | — | Confirmação pelo funcionário (app/QR) | ⚖ etapa futura dedicada |
 

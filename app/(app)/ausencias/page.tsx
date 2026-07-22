@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useEffect, useState } from "react";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
@@ -25,6 +26,15 @@ const SELO_TIPO: Record<string, string> = {
 export default function PaginaAusencias() {
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
+  const [abrirNovoDireto, setAbrirNovoDireto] = useState(false);
+
+  useEffect(() => {
+    if (!funcionarios || !sedes) return;
+    const parametros = new URLSearchParams(window.location.search);
+    if (parametros.get("novo") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setAbrirNovoDireto(true);
+  }, [funcionarios, sedes]);
 
   const nomeFuncionario = (id: string) =>
     funcionarios?.find((f) => f.id === id)?.nome ?? id;
@@ -37,6 +47,8 @@ export default function PaginaAusencias() {
       subtitulo="Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário fica bloqueada e as tarefas dele viram candidatas a remanejamento."
       endpoint="/api/ausencias"
       textoNovo="+ Nova ausência"
+      abrirNovoAoMontar={abrirNovoDireto}
+      chaveRascunho="nova-ausencia"
       campos={[
         {
           key: "funcionario_id",

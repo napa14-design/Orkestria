@@ -5,6 +5,7 @@
  * "recalibração em cascata": aplicar um fator ao tempo base de todas as
  * tarefas da categoria de uma vez.
  */
+import Link from "next/link";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
@@ -60,6 +61,8 @@ export default function PaginaCategorias() {
         subtitulo="Catálogo global que agrupa tarefas afins. Usado nos filtros e na recalibração em cascata. (A intensidade de limpeza agora é cadastrada em cada Local, não na categoria.)"
         endpoint="/api/categorias"
         textoNovo="+ Nova categoria"
+        permitirDuplicar
+        rotuloRegistro={(c) => c.nome}
         campos={[
           {
             key: "nome",
@@ -67,6 +70,8 @@ export default function PaginaCategorias() {
             tipo: "texto",
             obrigatorio: true,
             dica: "Como o grupo de tarefas aparece nos filtros e selos. Ex.: \"Higienização\", \"Coleta\", \"Limpeza terminal\".",
+            secao: "Identidade visual",
+            descricaoSecao: "Nome e cor ajudam o supervisor a reconhecer a atividade na paleta.",
           },
           {
             key: "descricao",
@@ -82,7 +87,14 @@ export default function PaginaCategorias() {
             ajuda: "Hex, ex.: #2f6f4f — usada no selo da paleta",
             dica: "Cor de exibição (hexadecimal) do selo da categoria na paleta de tarefas e na lista. Opcional.",
           },
-          { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
+          {
+            key: "ativo",
+            rotulo: "Ativa",
+            tipo: "checkbox",
+            padrao: true,
+            secao: "Disponibilidade",
+            descricaoSecao: "Categorias inativas permanecem no histórico e saem de novos cadastros.",
+          },
         ]}
         colunas={[
           {
@@ -122,9 +134,14 @@ export default function PaginaCategorias() {
           },
         ]}
         acoesExtra={(c) => (
-          <button className="btn btn-mini btn-fantasma" onClick={() => abrir(c)}>
-            Recalibrar
-          </button>
+          <>
+            <Link className="btn btn-mini btn-fantasma" href={`/tarefas?busca=${encodeURIComponent(c.nome)}`}>
+              Ver tarefas →
+            </Link>{" "}
+            <button className="btn btn-mini btn-fantasma" onClick={() => abrir(c)}>
+              Recalibrar
+            </button>
+          </>
         )}
       />
 

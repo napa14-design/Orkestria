@@ -6,9 +6,10 @@
  * (buffer) por sede.
  */
 import useSWR from "swr";
+import { useEffect, useState } from "react";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
-import { formatarDataBR, formatarDuracao } from "@/lib/dateUtils";
+import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type { Categoria, Funcionario, Local, Sede, ServicoEventual } from "@/types";
 
 const TIPOS = [
@@ -21,6 +22,15 @@ export default function PaginaEventuais() {
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const [abrirNovoDireto, setAbrirNovoDireto] = useState(false);
+
+  useEffect(() => {
+    if (!sedes || !funcionarios || !locais || !categorias) return;
+    const parametros = new URLSearchParams(window.location.search);
+    if (parametros.get("novo") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setAbrirNovoDireto(true);
+  }, [sedes, funcionarios, locais, categorias]);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const nomeFunc = (id: string) => funcionarios?.find((f) => f.id === id)?.nome ?? "—";
@@ -31,12 +41,15 @@ export default function PaginaEventuais() {
       subtitulo="Trabalho fora da rotina planejada, registrado depois. Use “eventual” para trabalho avulso e “imprevisto” para ocorrências que consumiram tempo — os imprevistos calibram a folga por sede."
       endpoint="/api/servicos-eventuais"
       textoNovo="+ Registrar eventual"
+      abrirNovoAoMontar={abrirNovoDireto}
+      chaveRascunho="novo-eventual"
       campos={[
         {
           key: "data",
           rotulo: "Data",
           tipo: "data",
           obrigatorio: true,
+          padrao: hojeISO(),
           dica: "Dia em que o serviço/ocorrência aconteceu. Como é registrado depois, costuma ser hoje ou um dia recente.",
         },
         {
@@ -54,6 +67,7 @@ export default function PaginaEventuais() {
           tipo: "select",
           obrigatorio: true,
           opcoes: (sedes ?? []).filter((s) => s.ativo).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
+          padrao: (sedes ?? []).find((s) => s.ativo)?.id ?? "",
           dica: "Sede onde ocorreu. Supervisores só registram na própria sede.",
         },
         {
