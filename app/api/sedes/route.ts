@@ -1,9 +1,14 @@
 import { comSessao, ok } from "@/lib/api";
+import { limitarSedeConsulta } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createSede, getSedes } from "@/services/sedesService";
 
 export async function GET() {
-  return comSessao(async () => ok(await getSedes()));
+  return comSessao(async (sessao) => {
+    const sede = limitarSedeConsulta(sessao);
+    const sedes = await getSedes();
+    return ok(sede ? sedes.filter((item) => item.id === sede) : sedes);
+  });
 }
 
 export async function POST(req: Request) {

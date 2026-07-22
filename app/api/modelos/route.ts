@@ -1,11 +1,12 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { excluirModelo, getModelos, salvarModelo } from "@/services/modelosService";
 
 export async function GET(req: Request) {
-  return comSessao(async () => {
-    const sede = new URL(req.url).searchParams.get("sede") ?? undefined;
+  return comSessao(async (sessao) => {
+    const solicitada = new URL(req.url).searchParams.get("sede") ?? undefined;
+    const sede = limitarSedeConsulta(sessao, solicitada);
     return ok(await getModelos(sede));
   });
 }

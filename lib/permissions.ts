@@ -24,6 +24,23 @@ export function acessaTodasAsSedes(sessao: SessaoUsuario): boolean {
   return sessao.perfil !== "supervisor" || sessao.sede_id === "geral";
 }
 
+/**
+ * Escopo obrigatório das consultas de leitura.
+ *
+ * Um supervisor comum nunca amplia a própria sede omitindo `?sede=` nem
+ * trocando o parâmetro manualmente. Administrador, visualizador e o supervisor
+ * explicitamente configurado como `geral` preservam o filtro solicitado.
+ */
+export function limitarSedeConsulta(
+  sessao: SessaoUsuario,
+  sedeSolicitada?: string,
+): string | undefined {
+  if (sessao.perfil === "supervisor" && sessao.sede_id !== "geral") {
+    return sessao.sede_id;
+  }
+  return sedeSolicitada;
+}
+
 /** Supervisor só altera registros da própria sede. */
 export function podeAlterarSede(sessao: SessaoUsuario, sedeId: string): boolean {
   if (sessao.perfil === "administrador") return true;

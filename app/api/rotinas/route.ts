@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createRotina,
@@ -13,9 +13,12 @@ import { getDataSource } from "@/lib/datasource";
  * GET /api/rotinas?de=...&ate=...[&sede=X]       → rotinas de um período
  */
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
     const url = new URL(req.url);
-    const sede = url.searchParams.get("sede") ?? undefined;
+    const sede = limitarSedeConsulta(
+      sessao,
+      url.searchParams.get("sede") ?? undefined,
+    );
     const data = url.searchParams.get("data");
     if (data) return ok(await getRotinasByData(data, sede));
     const de = url.searchParams.get("de");
