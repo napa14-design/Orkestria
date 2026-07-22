@@ -1,5 +1,13 @@
 # CLAUDE.md — instruções para sessões de IA neste projeto
 
+## ⛔ Antes de criar qualquer tela, controle, campo ou decisão
+
+**Leia [docs/00-doutrina.md](docs/00-doutrina.md) e passe pelo portão das cinco
+perguntas.** Tem força de regra arquitetural. Princípio central: **dados crescem;
+operação encolhe** — nada novo entra sem apagar algo velho da rotina do
+supervisor. Bug, texto e refino interno passam direto; aumento de superfície do
+produto, não.
+
 ## O que é este projeto
 
 **Orkestria**: sistema web de planejamento visual de rotinas operacionais para
