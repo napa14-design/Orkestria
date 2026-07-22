@@ -1,4 +1,10 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import diarioFonte from "@/DIARIO.md";
+import { parsearDiarioProduto } from "@/lib/diarioProduto";
+import { podeVerEvolucaoProduto } from "@/lib/permissions";
+import { obterSessao } from "@/lib/session";
 
 /**
  * "Da ata ao sistema" — painel de transparência para a direção: cada pedido
@@ -230,151 +236,332 @@ const BLOCOS: Bloco[] = [
   },
 ];
 
+const MARCOS = [
+  {
+    numero: "01",
+    fase: "Da conversa ao modelo",
+    titulo: "A ata deixou de ser memória",
+    antes: "Pedidos operacionais espalhados entre reunião, planilha e experiência de cada sede.",
+    agora: "Tempo, criticidade, periodicidade, aptidões, EPIs e calendário viraram regras verificáveis.",
+    impacto: "A decisão da reunião passou a sobreviver no dado e na validação.",
+  },
+  {
+    numero: "02",
+    fase: "Fundação invisível",
+    titulo: "Liberdade sem atravessar sedes",
+    antes: "Listas estavam escopadas, mas itens por ID e destinos de edição ainda abriam brechas.",
+    agora: "Leitura, escrita e vínculos são conferidos no servidor, inclusive o destino da mudança.",
+    impacto: "Mais segurança sem acrescentar um único passo ao supervisor.",
+  },
+  {
+    numero: "03",
+    fase: "Central do dia",
+    titulo: "Uma próxima decisão",
+    antes: "Cinco atalhos, indicadores cadastrais e escolhas antes mesmo de começar o dia.",
+    agora: "A Central mostra somente a primeira exceção e a ação adequada para resolvê-la.",
+    impacto: "O restante do sistema pode esperar até o que bloqueia o dia estar resolvido.",
+  },
+  {
+    numero: "04",
+    fase: "Acompanhamento",
+    titulo: "O comum virou um toque",
+    antes: "Toda tarefa exigia abrir e confirmar um formulário, mesmo quando tudo ocorreu conforme o plano.",
+    agora: "“✓ Conforme” registra a execução na linha; formulário completo fica para desvio e EPI.",
+    impacto: "O caso mediano perdeu um formulário sem esconder as exceções.",
+  },
+  {
+    numero: "05",
+    fase: "Exceção segura",
+    titulo: "Resolver deixou de ser um modo",
+    antes: "Abrir Agenda, localizar a tarefa órfã, procurar alguém e confirmar o remanejo.",
+    agora: "Quando existe uma substituta sem alertas, a Central oferece a alocação pronta em uma decisão.",
+    impacto: "A exceção ficou tão curta quanto o dia comum — e o servidor recalcula antes de gravar.",
+  },
+  {
+    numero: "06",
+    fase: "Agenda contextual",
+    titulo: "Controles aparecem quando servem",
+    antes: "Preparação, planejamento e utilidades competiam simultaneamente pela atenção.",
+    agora: "Cada ação nasce do estado do dia e desaparece quando deixa de ser necessária.",
+    impacto: "Mais capacidade no sistema, menos decisões na superfície operacional.",
+  },
+] as const;
+
+const ESCOLHAS_PILOTO = [
+  {
+    classe: "ativo",
+    rotulo: "Ativo no main",
+    itens: [
+      "Central enxuta e próxima exceção",
+      "Confirmação conforme na própria linha",
+      "Resolução segura em uma decisão",
+      "Agenda contextual e rota padrão",
+      "Permissões, integridade e auditoria aguardada",
+    ],
+  },
+  {
+    classe: "preservado",
+    rotulo: "Preservado para depois",
+    itens: [
+      "Kits e replicação de tarefas",
+      "Ações em massa e cadastro dentro da Agenda",
+      "Favoritas, recentes e modo foco",
+      "Busca global de entidades",
+      "Painéis permanentes de prontidão cadastral",
+    ],
+  },
+  {
+    classe: "cautela",
+    rotulo: "Aguardando validação",
+    itens: [
+      "Latência do Gerar o dia no Firestore real",
+      "ORK4: autenticidade, densidade e teste físico",
+      "Próximos retornos guiados pelo piloto",
+    ],
+  },
+] as const;
+
+const ENTRADAS_DIARIO = parsearDiarioProduto(diarioFonte);
+
 function Selo({ status }: { status: Status }) {
   const s = STATUS[status];
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        flexShrink: 0,
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: "0.03em",
-        textTransform: "uppercase",
-        color: s.cor,
-        border: `1.5px solid ${s.cor}`,
-        borderRadius: 999,
-        padding: "2px 9px",
-        whiteSpace: "nowrap",
-      }}
-    >
+    <span className="evolucao-selo" style={{ color: s.cor, borderColor: s.cor }}>
       <span aria-hidden>{s.icone}</span>
       {s.rotulo}
     </span>
   );
 }
 
-export default function PaginaDaAta() {
+function TextoComMarcacao({ texto }: { texto: string }) {
+  const partes = texto.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/gu);
+  return partes.map((parte, indice): ReactNode => {
+    if (parte.startsWith("**") && parte.endsWith("**")) {
+      return <strong key={indice}>{parte.slice(2, -2)}</strong>;
+    }
+    if (parte.startsWith("`") && parte.endsWith("`")) {
+      return <code key={indice}>{parte.slice(1, -1)}</code>;
+    }
+    const link = parte.match(/^\[([^\]]+)\]\(([^)]+)\)$/u);
+    if (link) {
+      const [, rotulo, href] = link;
+      if (/^https?:\/\//u.test(href)) {
+        return <a key={indice} href={href} rel="noreferrer" target="_blank">{rotulo}</a>;
+      }
+      return <span key={indice}>{rotulo}</span>;
+    }
+    return parte;
+  });
+}
+
+type TrechoDiario = {
+  tipo: "paragrafo" | "item" | "item-numerado" | "subtitulo";
+  texto: string;
+  numero?: string;
+};
+
+function estruturarConteudo(conteudo: string): TrechoDiario[] {
+  const trechos: TrechoDiario[] = [];
+  let paragrafo = "";
+
+  const guardarParagrafo = () => {
+    if (paragrafo.trim()) trechos.push({ tipo: "paragrafo", texto: paragrafo.trim() });
+    paragrafo = "";
+  };
+
+  for (const linhaOriginal of conteudo.split("\n")) {
+    const linha = linhaOriginal.trim();
+    if (!linha) {
+      guardarParagrafo();
+      continue;
+    }
+
+    const item = linha.match(/^[-*]\s+(.+)$/u);
+    const numerado = linha.match(/^(\d+)\.\s+(.+)$/u);
+    const subtitulo = linha.match(/^#{1,6}\s+(.+)$/u);
+    if (item || numerado || subtitulo) {
+      guardarParagrafo();
+      if (item) trechos.push({ tipo: "item", texto: item[1] });
+      else if (numerado) trechos.push({ tipo: "item-numerado", numero: numerado[1], texto: numerado[2] });
+      else if (subtitulo) trechos.push({ tipo: "subtitulo", texto: subtitulo[1] });
+      continue;
+    }
+
+    const anterior = trechos.at(-1);
+    if (/^\s{2,}\S/u.test(linhaOriginal) && anterior && (anterior.tipo === "item" || anterior.tipo === "item-numerado")) {
+      anterior.texto += ` ${linha}`;
+    } else {
+      paragrafo += `${paragrafo ? " " : ""}${linha}`;
+    }
+  }
+  guardarParagrafo();
+  return trechos;
+}
+
+function ConteudoDiario({ conteudo, bruto }: { conteudo: string; bruto: boolean }) {
+  if (bruto) return <pre className="evolucao-diario-bruto">{conteudo}</pre>;
+  return (
+    <div className="evolucao-diario-conteudo">
+      {estruturarConteudo(conteudo).map((trecho, indice) => {
+        if (trecho.tipo === "item" || trecho.tipo === "item-numerado") {
+          return (
+            <div className="evolucao-diario-item" key={indice}>
+              <span aria-hidden>{trecho.tipo === "item" ? "—" : `${trecho.numero}.`}</span>
+              <p><TextoComMarcacao texto={trecho.texto} /></p>
+            </div>
+          );
+        }
+        if (trecho.tipo === "subtitulo") {
+          return <h4 key={indice}><TextoComMarcacao texto={trecho.texto} /></h4>;
+        }
+        return <p key={indice}><TextoComMarcacao texto={trecho.texto} /></p>;
+      })}
+    </div>
+  );
+}
+
+function formatarData(data: string | null): string {
+  if (!data) return "Formato livre";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "UTC" })
+    .format(new Date(`${data}T12:00:00Z`));
+}
+
+export default async function PaginaDaAta() {
+  const sessao = await obterSessao();
+  if (!sessao) redirect("/login");
+  if (!podeVerEvolucaoProduto(sessao)) redirect("/inicio");
+
   const itens = BLOCOS.flatMap((b) => b.itens);
   const conta = (s: Status) => itens.filter((i) => i.status === s).length;
 
   return (
-    <div className="entra" style={{ maxWidth: 1040, margin: "0 auto" }}>
-      <div className="rotulo" style={{ color: "var(--acento)" }}>
-        Reunião de alinhamento · 16/06/2026
-      </div>
-      <h1 style={{ fontSize: 30, fontWeight: 800, marginTop: 2 }}>Da ata ao sistema</h1>
-      <p style={{ color: "var(--tinta-2)", marginTop: 6, marginBottom: 18, maxWidth: 720 }}>
-        Cada ponto levantado pela direção, lado a lado com o que o Orkestria faz em resposta.
-        Sem maquiagem: o que já está no ar, o que está pela metade e o que espera uma decisão.
-      </p>
-
-      {/* placar por status */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 22 }}>
-        {(Object.keys(STATUS) as Status[]).map((s) => (
-          <div
-            key={s}
-            className="painel"
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px" }}
-          >
-            <span
-              className="num"
-              style={{ fontSize: 24, fontWeight: 800, color: STATUS[s].cor, lineHeight: 1 }}
-            >
-              {conta(s)}
-            </span>
-            <span style={{ fontSize: 12, color: "var(--tinta-2)" }}>
-              {STATUS[s].rotulo}
-            </span>
-          </div>
-        ))}
-        <div
-          className="painel"
-          style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px" }}
-        >
-          <span className="num" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1 }}>
-            {itens.length}
-          </span>
-          <span style={{ fontSize: 12, color: "var(--tinta-2)" }}>pontos no total</span>
+    <div className="evolucao entra">
+      <header className="evolucao-hero">
+        <div className="evolucao-hero-pauta" aria-hidden />
+        <div className="evolucao-hero-texto">
+          <div className="rotulo">Prestação de contas · produto e operação</div>
+          <h1>Da ata ao sistema.<br /><em>Do sistema a menos trabalho.</em></h1>
+          <p>
+            Uma leitura executiva do caminho percorrido pelo Orkestria — incluindo o que entrou,
+            o que foi retirado de propósito e o que ainda exige evidência.
+          </p>
         </div>
-      </div>
+        <blockquote>
+          <span className="rotulo">A régua</span>
+          “Dados crescem;<br />operação encolhe.”
+        </blockquote>
+      </header>
 
-      {/* blocos de pedido × resposta */}
-      <div style={{ display: "grid", gap: 22 }}>
-        {BLOCOS.map((b) => (
-          <section key={b.titulo}>
-            <h2
-              style={{
-                fontSize: 18,
-                fontWeight: 800,
-                marginBottom: 10,
-                paddingBottom: 6,
-                borderBottom: "2px solid var(--tinta)",
-              }}
-            >
-              {b.titulo}
-            </h2>
-            <div style={{ display: "grid", gap: 10 }}>
-              {b.itens.map((it, i) => (
-                <div key={i} className="painel" style={{ padding: 14 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <div className="rotulo" style={{ color: "var(--tinta-3)" }}>
-                      A ata pediu
-                    </div>
-                    <Selo status={it.status} />
-                  </div>
-                  <p style={{ fontSize: 14, marginBottom: 12 }}>{it.pediu}</p>
+      <section className="evolucao-placar" aria-label="Resumo da evolução">
+        <div><strong className="num">{MARCOS.length}</strong><span>marcos executivos</span></div>
+        <div><strong className="num">3</strong><span>fluxos pilotáveis</span></div>
+        <div><strong className="num">1</strong><span>decisão por vez</span></div>
+        <div><strong className="num">{ENTRADAS_DIARIO.length}</strong><span>registros completos</span></div>
+      </section>
 
-                  <div
-                    style={{
-                      borderLeft: "3px solid var(--acento)",
-                      paddingLeft: 12,
-                    }}
-                  >
-                    <div className="rotulo" style={{ color: "var(--acento)", marginBottom: 3 }}>
-                      O sistema faz
-                    </div>
-                    <p style={{ fontSize: 14, color: "var(--tinta-2)", lineHeight: 1.5 }}>{it.faz}</p>
-                    {it.nota && (
-                      <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 6, fontStyle: "italic" }}>
-                        ⚠ {it.nota}
-                      </p>
-                    )}
-                  </div>
+      <section className="evolucao-secao">
+        <div className="evolucao-secao-cabecalho">
+          <span className="rotulo">01 · A narrativa executiva</span>
+          <h2>Seis movimentos, uma direção</h2>
+          <p>Os marcos abaixo são curados: contam decisões estáveis, não uma lista de commits.</p>
+        </div>
+        <div className="evolucao-marcos">
+          {MARCOS.map((marco) => (
+            <article className="evolucao-marco" key={marco.numero}>
+              <div className="evolucao-marco-num num">{marco.numero}</div>
+              <div className="evolucao-marco-corpo">
+                <span className="rotulo">{marco.fase}</span>
+                <h3>{marco.titulo}</h3>
+                <div className="evolucao-antes-agora">
+                  <div><span>Antes</span><p>{marco.antes}</p></div>
+                  <div><span>Agora</span><p>{marco.agora}</p></div>
                 </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+                <p className="evolucao-impacto"><strong>Impacto</strong> {marco.impacto}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-      <div
-        style={{
-          marginTop: 26,
-          paddingTop: 16,
-          borderTop: "1px solid var(--linha)",
-          fontSize: 12,
-          color: "var(--tinta-3)",
-        }}
-      >
-        Compromissos que atravessam tudo: planejamento, não punição · planejar ≠ avaliar ·
-        idade e sexo fora do motor de produtividade · números sempre ajustáveis pela operação,
-        nunca inventados pelo sistema · toda alteração registrada no histórico. Detalhe técnico em{" "}
-        <code>docs/08</code> e <code>docs/09</code>.{" "}
-        <Link href="/inicio" style={{ color: "var(--acento)" }}>
-          ← voltar ao início
-        </Link>
-      </div>
+      <section className="evolucao-secao">
+        <div className="evolucao-secao-cabecalho">
+          <span className="rotulo">02 · Escolhas explícitas</span>
+          <h2>Construído não significa ativo</h2>
+          <p>O piloto carrega somente o que substitui trabalho. O restante tem destino declarado.</p>
+        </div>
+        <div className="evolucao-escolhas">
+          {ESCOLHAS_PILOTO.map((grupo) => (
+            <article className={`evolucao-escolha ${grupo.classe}`} key={grupo.rotulo}>
+              <span className="rotulo">{grupo.rotulo}</span>
+              <ul>{grupo.itens.map((item) => <li key={item}>{item}</li>)}</ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="evolucao-secao">
+        <div className="evolucao-secao-cabecalho">
+          <span className="rotulo">03 · Rastreabilidade da reunião</span>
+          <h2>O pedido e a resposta</h2>
+          <p>{itens.length} pontos preservados da ata, recolhidos por tema para não competir com a apresentação.</p>
+        </div>
+        <div className="evolucao-status">
+          {(Object.keys(STATUS) as Status[]).map((status) => (
+            <div key={status}><strong className="num" style={{ color: STATUS[status].cor }}>{conta(status)}</strong><span>{STATUS[status].rotulo}</span></div>
+          ))}
+        </div>
+        <div className="evolucao-atas">
+          {BLOCOS.map((bloco) => (
+            <details className="evolucao-ata" key={bloco.titulo}>
+              <summary><span>{bloco.titulo}</span><small className="num">{bloco.itens.length}</small></summary>
+              <div className="evolucao-ata-itens">
+                {bloco.itens.map((item, indice) => (
+                  <article key={indice}>
+                    <div className="evolucao-ata-topo"><span className="rotulo">A ata pediu</span><Selo status={item.status} /></div>
+                    <p>{item.pediu}</p>
+                    <div className="evolucao-resposta">
+                      <span className="rotulo">O sistema responde</span>
+                      <p>{item.faz}</p>
+                      {item.nota && <small>{item.nota}</small>}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="evolucao-secao evolucao-arquivo">
+        <div className="evolucao-secao-cabecalho">
+          <span className="rotulo">04 · Arquivo integral</span>
+          <h2>Nada depende da memória</h2>
+          <p>
+            Esta linha do tempo vem do DIARIO no build. Uma entrada fora do padrão permanece visível
+            como texto bruto; nenhuma mudança é descartada porque o parser não a reconheceu.
+          </p>
+        </div>
+        <div className="evolucao-linha-tempo">
+          {ENTRADAS_DIARIO.map((entrada) => (
+            <details className="evolucao-diario" key={entrada.id}>
+              <summary>
+                <time dateTime={entrada.data ?? undefined}>{formatarData(entrada.data)}</time>
+                <span>{entrada.titulo}</span>
+                {entrada.formato === "bruto" && <small>formato livre</small>}
+              </summary>
+              <ConteudoDiario conteudo={entrada.conteudo} bruto={entrada.formato === "bruto"} />
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <footer className="evolucao-rodape">
+        <p>
+          Planejamento, não punição · planejar ≠ avaliar · decisões sensíveis exigem direção ·
+          toda escrita permanece auditada.
+        </p>
+        <Link href="/inicio">← Voltar à Central</Link>
+      </footer>
     </div>
   );
 }

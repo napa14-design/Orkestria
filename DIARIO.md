@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-07-22 — Da ata ao sistema virou memória executiva completa
+
+- **Substituição, não nova aba**: `/da-ata` deixou de ser apenas a lista estática
+  dos pedidos da reunião. A mesma rota agora abre com uma narrativa executiva
+  em seis movimentos, comparações `Antes → Agora`, impacto operacional e a
+  separação explícita entre o que está ativo, preservado e em validação.
+- **Duas camadas, duas fontes conscientes**: os marcos executivos são curados à
+  mão porque apresentação exige síntese; o mapa integral da ata continua
+  preservado por tema; e a linha do tempo abaixo incorpora automaticamente
+  todas as entradas do `DIARIO.md`.
+- **DIARIO no build, não no request**: o Markdown entra como `asset/source` no
+  bundle do Next. O parser roda uma vez no módulo e não toca no filesystem a
+  cada visita autenticada. Entrada que não casar com `data — título` aparece
+  integralmente como `formato livre`, em vez de sumir ou derrubar a página.
+- **Transparência fora da rotina local**: o item saiu do menu do supervisor e a
+  própria página valida a sessão no servidor. Administração e gerência acessam;
+  supervisor que digita `/da-ata` é redirecionado para `/inicio`.
+- **Portão da doutrina**: a mudança substitui a página existente e remove uma
+  opção irrelevante da navegação do supervisor. Não acrescenta decisão ao dia;
+  transforma pesquisa manual em DIARIO/commits numa prestação de contas pronta.
+- **Direção visual**: a skill de frontend orientou um caderno executivo dentro
+  do sistema Partitura — abertura editorial, pauta, marcos legíveis à distância,
+  arquivo recolhido e impressão limitada à narrativa, sem estética de dashboard
+  genérico.
+- **Validação**: TypeScript, `git diff --check` e build de produção com 67
+  páginas/rotas aprovados. Em `DATA_SOURCE=memory`, admin e gerência abriram
+  `/da-ata` com `200` e conteúdo completo; supervisor autenticado terminou em
+  `/inicio`. O fallback foi exercitado com um bloco fora do formato e preservou
+  o texto bruto sem erro. Nenhuma escrita ocorreu no Firebase.
+- **Arquivos principais**: `app/(app)/da-ata/page.tsx`, `lib/diarioProduto.ts`,
+  `next.config.ts`, `types/conteudo.d.ts`, `components/AppShell.tsx`,
+  `lib/permissions.ts` e `app/globals.css`.
+
+---
+
 ## 2026-07-22 — Agenda contextual: menos decisões simultâneas (passo 6)
 
 - **Uma preparação por vez**: `Gerar o dia` e `Repetir o dia anterior` deixaram

@@ -68,3 +68,8 @@ export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {
 export function podeGerenciarCatalogo(sessao: SessaoUsuario): boolean {
   return sessao.perfil === "administrador";
 }
+
+/** Transparência executiva: administração e gerência, nunca operação local. */
+export function podeVerEvolucaoProduto(sessao: SessaoUsuario): boolean {
+  return sessao.perfil === "administrador" || sessao.perfil === "visualizador";
+}

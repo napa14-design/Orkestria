@@ -61,7 +61,7 @@ const GRUPOS: Grupo[] = [
   {
     rotulo: "Sistema",
     itens: [
-      { href: "/da-ata", rotulo: "Da ata ao sistema" },
+      { href: "/da-ata", rotulo: "Da ata ao sistema", ocultarSupervisor: true },
       { href: "/parametros", rotulo: "Parâmetros" },
       { href: "/historico", rotulo: "Histórico", ocultarSupervisor: true },
       { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
