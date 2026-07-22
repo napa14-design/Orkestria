@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-07-22 — Auditoria aguardada sem serializar o Gerar o dia (passo 2)
+
+- **Escolha explícita**: toda criação, atualização ou exclusão agora aguarda a
+  escrita correspondente no histórico. O log deixou de ser `fire-and-forget`,
+  que podia ser perdido quando uma execução serverless terminasse.
+- **Falha transitória**: a auditoria tenta até três vezes, com esperas curtas de
+  40 ms e 80 ms e reutilizando o mesmo ID. Se as três falharem, o erro é
+  registrado no servidor e a operação principal permanece concluída — ela já
+  foi persistida e não é seguro repeti-la automaticamente.
+- **Lote preservado**: o Gerar o dia continua processando blocos em paralelo;
+  apenas cada gravação aguarda o próprio histórico. A evolução correta para
+  reduzir latência real no Firestore é escrita em lote/BulkWriter, não voltar a
+  abandonar a auditoria em segundo plano.
+- **Medição comparável**: com rota padrão de 44 blocos e banco isolado em
+  memória, a média geral de oito gerações foi de 6,02 ms para 6,21 ms. Nos seis
+  dias úteis que realmente geraram 44 rotinas, foi de 6,32 ms para 6,53 ms
+  (+0,21 ms). A diferença é ruído operacional nesse modo e confirma que o lote
+  não foi serializado; não pretende estimar a latência de rede do Firestore.
+  Sábado e domingo pularam corretamente os 44 blocos.
+- **Validação**: TypeScript, `git diff --check`, build de produção (64
+  páginas/rotas) e fluxo HTTP real de salvar modelo e gerar dias aprovados.
+  Uma criação seguida imediatamente pela leitura do histórico já encontrou o
+  log correspondente, com ação, resumo e usuário corretos. Nenhuma escrita
+  ocorreu no Firebase.
+- **Arquivo funcional**: `lib/historico.ts`.
+
+---
+
 ## 2026-07-22 — Fechamento independente da fundação de permissões (passo 1c)
 
 - **Revisão antes de empilhar**: os dois commits iniciais do Passo 1 foram
