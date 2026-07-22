@@ -40,6 +40,7 @@ export async function getExecucoes(
 export async function registrarExecucao(
   // sede_id é preenchida aqui a partir da rotina (o cliente não envia).
   dados: Omit<ExecucaoRealizada, "id" | "sede_id" | "criado_em" | "atualizado_em">,
+  opcoes?: { confirmacaoRapida?: boolean },
 ): Promise<ExecucaoRealizada> {
   const ds = await getDataSource();
   const rotina = await ds.obter("rotinas_planejadas", dados.rotina_id);
@@ -49,6 +50,26 @@ export async function registrarExecucao(
   const parametros = await resolverParametros(rotina.sede_id);
   // Tarefa com "tempo é referência" não cobra desvio (execução varia muito).
   const tarefa = await ds.obter("tarefas", rotina.tarefa_id);
+
+  // O caminho de um toque não pode afirmar uso de EPI sem a declaração humana.
+  // A UI já esconde o atalho, e esta validação fecha também chamadas diretas.
+  if (opcoes?.confirmacaoRapida && tarefa?.requisitos) {
+    const requisitos = await Promise.all(
+      tarefa.requisitos
+        .split(",")
+        .filter(Boolean)
+        .map((id) => ds.obter("requisitos", id)),
+    );
+    if (requisitos.some((requisito) => requisito?.tipo === "epi")) {
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "EPI_EXIGE_CONFIRMACAO",
+          mensagem: "Esta tarefa exige confirmação de EPI no formulário completo.",
+        },
+      ]);
+    }
+  }
 
   // Regras de justificativa obrigatória.
   const statusQueExigem: StatusRealizado[] = ["nao_realizada", "remanejada", "cancelada"];

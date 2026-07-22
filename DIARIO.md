@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-07-22 — Realizado comum confirmado na linha (passo 4)
+
+- **Um toque substitui o formulário**: tarefas pendentes sem EPI agora exibem
+  `✓ Conforme` diretamente no card mobile e na linha desktop. O servidor usa
+  horário e duração planejados; o supervisor não redigita dados iguais.
+- **Exceção continua explícita**: `Desvio` abre o formulário completo para
+  atraso, parcial, não realizada, remanejada, cancelada, justificativas e
+  horários diferentes. Registros existentes continuam com `Reabrir`.
+- **EPI não virou atalho**: tarefa com requisito de EPI mostra
+  `Confirmar + EPI` e permanece no formulário com declaração humana. A nova
+  rota `/api/execucoes/conforme` também recusa chamadas diretas nesses casos;
+  esconder o botão no navegador não é a única proteção.
+- **Backend deriva o registro**: o cliente rápido envia somente `rotina_id`.
+  Data, status, horários, duração, sede e supervisor são obtidos no servidor,
+  evitando que o atalho aceite números manipulados.
+- **Portão da doutrina**: elimina abrir e confirmar um formulário no caso
+  mediano, pertence ao Acompanhamento, reduz o fechamento a um toque, e o botão
+  desaparece assim que existe execução. O formulário completo continua sendo o
+  caminho básico para qualquer desvio ou declaração de EPI.
+- **Sem lote deliberadamente**: confirmação em massa e “registrar próxima” não
+  entraram. O ganho desta etapa vem de retirar o formulário repetitivo, sem
+  criar outro modo ou uma decisão de grande alcance.
+- **Validação**: TypeScript, `git diff --check` e build de produção com 66
+  páginas/rotas aprovados. Em `DATA_SOURCE=memory`, confirmação comum retornou
+  `201`; repetição manteve uma única execução; EPI retornou `422`; visualizador
+  retornou `403`; e a Central reduziu as pendências de 32 para 31. Nenhuma
+  escrita ocorreu no Firebase.
+- **Arquivos principais**: `app/(app)/acompanhamento/page.tsx`,
+  `app/api/execucoes/conforme/route.ts`, `services/execucoesService.ts` e
+  `app/globals.css`.
+
+---
+
 ## 2026-07-22 — Central enxuta: uma próxima decisão (passo 3)
 
 - **Substituição, não soma**: a página inicial deixou de ser uma grade com cinco

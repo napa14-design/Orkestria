@@ -339,6 +339,28 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .alerta-aviso { border-left-color: var(--amarelo); background: #f6efd8; }
 .alerta-ok { border-left-color: var(--verde); background: #e7f1e9; }
 
+/* Acompanhamento: o caso comum acontece na linha; o modal fica para desvios. */
+.btn-conforme {
+  color: #fff;
+  background: var(--verde);
+  border-color: var(--tinta);
+}
+.acompanhamento-mensagem { margin-bottom: 12px; }
+.acompanhamento-acoes-tabela {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.acompanhamento-acoes-linha {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.acompanhamento-acoes-linha > .btn { justify-content: center; min-height: 38px; }
+.acompanhamento-acoes-linha > .btn:only-child { grid-column: 1 / -1; }
+
 /* ── barra de progresso de ocupação ───────────────────────────────── */
 .barra-trilho {
   height: 14px;

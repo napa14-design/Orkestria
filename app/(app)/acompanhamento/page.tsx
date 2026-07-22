@@ -75,6 +75,8 @@ export default function PaginaAcompanhamento() {
   const [form, setForm] = useState<FormExecucao>(FORM_VAZIO);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [processandoRapido, setProcessandoRapido] = useState<Set<string>>(() => new Set());
+  const [mensagem, setMensagem] = useState<{ texto: string; erro?: boolean } | null>(null);
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -144,6 +146,41 @@ export default function PaginaAcompanhamento() {
   );
 
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
+
+  function tarefaExigeEpi(tarefaId: string): boolean {
+    const tarefa = tarefaPorId.get(tarefaId);
+    if (!tarefa) return true; // sem cadastro carregado, mantém o caminho seguro
+    return (tarefa.requisitos ?? "")
+      .split(",")
+      .filter(Boolean)
+      .some((id) => reqPorId.get(id)?.tipo === "epi");
+  }
+
+  async function confirmarConforme(rotina: RotinaPlanejada) {
+    // A declaração de EPI exige gesto explícito no formulário completo.
+    if (tarefaExigeEpi(rotina.tarefa_id)) {
+      abrirRegistro(rotina);
+      return;
+    }
+    setMensagem(null);
+    setProcessandoRapido((atuais) => new Set(atuais).add(rotina.id));
+    try {
+      await apiPost("/api/execucoes/conforme", { rotina_id: rotina.id });
+      setMensagem({ texto: "Realizado confirmado sem abrir formulário." });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+    } catch (err) {
+      setMensagem({
+        texto: err instanceof ErroApi ? err.message : "Não foi possível confirmar o realizado.",
+        erro: true,
+      });
+    } finally {
+      setProcessandoRapido((atuais) => {
+        const proximos = new Set(atuais);
+        proximos.delete(rotina.id);
+        return proximos;
+      });
+    }
+  }
 
   function abrirRegistro(rotina: RotinaPlanejada) {
     // EPIs exigidos pela tarefa — apenas para montar o texto da declaração.
@@ -297,6 +334,15 @@ export default function PaginaAcompanhamento() {
         </label>
       </div>
 
+      {mensagem && (
+        <div
+          className={`alerta ${mensagem.erro ? "alerta-erro" : "alerta-ok"} acompanhamento-mensagem`}
+          role="status"
+        >
+          {mensagem.texto}
+        </div>
+      )}
+
       {/* dias anteriores com tarefas sem status */}
       {diasPendentes.length > 0 && (
         <div
@@ -330,6 +376,9 @@ export default function PaginaAcompanhamento() {
           const exec = execucaoPorRotina.get(r.id);
           const tarefa = tarefaPorId.get(r.tarefa_id);
           const local = localPorId.get(r.local_id);
+          const tarefaCarregada = Boolean(tarefa);
+          const exigeEpi = tarefaExigeEpi(r.tarefa_id);
+          const confirmando = processandoRapido.has(r.id);
           const selo = SELO_STATUS_ROTINA[r.status] ?? SELO_STATUS_ROTINA.planejada;
           const desvio =
             exec && exec.tempo_real_min > 0
@@ -368,13 +417,32 @@ export default function PaginaAcompanhamento() {
                   </>
                 )}
               </div>
-              <button
-                className={`btn btn-mini ${exec ? "btn-fantasma" : "btn-primario"}`}
-                style={{ width: "100%", justifyContent: "center", marginTop: 10 }}
-                onClick={() => abrirRegistro(r)}
-              >
-                {exec ? "Reabrir registro" : "Registrar execução"}
-              </button>
+              <div className="acompanhamento-acoes-linha">
+                {!exec && !exigeEpi && (
+                  <button
+                    type="button"
+                    className="btn btn-mini btn-conforme"
+                    disabled={confirmando}
+                    onClick={() => void confirmarConforme(r)}
+                  >
+                    {confirmando ? "Confirmando…" : "✓ Conforme"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`btn btn-mini ${exec ? "btn-fantasma" : exigeEpi ? "btn-primario" : "btn-fantasma"}`}
+                  disabled={!exec && !tarefaCarregada}
+                  onClick={() => abrirRegistro(r)}
+                >
+                  {exec
+                    ? "Reabrir registro"
+                    : !tarefaCarregada
+                      ? "Carregando…"
+                      : exigeEpi
+                        ? "Confirmar + EPI"
+                        : "Houve desvio"}
+                </button>
+              </div>
             </div>
           );
         })}
@@ -407,6 +475,9 @@ export default function PaginaAcompanhamento() {
               const exec = execucaoPorRotina.get(r.id);
               const tarefa = tarefaPorId.get(r.tarefa_id);
               const local = localPorId.get(r.local_id);
+              const tarefaCarregada = Boolean(tarefa);
+              const exigeEpi = tarefaExigeEpi(r.tarefa_id);
+              const confirmando = processandoRapido.has(r.id);
               const selo = SELO_STATUS_ROTINA[r.status] ?? SELO_STATUS_ROTINA.planejada;
               const desvio =
                 exec && exec.tempo_real_min > 0
@@ -454,12 +525,32 @@ export default function PaginaAcompanhamento() {
                     <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <button
-                      className={`btn btn-mini ${exec ? "btn-fantasma" : "btn-primario"}`}
-                      onClick={() => abrirRegistro(r)}
-                    >
-                      {exec ? "Reabrir" : "Registrar"}
-                    </button>
+                    <div className="acompanhamento-acoes-tabela">
+                      {!exec && !exigeEpi && (
+                        <button
+                          type="button"
+                          className="btn btn-mini btn-conforme"
+                          disabled={confirmando}
+                          onClick={() => void confirmarConforme(r)}
+                        >
+                          {confirmando ? "Confirmando…" : "✓ Conforme"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={`btn btn-mini ${exec ? "btn-fantasma" : exigeEpi ? "btn-primario" : "btn-fantasma"}`}
+                        disabled={!exec && !tarefaCarregada}
+                        onClick={() => abrirRegistro(r)}
+                      >
+                        {exec
+                          ? "Reabrir"
+                          : !tarefaCarregada
+                            ? "Carregando…"
+                            : exigeEpi
+                              ? "Confirmar + EPI"
+                              : "Desvio"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
