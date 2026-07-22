@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-07-22 — Central enxuta: uma próxima decisão (passo 3)
+
+- **Substituição, não soma**: a página inicial deixou de ser uma grade com cinco
+  atalhos e um tutorial permanente de implantação. Agora apresenta uma única
+  próxima exceção, seguida apenas pela fila operacional que já está em ordem.
+- **Cadastros contextuais**: saúde cadastral, prontidão, kits e percentuais não
+  moram na Central. Um cadastro só aparece quando uma condição verificável
+  bloqueia o dia — sede inválida, ausência de equipe ativa ou ausência de
+  tarefas utilizáveis numa sede com pessoas disponíveis e agenda vazia.
+- **Leituras contidas**: a carga normal faz somente consultas do dia para
+  equipe, rotinas, execuções e ausências, mais a sede do supervisor. Não lê
+  locais, qualificações, usuários nem 31 dias de histórico. Tarefas só são
+  consultadas no caminho excepcional de uma sede específica com o dia vazio.
+- **Escopo**: supervisor comum recebe apenas a própria sede; administração e
+  gerência recebem o resumo global sem cálculo de cobertura histórica. O menu
+  passou de “Início” para “Central”, tornando explícita a função da tela.
+- **Portão da doutrina**: elimina escolha entre atalhos, pertence à operação,
+  reduz o primeiro gesto a um botão, e cada aviso desaparece automaticamente
+  quando sua condição é resolvida. O caminho básico não depende da fila nem de
+  conhecimento avançado.
+- **Validação**: TypeScript, `git diff --check`, build de produção com 65
+  páginas/rotas e testes HTTP em `DATA_SOURCE=memory` aprovados. Supervisor foi
+  escopado em `christus_dt`; admin e gerência ficaram em `geral`; uma sede vazia
+  exibiu `sem-equipe`. Em 20 chamadas, a API teve média de 4,42 ms e p95 de
+  5,75 ms. Nenhuma escrita ocorreu no Firebase.
+- **Arquivos principais**: `app/(app)/inicio/page.tsx`,
+  `app/api/central-dia/route.ts`, `components/CentralDoDia.tsx`,
+  `services/centralDiaService.ts`, `types/CentralDia.ts`, `app/globals.css` e
+  `components/AppShell.tsx`.
+
+---
+
 ## 2026-07-22 — Auditoria aguardada sem serializar o Gerar o dia (passo 2)
 
 - **Escolha explícita**: toda criação, atualização ou exclusão agora aguarda a
