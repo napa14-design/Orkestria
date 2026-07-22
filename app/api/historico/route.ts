@@ -1,6 +1,7 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
 import { somarDias, hojeISO } from "@/lib/dateUtils";
+import { ErroPermissao } from "@/services/erros";
 
 /**
  * GET /api/historico[?tabela=X][&dias=30][&limite=500] — mais recentes primeiro.
@@ -11,7 +12,11 @@ import { somarDias, hojeISO } from "@/lib/dateUtils";
  * Filtro por tabela usa o índice de `tabela` (também campo único).
  */
 export async function GET(req: Request) {
-  return comSessao(async () => {
+  return comSessao(async (sessao) => {
+    // O histórico legado não registra sede. Até o passo de auditoria adicionar
+    // esse escopo, não é seguro expor registros globais a supervisores.
+    if (sessao.perfil === "supervisor")
+      throw new ErroPermissao("O histórico por sede ainda não está disponível para supervisores.");
     const url = new URL(req.url);
     const tabela = url.searchParams.get("tabela");
     const dias = Number(url.searchParams.get("dias") ?? 30);

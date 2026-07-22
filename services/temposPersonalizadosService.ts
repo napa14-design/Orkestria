@@ -47,6 +47,14 @@ export async function createTempoPersonalizado(dados: Dados, autor: string): Pro
     throw new ErroValidacao([
       { nivel: "erro", codigo: "TAREFA_INEXISTENTE", mensagem: "Tarefa não existe." },
     ]);
+  if (tarefa.sede_id !== funcionario.sede_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "TEMPO_ENTIDADES_DE_SEDES_DIFERENTES",
+        mensagem: "Funcionário e tarefa precisam pertencer à mesma sede.",
+      },
+    ]);
   // um único tempo por (funcionário, tarefa)
   const existentes = await ds.consultar("tempos_personalizados", [
     { campo: "funcionario_id", op: "==", valor: dados.funcionario_id },
@@ -100,6 +108,14 @@ export async function updateTempoPersonalizado(
   if (!tarefa)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "TAREFA_INEXISTENTE", mensagem: "Tarefa não existe." },
+    ]);
+  if (tarefa.sede_id !== funcionario.sede_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "TEMPO_ENTIDADES_DE_SEDES_DIFERENTES",
+        mensagem: "Funcionário e tarefa precisam pertencer à mesma sede.",
+      },
     ]);
   if (existentes.some((x) => x.id !== id && x.tarefa_id === tarefaId))
     throw new ErroValidacao([

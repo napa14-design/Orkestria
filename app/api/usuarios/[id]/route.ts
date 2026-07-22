@@ -10,7 +10,10 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!podeGerenciarUsuarios(sessao))
       throw new ErroPermissao("Apenas administradores gerenciam usuários.");
     const { id } = await ctx.params;
-    return ok(await updateUsuario(id, await req.json()));
+    const mudancas = await req.json();
+    if (id === sessao.id && mudancas.ativo === false)
+      return ok({ erro: "Você não pode inativar o próprio usuário." }, 400);
+    return ok(await updateUsuario(id, mudancas));
   });
 }
 

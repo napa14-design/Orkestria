@@ -19,7 +19,10 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const { id } = await ctx.params;
     await exigirAcesso((s) => podeAlterarSede(sessao, s), id);
-    return ok(await updateLocal(id, await req.json(), sessao.email));
+    const mudancas = await req.json();
+    if (mudancas.sede_id && !podeAlterarSede(sessao, mudancas.sede_id))
+      throw new ErroPermissao("Supervisores não podem mover locais para outra sede.");
+    return ok(await updateLocal(id, mudancas, sessao.email));
   });
 }
 

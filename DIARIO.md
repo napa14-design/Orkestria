@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-07-22 — Fechamento independente da fundação de permissões (passo 1c)
+
+- **Revisão antes de empilhar**: os dois commits iniciais do Passo 1 foram
+  auditados novamente antes do início da auditoria aguardada. A integridade dos
+  dados estava melhor, mas várias rotas ainda autorizavam apenas a sede atual
+  do registro; um supervisor poderia tentar trocar o destino para funcionário,
+  local ou sede fora do próprio escopo.
+- **Destino também autorizado**: edição de rotina, ausência, funcionário,
+  local, tarefa, qualificação, tempo personalizado e serviço eventual agora
+  valida o destino antes de chamar o serviço. Criação de rotina também verifica
+  tarefa e funcionário, e execução realizada confirma a sede da rotina.
+- **Vínculos completos**: tempo personalizado exige funcionário e tarefa da
+  mesma sede. Exclusão de sede considera todas as tabelas que carregam
+  `sede_id`; requisito considera tarefas e qualificações; categoria considera
+  tarefas e eventuais. O administrador não consegue inativar a própria conta.
+- **Parâmetros sem escalada**: supervisor só cria parâmetro editável no próprio
+  escopo e não consegue mover ou alterar chave, tipo ou regra de permissão de
+  um parâmetro existente.
+- **Histórico protegido provisoriamente**: registros legados de auditoria não
+  têm `sede_id`; por isso, o histórico global foi retirado do menu e bloqueado
+  para supervisor até existir auditoria escopada. Administração e gerência
+  mantêm a leitura.
+- **Validação**: TypeScript, `git diff --check` e `npm run build` aprovados, com
+  64 páginas/rotas. Em servidor isolado `DATA_SOURCE=memory`, foi criada uma
+  segunda sede descartável: dez tentativas de cruzar escopo retornaram `403`,
+  vínculo de tempo entre sedes retornou `422` e auto-inativação retornou `400`.
+  Os caminhos legítimos de parâmetro, ausência, qualificação, tempo e execução
+  retornaram `200/201`; exclusões com vínculos retornaram `422`. Nenhuma escrita
+  ocorreu no Firebase.
+- **Arquivos principais**: rotas `app/api/*/[id]`, `app/api/rotinas`,
+  `app/api/execucoes`, `app/api/parametros`, `app/api/historico`,
+  `components/AppShell.tsx`, `services/temposPersonalizadosService.ts`,
+  `services/sedesService.ts`, `services/requisitosService.ts` e
+  `services/categoriasService.ts`.
+
+---
+
 ## 2026-07-22 — Fundação de segurança e integridade (passo 1 do piloto)
 
 - **Contexto**: as 8 entregas de desburocratização do Codex (~5.300 linhas) foram

@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { limitarSedeConsulta } from "@/lib/permissions";
+import { limitarSedeConsulta, podeAlterarSede } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createParametro,
@@ -30,6 +30,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
     if (sessao.perfil === "visualizador") throw new ErroPermissao();
-    return ok(await createParametro(await req.json(), sessao.email), 201);
+    const dados = await req.json();
+    if (
+      sessao.perfil === "supervisor" &&
+      (!dados.editavel_por_supervisor || !podeAlterarSede(sessao, dados.sede_id))
+    )
+      throw new ErroPermissao(
+        "Supervisores só criam parâmetros editáveis no escopo da própria sede.",
+      );
+    return ok(await createParametro(dados, sessao.email), 201);
   });
 }

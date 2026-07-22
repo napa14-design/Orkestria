@@ -6,7 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { SWRConfig } from "swr";
 import type { SessaoUsuario } from "@/lib/permissions";
 
-type Item = { href: string; rotulo: string; apenasAdmin?: boolean };
+type Item = {
+  href: string;
+  rotulo: string;
+  apenasAdmin?: boolean;
+  ocultarSupervisor?: boolean;
+};
 type Grupo = { rotulo: string; itens: Item[] };
 
 /** Menu organizado por intenção: do dia a dia → números → cadastros → sistema. */
@@ -58,7 +63,7 @@ const GRUPOS: Grupo[] = [
     itens: [
       { href: "/da-ata", rotulo: "Da ata ao sistema" },
       { href: "/parametros", rotulo: "Parâmetros" },
-      { href: "/historico", rotulo: "Histórico" },
+      { href: "/historico", rotulo: "Histórico", ocultarSupervisor: true },
       { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
     ],
   },
@@ -86,7 +91,12 @@ export default function AppShell({
   useEffect(() => setAberto(null), [pathname]);
 
   const ehAdmin = sessao.perfil === "administrador";
-  const visiveis = (g: Grupo) => g.itens.filter((i) => !i.apenasAdmin || ehAdmin);
+  const visiveis = (g: Grupo) =>
+    g.itens.filter(
+      (i) =>
+        (!i.apenasAdmin || ehAdmin) &&
+        (!i.ocultarSupervisor || sessao.perfil !== "supervisor"),
+    );
   const grupoAtivo = (g: Grupo) => visiveis(g).some((i) => pathname.startsWith(i.href));
 
   // pequeno atraso ao sair, para o mouse cruzar o vão até o painel

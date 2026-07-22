@@ -52,13 +52,17 @@ export async function updateCategoria(
 /** Bloqueado quando há tarefas vinculadas — preserva a integridade do catálogo. */
 export async function deleteCategoria(id: string): Promise<void> {
   const ds = await getDataSource();
-  const tarefas = await ds.consultar("tarefas", [{ campo: "categoria_id", op: "==", valor: id }]);
-  if (tarefas.length > 0) {
+  const [tarefas, eventuais] = await Promise.all([
+    ds.consultar("tarefas", [{ campo: "categoria_id", op: "==", valor: id }]),
+    ds.consultar("servicos_eventuais", [{ campo: "categoria_id", op: "==", valor: id }]),
+  ]);
+  const vinculos = tarefas.length + eventuais.length;
+  if (vinculos > 0) {
     throw new ErroValidacao([
       {
         nivel: "erro",
         codigo: "CATEGORIA_EM_USO",
-        mensagem: `Esta categoria tem ${tarefas.length} tarefa(s) vinculada(s). Reatribua-as ou marque a categoria como inativa em vez de excluir.`,
+        mensagem: `Esta categoria tem ${vinculos} tarefa(s)/eventual(is) vinculada(s). Reatribua-os ou marque a categoria como inativa.`,
       },
     ]);
   }

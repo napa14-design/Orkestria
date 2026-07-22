@@ -12,6 +12,18 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!atual) throw new Error("Parâmetro não encontrado.");
     if (!podeEditarParametro(sessao, atual.editavel_por_supervisor, atual.sede_id))
       throw new ErroPermissao("Este parâmetro não é editável pelo seu perfil.");
-    return ok(await updateParametro(id, await req.json(), sessao.email));
+    const mudancas = await req.json();
+    if (
+      sessao.perfil === "supervisor" &&
+      ((mudancas.sede_id !== undefined && mudancas.sede_id !== atual.sede_id) ||
+        (mudancas.chave !== undefined && mudancas.chave !== atual.chave) ||
+        (mudancas.tipo !== undefined && mudancas.tipo !== atual.tipo) ||
+        (mudancas.editavel_por_supervisor !== undefined &&
+          mudancas.editavel_por_supervisor !== atual.editavel_por_supervisor))
+    )
+      throw new ErroPermissao(
+        "Supervisores alteram o valor do parâmetro, não seu escopo ou regra de permissão.",
+      );
+    return ok(await updateParametro(id, mudancas, sessao.email));
   });
 }

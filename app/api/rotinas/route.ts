@@ -34,9 +34,14 @@ export async function POST(req: Request) {
     const dados = await req.json();
     // A sede da rotina vem da tarefa; valida permissão contra ela.
     const ds = await getDataSource();
-    const tarefa = await ds.obter("tarefas", dados.tarefa_id);
+    const [tarefa, funcionario] = await Promise.all([
+      ds.obter("tarefas", dados.tarefa_id),
+      ds.obter("funcionarios", dados.funcionario_id),
+    ]);
     if (tarefa && !podeAlterarSede(sessao, tarefa.sede_id))
       throw new ErroPermissao("Supervisores só montam rotinas da própria sede.");
+    if (funcionario && !podeAlterarSede(sessao, funcionario.sede_id))
+      throw new ErroPermissao("Remanejo entre sedes é restrito ao administrador.");
     return ok(await createRotina(dados, sessao.id), 201);
   });
 }

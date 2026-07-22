@@ -53,17 +53,21 @@ export async function updateRequisito(
   });
 }
 
-/** Bloqueado quando alguma tarefa o exige (preserva integridade). */
+/** Bloqueado quando alguma tarefa ou qualificação o referencia. */
 export async function deleteRequisito(id: string): Promise<void> {
   const ds = await getDataSource();
-  const tarefas = await ds.listar("tarefas");
+  const [tarefas, qualificacoes] = await Promise.all([
+    ds.listar("tarefas"),
+    ds.consultar("qualificacoes_funcionario", [{ campo: "requisito_id", op: "==", valor: id }]),
+  ]);
   const emUso = tarefas.filter((t) => (t.requisitos ?? "").split(",").includes(id)).length;
-  if (emUso > 0) {
+  const vinculos = emUso + qualificacoes.length;
+  if (vinculos > 0) {
     throw new ErroValidacao([
       {
         nivel: "erro",
         codigo: "REQUISITO_EM_USO",
-        mensagem: `Este requisito é exigido por ${emUso} tarefa(s). Remova-o delas ou marque-o como inativo.`,
+        mensagem: `Este requisito tem ${vinculos} vínculo(s) em tarefa(s)/qualificação(ões). Remova-os ou marque-o como inativo.`,
       },
     ]);
   }
