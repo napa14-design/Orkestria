@@ -112,15 +112,16 @@ export default function FiltersBar({
         />
       </label>
 
-      {modo === "semana" && (
-        <button
-          className="btn"
-          onClick={aoPlanejarPeriodo}
-          title="Duplicar dias ou aplicar modelos em datas futuras"
-        >
-          ⧉ Planejar período
-        </button>
-      )}
+      {/* Vale nos dois modos: quem monta um evento monta no DIA e precisa salvar
+          o modelo ali mesmo — exigir trocar para a semana escondia o caminho.
+          O rótulo cita "modelos" porque é o que a pessoa procura. */}
+      <button
+        className="btn"
+        onClick={aoPlanejarPeriodo}
+        title="Duplicar este dia, salvar como rota padrão ou modelo de evento, e aplicar em datas futuras"
+      >
+        ⧉ Duplicar e modelos
+      </button>
     </div>
   );
 }

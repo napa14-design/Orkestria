@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-08-03 — Modelos de rotina deixaram de ficar escondidos na visão Semana
+
+- **Problema real relatado**: "não achei onde salva uma rotina de evento". Não era
+  falta de atenção — o botão que abre a janela de modelos **só existia no modo
+  Semana** (`modo === "semana"` em `FiltersBar`). Quem monta um evento monta no
+  **Dia**, e ali o caminho simplesmente não existia.
+- **Correção**: o botão passa a aparecer nos dois modos, e o rótulo mudou de
+  "⧉ Planejar período" para **"⧉ Duplicar e modelos"** — a pessoa procura pela
+  palavra *modelo*, não por *período*. O tooltip agora cita as três coisas que a
+  janela faz: duplicar o dia, salvar como rota padrão ou modelo de evento, e
+  aplicar em datas futuras.
+- Verificado no navegador: no modo Dia o botão aparece e abre a janela com a
+  caixa "É um modelo de evento (formatura, feira, prova…)".
+- **Passa no portão da doutrina**: não acrescenta superfície — torna alcançável
+  um caminho que já existia e estava inacessível na tela onde é usado.
+- Arquivo: `components/agenda/FiltersBar.tsx`.
+- Junto disso foi produzido o **guia de operação em PDF** (27 páginas, com as
+  telas reais capturadas do sistema) para a apresentação aos coordenadores de
+  sede — fica fora do repositório, entregue direto ao usuário.
+
+---
+
 ## 2026-07-22 — Marcos da evolução mais didáticos para a direção
 
 - Os seis MARCOS da página "Da ata ao sistema" foram reescritos para o leitor
