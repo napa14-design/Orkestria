@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-04 — Material de apresentação para os coordenadores de sede
+
+- **Nada mudou no sistema.** Esta entrada registra o material produzido para a
+  implantação, que mora **fora do repositório** (é grande e binário), em
+  `Desktop/Orkestria - Material de Apresentacao/`.
+- **Persona definida**: o destinatário não é "usuário leigo" genérico — é o
+  **coordenador que hoje monta a rota na planilha**. Isso mudou o material
+  inteiro: em vez de descrever telas, ele compara ferramentas ("na planilha /
+  no Orkestria") e trata o conhecimento da rota como algo que a pessoa já tem.
+- **Entregas**:
+  - `Orkestria-Guia-Completo.mp4` — 8min14, narrado (voz neural pt-BR), com
+    legenda, destaque no clique e **zoom aplicado na própria página** durante a
+    gravação (não na imagem depois, para o texto não borrar). Quatro módulos:
+    o seu dia · dia de evento · quando o dia foge do plano · montar a sede.
+  - `Orkestria-Manual-do-Coordenador.pdf` — 23 páginas, com glossário e tabela
+    de "deu errado → o que fazer".
+  - `Orkestria-Guia-de-Operacao.pdf` — 27 páginas, referência completa.
+  - `telas-do-sistema/` e `telas-anotadas/` — 21 capturas cada, para slides.
+- **Honestidade no encerramento**: o vídeo termina dizendo que os primeiros dias
+  dão *mais* trabalho, porque o sistema ainda não conhece a rota da sede. Quem
+  espera ganho no dia 1 e não encontra, abandona.
+- Ferramentas de captura (Chrome headless + CDP, narração, anotação) ficaram no
+  scratchpad da sessão — descartáveis, mas o roteiro está reproduzível.
+
+---
+
 ## 2026-08-03 — Modelos de rotina deixaram de ficar escondidos na visão Semana
 
 - **Problema real relatado**: "não achei onde salva uma rotina de evento". Não era
