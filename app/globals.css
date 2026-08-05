@@ -892,6 +892,55 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   color: var(--tinta-3);
 }
 
+/* Convite do primeiro acesso. */
+.boas-vindas-linha {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--tinta-2);
+  margin-bottom: 12px;
+}
+
+.boas-vindas-calma {
+  padding: 10px 12px;
+  border-left: 3px solid var(--verde);
+  background: var(--papel-2);
+  font-size: 13px;
+}
+
+.boas-vindas-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.boas-vindas-botoes .btn-primario { flex: 1 1 auto; justify-content: center; }
+
+.boas-vindas-rodape {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tinta-3);
+}
+
+.trilha-retomar {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--linha);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.trilha-retomar p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+  flex: 1 1 260px;
+}
+
 /* ── Holofote do tutorial ────────────────────────────────────────────
    Quatro faixas de sombra em vez de uma tela com recorte: o miolo fica
    descoberto, então o clique chega ao elemento real. */

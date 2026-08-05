@@ -36,6 +36,12 @@ export interface Usuario {
    * está aqui é onde ela parou: é assim que se enxerga quem travou e onde.
    */
   tutorial_concluido?: string;
+  /**
+   * Onde a pessoa está em relação ao convite do tutorial:
+   * vazio (nunca respondeu) · `ativo` · `adiado:<ISO>` · `pulado`.
+   * Ver `lib/tutorial/estado.ts`.
+   */
+  tutorial_estado?: string;
   ativo: boolean;
   criado_em: string;
   atualizado_em: string;

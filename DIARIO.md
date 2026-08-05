@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-08-05 — Convite do tutorial: Ver, Adiar e Pular
+
+- **Antes o tutorial começava sozinho** — a pessoa era jogada dentro dele sem
+  saber que existia um caminho de 11 etapas. Agora o primeiro acesso abre um
+  convite na Central, que diz o que é, quanto é, e pede licença.
+- **Três respostas com significados diferentes**: `Ver` liga os holofotes e
+  **leva direto à primeira etapa** (ficar na Central obrigaria a adivinhar para
+  onde ir); `Adiar` cala tudo por 24h e volta a perguntar; `Pular` não pergunta
+  mais. Fechar no ✕ vale como Adiar — a saída menos destrutiva.
+- **Quem adiou ou pulou não é perseguido pelas telas.** A volta é a trilha, que
+  ganhou um botão "Começar o passo a passo" e um link `?tutorial=<etapa>` que
+  abre o holofote mesmo com o convite recusado.
+- **Uma coluna, não três flags**: `usuarios.tutorial_estado` guarda
+  `""` · `ativo` · `adiado:<ISO>` · `pulado`. Flags booleanas permitiriam
+  combinações sem sentido ("pulado e ativo"); como estado, cada pessoa está em
+  exatamente um lugar e o texto se lê sozinho no banco (`lib/tutorial/estado.ts`).
+- **Dois bugs achados na verificação**, nenhum deles pego pelos testes
+  anteriores:
+  1. **Retomar pela trilha não abria o holofote.** Dois `useEffect` brigavam —
+     o que inicia roda antes do que limpa na troca de rota, e na navegação pelo
+     cliente (dados já em cache) o segundo apagava o primeiro. Passou a ser um
+     efeito só, que decide abrir ou fechar.
+  2. **As quatro etapas da agenda emendavam.** Ao concluir uma, a seguinte da
+     mesma tela abria na hora — recriando o tour de 32 passos que o desenho
+     inteiro existe para evitar. Agora a tela fica quieta até a pessoa navegar.
+- Verificado: convite aparece só no primeiro acesso e sem holofote junto; Ver
+  leva a /locais e abre; etapas da agenda não emendam e a seguinte só vem na
+  próxima visita; adiado e pulado ficam em silêncio; retomar pela trilha abre.
+- Arquivos: `lib/tutorial/estado.ts`, `components/tutorial/BoasVindas.tsx`,
+  `components/tutorial/{Tutorial,TrilhaProgresso}.tsx`,
+  `services/tutorialService.ts`, `app/api/tutorial/route.ts`,
+  `app/(app)/inicio/page.tsx`, `types/Usuario.ts`, `lib/schema.ts`,
+  `app/globals.css`.
+
+---
+
 ## 2026-08-05 — Tutorial completo: 11 etapas e a trilha na Central
 
 - **A trilha inteira**, na ordem do mapa do caminho: fundação (locais, tarefas,

@@ -1,19 +1,29 @@
 import { comSessao, ok } from "@/lib/api";
-import { concluirEtapa, getEtapasConcluidas } from "@/services/tutorialService";
+import {
+  concluirEtapa,
+  getProgressoTutorial,
+  responderConvite,
+} from "@/services/tutorialService";
 
-/** Etapas que a pessoa da sessão já concluiu. */
+/** Progresso e estado do tutorial de quem está na sessão. */
 export async function GET() {
-  return comSessao(async (sessao) => ok({ concluidas: await getEtapasConcluidas(sessao.id) }));
+  return comSessao(async (sessao) => ok(await getProgressoTutorial(sessao.id)));
 }
 
 /**
- * Marca uma etapa como concluída — sempre para o usuário da **sessão**, nunca
- * para um id vindo do corpo: progresso de aprendizado é de quem está usando.
+ * Duas coisas: concluir uma etapa (`etapa`) ou responder ao convite (`acao`).
+ *
+ * Sempre para o usuário da **sessão**, nunca para um id vindo do corpo:
+ * progresso de aprendizado é de quem está usando.
  */
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    const { etapa } = (await req.json()) as { etapa?: string };
-    if (!etapa) return ok({ concluidas: await getEtapasConcluidas(sessao.id) });
-    return ok({ concluidas: await concluirEtapa(sessao.id, etapa) });
+    const { etapa, acao } = (await req.json()) as {
+      etapa?: string;
+      acao?: "ver" | "adiar" | "pular" | "retomar";
+    };
+    if (acao) await responderConvite(sessao.id, acao);
+    else if (etapa) await concluirEtapa(sessao.id, etapa);
+    return ok(await getProgressoTutorial(sessao.id));
   });
 }

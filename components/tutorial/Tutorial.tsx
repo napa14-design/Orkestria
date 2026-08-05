@@ -1,55 +1,78 @@
 "use client";
 
 /**
- * Decide quando o tutorial aparece e guarda o progresso.
+ * Decide quando o holofote aparece e guarda o progresso.
  *
- * Dispara sozinho na **primeira visita** de cada tela que tem etapa — é para
- * isso que ele existe, ensinar sem a pessoa precisar procurar ajuda. Sai a
- * qualquer momento, e sair já conta como "não mostrar de novo nesta sessão":
- * insistir com quem recusou é o caminho mais curto para virar estorvo.
+ * Abre sozinho na **primeira visita** de cada tela, para quem aceitou o convite
+ * — é para isso que ele existe, ensinar sem a pessoa precisar procurar ajuda.
+ * Quem adiou ou pulou não é perseguido: só um pedido explícito da trilha
+ * (`?tutorial=<etapa>`) abre o holofote nesse caso.
+ *
+ * **Uma etapa por visita.** Terminou (ou saiu de) uma etapa, esta tela fica
+ * quieta até a pessoa navegar de novo. Sem isso, as quatro etapas da agenda
+ * emendariam em sequência e viraria o tour de 32 passos que ninguém lê.
  *
  * A aplicação continua inteira funcionando por baixo. O tutorial é apoio,
  * nunca dependência.
  */
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { apiPost, fetcher } from "@/lib/clientApi";
+import { lerEstado, podeAutoIniciar } from "@/lib/tutorial/estado";
 import { etapasDaRota } from "@/lib/tutorial/trilha";
 import Holofote from "./Holofote";
 
+type Progresso = { concluidas: string[]; estado: string };
+
 export default function Tutorial() {
-  const rota = usePathname();
-  const { data, mutate } = useSWR<{ concluidas: string[] }>("/api/tutorial", fetcher);
+  const rota = usePathname() ?? "";
+  const params = useSearchParams();
+  const { data, mutate } = useSWR<Progresso>("/api/tutorial", fetcher);
   const [etapaAtiva, setEtapaAtiva] = useState<string | null>(null);
   const [passo, setPasso] = useState(0);
-  /** Etapas recusadas nesta sessão — não insistir até recarregar a página. */
+  /** Rota em que já encerramos uma etapa — não abrir outra sem navegar. */
+  const rotaEncerrada = useRef<string | null>(null);
+  /** Etapas de que ela saiu nesta sessão: não insistir ao voltar na tela. */
   const recusadas = useRef<Set<string>>(new Set());
 
+  /** Pedido explícito (link da trilha): vale mesmo para quem pulou o convite. */
+  const pedida = params?.get("tutorial") ?? "";
+  const daRota = etapasDaRota(rota);
   const concluidas = data?.concluidas;
   // A agenda hospeda quatro etapas; a pendente mais antiga é a próxima aula.
-  // Uma por visita: emendar todas de uma vez viraria o tour de 30 passos que a
-  // pessoa despacha no automático.
-  const etapa = etapasDaRota(rota ?? "").find(
-    (e) => !concluidas?.includes(e.id) && !recusadas.current.has(e.id),
-  );
+  const etapa =
+    daRota.find((e) => e.id === pedida) ??
+    daRota.find((e) => !concluidas?.includes(e.id) && !recusadas.current.has(e.id));
 
+  // Um efeito só decide tudo. Dois (um para abrir, outro para limpar na troca
+  // de rota) se atropelavam: o de abrir roda primeiro e o de limpar apagava,
+  // deixando a tela sem holofote quando a navegação era pelo cliente.
   useEffect(() => {
-    if (!etapa || !concluidas) return;
+    if (!data || !etapa) {
+      setEtapaAtiva(null);
+      return;
+    }
+    const explicita = etapa.id === pedida;
+    const guiado = podeAutoIniciar(lerEstado(data.estado), data.concluidas.length);
+    const permitido = explicita || (guiado && rotaEncerrada.current !== rota);
+    if (!permitido) {
+      setEtapaAtiva(null);
+      return;
+    }
     setEtapaAtiva(etapa.id);
     setPasso(0);
-  }, [etapa, concluidas]);
+  }, [rota, etapa, data, pedida]);
 
-  // Trocar de tela no meio de uma etapa encerra a etapa: o roteiro dela vale
-  // para aquela tela, e seguir apontando para elementos de outra página seria
-  // exatamente o "aponta para o nada" que a gente quer evitar.
+  // Navegou: a tela nova pode ensinar de novo.
   useEffect(() => {
-    setEtapaAtiva(null);
+    if (rotaEncerrada.current !== rota) rotaEncerrada.current = null;
   }, [rota]);
 
   const encerrar = useCallback(
     async (concluida: boolean) => {
       const id = etapaAtiva;
+      rotaEncerrada.current = rota;
       setEtapaAtiva(null);
       setPasso(0);
       if (!id) return;
@@ -60,7 +83,7 @@ export default function Tutorial() {
         recusadas.current.add(id);
       }
     },
-    [etapaAtiva, mutate],
+    [etapaAtiva, mutate, rota],
   );
 
   if (!etapa || etapaAtiva !== etapa.id) return null;
