@@ -206,9 +206,9 @@ export default function PaginaLogin() {
                   : "Boas-vindas."}
               </h2>
               <p style={{ fontSize: 13, color: "var(--tinta-2)", lineHeight: 1.6, marginBottom: 20 }}>
-                Esta é a sua primeira entrada, então a senha que você usou é temporária e conhecida
-                por outras pessoas. <strong>Crie agora a sua senha</strong> — ela será só sua, e é com
-                ela que você vai entrar de agora em diante.
+                O código que você usou serve uma vez só e já venceu.{" "}
+                <strong>Crie agora a sua senha</strong> — ela será só sua, e é com ela que você vai
+                entrar de agora em diante.
               </p>
 
               <form onSubmit={criarSenha} style={{ display: "grid", gap: 14 }}>
@@ -295,7 +295,7 @@ export default function PaginaLogin() {
               />
             </label>
             <label className="campo entra-2">
-              <span className="rotulo">Senha</span>
+              <span className="rotulo">Senha ou código de primeiro acesso</span>
               <input
                 type="password"
                 value={senha}
@@ -332,15 +332,9 @@ export default function PaginaLogin() {
             </button>
           </form>
 
-          <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 20, lineHeight: 1.5 }}>
-            Demo: <code className="num">admin@empresa.com</code> ·{" "}
-            <code className="num">supervisor.aldeota@empresa.com</code> — senha{" "}
-            <code className="num">mudar123</code>. Para ver o primeiro acesso:{" "}
-            <code className="num">coordenador.novo@empresa.com</code>.
-          </p>
           <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 12, lineHeight: 1.5 }}>
-            <strong>Esqueceu a senha?</strong> Peça ao administrador para resetá-la: você entra com a
-            senha de primeiro acesso e escolhe uma nova.
+            <strong>Esqueceu a senha?</strong> Peça um código novo ao administrador: você entra com
+            ele e escolhe outra senha.
           </p>
           </>
           )}

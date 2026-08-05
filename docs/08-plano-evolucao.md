@@ -170,7 +170,7 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Login individual** ✅ | senha por usuário (hash scrypt) **e** "Entrar com Google" (Firebase Auth): popup → ID token → Admin verifica → e-mail precisa estar cadastrado → sessão. ACCESS_PASSWORD vira bootstrap | — | M |
+| **Login individual** ✅ | senha por usuário (hash scrypt) **e** "Entrar com Google" (Firebase Auth): popup → ID token → Admin verifica → e-mail precisa estar cadastrado → sessão. primeiro acesso por código individual, sem senha compartilhada | — | M |
 | **Confirmação pelo funcionário (app/QR)** | ASG confirma "fiz tal atividade" → prova jurídica | Auth individual | G |
 | **Remanejo entre sedes** ✅ | tela `/remanejo` (admin): órfãs de todas as sedes, candidatos com folga inclusive de outra sede (tag ↗); move valida jornada/conflito/conformidade | perfil gerência multi-sede | G |
 | **Score de produtividade + premiação** ✅ | tela `/produtividade`: aderência previsto×realizado por funcionário + CSV; salvaguardas (sem idade/sexo, não punitivo) | guarda-corpos de risco | M |

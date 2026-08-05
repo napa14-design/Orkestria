@@ -1,46 +1,101 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { lerSedesExtra } from "@/lib/permissions";
-import { hashSenha, problemaNaSenha } from "@/lib/senha";
+import {
+  DIAS_VALIDADE_CODIGO,
+  gerarCodigoAcesso,
+  hashSenha,
+  normalizarCodigo,
+  problemaNaSenha,
+  verificarSenha,
+} from "@/lib/senha";
 import type { Usuario, UsuarioListado } from "@/types";
 import { ErroValidacao } from "./erros";
 
+/** O código de primeiro acesso está gerado e ainda dentro da validade? */
+export function conviteValido(u: Usuario, agora = new Date()): boolean {
+  if (!u.convite_hash) return false;
+  if (!u.convite_expira_em) return false;
+  const limite = new Date(u.convite_expira_em);
+  return !Number.isNaN(limite.getTime()) && limite.getTime() > agora.getTime();
+}
+
 /**
- * Troca o hash de senha por um indicador booleano.
+ * Troca os hashes por indicadores booleanos.
  *
- * O hash nunca sai do servidor; o booleano sai porque o administrador precisa
- * ver quem ainda não fez o primeiro acesso.
+ * Nem a senha nem o código saem do servidor; os booleanos saem porque o
+ * administrador precisa ver quem ainda não entrou e quem precisa de código novo.
  */
-function semSenha(u: Usuario): UsuarioListado {
-  const { senha_hash, ...resto } = u;
-  return { ...resto, senha_definida: !!senha_hash };
+function semSegredos(u: Usuario): UsuarioListado {
+  const { senha_hash, convite_hash, ...resto } = u;
+  return {
+    ...resto,
+    senha_definida: !!senha_hash,
+    convite_valido: conviteValido(u),
+    convite_expirado: !!convite_hash && !conviteValido(u),
+  };
 }
 
 export async function getUsuarios(): Promise<UsuarioListado[]> {
   const ds = await getDataSource();
-  return (await ds.listar("usuarios")).map(semSenha);
+  return (await ds.listar("usuarios")).map(semSegredos);
 }
 
-/** Grava a senha pessoal (já validada por quem chamou). */
-export async function definirSenhaUsuario(id: string, novaSenha: string): Promise<void> {
-  const problema = problemaNaSenha(novaSenha);
+/**
+ * Grava a senha pessoal e **queima o código** de primeiro acesso.
+ *
+ * Apagar o código aqui é o que o torna de uso único: mesmo quem o tenha
+ * anotado não consegue reutilizá-lo depois.
+ */
+export async function definirSenhaUsuario(
+  id: string,
+  novaSenha: string,
+  codigoUsado?: string,
+): Promise<void> {
+  const problema = problemaNaSenha(novaSenha, codigoUsado);
   if (problema) throw new Error(problema);
   const ds = await getDataSource();
   const usuario = await ds.obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
-  await ds.atualizar("usuarios", id, { senha_hash: hashSenha(novaSenha), atualizado_em: agoraISO() });
+  await ds.atualizar("usuarios", id, {
+    senha_hash: hashSenha(novaSenha),
+    convite_hash: "",
+    convite_expira_em: "",
+    atualizado_em: agoraISO(),
+  });
 }
 
 /**
- * Apaga a senha pessoal: a pessoa volta ao primeiro acesso e escolhe outra.
+ * Gera um código de primeiro acesso e devolve o texto puro **uma única vez**.
  *
- * É assim que se resolve "esqueci a senha" sem serviço de e-mail — e sem o
- * administrador precisar saber a senha de ninguém.
+ * Também apaga a senha atual: é assim que se resolve "esqueci a senha" sem
+ * serviço de e-mail e sem o administrador conhecer a senha de ninguém. Chamar de
+ * novo invalida o código anterior.
  */
-export async function resetarSenhaUsuario(id: string): Promise<void> {
+export async function gerarConviteUsuario(id: string): Promise<{ codigo: string; expira_em: string }> {
   const ds = await getDataSource();
   const usuario = await ds.obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
-  await ds.atualizar("usuarios", id, { senha_hash: "", atualizado_em: agoraISO() });
+  const codigo = gerarCodigoAcesso();
+  const expira = new Date(Date.now() + DIAS_VALIDADE_CODIGO * 24 * 60 * 60 * 1000);
+  await ds.atualizar("usuarios", id, {
+    senha_hash: "",
+    convite_hash: hashSenha(normalizarCodigo(codigo)),
+    convite_expira_em: expira.toISOString(),
+    atualizado_em: agoraISO(),
+  });
+  return { codigo, expira_em: expira.toISOString() };
+}
+
+/**
+ * Confere o código digitado no primeiro acesso.
+ *
+ * Só vale para quem **ainda não tem senha**: depois de criada, o caminho de
+ * recuperação é o administrador gerar um código novo.
+ */
+export function codigoConfere(usuario: Usuario, codigo: string): boolean {
+  if (usuario.senha_hash) return false;
+  if (!conviteValido(usuario)) return false;
+  return verificarSenha(normalizarCodigo(codigo), usuario.convite_hash);
 }
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {

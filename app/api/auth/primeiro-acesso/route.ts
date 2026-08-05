@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
 import { montarSedesDaSessao } from "@/lib/permissions";
-import { problemaNaSenha, senhaCompartilhada } from "@/lib/senha";
+import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
-import { definirSenhaUsuario, getUsuarioPorEmail } from "@/services/usuariosService";
+import {
+  codigoConfere,
+  definirSenhaUsuario,
+  getUsuarioPorEmail,
+} from "@/services/usuariosService";
 
 /**
  * Primeiro acesso: a pessoa cria a própria senha e entra.
  *
- * A prova de identidade é a **senha compartilhada** de primeiro acesso — o
- * mesmo nível de acesso que o login já exigia. Sem essa prova qualquer um
- * digitaria o e-mail de outra pessoa e tomaria a conta, então ela é conferida
+ * A prova de identidade é o **código de primeiro acesso** — individual, gerado
+ * pelo administrador e válido por alguns dias. Sem essa prova qualquer um
+ * digitaria o e-mail de outra pessoa e tomaria a conta, então ele é conferido
  * aqui de novo: esta rota não confia em ter passado pela tela de login.
  *
  * Só vale para quem **ainda não tem** senha própria. Quem já definiu não passa
  * por aqui — nem para trocar de senha, nem para recuperar. Nesse caso o
- * administrador reseta (apaga a senha) e a pessoa volta a este fluxo.
+ * administrador gera um código novo e a pessoa volta a este fluxo.
  */
 export async function POST(req: Request) {
   const { email, senha_atual, nova_senha } = (await req.json()) as {
@@ -24,7 +28,7 @@ export async function POST(req: Request) {
   };
   if (!email || !senha_atual || !nova_senha) {
     return NextResponse.json(
-      { erro: "Informe o e-mail, a senha de primeiro acesso e a nova senha." },
+      { erro: "Informe o e-mail, o código de primeiro acesso e a nova senha." },
       { status: 400 },
     );
   }
@@ -42,20 +46,23 @@ export async function POST(req: Request) {
     );
   }
 
-  // Mensagem única para e-mail inexistente, senha errada e conta que já tem
-  // senha: qualquer diferença entre elas contaria a estranhos quais e-mails
-  // existem e quais contas estão sem senha.
-  if (!usuario || senha_atual !== senhaCompartilhada() || usuario.senha_hash) {
+  // Mensagem única para e-mail inexistente, código errado, código vencido e
+  // conta que já tem senha: qualquer diferença entre elas contaria a estranhos
+  // quais e-mails existem e quais contas estão abertas para primeiro acesso.
+  if (!usuario || !codigoConfere(usuario, senha_atual)) {
     return NextResponse.json(
-      { erro: "Não foi possível concluir o primeiro acesso. Confira o e-mail e a senha recebida." },
+      {
+        erro: "Não foi possível concluir o primeiro acesso. Confira o código recebido — se ele venceu, peça um novo ao administrador.",
+      },
       { status: 401 },
     );
   }
 
-  const problema = problemaNaSenha(nova_senha);
+  const problema = problemaNaSenha(nova_senha, senha_atual);
   if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
 
-  await definirSenhaUsuario(usuario.id, nova_senha);
+  // `definirSenhaUsuario` apaga o código junto, então ele não serve duas vezes.
+  await definirSenhaUsuario(usuario.id, nova_senha, senha_atual);
   await gravarSessao({
     id: usuario.id,
     nome: usuario.nome,

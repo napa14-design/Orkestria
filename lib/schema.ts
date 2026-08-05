@@ -76,6 +76,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     // Colunas novas vão SEMPRE no fim: o Sheets grava por posição, então
     // inserir no meio desloca os dados das linhas já existentes.
     col("sedes_extra"),
+    col("convite_hash"),
+    col("convite_expira_em"),
   ],
   funcionarios: [
     col("id"),

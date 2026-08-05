@@ -1,9 +1,9 @@
 /**
  * Sessão do MVP: cookie httpOnly assinado com HMAC-SHA256.
  *
- * Login simples — senha única (ACCESS_PASSWORD) + e-mail cadastrado na
- * tabela de usuários, que define perfil e sede. Na Fase 3 (Firebase),
- * substituir por Firebase Authentication sem alterar o restante do sistema.
+ * A identidade vem do e-mail cadastrado na tabela de usuários, que define
+ * perfil e sedes; a credencial é a senha pessoal, o código de primeiro acesso
+ * ou o Google (Firebase Auth).
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";

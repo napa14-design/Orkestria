@@ -18,10 +18,18 @@ export interface Usuario {
    */
   sedes_extra?: string;
   /**
-   * Hash scrypt da senha individual ("salt:hash"). Ausente = usuário ainda usa
-   * a senha única (ACCESS_PASSWORD) como bootstrap. Nunca é enviado ao cliente.
+   * Hash scrypt da senha individual ("salt:hash"). Ausente = a pessoa ainda não
+   * fez o primeiro acesso e entra pelo código. Nunca é enviado ao cliente.
    */
   senha_hash?: string;
+  /**
+   * Hash scrypt do código de primeiro acesso. Gerado pelo administrador e
+   * mostrado **uma única vez** a ele; some quando a senha é criada. Nunca é
+   * enviado ao cliente.
+   */
+  convite_hash?: string;
+  /** Data-hora ISO em que o código de primeiro acesso deixa de valer. */
+  convite_expira_em?: string;
   ativo: boolean;
   criado_em: string;
   atualizado_em: string;
@@ -34,7 +42,12 @@ export interface Usuario {
  * É um tipo separado de propósito — o indicador é **calculado**, e se morasse
  * em `Usuario` corria o risco de ser gravado no banco junto num update.
  */
-export interface UsuarioListado extends Omit<Usuario, "senha_hash"> {
-  /** `false` = ainda não fez o primeiro acesso (entra com a senha compartilhada). */
+export interface UsuarioListado
+  extends Omit<Usuario, "senha_hash" | "convite_hash"> {
+  /** `false` = ainda não fez o primeiro acesso. */
   senha_definida: boolean;
+  /** Tem código de primeiro acesso gerado e dentro da validade. */
+  convite_valido: boolean;
+  /** Tem código, mas venceu — precisa de um novo. */
+  convite_expirado: boolean;
 }

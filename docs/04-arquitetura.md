@@ -74,24 +74,38 @@ middleware.ts            bloqueio de rotas sem sessão
 Existem três caminhos de entrada, e nenhum deles faz o administrador conhecer a
 senha de alguém:
 
+**Não existe senha compartilhada.** Cada pessoa recebe um **código individual**
+de uso único, e nem o administrador conhece a senha de ninguém.
+
 | Momento | Como funciona |
 |---|---|
-| **Primeiro acesso** | A conta nasce sem `senha_hash`. A pessoa entra com a **senha compartilhada** (`ACCESS_PASSWORD`) e o login responde `primeiro_acesso: true` **sem criar sessão**; `POST /api/auth/primeiro-acesso` revalida tudo, grava a senha pessoal e só então abre a sessão. |
+| **Primeiro acesso** | O admin gera o código em `Sistema › Usuários` (`POST /api/usuarios/[id]/codigo`) e o repassa. A pessoa entra com e-mail + código; o login responde `primeiro_acesso: true` **sem criar sessão**; `POST /api/auth/primeiro-acesso` revalida o código, grava a senha pessoal, **apaga o código** e só então abre a sessão. |
 | **Troca** | `Sistema › Minha conta` → `POST /api/auth/senha` (usa o id da sessão). |
-| **Esqueceu** | O administrador reseta em `Sistema › Usuários` (`DELETE /api/usuarios/[id]/senha`): a senha é apagada e a pessoa **volta ao primeiro acesso**. Não existe rota para o admin *definir* a senha de outra pessoa. |
+| **Esqueceu** | O admin gera um código novo — a mesma rota. Isso apaga a senha atual e devolve a pessoa ao primeiro acesso. Não existe rota para o admin *definir* a senha de alguém. |
+| **Google** | `POST /api/auth/google` — dispensa senha e código; o e-mail só precisa estar cadastrado e ativo. |
 
-Regras da senha pessoal ficam em `lib/senha.ts` (`problemaNaSenha`): mínimo de
-`MIN_SENHA` caracteres (constante em `lib/sessionConstants.ts`, para o cliente
-poder exibir o mesmo número que o servidor cobra) e **proibido repetir a senha
-compartilhada** — senão a troca não trocaria nada.
+Propriedades do código (`lib/senha.ts`):
 
-**Risco aceito e como fechá-lo:** a senha compartilhada é a prova de identidade
-do primeiro acesso, então quem a souber pode assumir a conta de qualquer pessoa
-que **ainda não** definiu senha. Some sozinho conforme todos fazem o primeiro
-acesso — a coluna "Senha" em `Sistema › Usuários` mostra quem falta. Antes de
-liberar o sistema, trocar `ACCESS_PASSWORD` do valor padrão e garantir que as
-contas de administrador já tenham senha própria. Quem entra com **Google** não
-depende disso em nenhum momento.
+- **Individual**: vazar um código expõe uma conta, nunca todas.
+- **Uso único**: `definirSenhaUsuario` apaga `convite_hash` ao gravar a senha.
+- **Com prazo**: `DIAS_VALIDADE_CODIGO` (14 dias) em `convite_expira_em`.
+- **Guardado como hash** scrypt, igual à senha — o texto puro existe só no
+  instante em que é mostrado ao administrador, e nunca mais.
+- **Formato `K7M-4QP-92X`**: alfabeto sem `O/0`, `I/1/L` e `U`, em grupos de
+  três, para conseguir ditar por telefone sem erro. `normalizarCodigo` aceita
+  minúsculas e sem hífens.
+
+Regras da senha pessoal (`problemaNaSenha`): mínimo de `MIN_SENHA` caracteres
+(constante em `lib/sessionConstants.ts`, para o cliente exibir o mesmo número que
+o servidor cobra) e **proibido repetir o código recebido**.
+
+As respostas de erro do primeiro acesso são **indistinguíveis** entre e-mail
+inexistente, código errado, código vencido e conta que já tem senha: diferenciar
+contaria a estranhos quais e-mails existem e quais contas estão abertas.
+
+A coluna "Acesso" em `Sistema › Usuários` mostra o estado de cada pessoa — senha
+própria · código enviado · código vencido · sem acesso — que é o painel de
+acompanhamento da implantação.
 
 ## Limitações conhecidas do banco provisório (Sheets)
 

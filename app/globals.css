@@ -807,6 +807,27 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   font-size: 13px;
 }
 
+/* Código de primeiro acesso — mostrado uma única vez ao administrador. */
+.codigo-acesso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 2px dashed var(--tinta);
+  border-radius: var(--raio);
+  background: var(--papel-2);
+}
+
+.codigo-acesso code {
+  font-family: var(--fonte-mono);
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--tinta);
+  user-select: all;
+}
+
 /* Seletor de sede — aparece só para quem opera mais de uma. */
 .central-sede {
   display: inline-flex;

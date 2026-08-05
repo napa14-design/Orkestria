@@ -63,6 +63,7 @@ export default function CrudManager<T extends Registro>({
   colunas,
   textoNovo = "+ Novo",
   acoesExtra,
+  aoCriar,
   vazio,
 }: {
   titulo: string;
@@ -73,6 +74,8 @@ export default function CrudManager<T extends Registro>({
   textoNovo?: string;
   /** Controles adicionais por linha, à esquerda de Editar/Excluir. */
   acoesExtra?: (item: T) => React.ReactNode;
+  /** Chamado com o registro recém-criado (não roda em edição). */
+  aoCriar?: (criado: T) => void;
   /** Mensagem amigável quando ainda não há nada cadastrado. */
   vazio?: string;
 }) {
@@ -141,7 +144,12 @@ export default function CrudManager<T extends Registro>({
     }
     try {
       if (editando) await apiPut(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
-      else await apiPost(endpoint.split("?")[0], corpo);
+      else {
+        const criado = await apiPost<T>(endpoint.split("?")[0], corpo);
+        // Deixa a tela reagir ao registro novo — Usuários usa isto para gerar e
+        // mostrar o código de primeiro acesso logo depois do cadastro.
+        aoCriar?.(criado);
+      }
       await mutate();
       setAberto(false);
     } catch (err) {

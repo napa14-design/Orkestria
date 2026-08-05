@@ -55,8 +55,10 @@ npm run build    # build de produção — RODAR antes de declarar pronto
 npm run start    # servidor de produção
 ```
 
-Login demo (DATA_SOURCE=memory): `admin@empresa.com` ou
-`supervisor.aldeota@empresa.com`, senha `mudar123`.
+Não há usuários de demonstração. Para rodar com `DATA_SOURCE=memory`, defina
+`DEV_ADMIN_EMAIL` e `DEV_ADMIN_SENHA` no `.env` — o seed cria só esse
+administrador. Em produção, o primeiro acesso de cada pessoa é por **código
+individual** gerado em Sistema › Usuários.
 
 ## Onde está o quê
 

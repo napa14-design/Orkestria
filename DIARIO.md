@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-08-05 — Fim da senha compartilhada: código individual de primeiro acesso
+
+- **Motivo**: a `ACCESS_PASSWORD` era um segredo único para todo mundo. Quem a
+  soubesse podia assumir a conta de **qualquer** pessoa que ainda não tivesse
+  senha. E a tela de login **anunciava as credenciais de demonstração em
+  produção** — e-mail e senha, à vista de todos.
+- **Código individual**: o administrador gera em `Sistema › Usuários` e repassa.
+  Formato `K7M-4QP-92X` — alfabeto sem `O/0`, `I/1/L` e `U`, em grupos de três,
+  para ditar por telefone sem erro. O leitor aceita minúscula e sem hífen.
+- **Propriedades**: individual (vazar um expõe uma conta, não todas), **uso
+  único** (a criação da senha apaga o código), **prazo de 14 dias**, guardado
+  como hash scrypt — o texto puro existe só no instante em que é mostrado.
+- **Sorteio uniforme**: `byte % 30` fazia os 16 primeiros caracteres do alfabeto
+  saírem ~12% mais que os outros (medido: 7,7% de desvio em 180 mil amostras).
+  Agora descarta os bytes acima do último múltiplo de 30 — desvio caiu a 2,7%,
+  que é só ruído de amostragem.
+- **Esqueceu a senha**: mesmo botão. Gerar um código novo apaga a senha atual.
+- **Coluna "Acesso"** com quatro estados: senha própria · código enviado ·
+  código vencido · sem acesso. É o painel de acompanhamento da implantação.
+- **`ACCESS_PASSWORD` não existe mais** — removida do código, do `.env`, do
+  `.env.example` e das docs.
+- **Demo apagada**: nem a dica na tela de login, nem os usuários no seed. O modo
+  memória agora sobe **sem ninguém**; para desenvolver, defina `DEV_ADMIN_EMAIL`
+  e `DEV_ADMIN_SENHA` no `.env` (só tem efeito com `DATA_SOURCE=memory`).
+- **`aoCriar`** no `CrudManager`: gancho opcional para a tela reagir ao registro
+  novo — Usuários usa para já mostrar o código de quem acabou de ser cadastrado.
+- Verificado de ponta a ponta: a senha compartilhada antiga não entra mais;
+  cadastrar → gerar código → entrar com ele (mesmo minúsculo e sem hífen) →
+  criar senha → o código não serve de novo; código chutado, senha igual ao
+  código e reuso são todos recusados; nenhum hash sai na API.
+- **Atenção na migração**: usuários que já existem em produção **sem senha
+  definida** perderam a forma antiga de entrar. Cada um precisa de um código
+  gerado por você (ou entrar com Google) — a coluna "Acesso" mostra quem é.
+- Arquivos: `lib/senha.ts`, `types/Usuario.ts`, `lib/schema.ts`,
+  `services/usuariosService.ts`, `app/api/auth/{login,primeiro-acesso}`,
+  `app/api/usuarios/[id]/codigo` (nova, substitui `.../senha`),
+  `app/(app)/usuarios/page.tsx`, `app/login/page.tsx`, `components/CrudManager.tsx`,
+  `lib/memoryStore.ts`, `.env.example`, `docs/04`, `docs/06`, `docs/08`, `CLAUDE.md`.
+
+---
+
 ## 2026-08-05 — Primeiro acesso: a pessoa cria a própria senha
 
 - **Buraco real**: ninguém criava senha. A conta nascia sem `senha_hash` e a
