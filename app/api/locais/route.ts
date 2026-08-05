@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const dados = await req.json();
     if (!podeAlterarSede(sessao, dados.sede_id))
-      throw new ErroPermissao("Supervisores só cadastram locais da própria sede.");
+      throw new ErroPermissao("Supervisores só cadastram locais das sedes que operam.");
     return ok(await createLocal(dados, sessao.email), 201);
   });
 }

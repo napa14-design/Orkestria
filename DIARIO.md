@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-08-05 — Supervisor pode operar mais de uma sede
+
+- **Lacuna real**: o modelo era binário — `sede_id` aceitava **uma** sede ou
+  `geral` (todas as 17). Não existia "estas três". Um coordenador que cobre
+  sedes vizinhas só tinha saídas ruins: três logins, ou `geral`, que é acesso de
+  escrita a todas — um excesso de permissão disfarçado de solução.
+- **Modelo novo**: `sede_id` continua sendo a sede **principal** (a que abre por
+  padrão) e entra `sedes_extra` (ids separadas por vírgula, coluna no fim).
+  Escopo efetivo = principal + extras, resolvido por `sedesPermitidas`.
+  Aditivo: quem tem uma sede só não muda em nada.
+- **Alcance contido**: as ~40 rotas de API já passavam todas por
+  `limitarSedeConsulta` e `podeAlterarSede`. Ensinar lista a essas duas funções
+  tornou a API inteira multi-sede sem tocar nas rotas.
+- **Uma sede por vez, nunca agregado**: a Central ganhou seletor (`?sede=`) e a
+  Agenda usa o filtro que já existia. Decisão de custo: agregar multiplicaria as
+  leituras por sede, e a grade da Agenda é por natureza de uma sede (colunas =
+  pessoas dela). O seletor mostra o total — "você opera 2 sedes · vendo …" —
+  porque sem isso é fácil esquecer que as outras existem.
+- **Não amplia escopo**: sede pedida fora do escopo **cai na principal**, nunca
+  em "todas". Verificado por API: ler e escrever na 2ª sede passa; numa 3ª sede
+  dá 403; `?sede=` inventada volta para a principal.
+- **Compatibilidade**: cookie emitido antes do campo cai em `[sede_id]` — mantém
+  o comportamento de hoje e só ganha o escopo novo ao relogar (falha fechando).
+- **`sedeDoEscopo` da Central foi removida** (lógica de permissão duplicada) e
+  as mensagens de erro deixaram de dizer "da própria sede".
+- Demo: a supervisora agora opera Dionísio Torres + Aldeota (a segunda sem
+  cadastro, que é o estado real de uma unidade no primeiro dia).
+- Arquivos: `lib/permissions.ts`, `types/Usuario.ts`, `lib/schema.ts`,
+  `app/api/auth/login`, `app/api/sedes`, `app/api/central-dia`,
+  `services/centralDiaService.ts`, `services/usuariosService.ts`,
+  `components/CentralDoDia.tsx`, `app/(app)/usuarios/page.tsx`,
+  `lib/memoryStore.ts`, `docs/02`, `docs/01`, `docs/04`, `CLAUDE.md`.
+- **Portão da doutrina**: elimina passos (um login por sede, ou pedir a alguém
+  para olhar a outra unidade); é campo de **implantação** (cadastro de usuário,
+  mexido pelo admin), não de operação diária; o dia do supervisor não ganha
+  nenhuma decisão nova — quem tem uma sede não vê seletor. Não tem gatilho de
+  aposentadoria porque não é ferramenta de implantação: é atributo de permissão,
+  da mesma natureza de `perfil`.
+
+---
+
 ## 2026-08-04 — Material de apresentação para os coordenadores de sede
 
 - **Nada mudou no sistema.** Esta entrada registra o material produzido para a

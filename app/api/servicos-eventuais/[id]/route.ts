@@ -14,7 +14,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("servicos_eventuais", id);
   if (!atual) throw new Error("Registro não encontrado.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram eventuais da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram eventuais das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

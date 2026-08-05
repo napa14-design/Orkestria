@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       ? await ds.obter("rotinas_planejadas", dados.rotina_id)
       : null;
     if (rotina && !podeAlterarSede(sessao, rotina.sede_id))
-      throw new ErroPermissao("Supervisores só registram execuções da própria sede.");
+      throw new ErroPermissao("Supervisores só registram execuções das sedes que operam.");
     return ok(await registrarExecucao({ ...dados, supervisor_id: sessao.id }), 201);
   });
 }

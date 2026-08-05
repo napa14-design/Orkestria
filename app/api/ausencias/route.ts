@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       ? await ds.obter("funcionarios", dados.funcionario_id)
       : null;
     if (funcionario && !podeAlterarSede(sessao, funcionario.sede_id))
-      throw new ErroPermissao("Supervisores só registram ausências da própria sede.");
+      throw new ErroPermissao("Supervisores só registram ausências das sedes que operam.");
     return ok(await createAusencia(dados, sessao.email), 201);
   });
 }

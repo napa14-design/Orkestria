@@ -17,8 +17,11 @@ const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
 export default function CentralDoDia({ nome }: { nome: string }) {
   const [resolvendo, setResolvendo] = useState(false);
   const [erroAcao, setErroAcao] = useState("");
+  // Vazio = a sede principal decidida no servidor. Quem opera uma sede só
+  // nunca mexe nisto.
+  const [sedeVista, setSedeVista] = useState("");
   const { data, error, isLoading, isValidating, mutate } = useSWR<CentralDiaDados>(
-    "/api/central-dia",
+    sedeVista ? `/api/central-dia?sede=${encodeURIComponent(sedeVista)}` : "/api/central-dia",
     fetcher,
   );
 
@@ -79,6 +82,28 @@ export default function CentralDoDia({ nome }: { nome: string }) {
           </span>
           <h1>{primeiroNome}, cuide só da próxima exceção.</h1>
           <p>O restante do sistema pode esperar até isto estar resolvido.</p>
+          {/* Só para quem opera mais de uma sede. O texto diz o total de
+              propósito: a Central mostra uma sede por vez, e sem esse aviso é
+              fácil esquecer que as outras existem. */}
+          {data.escopo.sedes.length > 1 && (
+            <label className="central-sede">
+              <span className="rotulo">
+                Você opera {data.escopo.sedes.length} sedes · vendo
+              </span>
+              <select
+                value={data.escopo.sede_id}
+                onChange={(e) => setSedeVista(e.target.value)}
+                disabled={isValidating}
+                aria-label="Sede exibida na Central"
+              >
+                {data.escopo.sedes.map((sede) => (
+                  <option key={sede.id} value={sede.id}>
+                    {sede.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <button
           className="central-recarregar"

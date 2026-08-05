@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const ds = await getDataSource();
     const func = await ds.obter("funcionarios", dados.funcionario_id);
     if (func && !podeAlterarSede(sessao, func.sede_id))
-      throw new ErroPermissao("Supervisores só definem tempos da própria sede.");
+      throw new ErroPermissao("Supervisores só definem tempos das sedes que operam.");
     return ok(await createTempoPersonalizado(dados, sessao.email), 201);
   });
 }

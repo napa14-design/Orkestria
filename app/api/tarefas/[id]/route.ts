@@ -11,7 +11,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("tarefas", id);
   if (!atual) throw new Error("Tarefa não encontrada.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram tarefas da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram tarefas das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

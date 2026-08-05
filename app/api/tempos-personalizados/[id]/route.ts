@@ -14,7 +14,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("tempos_personalizados", id);
   if (!atual) throw new Error("Registro não encontrado.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram tempos da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram tempos das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

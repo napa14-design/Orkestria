@@ -24,11 +24,17 @@ function seed(): Banco {
   return {
     usuarios: [
       { id: "u1", nome: "Administrador", email: "admin@empresa.com", perfil: "administrador", sede_id: "geral", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
-      { id: "u2", nome: "Supervisora Aldeota", email: "supervisor.aldeota@empresa.com", perfil: "supervisor", sede_id: "christus_dt", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
+      // Supervisora com DUAS sedes: é o caso do coordenador que cobre mais de
+      // uma unidade. Serve para exercitar o seletor de sede da Central.
+      { id: "u2", nome: "Supervisora Aldeota", email: "supervisor.aldeota@empresa.com", perfil: "supervisor", sede_id: "christus_dt", sedes_extra: "christus_ald", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
       { id: "u3", nome: "Gerência", email: "gerencia@empresa.com", perfil: "visualizador", sede_id: "geral", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
     ],
     sedes: [
       { id: "christus_dt", nome_sede: "Christus — Dionísio Torres", cidade: "Fortaleza", endereco: "R. Israel Bezerra, 630 - Dionísio Torres", tipo_sede: "escola", grupo: "Christus", ativo: true, ...aud },
+      // Sede sem cadastro nenhum, de propósito: é o estado real de uma unidade
+      // no primeiro dia de implantação, e o que a segunda sede da supervisora
+      // mostra ao trocar o seletor.
+      { id: "christus_ald", nome_sede: "Christus — Aldeota", cidade: "Fortaleza", endereco: "Av. Dom Luís, 1000 - Aldeota", tipo_sede: "escola", grupo: "Christus", ativo: true, ...aud },
     ],
     funcionarios: [
       { id: "christus_f1", nome: "Aurilene", genero: "feminino", sede_id: "christus_dt", turno: "manha", entrada: "06:00", saida: "16:00", intervalo_min: 120, intervalo_inicio: "11:30", intervalo_fim: "13:00", intervalos: "09:00-09:15;11:30-13:00;15:00-15:15", cargo: "ASG", ativo: true, observacoes: "Rota real Christus DT — FINANCEIRO / LOJINHA", ...aud },

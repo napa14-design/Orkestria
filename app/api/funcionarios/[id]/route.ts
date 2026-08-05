@@ -11,7 +11,7 @@ async function exigirAcesso(sessaoSedeCheck: (sedeId: string) => boolean, id: st
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
   if (!sessaoSedeCheck(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram funcionários da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram funcionários das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

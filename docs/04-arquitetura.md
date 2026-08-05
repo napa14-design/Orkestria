@@ -66,7 +66,7 @@ middleware.ts            bloqueio de rotas sem sessão
 1. `middleware.ts` exige o cookie de sessão em toda rota não pública.
 2. `lib/session.ts` valida a assinatura HMAC e expõe `obterSessao()`.
 3. Cada rota de API passa por `comSessao()` ([lib/api.ts](../lib/api.ts)) e
-   aplica `lib/permissions.ts`: supervisor só escreve na própria sede;
+   aplica `lib/permissions.ts`: supervisor só escreve nas sedes que opera (uma ou várias);
    visualizador não escreve; parâmetros respeitam `editavel_por_supervisor`.
 
 ## Limitações conhecidas do banco provisório (Sheets)

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (!nome || !data_origem || !sede_id)
       return ok({ erro: "Informe nome, data_origem e sede_id." }, 400);
     if (!podeAlterarSede(sessao, sede_id))
-      throw new ErroPermissao("Supervisores só gerenciam modelos da própria sede.");
+      throw new ErroPermissao("Supervisores só gerenciam modelos das sedes que operam.");
     return ok(
       await salvarModelo(nome, data_origem, sede_id, sessao.email, {
         padrao: !!padrao,
@@ -40,7 +40,7 @@ export async function DELETE(req: Request) {
     const sede = url.searchParams.get("sede");
     if (!nome || !sede) return ok({ erro: "Informe ?nome= e ?sede=." }, 400);
     if (!podeAlterarSede(sessao, sede))
-      throw new ErroPermissao("Supervisores só gerenciam modelos da própria sede.");
+      throw new ErroPermissao("Supervisores só gerenciam modelos das sedes que operam.");
     return ok({ removidos: await excluirModelo(nome, sede) });
   });
 }

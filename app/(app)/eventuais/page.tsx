@@ -54,7 +54,7 @@ export default function PaginaEventuais() {
           tipo: "select",
           obrigatorio: true,
           opcoes: (sedes ?? []).filter((s) => s.ativo).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
-          dica: "Sede onde ocorreu. Supervisores só registram na própria sede.",
+          dica: "Sede onde ocorreu. Supervisores só registram nas sedes que operam.",
         },
         {
           key: "descricao",

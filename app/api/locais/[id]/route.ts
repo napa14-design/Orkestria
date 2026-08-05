@@ -11,7 +11,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("locais", id);
   if (!atual) throw new Error("Local não encontrado.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram locais da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram locais das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

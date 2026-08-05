@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const dados = await req.json();
     if (!podeAlterarSede(sessao, dados.sede_id))
-      throw new ErroPermissao("Supervisores só cadastram funcionários da própria sede.");
+      throw new ErroPermissao("Supervisores só cadastram funcionários das sedes que operam.");
     return ok(await createFuncionario(dados, sessao.email), 201);
   });
 }

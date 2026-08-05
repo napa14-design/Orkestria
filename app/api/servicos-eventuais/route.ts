@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const dados = await req.json();
     if (!podeAlterarSede(sessao, dados.sede_id))
-      throw new ErroPermissao("Supervisores só registram eventuais da própria sede.");
+      throw new ErroPermissao("Supervisores só registram eventuais das sedes que operam.");
     return ok(await createServicoEventual({ ...dados, supervisor_id: sessao.id }, sessao.email), 201);
   });
 }

@@ -8,8 +8,10 @@ import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import {
+  limitarSedeConsulta,
   podeAlterarSede,
   podeEscrever,
+  sedesPermitidas,
   type SessaoUsuario,
 } from "@/lib/permissions";
 import { validarAlocacao } from "@/lib/validations";
@@ -28,11 +30,6 @@ import { resolverParametros } from "./parametrosService";
 import { getQualificacoes } from "./qualificacoesService";
 import { getRotinasByData, updateRotina } from "./rotinasService";
 import { getTarefas } from "./tarefasService";
-
-function sedeDoEscopo(sessao: SessaoUsuario): string | undefined {
-  if (sessao.perfil !== "supervisor" || sessao.sede_id === "geral") return undefined;
-  return sessao.sede_id;
-}
 
 function minutosAgora(): number {
   const agora = new Date();
@@ -127,6 +124,31 @@ async function proporRedistribuicao(args: {
 }
 
 /**
+ * Nomes das sedes do seletor — só para quem opera mais de uma.
+ *
+ * Quem tem escopo único (o caso comum) não paga leitura nenhuma por isto: a
+ * lista sai vazia antes de tocar no banco. Para quem tem várias, lê apenas os
+ * documentos das sedes dele, e reaproveita o nome da sede já carregada.
+ */
+async function sedesDoSeletor(
+  sessao: SessaoUsuario,
+  sedeAtual: string | undefined,
+  nomeAtual: string | undefined,
+): Promise<{ id: string; nome: string }[]> {
+  const permitidas = sedesPermitidas(sessao);
+  if (!permitidas || permitidas.length < 2) return [];
+  const ds = await getDataSource();
+  const sedes = await Promise.all(
+    permitidas.map(async (id) => {
+      if (id === sedeAtual && nomeAtual) return { id, nome: nomeAtual };
+      const doc = await ds.obter("sedes", id);
+      return { id, nome: doc?.nome_sede ?? "Sede não encontrada" };
+    }),
+  );
+  return sedes.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+/**
  * Consolida só o que pode exigir uma decisão hoje.
  *
  * Deliberadamente não calcula saúde cadastral, prontidão nem cobertura de 31
@@ -134,9 +156,14 @@ async function proporRedistribuicao(args: {
  * visitada; no escopo de sede, a própria Agenda já calcula cobertura quando o
  * supervisor realmente entra para planejar.
  */
-export async function getCentralDia(sessao: SessaoUsuario): Promise<CentralDiaDados> {
+export async function getCentralDia(
+  sessao: SessaoUsuario,
+  sedeSolicitada?: string,
+): Promise<CentralDiaDados> {
   const data = hojeISO();
-  const sedeId = sedeDoEscopo(sessao);
+  // Uma sede por vez: quem opera várias troca no seletor. Manter uma única
+  // sede por consulta é o que impede a Central de multiplicar leituras.
+  const sedeId = limitarSedeConsulta(sessao, sedeSolicitada);
   const ds = await getDataSource();
 
   const [sede, funcionarios, rotinas, execucoes, ausencias] = await Promise.all([
@@ -289,6 +316,7 @@ export async function getCentralDia(sessao: SessaoUsuario): Promise<CentralDiaDa
     escopo: {
       sede_id: sedeId ?? "geral",
       nome: sede?.nome_sede ?? (sedeId ? "Sede não encontrada" : "Todas as sedes"),
+      sedes: await sedesDoSeletor(sessao, sedeId, sede?.nome_sede),
     },
     resumo: {
       funcionarios_disponiveis: disponiveis.length,
@@ -328,7 +356,7 @@ export async function resolverProximaExcecao(
     ]);
   }
   if (!podeAlterarSede(sessao, proposta.sede_id))
-    throw new ErroPermissao("Supervisores só redistribuem tarefas da própria sede.");
+    throw new ErroPermissao("Supervisores só redistribuem tarefas das sedes que operam.");
 
   return updateRotina(proposta.rotina_id, {
     funcionario_id: proposta.funcionario_id,

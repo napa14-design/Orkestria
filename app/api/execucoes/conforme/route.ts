@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const rotina = rotina_id ? await ds.obter("rotinas_planejadas", rotina_id) : null;
     if (!rotina) throw new Error("Rotina planejada não encontrada.");
     if (!podeAlterarSede(sessao, rotina.sede_id))
-      throw new ErroPermissao("Supervisores só registram execuções da própria sede.");
+      throw new ErroPermissao("Supervisores só registram execuções das sedes que operam.");
 
     return ok(
       await registrarExecucao(

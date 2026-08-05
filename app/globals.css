@@ -807,6 +807,34 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   font-size: 13px;
 }
 
+/* Seletor de sede — aparece só para quem opera mais de uma. */
+.central-sede {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 5px 5px 5px 11px;
+  border: var(--borda);
+  border-radius: var(--raio);
+  background: var(--papel-2);
+  box-shadow: var(--sombra-leve);
+}
+
+.central-sede .rotulo { color: var(--tinta-2); }
+
+.central-sede select {
+  min-width: 172px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--tinta);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.central-sede select:disabled { opacity: 0.6; }
+
 .central-recarregar {
   display: inline-flex;
   align-items: center;

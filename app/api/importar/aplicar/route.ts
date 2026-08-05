@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const { sede_id, data, analise, salvar_padrao } = await req.json();
     if (!sede_id || !data || !analise) return ok({ erro: "Informe sede_id, data e a análise." }, 400);
     if (!podeAlterarSede(sessao, sede_id))
-      throw new ErroPermissao("Supervisores só importam rotas da própria sede.");
+      throw new ErroPermissao("Supervisores só importam rotas das sedes que operam.");
     return ok(
       await aplicarImportacao(sede_id, data, analise, sessao.email, { salvarPadrao: !!salvar_padrao }),
     );

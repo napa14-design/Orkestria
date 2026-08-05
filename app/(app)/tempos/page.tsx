@@ -36,7 +36,7 @@ export default function PaginaTempos() {
             valor: f.id,
             rotulo: `${f.nome} — ${nomeSede(f.sede_id)}`,
           })),
-          dica: "De quem é o ritmo. A sede vem do funcionário (supervisores só definem na própria sede).",
+          dica: "De quem é o ritmo. A sede vem do funcionário (supervisores só definem nas sedes que operam).",
         },
         {
           key: "tarefa_id",

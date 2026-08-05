@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       ds.obter("funcionarios", dados.funcionario_id),
     ]);
     if (tarefa && !podeAlterarSede(sessao, tarefa.sede_id))
-      throw new ErroPermissao("Supervisores só montam rotinas da própria sede.");
+      throw new ErroPermissao("Supervisores só montam rotinas das sedes que operam.");
     if (funcionario && !podeAlterarSede(sessao, funcionario.sede_id))
       throw new ErroPermissao("Remanejo entre sedes é restrito ao administrador.");
     return ok(await createRotina(dados, sessao.id), 201);

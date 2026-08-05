@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       (!dados.editavel_por_supervisor || !podeAlterarSede(sessao, dados.sede_id))
     )
       throw new ErroPermissao(
-        "Supervisores só criam parâmetros editáveis no escopo da própria sede.",
+        "Supervisores só criam parâmetros editáveis no escopo das sedes que operam.",
       );
     return ok(await createParametro(dados, sessao.email), 201);
   });

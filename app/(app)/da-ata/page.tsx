@@ -248,9 +248,9 @@ const MARCOS = [
   {
     numero: "02",
     fase: "Fundação invisível",
-    titulo: "Cada um só vê a própria sede",
+    titulo: "Cada um só vê as sedes que opera",
     antes: "Um supervisor ainda conseguia, por caminhos indiretos, ver ou mexer em dados de outra sede.",
-    agora: "O servidor confere cada acesso: ninguém enxerga nem altera fora da própria sede.",
+    agora: "O servidor confere cada acesso: ninguém enxerga nem altera fora das sedes que lhe foram atribuídas — uma, ou várias, no caso de quem coordena mais de uma unidade.",
     impacto: "Mais proteção sem um clique a mais no dia de ninguém.",
   },
   {

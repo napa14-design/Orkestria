@@ -32,6 +32,12 @@ export interface CentralDiaDados {
   escopo: {
     sede_id: string;
     nome: string;
+    /**
+     * Sedes que a pessoa opera, quando é **mais de uma** — a Central mostra uma
+     * por vez e este é o material do seletor. Lista vazia = escopo único (ou
+     * acesso a todas), e nenhum seletor aparece.
+     */
+    sedes: { id: string; nome: string }[];
   };
   resumo: {
     funcionarios_disponiveis: number;

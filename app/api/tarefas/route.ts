@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const ds = await getDataSource();
     const local = dados.local_id ? await ds.obter("locais", dados.local_id) : null;
     if (local && !podeAlterarSede(sessao, local.sede_id))
-      throw new ErroPermissao("Supervisores só cadastram tarefas da própria sede.");
+      throw new ErroPermissao("Supervisores só cadastram tarefas das sedes que operam.");
     return ok(await createTarefa(dados, sessao.email), 201);
   });
 }

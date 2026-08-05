@@ -40,9 +40,9 @@ DT" (45 m²) são **registros distintos**, com metragens, tempos e rotinas próp
 |---|---|---|---|
 | Cadastrar usuários | ✔ | ✘ | ✘ |
 | Cadastrar sedes | ✔ | ✘ | ✘ |
-| Cadastrar funcionários/locais/tarefas | ✔ (todas) | ✔ (própria sede) | ✘ |
+| Cadastrar funcionários/locais/tarefas | ✔ (todas) | ✔ (sedes que opera) | ✘ |
 | Editar parâmetros gerais | ✔ | ✔ (quando `editavel_por_supervisor`) | ✘ |
-| Montar/editar rotinas | ✔ | ✔ (própria sede) | ✘ |
+| Montar/editar rotinas | ✔ | ✔ (sedes que opera) | ✘ |
 | Registrar execução realizada | ✔ | ✔ | ✘ |
 | Dashboards e relatórios | ✔ (tudo) | ✔ (sua sede) | ✔ |
 

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const ds = await getDataSource();
     const func = await ds.obter("funcionarios", dados.funcionario_id);
     if (func && !podeAlterarSede(sessao, func.sede_id))
-      throw new ErroPermissao("Supervisores só definem qualificações da própria sede.");
+      throw new ErroPermissao("Supervisores só definem qualificações das sedes que operam.");
     return ok(await createQualificacao(dados, sessao.email), 201);
   });
 }

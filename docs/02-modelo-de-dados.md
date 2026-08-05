@@ -29,9 +29,23 @@ parametros (sede_id|geral)   │ ├──< funcionarios (sede_id)
 | nome | string | |
 | email | string | chave de login |
 | perfil | enum | administrador · supervisor · visualizador |
-| sede_id | string | `geral` = todas as sedes |
+| sede_id | string | sede **principal** (abre por padrão). `geral` = todas as sedes |
 | ativo | boolean | |
 | criado_em, atualizado_em | ISO 8601 | |
+| sedes_extra | string | sedes **adicionais** que o supervisor opera: ids separadas por vírgula. Vazio = opera só a principal |
+
+**Escopo de sede do supervisor.** Um coordenador pode cobrir mais de uma
+unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
+
+- Só vale para `perfil = supervisor`; nos outros perfis o campo é normalizado
+  para vazio (administrador e gerência já alcançam todas as sedes).
+- Com `sede_id = geral`, `sedes_extra` é irrelevante e também é zerado.
+- As telas mostram **uma sede por vez** (seletor na Central e filtro na
+  Agenda). Isso é deliberado: mantém cada consulta em um único `where` do
+  Firestore, sem multiplicar leituras por sede.
+- O escopo entra na sessão no **login** (`montarSedesDaSessao`). Cookie emitido
+  antes deste campo existir cai em `[sede_id]` — ou seja, muda de escopo só ao
+  relogar, e falha fechando.
 
 ### funcionarios
 | Campo | Tipo | Observação |

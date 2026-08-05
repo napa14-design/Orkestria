@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     if (!data_origem || !Array.isArray(datas_destino) || datas_destino.length === 0 || !sede_id)
       return ok({ erro: "Informe data_origem, datas_destino[] e sede_id." }, 400);
     if (!podeAlterarSede(sessao, sede_id))
-      throw new ErroPermissao("Supervisores só duplicam rotinas da própria sede.");
+      throw new ErroPermissao("Supervisores só duplicam rotinas das sedes que operam.");
     return ok(await duplicarDia(data_origem, datas_destino, sede_id, sessao.id));
   });
 }

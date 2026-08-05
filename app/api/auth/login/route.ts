@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { montarSedesDaSessao } from "@/lib/permissions";
 import { verificarSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
     email: usuario.email,
     perfil: usuario.perfil,
     sede_id: usuario.sede_id,
+    sedes: montarSedesDaSessao(usuario.sede_id, usuario.sedes_extra),
   });
   return NextResponse.json({
     nome: usuario.nome,

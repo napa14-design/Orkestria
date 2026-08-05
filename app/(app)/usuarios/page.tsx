@@ -47,7 +47,7 @@ export default function PaginaUsuarios() {
     <>
     <CrudManager<Usuario>
       titulo="Usuários"
-      subtitulo="Quem acessa o sistema. O perfil define as permissões; a sede limita o alcance dos supervisores. Acesso restrito a administradores."
+      subtitulo="Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance dos supervisores — um coordenador pode operar mais de uma. Acesso restrito a administradores."
       endpoint="/api/usuarios"
       textoNovo="+ Novo usuário"
       campos={[
@@ -66,7 +66,7 @@ export default function PaginaUsuarios() {
           tipo: "select",
           obrigatorio: true,
           opcoes: PERFIS,
-          dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • SUPERVISOR: monta rotinas e cadastra, mas só na própria sede. • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
+          dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • SUPERVISOR: monta rotinas e cadastra, apenas nas sedes que opera (uma ou várias). • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
         },
         {
           key: "sede_id",
@@ -78,7 +78,20 @@ export default function PaginaUsuarios() {
             { valor: "geral", rotulo: "Geral (todas as sedes)" },
             ...(sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
           ],
-          dica: "A qual sede o usuário pertence. Para supervisor, limita o que ele enxerga e edita àquela sede. Administrador e gerência costumam usar \"Geral\" (todas as sedes).",
+          dica: "A sede principal do usuário — é ela que abre por padrão nas telas. Para supervisor, define o alcance básico; se ele cobre mais de uma sede, acrescente as outras no campo abaixo. Administrador e gerência costumam usar \"Geral\" (todas as sedes).",
+        },
+        {
+          key: "sedes_extra",
+          rotulo: "Outras sedes que ele opera",
+          tipo: "multiselect",
+          inteira: true,
+          opcoes: (sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
+          ajuda: "Deixe vazio se ele cuida só da sede principal",
+          dica:
+            "Para o coordenador que cobre mais de uma sede. Ele passa a enxergar e editar todas as marcadas aqui, além da principal, trocando de sede num seletor — a Central e a Agenda mostram uma sede por vez. A sede principal já está incluída, não precisa marcar. Só aparece para supervisor com sede específica: administrador e gerência já alcançam todas.",
+          // Escopo por sede só existe para supervisor; com "Geral" a lista não
+          // significaria nada, porque ele já alcança todas.
+          mostrarSe: (f) => f.perfil === "supervisor" && f.sede_id !== "geral",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
       ]}
@@ -94,7 +107,27 @@ export default function PaginaUsuarios() {
             </span>
           ),
         },
-        { key: "sede_id", rotulo: "Sede", render: (u) => nomeSede(u.sede_id) },
+        {
+          key: "sede_id",
+          rotulo: "Sede",
+          render: (u) => {
+            const extras = (u.sedes_extra ?? "").split(",").filter(Boolean);
+            return (
+              <>
+                {nomeSede(u.sede_id)}
+                {extras.length > 0 && (
+                  <span
+                    className="selo selo-azul"
+                    style={{ marginLeft: 6 }}
+                    title={`Também opera: ${extras.map(nomeSede).join(", ")}`}
+                  >
+                    +{extras.length}
+                  </span>
+                )}
+              </>
+            );
+          },
+        },
         {
           key: "ativo",
           rotulo: "Status",

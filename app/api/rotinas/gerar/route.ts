@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const { sede, data } = await req.json();
     if (!sede || !data) return ok({ erro: "Informe sede e data." }, 400);
     if (!podeAlterarSede(sessao, sede))
-      throw new ErroPermissao("Supervisores só geram a rotina da própria sede.");
+      throw new ErroPermissao("Supervisores só geram a rotina das sedes que operam.");
     return ok(await gerarDiaDaRotaPadrao(sede, data, sessao.id));
   });
 }

@@ -14,7 +14,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("qualificacoes_funcionario", id);
   if (!atual) throw new Error("Qualificação não encontrada.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram qualificações da própria sede.");
+    throw new ErroPermissao("Supervisores só alteram qualificações das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
