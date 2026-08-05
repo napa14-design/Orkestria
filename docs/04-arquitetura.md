@@ -69,6 +69,30 @@ middleware.ts            bloqueio de rotas sem sessão
    aplica `lib/permissions.ts`: supervisor só escreve nas sedes que opera (uma ou várias);
    visualizador não escreve; parâmetros respeitam `editavel_por_supervisor`.
 
+### Ciclo de vida da senha
+
+Existem três caminhos de entrada, e nenhum deles faz o administrador conhecer a
+senha de alguém:
+
+| Momento | Como funciona |
+|---|---|
+| **Primeiro acesso** | A conta nasce sem `senha_hash`. A pessoa entra com a **senha compartilhada** (`ACCESS_PASSWORD`) e o login responde `primeiro_acesso: true` **sem criar sessão**; `POST /api/auth/primeiro-acesso` revalida tudo, grava a senha pessoal e só então abre a sessão. |
+| **Troca** | `Sistema › Minha conta` → `POST /api/auth/senha` (usa o id da sessão). |
+| **Esqueceu** | O administrador reseta em `Sistema › Usuários` (`DELETE /api/usuarios/[id]/senha`): a senha é apagada e a pessoa **volta ao primeiro acesso**. Não existe rota para o admin *definir* a senha de outra pessoa. |
+
+Regras da senha pessoal ficam em `lib/senha.ts` (`problemaNaSenha`): mínimo de
+`MIN_SENHA` caracteres (constante em `lib/sessionConstants.ts`, para o cliente
+poder exibir o mesmo número que o servidor cobra) e **proibido repetir a senha
+compartilhada** — senão a troca não trocaria nada.
+
+**Risco aceito e como fechá-lo:** a senha compartilhada é a prova de identidade
+do primeiro acesso, então quem a souber pode assumir a conta de qualquer pessoa
+que **ainda não** definiu senha. Some sozinho conforme todos fazem o primeiro
+acesso — a coluna "Senha" em `Sistema › Usuários` mostra quem falta. Antes de
+liberar o sistema, trocar `ACCESS_PASSWORD` do valor padrão e garantir que as
+contas de administrador já tenham senha própria. Quem entra com **Google** não
+depende disso em nenhum momento.
+
 ## Limitações conhecidas do banco provisório (Sheets)
 
 - Sem transações nem integridade referencial — o servidor valida tudo antes de

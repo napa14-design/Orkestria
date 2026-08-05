@@ -26,3 +26,15 @@ export interface Usuario {
   criado_em: string;
   atualizado_em: string;
 }
+
+/**
+ * Como a API devolve o usuário para as telas: sem o hash e com o indicador de
+ * senha definida.
+ *
+ * É um tipo separado de propósito — o indicador é **calculado**, e se morasse
+ * em `Usuario` corria o risco de ser gravado no banco junto num update.
+ */
+export interface UsuarioListado extends Omit<Usuario, "senha_hash"> {
+  /** `false` = ainda não fez o primeiro acesso (entra com a senha compartilhada). */
+  senha_definida: boolean;
+}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { montarSedesDaSessao } from "@/lib/permissions";
-import { verificarSenha } from "@/lib/senha";
+import { senhaCompartilhada, verificarSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
 
@@ -31,13 +31,20 @@ export async function POST(req: Request) {
   const senhaCorreta = usuario
     ? usuario.senha_hash
       ? verificarSenha(senha, usuario.senha_hash)
-      : senha === (process.env.ACCESS_PASSWORD ?? "mudar123")
+      : senha === senhaCompartilhada()
     : false;
   if (!usuario || !senhaCorreta) {
     return NextResponse.json(
       { erro: "E-mail não cadastrado ou senha incorreta." },
       { status: 401 },
     );
+  }
+
+  // Primeiro acesso: entrou com a senha compartilhada e ainda não tem senha
+  // própria. Nenhuma sessão é criada aqui — a pessoa precisa definir a senha
+  // dela primeiro, e é `/api/auth/primeiro-acesso` que valida tudo de novo.
+  if (!usuario.senha_hash) {
+    return NextResponse.json({ primeiro_acesso: true, nome: usuario.nome });
   }
 
   await gravarSessao({

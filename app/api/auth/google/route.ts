@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authAdmin } from "@/lib/firebaseAdmin";
+import { montarSedesDaSessao } from "@/lib/permissions";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
 
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
     email: usuario.email,
     perfil: usuario.perfil,
     sede_id: usuario.sede_id,
+    // Mesmo escopo do login por senha: quem opera mais de uma sede precisa da
+    // lista aqui também, senão entrar pelo Google reduziria o acesso à principal.
+    sedes: montarSedesDaSessao(usuario.sede_id, usuario.sedes_extra),
   });
   return NextResponse.json({ nome: usuario.nome, perfil: usuario.perfil, sede_id: usuario.sede_id });
 }

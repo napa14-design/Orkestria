@@ -8,6 +8,7 @@
 import { type CondicaoConsulta, type DataSource, filtrarEmMemoria } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
+import { hashSenha, senhaCompartilhada } from "./senha";
 
 type Banco = { [K in NomeTabela]: MapaTabelas[K][] };
 
@@ -19,15 +20,26 @@ const aud = {
   atualizado_em: AGORA,
 };
 
+/**
+ * Senha pessoal dos usuários da demo, igual à compartilhada.
+ *
+ * Sem isso, todo login da demo cairia no fluxo de primeiro acesso — e como a
+ * memória volta ao seed a cada reinício, seria preciso criar senha toda vez.
+ * Quem demonstra o primeiro acesso é o `coordenador.novo`, que fica sem hash.
+ */
+const SENHA_DEMO = hashSenha(senhaCompartilhada());
+
 function seed(): Banco {
   const hoje = hojeISO();
   return {
     usuarios: [
-      { id: "u1", nome: "Administrador", email: "admin@empresa.com", perfil: "administrador", sede_id: "geral", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
+      { id: "u1", nome: "Administrador", email: "admin@empresa.com", perfil: "administrador", sede_id: "geral", senha_hash: SENHA_DEMO, ativo: true, criado_em: AGORA, atualizado_em: AGORA },
       // Supervisora com DUAS sedes: é o caso do coordenador que cobre mais de
       // uma unidade. Serve para exercitar o seletor de sede da Central.
-      { id: "u2", nome: "Supervisora Aldeota", email: "supervisor.aldeota@empresa.com", perfil: "supervisor", sede_id: "christus_dt", sedes_extra: "christus_ald", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
-      { id: "u3", nome: "Gerência", email: "gerencia@empresa.com", perfil: "visualizador", sede_id: "geral", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
+      { id: "u2", nome: "Supervisora Aldeota", email: "supervisor.aldeota@empresa.com", perfil: "supervisor", sede_id: "christus_dt", sedes_extra: "christus_ald", senha_hash: SENHA_DEMO, ativo: true, criado_em: AGORA, atualizado_em: AGORA },
+      { id: "u3", nome: "Gerência", email: "gerencia@empresa.com", perfil: "visualizador", sede_id: "geral", senha_hash: SENHA_DEMO, ativo: true, criado_em: AGORA, atualizado_em: AGORA },
+      // SEM senha_hash de propósito: é quem demonstra o primeiro acesso.
+      { id: "u4", nome: "Coordenador Novo", email: "coordenador.novo@empresa.com", perfil: "supervisor", sede_id: "christus_ald", ativo: true, criado_em: AGORA, atualizado_em: AGORA },
     ],
     sedes: [
       { id: "christus_dt", nome_sede: "Christus — Dionísio Torres", cidade: "Fortaleza", endereco: "R. Israel Bezerra, 630 - Dionísio Torres", tipo_sede: "escola", grupo: "Christus", ativo: true, ...aud },

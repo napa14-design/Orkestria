@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiPost, ErroApi } from "@/lib/clientApi";
+import { MIN_SENHA } from "@/lib/sessionConstants";
 
 /** Blocos da "partitura" do palco — evocam a agenda (tarefas em horários). */
 const PAUTAS = [
@@ -36,6 +37,13 @@ export default function PaginaLogin() {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [enviando, setEnviando] = useState(false);
+  /**
+   * Etapa 2, do primeiro acesso. Guarda o nome só para cumprimentar a pessoa —
+   * a senha digitada continua em `senha` e vai junto como prova de identidade.
+   */
+  const [primeiroAcesso, setPrimeiroAcesso] = useState<{ nome: string } | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -43,11 +51,43 @@ export default function PaginaLogin() {
     setAviso("");
     setEnviando(true);
     try {
-      await apiPost("/api/auth/login", { email, senha });
+      const r = await apiPost<{ primeiro_acesso?: boolean; nome?: string }>("/api/auth/login", {
+        email,
+        senha,
+      });
+      // Conta sem senha própria: o servidor não criou sessão nenhuma. A pessoa
+      // escolhe a senha dela antes de entrar.
+      if (r?.primeiro_acesso) {
+        setPrimeiroAcesso({ nome: r.nome ?? "" });
+        setEnviando(false);
+        return;
+      }
       router.push("/inicio");
       router.refresh();
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Falha ao entrar.");
+      setEnviando(false);
+    }
+  }
+
+  async function criarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    setErro("");
+    if (novaSenha !== confirmacao) {
+      setErro("As duas senhas não são iguais. Digite de novo.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      await apiPost("/api/auth/primeiro-acesso", {
+        email,
+        senha_atual: senha,
+        nova_senha: novaSenha,
+      });
+      router.push("/inicio");
+      router.refresh();
+    } catch (err) {
+      setErro(err instanceof ErroApi ? err.message : "Falha ao criar a senha.");
       setEnviando(false);
     }
   }
@@ -144,6 +184,88 @@ export default function PaginaLogin() {
       {/* ── formulário ── */}
       <section className="login-painel">
         <div className="login-form">
+          {primeiroAcesso ? (
+            <>
+              <div className="rotulo entra" style={{ color: "var(--acento)" }}>
+                ▮ Primeiro acesso
+              </div>
+              <h2
+                className="entra"
+                style={{
+                  fontFamily: "var(--fonte-display)",
+                  fontSize: 30,
+                  fontWeight: 600,
+                  marginTop: 6,
+                  marginBottom: 10,
+                }}
+              >
+                {/* "Boas-vindas" em vez de "Bem-vindo": não presume o gênero
+                    de quem está entrando. */}
+                {primeiroAcesso.nome
+                  ? `Boas-vindas, ${primeiroAcesso.nome.split(" ")[0]}.`
+                  : "Boas-vindas."}
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--tinta-2)", lineHeight: 1.6, marginBottom: 20 }}>
+                Esta é a sua primeira entrada, então a senha que você usou é temporária e conhecida
+                por outras pessoas. <strong>Crie agora a sua senha</strong> — ela será só sua, e é com
+                ela que você vai entrar de agora em diante.
+              </p>
+
+              <form onSubmit={criarSenha} style={{ display: "grid", gap: 14 }}>
+                <label className="campo entra-2">
+                  <span className="rotulo">Sua nova senha</span>
+                  <input
+                    type="password"
+                    value={novaSenha}
+                    onChange={(e) => setNovaSenha(e.target.value)}
+                    autoComplete="new-password"
+                    minLength={MIN_SENHA}
+                    autoFocus
+                    required
+                  />
+                  <span style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 5 }}>
+                    Ao menos {MIN_SENHA} caracteres. Anote em lugar seguro — ninguém no sistema
+                    consegue ver a sua senha.
+                  </span>
+                </label>
+                <label className="campo entra-2">
+                  <span className="rotulo">Digite de novo, para confirmar</span>
+                  <input
+                    type="password"
+                    value={confirmacao}
+                    onChange={(e) => setConfirmacao(e.target.value)}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+
+                {erro && <div className="alerta alerta-erro">{erro}</div>}
+
+                <button
+                  type="submit"
+                  className="btn btn-primario entra-3"
+                  disabled={enviando || novaSenha.length < MIN_SENHA}
+                  style={{ justifyContent: "center" }}
+                >
+                  {enviando ? "Salvando…" : "Salvar e entrar →"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-fantasma"
+                  onClick={() => {
+                    setPrimeiroAcesso(null);
+                    setNovaSenha("");
+                    setConfirmacao("");
+                    setErro("");
+                  }}
+                  disabled={enviando}
+                >
+                  Voltar
+                </button>
+              </form>
+            </>
+          ) : (
+          <>
           <div className="rotulo entra" style={{ color: "var(--acento)" }}>
             ▮ Acesso ao sistema
           </div>
@@ -213,8 +335,15 @@ export default function PaginaLogin() {
           <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 20, lineHeight: 1.5 }}>
             Demo: <code className="num">admin@empresa.com</code> ·{" "}
             <code className="num">supervisor.aldeota@empresa.com</code> — senha{" "}
-            <code className="num">mudar123</code>
+            <code className="num">mudar123</code>. Para ver o primeiro acesso:{" "}
+            <code className="num">coordenador.novo@empresa.com</code>.
           </p>
+          <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 12, lineHeight: 1.5 }}>
+            <strong>Esqueceu a senha?</strong> Peça ao administrador para resetá-la: você entra com a
+            senha de primeiro acesso e escolhe uma nova.
+          </p>
+          </>
+          )}
         </div>
       </section>
     </main>

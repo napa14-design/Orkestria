@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-08-05 — Primeiro acesso: a pessoa cria a própria senha
+
+- **Buraco real**: ninguém criava senha. A conta nascia sem `senha_hash` e a
+  pessoa entrava com a senha compartilhada (`ACCESS_PASSWORD`) — **sem nada na
+  tela dizendo que aquilo era temporário**. Trocar era possível em "Minha
+  conta", mas escondido; e **esquecer não tinha saída**: o admin digitava uma
+  senha nova e transmitia para a pessoa, ficando sabendo a senha dela.
+- **Primeiro acesso**: o login detecta conta sem senha própria e responde
+  `primeiro_acesso: true` **sem criar sessão**. A tela vira "crie a sua senha"
+  (nova + confirmação) e `POST /api/auth/primeiro-acesso` revalida tudo do zero
+  antes de gravar e abrir a sessão — não confia em ter passado pelo login.
+- **A prova de identidade é a senha compartilhada.** Sem isso, bastaria digitar
+  o e-mail de outra pessoa para tomar a conta. É o mesmo nível de acesso que o
+  login já exigia, e ela deixa de valer para a pessoa depois da troca.
+- **Esqueceu**: o admin **reseta** (apaga a senha) e a pessoa volta ao primeiro
+  acesso. Removida a rota de o admin *definir* a senha de alguém — mesmo
+  resultado, sem ele conhecer a senha de ninguém.
+- **Regras**: mínimo de 6 caracteres (era 4) e **proibido repetir a senha
+  compartilhada**, senão a troca não trocaria nada. `MIN_SENHA` mora em
+  `lib/sessionConstants.ts` para cliente e servidor não divergirem — a tela
+  "Minha conta" ainda cobrava 4 e daria erro só depois de clicar em salvar.
+- **Erros indistinguíveis** no primeiro acesso: e-mail inexistente, senha errada
+  e conta que já tem senha devolvem a mesma mensagem. Diferenciar contaria a
+  estranhos quais e-mails existem e quais contas estão sem senha.
+- **Coluna "Senha"** em Usuários mostra quem ainda está no primeiro acesso —
+  serve para acompanhar a implantação e saber quando o risco da senha
+  compartilhada acabou. O hash nunca sai do servidor (novo tipo
+  `UsuarioListado`, com booleano em vez do hash).
+- **Bug corrigido de tabela**: `/api/auth/google` não montava `sedes` na sessão —
+  quem opera mais de uma sede e entrava pelo Google ficava só com a principal.
+- Demo: os três usuários ganharam senha pronta (senão todo login da demo cairia
+  no primeiro acesso a cada reinício) e entrou `coordenador.novo@empresa.com`
+  sem senha, para demonstrar o fluxo.
+- Verificado por API: senha fraca, senha igual à compartilhada, primeiro acesso
+  sem saber a senha compartilhada e tentativa de tomar conta que já tem senha
+  são todos recusados; após a troca a compartilhada para de valer; supervisor
+  não reseta senha de ninguém (403); reset devolve a pessoa ao primeiro acesso.
+- **Risco em aberto**: quem souber a senha compartilhada pode assumir contas que
+  ainda não definiram senha. Antes de liberar: trocar `ACCESS_PASSWORD` do padrão
+  e garantir que os administradores já tenham senha própria.
+- Arquivos: `lib/senha.ts`, `lib/sessionConstants.ts`,
+  `app/api/auth/{login,primeiro-acesso,google}`, `app/api/usuarios/[id]/senha`,
+  `services/usuariosService.ts`, `types/Usuario.ts`, `app/login/page.tsx`,
+  `app/(app)/{usuarios,conta}/page.tsx`, `lib/memoryStore.ts`, `docs/04`.
+
+---
+
 ## 2026-08-05 — Supervisor pode operar mais de uma sede
 
 - **Lacuna real**: o modelo era binário — `sede_id` aceitava **uma** sede ou

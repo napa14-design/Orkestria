@@ -4,8 +4,8 @@ import { useState } from "react";
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import Modal from "@/components/Modal";
-import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
-import type { Sede, Usuario } from "@/types";
+import { apiDelete, ErroApi, fetcher } from "@/lib/clientApi";
+import type { Sede, UsuarioListado } from "@/types";
 
 const PERFIS = [
   { valor: "administrador", rotulo: "Administrador" },
@@ -24,28 +24,29 @@ export default function PaginaUsuarios() {
   const nomeSede = (id: string) =>
     id === "geral" ? "Geral (todas)" : (sedes?.find((s) => s.id === id)?.nome_sede ?? id);
 
-  const [alvo, setAlvo] = useState<Usuario | null>(null);
-  const [senha, setSenha] = useState("");
+  const [alvo, setAlvo] = useState<UsuarioListado | null>(null);
   const [estado, setEstado] = useState<"idle" | "enviando" | "ok" | "erro">("idle");
   const [msg, setMsg] = useState("");
 
-  async function salvarSenha() {
+  async function resetarSenha() {
     if (!alvo) return;
     setEstado("enviando");
     setMsg("");
     try {
-      await apiPost(`/api/usuarios/${alvo.id}/senha`, { senha });
+      await apiDelete(`/api/usuarios/${alvo.id}/senha`);
       setEstado("ok");
-      setMsg(`Senha individual definida para ${alvo.nome}. A partir de agora ele entra só com ela.`);
+      setMsg(
+        `Senha de ${alvo.nome} apagada. No próximo login ele entra com a senha de primeiro acesso e escolhe uma nova.`,
+      );
     } catch (e) {
       setEstado("erro");
-      setMsg(e instanceof ErroApi ? e.message : "Erro ao definir senha.");
+      setMsg(e instanceof ErroApi ? e.message : "Erro ao resetar a senha.");
     }
   }
 
   return (
     <>
-    <CrudManager<Usuario>
+    <CrudManager<UsuarioListado>
       titulo="Usuários"
       subtitulo="Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance dos supervisores — um coordenador pode operar mais de uma. Acesso restrito a administradores."
       endpoint="/api/usuarios"
@@ -137,31 +138,50 @@ export default function PaginaUsuarios() {
             </span>
           ),
         },
+        {
+          key: "senha_definida",
+          rotulo: "Senha",
+          // Serve para acompanhar a implantação: mostra quem ainda não entrou
+          // pela primeira vez e portanto continua usando a senha compartilhada.
+          render: (u) =>
+            u.senha_definida ? (
+              <span className="selo selo-verde" title="Tem senha própria">
+                Própria
+              </span>
+            ) : (
+              <span className="selo selo-laranja" title="Ainda entra com a senha de primeiro acesso">
+                1º acesso
+              </span>
+            ),
+        },
       ]}
-      acoesExtra={(u) => (
-        <button
-          className="btn btn-mini btn-fantasma"
-          onClick={() => {
-            setAlvo(u);
-            setSenha("");
-            setEstado("idle");
-            setMsg("");
-          }}
-        >
-          Senha
-        </button>
-      )}
+      acoesExtra={(u) =>
+        u.senha_definida ? (
+          <button
+            className="btn btn-mini btn-fantasma"
+            onClick={() => {
+              setAlvo(u);
+              setEstado("idle");
+              setMsg("");
+            }}
+            title="Apaga a senha para a pessoa criar outra no próximo login"
+          >
+            Resetar senha
+          </button>
+        ) : null
+      }
     />
 
-    <Modal titulo={`Definir senha — ${alvo?.nome ?? ""}`} aberto={!!alvo} aoFechar={() => setAlvo(null)} larguraMax={420}>
-      <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 14 }}>
-        Define a senha individual de <strong>{alvo?.email}</strong>. Depois disso, esse usuário
-        entra <em>apenas</em> com ela (a senha única deixa de valer para ele).
+    <Modal titulo={`Resetar senha — ${alvo?.nome ?? ""}`} aberto={!!alvo} aoFechar={() => setAlvo(null)} larguraMax={440}>
+      <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 12, lineHeight: 1.55 }}>
+        Use quando <strong>{alvo?.email}</strong> esquecer a senha. A senha atual é apagada e, no
+        próximo login, o sistema pede que a pessoa <strong>crie uma nova</strong> — você não precisa
+        saber qual será.
       </p>
-      <label className="campo" style={{ marginBottom: 14 }}>
-        <span className="rotulo">Nova senha</span>
-        <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" />
-      </label>
+      <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 14, lineHeight: 1.55 }}>
+        Para entrar dessa vez, ela vai precisar da <strong>senha de primeiro acesso</strong> (a mesma
+        usada quando a conta foi criada). Passe essa senha para ela.
+      </p>
       {msg && (
         <div className={`alerta ${estado === "erro" ? "alerta-erro" : "alerta-ok"}`} style={{ marginBottom: 12 }}>
           {msg}
@@ -172,8 +192,8 @@ export default function PaginaUsuarios() {
           {estado === "ok" ? "Fechar" : "Cancelar"}
         </button>
         {estado !== "ok" && (
-          <button type="button" className="btn btn-primario" onClick={salvarSenha} disabled={estado === "enviando" || senha.length < 4}>
-            {estado === "enviando" ? "Salvando…" : "Definir senha"}
+          <button type="button" className="btn btn-primario" onClick={resetarSenha} disabled={estado === "enviando"}>
+            {estado === "enviando" ? "Resetando…" : "Resetar senha"}
           </button>
         )}
       </div>

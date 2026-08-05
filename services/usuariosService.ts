@@ -1,29 +1,46 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { lerSedesExtra } from "@/lib/permissions";
-import { hashSenha } from "@/lib/senha";
-import type { Usuario } from "@/types";
+import { hashSenha, problemaNaSenha } from "@/lib/senha";
+import type { Usuario, UsuarioListado } from "@/types";
 import { ErroValidacao } from "./erros";
 
-/** Remove o hash de senha antes de devolver ao cliente. */
-function semSenha(u: Usuario): Usuario {
-  const { senha_hash: _omitido, ...resto } = u;
-  void _omitido;
-  return resto;
+/**
+ * Troca o hash de senha por um indicador booleano.
+ *
+ * O hash nunca sai do servidor; o booleano sai porque o administrador precisa
+ * ver quem ainda não fez o primeiro acesso.
+ */
+function semSenha(u: Usuario): UsuarioListado {
+  const { senha_hash, ...resto } = u;
+  return { ...resto, senha_definida: !!senha_hash };
 }
 
-export async function getUsuarios(): Promise<Usuario[]> {
+export async function getUsuarios(): Promise<UsuarioListado[]> {
   const ds = await getDataSource();
   return (await ds.listar("usuarios")).map(semSenha);
 }
 
-/** Define (ou troca) a senha individual de um usuário. */
+/** Grava a senha pessoal (já validada por quem chamou). */
 export async function definirSenhaUsuario(id: string, novaSenha: string): Promise<void> {
-  if (!novaSenha || novaSenha.length < 4)
-    throw new Error("A senha deve ter ao menos 4 caracteres.");
+  const problema = problemaNaSenha(novaSenha);
+  if (problema) throw new Error(problema);
   const ds = await getDataSource();
   const usuario = await ds.obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
   await ds.atualizar("usuarios", id, { senha_hash: hashSenha(novaSenha), atualizado_em: agoraISO() });
+}
+
+/**
+ * Apaga a senha pessoal: a pessoa volta ao primeiro acesso e escolhe outra.
+ *
+ * É assim que se resolve "esqueci a senha" sem serviço de e-mail — e sem o
+ * administrador precisar saber a senha de ninguém.
+ */
+export async function resetarSenhaUsuario(id: string): Promise<void> {
+  const ds = await getDataSource();
+  const usuario = await ds.obter("usuarios", id);
+  if (!usuario) throw new Error("Usuário não encontrado.");
+  await ds.atualizar("usuarios", id, { senha_hash: "", atualizado_em: agoraISO() });
 }
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {
