@@ -200,7 +200,7 @@ export default function CrudManager<T extends Registro>({
               width: 200,
             }}
           />
-          <button className="btn btn-primario" onClick={abrirNovo}>
+          <button className="btn btn-primario" data-tour="crud-novo" onClick={abrirNovo}>
             {textoNovo}
           </button>
         </div>
@@ -284,6 +284,9 @@ export default function CrudManager<T extends Registro>({
             <label
               key={c.key}
               className="campo"
+              // Todo campo de cadastro vira alvo possível do tutorial sem
+              // trabalho manual: o roteiro só precisa citar "campo-<chave>".
+              data-tour={`campo-${c.key}`}
               style={{ gridColumn: c.inteira ? "1 / -1" : undefined }}
             >
               <span className="rotulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -461,7 +464,7 @@ export default function CrudManager<T extends Registro>({
               <button type="button" className="btn" onClick={() => setAberto(false)}>
                 Cancelar
               </button>
-              <button type="submit" className="btn btn-primario">
+              <button type="submit" className="btn btn-primario" data-tour="crud-salvar">
                 Salvar
               </button>
             </div>

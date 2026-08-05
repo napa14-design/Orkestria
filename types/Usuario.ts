@@ -30,6 +30,12 @@ export interface Usuario {
   convite_hash?: string;
   /** Data-hora ISO em que o código de primeiro acesso deixa de valer. */
   convite_expira_em?: string;
+  /**
+   * Etapas da trilha de aprendizado já concluídas — **ids separados por
+   * vírgula**. Vazio = a pessoa ainda não fez nada. A primeira etapa que não
+   * está aqui é onde ela parou: é assim que se enxerga quem travou e onde.
+   */
+  tutorial_concluido?: string;
   ativo: boolean;
   criado_em: string;
   atualizado_em: string;

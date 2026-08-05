@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-08-05 — Tutorial com holofote: a base e a primeira etapa
+
+- **Para quê**: o piloto começa e o coordenador vai ficar sozinho diante de um
+  sistema vazio. Manual e vídeo ensinam **fora** do sistema — a pessoa vê, fecha
+  e precisa lembrar. O holofote ensina **dentro**, na hora de fazer.
+- **Não é um tour narrado; é a implantação acompanhada.** Em vez de "esta é a
+  tela de Locais", o roteiro diz "cadastre o primeiro local da sua sede agora".
+  A pessoa sai com a sede montada, não com um certificado — e isso resolve o
+  problema de não haver nada para apontar numa tela vazia no dia 1.
+- **Quatro retângulos, não uma tela com recorte.** O alvo precisa continuar
+  clicável de verdade; cobrir tudo e liberar por `pointer-events` viraria briga
+  de z-index com modais. Com moldura de quatro faixas, o miolo não tem nada por
+  cima e o clique chega ao botão real — verificado inclusive **dentro do modal**
+  de cadastro.
+- **Só avança quando ela clica.** Passo do tipo `clique` não tem botão de
+  avançar. É o que separa treinar de assistir.
+- **Falha alto, nunca em silêncio.** Alvo que não aparece em ~2s mostra aviso na
+  tela e `console.error` dizendo qual `data-tour` sumiu. Foi a lição de mudar o
+  rótulo do `FiltersBar` esta semana: tutorial que procura por texto de botão
+  apodrece calado.
+- **O roteiro inteiro é dado**, em `lib/tutorial/trilha.ts`. Depois do piloto
+  vamos querer trocar palavra, ordem e passo — tem que ser edição de texto.
+- **Alvos genéricos de graça**: o `CrudManager` marca todo campo como
+  `campo-<chave>`, então qualquer campo de qualquer cadastro já é alvo possível.
+- **Progresso** em `usuarios.tutorial_concluido` (ids por vírgula) em vez de
+  tabela nova: vem junto com o usuário já lido, sem coleção nem índice novo. A
+  primeira etapa ausente é onde a pessoa parou — é o dado que diz quem travou e
+  onde, que era o que eu queria colher no piloto.
+- **Portão da doutrina**: elimina passos (procurar no manual, perguntar a
+  alguém); é de **implantação**, não entra na operação diária; some sozinho por
+  pessoa e por etapa — a resposta mais limpa que já demos à pergunta 4; e o
+  caminho básico funciona sem ele (dá para sair a qualquer momento).
+- **Falta**: as outras 7 etapas do roteiro e a trilha de progresso na Central.
+- Arquivos: `lib/tutorial/trilha.ts`, `components/tutorial/{Holofote,Tutorial}.tsx`,
+  `services/tutorialService.ts`, `app/api/tutorial/route.ts`,
+  `app/(app)/layout.tsx`, `components/CrudManager.tsx`, `app/globals.css`,
+  `types/Usuario.ts`, `lib/schema.ts`.
+
+---
+
 ## 2026-08-05 — Fim da senha compartilhada: código individual de primeiro acesso
 
 - **Motivo**: a `ACCESS_PASSWORD` era um segredo único para todo mundo. Quem a
