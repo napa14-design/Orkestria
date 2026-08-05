@@ -40,6 +40,7 @@ export default function BarraPassosDoDia({
       {!temRotaPadrao && temRotinas && (
         <button
           className="btn btn-mini"
+          data-tour="ensinar-rota"
           onClick={aoSalvarRotaPadrao}
           disabled={salvandoPadrao}
           title="Ensina este dia como rota padrão; depois, dias vazios são gerados em um clique"
@@ -64,6 +65,7 @@ export default function BarraPassosDoDia({
           target="_blank"
           rel="noreferrer"
           className="btn btn-mini btn-fantasma"
+          data-tour="imprimir-fichas"
         >
           Imprimir fichas
         </a>
@@ -73,6 +75,7 @@ export default function BarraPassosDoDia({
         <Link
           href="/acompanhamento"
           className="btn btn-mini btn-primario"
+          data-tour="confirmar-realizados"
           title={`${faltamRegistrar} tarefa(s) cujo horário já terminou`}
         >
           Confirmar realizados ({faltamRegistrar})

@@ -183,7 +183,7 @@ export default function OccupancySummary({
       {/* equipe */}
       <div className="painel">
         <div className="painel-cabecalho" style={{ padding: "10px 12px" }}>
-          <span className="rotulo">Equipe — ocupação</span>
+          <span className="rotulo" data-tour="painel-ocupacao">Equipe — ocupação</span>
         </div>
         <div style={{ padding: 12, display: "grid", gap: 10 }}>
           {resumos.map(({ funcionario, resumo }) => (

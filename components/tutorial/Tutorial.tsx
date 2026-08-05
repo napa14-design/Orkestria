@@ -15,7 +15,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { apiPost, fetcher } from "@/lib/clientApi";
-import { etapaDaRota } from "@/lib/tutorial/trilha";
+import { etapasDaRota } from "@/lib/tutorial/trilha";
 import Holofote from "./Holofote";
 
 export default function Tutorial() {
@@ -26,12 +26,16 @@ export default function Tutorial() {
   /** Etapas recusadas nesta sessão — não insistir até recarregar a página. */
   const recusadas = useRef<Set<string>>(new Set());
 
-  const etapa = etapaDaRota(rota ?? "");
   const concluidas = data?.concluidas;
+  // A agenda hospeda quatro etapas; a pendente mais antiga é a próxima aula.
+  // Uma por visita: emendar todas de uma vez viraria o tour de 30 passos que a
+  // pessoa despacha no automático.
+  const etapa = etapasDaRota(rota ?? "").find(
+    (e) => !concluidas?.includes(e.id) && !recusadas.current.has(e.id),
+  );
 
   useEffect(() => {
     if (!etapa || !concluidas) return;
-    if (concluidas.includes(etapa.id) || recusadas.current.has(etapa.id)) return;
     setEtapaAtiva(etapa.id);
     setPasso(0);
   }, [etapa, concluidas]);

@@ -117,6 +117,7 @@ export default function FiltersBar({
           O rótulo cita "modelos" porque é o que a pessoa procura. */}
       <button
         className="btn"
+        data-tour="duplicar-modelos"
         onClick={aoPlanejarPeriodo}
         title="Duplicar este dia, salvar como rota padrão ou modelo de evento, e aplicar em datas futuras"
       >

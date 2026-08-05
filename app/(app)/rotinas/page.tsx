@@ -639,7 +639,7 @@ export default function PaginaRotinas() {
                 <strong>Dia ainda vazio.</strong> Esta sede tem uma <strong>rota padrão</strong> — gere o dia
                 em 1 clique e depois ajuste só o que mudou (faltas, eventos…).
               </span>
-              <button className="btn btn-primario" onClick={gerarDia} disabled={gerando}>
+              <button className="btn btn-primario" data-tour="gerar-dia" onClick={gerarDia} disabled={gerando}>
                 {gerando ? "Gerando…" : "⚡ Gerar o dia da rota padrão"}
               </button>
             </div>

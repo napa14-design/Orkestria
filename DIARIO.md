@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-05 — Tutorial completo: 11 etapas e a trilha na Central
+
+- **A trilha inteira**, na ordem do mapa do caminho: fundação (locais, tarefas,
+  equipe, qualificações) → o dia (Central, montar, ensinar a rota, fichas,
+  confirmar) → exceções (falta, trabalho fora da rotina). 32 passos no total,
+  nenhuma etapa com mais de 5.
+- **Uma etapa por visita, não um tour de 32 passos.** A agenda hospeda quatro
+  etapas; a pendente mais antiga é a próxima aula. Emendar todas de uma vez
+  viraria o tour que a pessoa despacha no automático.
+- **Trilha na Central** ("3 de 11"), abaixo da exceção do dia — nunca acima: a
+  Central existe para resolver o que está travando agora; aprendizado é o
+  segundo assunto. **Some sozinha** quando tudo é concluído.
+- **`scripts/conferir-trilha.mjs`**: confere que todo alvo citado no roteiro
+  existe no código. Achou dois erros meus na hora (`tipo_calculo` em vez de
+  `regra_calculo`; `intervalos` em vez de `intervalo_min`). Testei o testador
+  quebrando alvos de propósito — acusa os dois tipos de erro e sai com código 1.
+- Verificado percorrendo as 11 telas: todas dispararam a etapa certa, na ordem
+  certa, sem nenhum alvo perdido.
+- **Falta**: rodar com gente de verdade. O dado de abandono (primeira etapa
+  ausente em `tutorial_concluido`) é o que vai dizer qual passo reescrever.
+- Arquivos: `lib/tutorial/trilha.ts`, `components/tutorial/TrilhaProgresso.tsx`,
+  `components/tutorial/Tutorial.tsx`, `scripts/conferir-trilha.mjs`,
+  `app/(app)/inicio/page.tsx`, `app/globals.css`, e marcadores `data-tour` em
+  `BarraPassosDoDia`, `FiltersBar`, `TaskPalette`, `OccupancySummary`,
+  `CentralDoDia` e `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-08-05 — Tutorial com holofote: a base e a primeira etapa
 
 - **Para quê**: o piloto começa e o coordenador vai ficar sozinho diante de um

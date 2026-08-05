@@ -124,7 +124,7 @@ export default function TaskPalette({
   }, [tarefas, funcionarios, qualificacoes, requisitos, data, ausentes]);
 
   return (
-    <aside className="painel entra paleta-tarefas">
+    <aside className="painel entra paleta-tarefas" data-tour="paleta-tarefas">
       <div className="painel-cabecalho" style={{ padding: "10px 12px" }}>
         <span className="rotulo">Tarefas disponíveis</span>
         <span className="selo selo-cinza num">{visiveis.length}</span>

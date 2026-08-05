@@ -124,7 +124,7 @@ export default function CentralDoDia({ nome }: { nome: string }) {
         <span><strong className="num">{data.resumo.realizados_registrados}</strong> confirmados</span>
       </div>
 
-      <main className={`central-proxima nivel-${data.proxima.nivel}`}>
+      <main className={`central-proxima nivel-${data.proxima.nivel}`} data-tour="central-proxima">
         <div className="central-proxima-marca" aria-hidden="true">
           <span>01</span>
           <i />
