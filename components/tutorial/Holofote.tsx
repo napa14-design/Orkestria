@@ -37,12 +37,20 @@ export default function Holofote({
   passo,
   indice,
   total,
+  precisa,
   aoAvancar,
   aoSair,
 }: {
   passo: PassoTutorial;
   indice: number;
   total: number;
+  /**
+   * O que a etapa precisa para existir (ex.: "um dia com tarefas montadas").
+   *
+   * Com isto, alvo ausente vira explicação — a etapa depende de um dado que a
+   * pessoa ainda não criou. Sem isto, alvo ausente é defeito nosso e grita.
+   */
+  precisa?: string;
   aoAvancar: () => void;
   aoSair: () => void;
 }) {
@@ -69,12 +77,16 @@ export default function Holofote({
         setCaixa(c);
         setPerdido(false);
       } else if (++tentativas > 20) {
-        // 20 tentativas ≈ 2s: o elemento não vai aparecer. Avisa em vez de
-        // apontar para o nada — é assim que esses tutoriais apodrecem calados.
+        // 20 tentativas ≈ 2s: o elemento não vai aparecer.
         setPerdido(true);
-        console.error(
-          `[tutorial] alvo data-tour="${passo.alvo}" não existe nesta tela. O roteiro em lib/tutorial/trilha.ts está desatualizado.`,
-        );
+        // Grita só quando a etapa NÃO declara depender de dado. Aí o alvo
+        // sumiu do código e é defeito nosso. Quando a etapa declara, a
+        // ausência é esperada e virar erro no console seria ruído.
+        if (!precisa) {
+          console.error(
+            `[tutorial] alvo data-tour="${passo.alvo}" não existe nesta tela. O roteiro em lib/tutorial/trilha.ts está desatualizado.`,
+          );
+        }
       }
     };
     procurar();
@@ -87,7 +99,7 @@ export default function Holofote({
       window.removeEventListener("scroll", procurar, true);
       window.removeEventListener("resize", procurar);
     };
-  }, [passo.alvo]);
+  }, [passo.alvo, precisa]);
 
   // Traz o alvo para a tela antes de iluminá-lo.
   useEffect(() => {
@@ -169,10 +181,21 @@ export default function Holofote({
         <p>{passo.texto}</p>
 
         {perdido ? (
-          <div className="alerta alerta-erro" style={{ marginTop: 10 }}>
-            Não encontrei este item na tela. O tutorial está desatualizado — avise
-            quem cuida do sistema. Você pode continuar usando normalmente.
-          </div>
+          precisa ? (
+            /* Falta dado, não é defeito. Dizer o motivo em vez de acusar erro:
+               quem está no primeiro dia ainda não montou nada, e um alarme
+               vermelho aqui faria parecer que o sistema quebrou. */
+            <div className="holofote-adiante">
+              <strong>Este passo ainda não dá para fazer.</strong> Ele aparece
+              quando você tiver {precisa}. Nada de errado — é só a ordem das
+              coisas. Siga em frente e volte aqui depois.
+            </div>
+          ) : (
+            <div className="alerta alerta-erro" style={{ marginTop: 10 }}>
+              Não encontrei este item na tela. O tutorial está desatualizado — avise
+              quem cuida do sistema. Você pode continuar usando normalmente.
+            </div>
+          )
         ) : passo.avancarEm === "clique" ? (
           <div className="holofote-espera">↑ Clique no item destacado para continuar</div>
         ) : null}
@@ -183,8 +206,12 @@ export default function Holofote({
           </button>
         )}
         {perdido && (
-          <button type="button" className="btn holofote-ok" onClick={avancar}>
-            Pular este passo →
+          <button
+            type="button"
+            className={`btn holofote-ok${precisa ? " btn-primario" : ""}`}
+            onClick={avancar}
+          >
+            {precisa ? "Entendi, seguir →" : "Pular este passo →"}
           </button>
         )}
       </div>

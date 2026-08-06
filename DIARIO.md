@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-08-06 — Tutorial: passo que ainda não dá para fazer explica o motivo
+
+- **Risco pego a tempo, no dia em que o piloto começou.** Três etapas apontam
+  para botões que só existem quando há dado: "★ Ensinar esta rota", "Imprimir
+  fichas" e "Confirmar realizados". Numa sede recém-criada eles não existem — e o
+  holofote mostrava a faixa **vermelha** dizendo *"o tutorial está
+  desatualizado"*. Tecnicamente correto (ele falha alto de propósito), péssimo no
+  primeiro contato: a pessoa acharia o sistema quebrado quando só ainda não
+  chegou naquela parte.
+- **A correção foi transparência, não silêncio.** A etapa agora declara em
+  português o que precisa (`precisa: "um dia com tarefas montadas na agenda"`), e
+  a mesma frase serve dois lugares:
+  - no holofote, vira explicação em verde — *"Este passo ainda não dá para fazer.
+    Ele aparece quando você tiver um dia com tarefas montadas. Nada de errado — é
+    só a ordem das coisas."* — com botão **"Entendi, seguir →"**;
+  - na trilha da Central, vira *"Precisa de um dia com tarefas montadas"*, para a
+    ordem não parecer arbitrária.
+- **A distinção é o ponto**: etapa que declara `precisa` e não acha o alvo está
+  esperando dado — explica e segue, sem sujar o console. Etapa **sem** `precisa`
+  que não acha o alvo é defeito nosso — continua gritando em vermelho e no
+  `console.error`. O alarme não foi enfraquecido; ficou específico.
+- **Furo meu, achado na verificação**: eu só mostrava o pré-requisito nas etapas
+  **futuras** da trilha, e a atual — justamente onde a pessoa vai tentar e não
+  conseguir — ficava sem. Corrigido.
+- **O teste passou a reproduzir o cenário de verdade**, não uma aproximação:
+  cria a coordenadora na sede vazia, gera código, faz o primeiro acesso e abre a
+  agenda dela. A primeira tentativa não reproduziu nada (a agenda mostrava a sede
+  que tem dados, então o botão existia) e passou perto de dar falso "ok".
+- Verificado: o botão realmente não existe, a explicação aparece citando o
+  pré-requisito, zero alarme, zero erro no console, e a trilha diz o que falta.
+- Arquivos: `lib/tutorial/trilha.ts`, `components/tutorial/Holofote.tsx`,
+  `components/tutorial/{Tutorial,TrilhaProgresso}.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-08-06 — Intensidade em escala nomeada e a conta da tarefa na tela
 
 - **Dois campos confundiam os supervisores**, e por motivos diferentes.

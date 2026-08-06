@@ -62,12 +62,25 @@ export default function TrilhaProgresso() {
               {atual && guiado ? (
                 <Link href={`${etapa.rota}?tutorial=${etapa.id}`}>
                   <strong>{etapa.nome}</strong>
-                  <small>{etapa.ganho}</small>
+                  {/* O pré-requisito importa MAIS na etapa atual do que nas
+                      futuras: é nela que a pessoa vai tentar e não conseguir. */}
+                  <small>
+                    {etapa.ganho}
+                    {etapa.precisa && ` · Precisa de ${etapa.precisa}`}
+                  </small>
                 </Link>
               ) : (
                 <span>
                   <strong>{etapa.nome}</strong>
-                  {feita && <small>{etapa.ganho}</small>}
+                  {feita ? (
+                    <small>{etapa.ganho}</small>
+                  ) : (
+                    // Diz o pré-requisito nas etapas que dependem de dado: sem
+                    // isso a ordem da trilha parece arbitrária, e quem tenta
+                    // pular direto para "ensinar a rota" não entende por que
+                    // não dá.
+                    etapa.precisa && <small>Precisa de {etapa.precisa}</small>
+                  )}
                 </span>
               )}
             </li>

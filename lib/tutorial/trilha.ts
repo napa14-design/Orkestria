@@ -38,6 +38,20 @@ export interface EtapaTutorial {
   ganho: string;
   /** Tela em que esta etapa acontece. Várias etapas podem dividir a mesma. */
   rota: string;
+  /**
+   * O que precisa existir para esta etapa fazer sentido, em português — ex.:
+   * "um dia com tarefas montadas".
+   *
+   * Alguns botões do sistema só aparecem quando há dado ("★ Ensinar esta rota"
+   * só existe se o dia tem tarefas). Numa sede recém-criada eles não estão lá, e
+   * sem esta frase o holofote acusaria "tutorial desatualizado" — assustando
+   * quem só ainda não chegou naquela parte. Com ela, o sistema **diz o motivo**
+   * e oferece seguir adiante.
+   *
+   * Ausente = os alvos da etapa existem sempre; alvo faltando aí é defeito de
+   * verdade, e deve gritar.
+   */
+  precisa?: string;
   passos: PassoTutorial[];
 }
 
@@ -238,6 +252,7 @@ export const TRILHA: EtapaTutorial[] = [
     nome: "Ensinar a rota da sede",
     ganho: "A partir daqui, montar o dia vira um clique.",
     rota: "/rotinas",
+    precisa: "um dia com tarefas montadas na agenda",
     passos: [
       {
         titulo: "Este é o passo que encolhe o seu trabalho",
@@ -266,6 +281,7 @@ export const TRILHA: EtapaTutorial[] = [
     nome: "Imprimir as fichas",
     ganho: "A equipe recebe o dia no papel, sem celular e sem senha.",
     rota: "/rotinas",
+    precisa: "um dia com tarefas montadas na agenda",
     passos: [
       {
         alvo: "imprimir-fichas",
@@ -287,6 +303,7 @@ export const TRILHA: EtapaTutorial[] = [
     nome: "Confirmar o realizado",
     ganho: "O previsto vira comparação com o que aconteceu de verdade.",
     rota: "/rotinas",
+    precisa: "tarefas cujo horário já passou, esperando confirmação",
     passos: [
       {
         alvo: "confirmar-realizados",

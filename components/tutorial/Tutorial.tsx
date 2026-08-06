@@ -95,6 +95,7 @@ export default function Tutorial() {
       passo={atual}
       indice={passo}
       total={etapa.passos.length}
+      precisa={etapa.precisa}
       aoAvancar={() => {
         if (passo + 1 >= etapa.passos.length) void encerrar(true);
         else setPasso((p) => p + 1);

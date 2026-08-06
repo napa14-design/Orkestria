@@ -1031,6 +1031,21 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   text-align: center;
 }
 
+/* Passo que ainda não dá para fazer: explica, não alarma. Verde do "está tudo
+   bem", nunca o vermelho de erro. */
+.holofote-adiante {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--verde);
+  background: var(--papel-2);
+  border-radius: var(--raio);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+}
+
+.holofote-adiante strong { color: var(--tinta); }
+
 .holofote-ok {
   margin-top: 12px;
   width: 100%;
