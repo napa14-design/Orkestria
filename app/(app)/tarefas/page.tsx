@@ -52,6 +52,32 @@ export default function PaginaTarefas() {
   const requisitosDe = (csv?: string) =>
     (csv ?? "").split(",").filter(Boolean).map((id) => requisitos?.find((r) => r.id === id)).filter(Boolean) as Requisito[];
 
+  /**
+   * A multiplicação escrita com os números que a pessoa acabou de digitar.
+   *
+   * É a cura da dúvida em "tempo base" e "quantidade": explicar a regra por
+   * escrito não convence ninguém — ver `20 min × 3 = 60 min` convence.
+   * Não inclui os multiplicadores de intensidade/serviço de propósito: aqui o
+   * objetivo é a conta da regra, e a soma de fatores viraria outra confusão.
+   */
+  function contaDoTempo(form: Record<string, unknown>): string {
+    const base = Number(form.tempo_base_min ?? 0);
+    if (!base) return "";
+    const regra = String(form.regra_calculo ?? "");
+    if (regra === "por_unidade") {
+      const qtd = Number(form.quantidade ?? 1) || 1;
+      return `${base} min × ${qtd} unidade${qtd === 1 ? "" : "s"} = ${formatarDuracao(base * qtd)}`;
+    }
+    if (regra === "por_m2") {
+      const local = localPorId(String(form.local_id ?? ""));
+      if (!local) return `${base} min por m² — escolha o local para ver o total`;
+      if (!local.metragem)
+        return `${local.nome_local} está sem metragem — o total sairia zero`;
+      return `${base} min/m² × ${local.metragem} m² = ${formatarDuracao(base * local.metragem)}`;
+    }
+    return `Tempo total da tarefa: ${formatarDuracao(base)}`;
+  }
+
   return (
     <CrudManager<Tarefa>
       titulo="Tarefas"
@@ -116,20 +142,29 @@ export default function PaginaTarefas() {
         },
         {
           key: "tempo_base_min",
+          // O rótulo muda com a regra: "tempo base" não diz de quê, e a mesma
+          // caixa significa total, min/m² ou min por unidade.
           rotulo: "Tempo base (min)",
           tipo: "numero",
           passo: "0.1",
           obrigatorio: true,
-          ajuda: "Fixo/manual: total · por m²: min/m² · por unidade: min/un.",
+          // A conta ao vivo é o que mata a dúvida: em vez de explicar a regra,
+          // mostrar a multiplicação com os números que a pessoa acabou de pôr.
+          ajuda: (form) => contaDoTempo(form),
           dica: "O número que entra na conta da regra acima, sempre em minutos. Se a regra é FIXO ou MANUAL, é o tempo total da tarefa. Se é POR M², é quantos minutos cada m² leva (ex.: 1). Se é POR UNIDADE, é quantos minutos cada unidade leva (ex.: 20).",
         },
         {
           key: "quantidade",
-          rotulo: "Quantidade",
+          rotulo: "Quantas unidades",
           tipo: "numero",
           padrao: 1,
-          ajuda: "Usada na regra por unidade",
-          dica: "Só é usada quando a regra é POR UNIDADE: quantas unidades existem (ex.: 3 banheiros, 5 lixeiras). Nas outras regras pode deixar 1 — não afeta o cálculo.",
+          // Sem repetir a conta: ela já aparece no campo ao lado, e duplicar
+          // faria a ajuda quebrar em duas linhas sem dizer nada novo.
+          ajuda: "Ex.: 3 banheiros, 5 lixeiras, 30 carteiras",
+          dica: "Quantas unidades a tarefa cobre. O tempo base é multiplicado por este número: 20 min × 3 banheiros = 60 min.",
+          // Só aparece na regra que a usa. Antes ficava visível sempre, e campo
+          // que aparece sem servir ensina a preencher no chute.
+          mostrarSe: (f) => f.regra_calculo === "por_unidade",
         },
         {
           key: "frequencia",

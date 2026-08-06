@@ -31,12 +31,24 @@ export interface CampoForm {
     | "textarea"
     | "dias_semana"
     | "multiselect";
-  opcoes?: OpcaoCampo[];
+  /**
+   * Opções do select/multiselect. Como função, recalcula a cada digitação —
+   * usado para oferecer "manter o valor atual" quando o registro tem um valor
+   * fora da escala oferecida.
+   */
+  opcoes?: OpcaoCampo[] | ((form: Record<string, unknown>) => OpcaoCampo[]);
   obrigatorio?: boolean;
   padrao?: unknown;
   inteira?: boolean; // ocupa a linha toda do formulário
   passo?: string; // step para campos numéricos
-  ajuda?: string; // dica curta exibida abaixo do campo
+  /**
+   * Dica curta abaixo do campo. Como função, vira cálculo ao vivo — é o que
+   * mata a dúvida em campo numérico: em vez de explicar a regra, mostrar a
+   * conta ("20 min × 3 unidades = 60 min").
+   */
+  ajuda?: string | ((form: Record<string, unknown>) => string);
+  /** Converte para número ao salvar mesmo não sendo `tipo: "numero"`. */
+  numerico?: boolean;
   /** Explicação completa, mostrada ao clicar no (?) ao lado do rótulo. */
   dica?: string;
   /** Exibe o campo só quando a condição (sobre o estado atual do form) for verdadeira. */
@@ -53,6 +65,16 @@ type Registro = { id: string };
 
 function valorDe(item: Registro, key: string): unknown {
   return (item as unknown as Record<string, unknown>)[key];
+}
+
+/** Opções e ajuda podem ser função do formulário — aqui elas viram valor. */
+function opcoesDe(campo: CampoForm, form: Record<string, unknown>): OpcaoCampo[] {
+  const o = campo.opcoes;
+  return (typeof o === "function" ? o(form) : o) ?? [];
+}
+function ajudaDe(campo: CampoForm, form: Record<string, unknown>): string {
+  const a = campo.ajuda;
+  return (typeof a === "function" ? a(form) : a) ?? "";
 }
 
 /**
@@ -168,7 +190,7 @@ export default function CrudManager<T extends Registro>({
     setSalvando(true);
     const corpo: Record<string, unknown> = { ...form };
     for (const c of campos) {
-      if (c.tipo === "numero") corpo[c.key] = Number(corpo[c.key] ?? 0);
+      if (c.tipo === "numero" || c.numerico) corpo[c.key] = Number(corpo[c.key] ?? 0);
     }
     try {
       if (editando) await apiPut(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
@@ -371,8 +393,15 @@ export default function CrudManager<T extends Registro>({
                   onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
                   required={c.obrigatorio}
                 >
-                  <option value="">— selecionar —</option>
-                  {c.opcoes?.map((o) => (
+                  {/* O campo pode trazer a própria opção de valor vazio, com
+                      rótulo que explica o que "vazio" significa (ex.: "herdar
+                      do tipo do local"). Nesse caso o genérico sobraria — e
+                      duas opções com o mesmo valor deixariam a do campo
+                      inalcançável, porque o navegador seleciona a primeira. */}
+                  {!opcoesDe(c, form).some((o) => o.valor === "") && (
+                    <option value="">— selecionar —</option>
+                  )}
+                  {opcoesDe(c, form).map((o) => (
                     <option key={o.valor} value={o.valor}>
                       {o.rotulo}
                     </option>
@@ -395,10 +424,10 @@ export default function CrudManager<T extends Registro>({
                 />
               ) : c.tipo === "multiselect" ? (
                 <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
-                  {(c.opcoes ?? []).length === 0 && (
+                  {opcoesDe(c, form).length === 0 && (
                     <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Nenhuma opção disponível.</span>
                   )}
-                  {(c.opcoes ?? []).map((o) => {
+                  {opcoesDe(c, form).map((o) => {
                     const sel = String(form[c.key] ?? "").split(",").filter(Boolean);
                     const ativo = sel.includes(o.valor);
                     return (
@@ -484,8 +513,8 @@ export default function CrudManager<T extends Registro>({
                   required={c.obrigatorio}
                 />
               )}
-              {c.ajuda && (
-                <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>{c.ajuda}</span>
+              {ajudaDe(c, form) && (
+                <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>{ajudaDe(c, form)}</span>
               )}
             </label>
           ))}

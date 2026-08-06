@@ -2,9 +2,25 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
-import { fatorIntensidadeLocal } from "@/lib/calculations";
+import { fatorIntensidadeLocal, FATOR_POR_TIPO_LOCAL } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
-import type { Local, Sede } from "@/types";
+import type { Local, Sede, TipoLocal } from "@/types";
+
+/**
+ * Escala nomeada da intensidade.
+ *
+ * Os valores são **os que o sistema já usava** — 0,8 para área externa e 1,5
+ * para banheiro/copa. Uma escala simétrica (0,5 … 1,5) seria mais bonita, mas
+ * mudaria o tempo calculado de todo local já cadastrado. Escala torta que não
+ * remexe nos dados é melhor que escala bonita que remexe.
+ */
+const ESCALA_INTENSIDADE = [
+  { valor: "0.8", rotulo: "Leve — suja pouco (×0,8)" },
+  { valor: "0.9", rotulo: "Entre leve e médio (×0,9)" },
+  { valor: "1", rotulo: "Médio — o comum (×1,0)" },
+  { valor: "1.25", rotulo: "Entre médio e pesado (×1,25)" },
+  { valor: "1.5", rotulo: "Pesado — suja muito (×1,5)" },
+];
 
 const TIPOS_LOCAL = [
   { valor: "sala", rotulo: "Sala" },
@@ -73,13 +89,40 @@ export default function PaginaLocais() {
         },
         {
           key: "fator_intensidade",
-          rotulo: "Intensidade (fator)",
-          tipo: "numero",
-          passo: "0.1",
+          rotulo: "Quanto este ambiente pesa na limpeza",
+          // Escala nomeada em vez de multiplicador digitado: o supervisor pensa
+          // "esse banheiro suja mais", não "1,5". Os números da escala são os
+          // que o sistema JÁ usava (0,8 externa · 1,5 banheiro/copa), então
+          // nenhum tempo já calculado muda por causa da troca de controle.
+          tipo: "select",
+          numerico: true,
           // "" (e não 0) para o campo nascer VAZIO — vazio = herda do tipo.
           padrao: "",
-          ajuda: "Em branco = o tipo do local decide",
-          dica: "O quanto este ambiente \"suja\" e pesa na limpeza — multiplica o tempo previsto de TODAS as tarefas do local. DEIXE EM BRANCO para o sistema usar o padrão do tipo de local (banheiro e copa 1,5 · área externa 0,8 · demais 1,0). Preencha só quando este ambiente fugir do padrão do tipo dele — o valor digitado sempre vence.",
+          opcoes: (form) => {
+            const atual = String(form.fator_intensidade ?? "");
+            const naEscala = ESCALA_INTENSIDADE.some((o) => o.valor === atual);
+            return [
+              { valor: "", rotulo: "Herdar do tipo do local (recomendado)" },
+              ...ESCALA_INTENSIDADE,
+              // Local cadastrado antes desta escala pode ter valor fora dela.
+              // Some da lista = trocaria o valor sem a pessoa pedir.
+              ...(atual && atual !== "0" && !naEscala
+                ? [{ valor: atual, rotulo: `Manter o valor atual (×${atual.replace(".", ",")})` }]
+                : []),
+            ];
+          },
+          ajuda: (form) => {
+            const atual = String(form.fator_intensidade ?? "");
+            if (!atual || atual === "0") {
+              const tipo = String(form.tipo_local ?? "");
+              const herdado = FATOR_POR_TIPO_LOCAL[tipo as TipoLocal];
+              return herdado
+                ? `O tipo escolhido usa ×${String(herdado).replace(".", ",")}`
+                : "O tipo do local decide";
+            }
+            return "Multiplica o tempo de todas as tarefas deste local";
+          },
+          dica: "O quanto este ambiente suja e pesa na limpeza. Multiplica o tempo previsto de TODAS as tarefas do local: \"pesado\" faz cada tarefa levar 50% mais tempo que a mesma tarefa num ambiente médio. Deixe em \"Herdar do tipo do local\" na dúvida — banheiro e copa já entram como pesado, área externa como leve, o resto como médio. Escolha na mão só quando este ambiente fugir do padrão do tipo dele.",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },

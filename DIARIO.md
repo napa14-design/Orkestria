@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-08-06 — Intensidade em escala nomeada e a conta da tarefa na tela
+
+- **Dois campos confundiam os supervisores**, e por motivos diferentes.
+- **Intensidade: o problema era a unidade.** Multiplicador (0,5 · 1,0 · 1,5) é
+  linguagem de quem escreveu a fórmula; quem usa pensa "esse banheiro suja
+  mais". Virou escala nomeada — Leve · Entre leve e médio · Médio · Entre médio e
+  pesado · Pesado — com o fator entre parênteses, para quem quiser conferir.
+  - **A escala está ancorada nos números que o sistema já usava** (0,8 de área
+    externa e 1,5 de banheiro/copa). Uma escala simétrica (0,5 … 1,5) seria mais
+    bonita e **mudaria o tempo calculado de todo local já cadastrado**. Escala
+    torta que não remexe nos dados é melhor que escala bonita que remexe.
+  - Primeira opção é **"Herdar do tipo do local (recomendado)"**, e a ajuda diz
+    qual fator o tipo escolhido usa. Local com valor fora da escala ganha um
+    "manter o valor atual (×0,7)" — o select não troca nada sem a pessoa pedir.
+- **Quantidade: o problema não era o nome, era estar sempre visível.** Só vale na
+  regra "por unidade", mas aparecia em todas — campo que aparece sem servir
+  ensina a preencher no chute. Agora só aparece nessa regra, chama-se "Quantas
+  unidades" e traz exemplos (3 banheiros, 5 lixeiras, 30 carteiras).
+- **A cura da dúvida foi mostrar a conta**, não explicar a regra: embaixo do
+  tempo base aparece `20 min × 3 unidades = 1h` ao vivo, com os números que a
+  pessoa acabou de digitar. Idem para por m² — e quando o local está sem
+  metragem, diz isso em vez de mostrar zero.
+- **`CrudManager` ganhou três generalizações** reutilizáveis: `opcoes` e `ajuda`
+  podem ser função do formulário, e `numerico` converte select para número ao
+  salvar.
+- **Um defeito meu, achado na verificação**: o select genérico já injeta
+  "— selecionar —" com valor vazio, e a minha opção "Herdar" também tinha valor
+  vazio — duas opções com o mesmo valor deixavam a minha **inalcançável**, porque
+  o navegador seleciona a primeira. O placeholder genérico agora só aparece
+  quando o campo não traz a própria opção vazia.
+- Verificado na tela: 6 opções sem duplicata, nenhum rótulo só numérico, ajuda
+  refletindo o tipo escolhido, "Quantas unidades" oculto na regra padrão e
+  visível em "por unidade", e a multiplicação aparecendo com os valores digitados.
+- Arquivos: `app/(app)/locais/page.tsx`, `app/(app)/tarefas/page.tsx`,
+  `components/CrudManager.tsx`.
+
+---
+
 ## 2026-08-06 — Vulnerabilidades: de 17 para 0
 
 - **`npm audit`: 17 → 0.** Antes: 5 altas e 12 moderadas. Agora nenhuma.
