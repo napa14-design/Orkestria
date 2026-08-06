@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-08-06 — Vulnerabilidades: de 17 para 0
+
+- **`npm audit`: 17 → 0.** Antes: 5 altas e 12 moderadas. Agora nenhuma.
+- **Next 15.5.19 → 16.3.0.** As 3 altas que sobraram depois do `audit fix` eram
+  todas de dependências do próprio Next (`postcss`, `sharp`), e a única correção
+  era o salto de major.
+  - **`--webpack` nos scripts**: o Next 16 usa Turbopack por padrão e aborta o
+    build ao encontrar config webpack. A nossa regra injeta o `DIARIO.md` no
+    bundle como texto, e Turbopack não tem equivalente nativo (exigiria
+    `raw-loader`, sem manutenção desde 2020). `fs` não serve: na Vercel o
+    arquivo da raiz não vai para a função serverless. Migrar para Turbopack no
+    futuro passa por resolver esse import.
+  - O Next reescreveu o `tsconfig.json` (`jsx: preserve` → `react-jsx`).
+- **firebase-admin 13.10 → 14.2** e **googleapis 144 → 174.0.1**, que fecharam 8
+  moderadas. A superfície que usamos é mínima e estável (`cert`, `getApps`,
+  `initializeApp`, `getAuth`, `getFirestore`).
+- **`overrides: { uuid: "^11.1.1" }`** fechou as 7 últimas. Todas desembocavam no
+  mesmo `uuid` antigo, e o que o npm propunha como "correção" era **downgrade**
+  (firebase-admin 14 → 10, exceljs 4.4 → 3.4) — pior que a falha.
+- **Verificação, porque atualizar dependência sem provar é fé:**
+  - Leitura real no Firestore de **produção** com o SDK novo (somente leitura):
+    `usuarios`, `sedes` e consulta com `where` — todas responderam.
+  - `exceljs` com o `uuid` forçado: baixou o modelo (xlsx válido, assinatura ZIP)
+    e releu o próprio arquivo — o importador continua interpretando planilha.
+  - Portão de autenticação: `/rotinas` sem cookie → 307 para `/login`;
+    `/api/rotinas` sem cookie → 401.
+  - As 11 telas da trilha do tutorial: 11/11, zero alvos perdidos.
+- **Um alarme falso que valeu a lição**: a primeira rodada acusou 1 falha e 18
+  alvos perdidos. Não era o Next 16 — era o **meu script de verificação**,
+  escrito antes do convite existir, esperando holofote numa conta que ainda não
+  respondeu "Ver" (comportamento correto). Script corrigido; teste que grita à
+  toa é pior que teste nenhum.
+- **Fica pendente**: a convenção `middleware` está **deprecada** no Next 16 (o
+  build avisa e pede `proxy`). Não migrei junto de propósito — é o portão de
+  autenticação do sistema inteiro, e uma mudança de risco por vez.
+- Arquivos: `package.json` (versões, `overrides`, `--webpack`),
+  `package-lock.json`, `next.config.ts`, `tsconfig.json`.
+
+---
+
 ## 2026-08-05 — E-mail de boas-vindas com o código de primeiro acesso
 
 - Gerar o código passa a **enviar um e-mail** para a pessoa, com o código, o

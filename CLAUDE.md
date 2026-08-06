@@ -81,6 +81,18 @@ bordas firmes, sombras duras e rótulos mono em caixa alta. Fontes: Fraunces
 (display/serif), Albert Sans (corpo), Spline Sans Mono (números). A marca é
 "Orkestr" + "ia" em destaque. Manter a identidade ao criar telas novas.
 
+## Build (Next 16)
+
+O build roda com **`--webpack`** de propósito (`next build --webpack`): o Next 16
+usa Turbopack por padrão e aborta ao ver config webpack, e a nossa regra injeta o
+`DIARIO.md` no bundle como texto — Turbopack não tem equivalente nativo, e `fs`
+não serve porque na Vercel o arquivo da raiz não vai para a função serverless.
+Migrar para Turbopack passa por resolver esse import.
+
+`overrides: { uuid: "^11.1.1" }` no `package.json` existe para zerar a auditoria:
+sem ele, a única "correção" que o npm oferece é downgrade de `firebase-admin` e
+`exceljs`. Não remover sem rodar `npm audit`.
+
 ## Pendências conhecidas
 
 - Firebase Authentication (substituir cookie HMAC + senha única) — aguarda o
