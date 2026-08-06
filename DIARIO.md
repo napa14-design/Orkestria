@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-05 — Campo de sedes extras visível, e exclusão sem o `confirm` do navegador
+
+- **O campo de sedes adicionais estava invisível para quem cadastrava.** Eu o
+  havia condicionado a `perfil === supervisor && sede_id !== "geral"` — e como a
+  sede começa em "Geral", ele só aparecia depois de escolher uma sede
+  específica. Resultado: o administrador não achou o campo e concluiu que não
+  dava para selecionar várias sedes. **É o mesmo erro do botão de modelos**, que
+  só existia na visão Semana. Agora aparece para todo supervisor, e o texto de
+  ajuda avisa que com "Geral" ele é ignorado.
+- **Exclusão saiu do `window.confirm`.** Não era só feiura fora da identidade:
+  quando alguém marca *"Não permitir que este site mostre mensagens assim
+  novamente"* no Chrome, o `confirm` passa a devolver `false` e **excluir para de
+  funcionar em silêncio** — ninguém entende por quê. Agora é modal do sistema, e
+  ele **diz qual registro** ("Excluir Financeiro / Lojinha definitivamente?"),
+  em vez do genérico "este registro". `window.alert` do erro virou alerta
+  dentro do modal.
+- No `ModalPlanejamento`, a exclusão de modelo virou confirmação em dois toques
+  (o botão passa a "Confirmar exclusão"), pelo mesmo motivo. Trocar de modelo no
+  select cancela a confirmação pendente.
+- Não sobrou nenhum `window.confirm`/`window.alert` no código.
+- Verificado: campo aparece ao escolher Supervisor (com 3 sedes marcáveis);
+  excluir não abre diálogo do navegador e o modal nomeia o registro.
+- Arquivos: `app/(app)/usuarios/page.tsx`, `components/CrudManager.tsx`,
+  `components/agenda/ModalPlanejamento.tsx`.
+
+---
+
 ## 2026-08-05 — Convite do tutorial: Ver, Adiar e Pular
 
 - **Antes o tutorial começava sozinho** — a pessoa era jogada dentro dele sem

@@ -113,6 +113,8 @@ export default function ModalPlanejamento({
   const [padraoNovo, setPadraoNovo] = useState(false);
   const [eventoNovo, setEventoNovo] = useState(false);
   const [modeloEscolhido, setModeloEscolhido] = useState("");
+  /** Confirmação em dois toques, no lugar do confirm() do navegador. */
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -190,7 +192,13 @@ export default function ModalPlanejamento({
 
   async function excluirModelo() {
     if (!modeloEscolhido) return;
-    if (!window.confirm(`Excluir o modelo "${modeloEscolhido}"?`)) return;
+    // Sem `window.confirm`: marcado o "não mostrar mensagens assim novamente"
+    // do navegador, ele passa a devolver false e a exclusão morre em silêncio.
+    if (!confirmandoExclusao) {
+      setConfirmandoExclusao(true);
+      return;
+    }
+    setConfirmandoExclusao(false);
     executar(async () => {
       await apiDelete(`/api/modelos?nome=${encodeURIComponent(modeloEscolhido)}&sede=${sedeId}`);
       await mutateModelos();
@@ -281,7 +289,7 @@ export default function ModalPlanejamento({
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <label className="campo" style={{ flex: 1 }}>
               <span className="rotulo">Aplicar modelo existente</span>
-              <select value={modeloEscolhido} onChange={(e) => setModeloEscolhido(e.target.value)}>
+              <select value={modeloEscolhido} onChange={(e) => { setModeloEscolhido(e.target.value); setConfirmandoExclusao(false); }}>
                 <option value="">— escolher —</option>
                 {(() => {
                   const todos = modelos ?? [];
@@ -323,9 +331,9 @@ export default function ModalPlanejamento({
               style={{ color: "var(--vermelho)" }}
               onClick={excluirModelo}
               disabled={ocupado || !modeloEscolhido}
-              title="Excluir modelo"
+              title={confirmandoExclusao ? "Clique de novo para confirmar" : "Excluir modelo"}
             >
-              ✕
+              {confirmandoExclusao ? "Confirmar exclusão" : "✕"}
             </button>
           </div>
           <p style={{ fontSize: 11, color: "var(--tinta-3)" }}>

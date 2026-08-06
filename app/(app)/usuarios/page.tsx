@@ -104,12 +104,15 @@ export default function PaginaUsuarios() {
           tipo: "multiselect",
           inteira: true,
           opcoes: (sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
-          ajuda: "Deixe vazio se ele cuida só da sede principal",
+          ajuda:
+            "Marque as sedes extras. Deixe vazio se ele cuida só da principal (com sede \"Geral\" este campo é ignorado)",
           dica:
-            "Para o coordenador que cobre mais de uma sede. Ele passa a enxergar e editar todas as marcadas aqui, além da principal, trocando de sede num seletor — a Central e a Agenda mostram uma sede por vez. A sede principal já está incluída, não precisa marcar. Só aparece para supervisor com sede específica: administrador e gerência já alcançam todas.",
-          // Escopo por sede só existe para supervisor; com "Geral" a lista não
-          // significaria nada, porque ele já alcança todas.
-          mostrarSe: (f) => f.perfil === "supervisor" && f.sede_id !== "geral",
+            "Para o coordenador que cobre mais de uma sede. Ele passa a enxergar e editar todas as marcadas aqui, além da principal, trocando de sede num seletor — a Central e a Agenda mostram uma sede por vez. A sede principal já está incluída, não precisa marcar.",
+          // Aparece para TODO supervisor, mesmo antes de escolher a sede
+          // principal: escondê-lo até a sede estar preenchida deixou o campo
+          // invisível para quem estava cadastrando — o mesmo erro do botão de
+          // modelos, que só existia na visão Semana.
+          mostrarSe: (f) => f.perfil === "supervisor",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
       ]}

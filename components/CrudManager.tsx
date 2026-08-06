@@ -55,6 +55,31 @@ function valorDe(item: Registro, key: string): unknown {
   return (item as unknown as Record<string, unknown>)[key];
 }
 
+/**
+ * Como chamar o registro na confirmação de exclusão.
+ *
+ * "Excluir definitivamente este registro?" não diz qual — e quem clicou errado
+ * não tem como perceber antes de confirmar. Procura o campo de nome mais
+ * provável e cai em "este registro" só se não achar nenhum.
+ */
+function rotuloDoItem(item: Registro): string {
+  const candidatos = [
+    "nome",
+    "nome_local",
+    "nome_tarefa",
+    "nome_sede",
+    "nome_modelo",
+    "descricao",
+    "email",
+    "chave",
+  ];
+  for (const key of candidatos) {
+    const valor = valorDe(item, key);
+    if (typeof valor === "string" && valor.trim()) return valor.trim();
+  }
+  return "este registro";
+}
+
 export default function CrudManager<T extends Registro>({
   titulo,
   subtitulo,
@@ -86,6 +111,9 @@ export default function CrudManager<T extends Registro>({
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [paraExcluir, setParaExcluir] = useState<T | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState("");
   // Balão de ajuda flutuante (hover/foco no "?"). Posição em coordenadas
   // de tela, renderizado em portal para nunca ser cortado pelo modal.
   const [tip, setTip] = useState<{ texto: string; x: number; y: number; acima: boolean } | null>(null);
@@ -159,13 +187,26 @@ export default function CrudManager<T extends Registro>({
     }
   }
 
-  async function excluir(item: T) {
-    if (!window.confirm(`Excluir definitivamente este registro?`)) return;
+  /**
+   * Confirmação em modal do sistema, não no `confirm` do navegador.
+   *
+   * O nativo tem dois problemas: é feio fora da identidade, e o Chrome oferece
+   * "não mostrar mensagens assim novamente" — marcado isso, `confirm` passa a
+   * devolver `false` e **excluir para de funcionar em silêncio**, sem ninguém
+   * entender o motivo.
+   */
+  async function confirmarExclusao() {
+    if (!paraExcluir) return;
+    setExcluindo(true);
+    setErroExcluir("");
     try {
-      await apiDelete(`${endpoint.split("?")[0]}/${item.id}`);
+      await apiDelete(`${endpoint.split("?")[0]}/${paraExcluir.id}`);
       await mutate();
+      setParaExcluir(null);
     } catch (err) {
-      window.alert(err instanceof ErroApi ? err.message : "Erro ao excluir.");
+      setErroExcluir(err instanceof ErroApi ? err.message : "Erro ao excluir.");
+    } finally {
+      setExcluindo(false);
     }
   }
 
@@ -262,7 +303,7 @@ export default function CrudManager<T extends Registro>({
                   <button
                     className="btn btn-mini btn-fantasma"
                     style={{ color: "var(--vermelho)" }}
-                    onClick={() => excluir(item)}
+                    onClick={() => { setParaExcluir(item); setErroExcluir(""); }}
                   >
                     Excluir
                   </button>
@@ -500,6 +541,37 @@ export default function CrudManager<T extends Registro>({
           </div>,
           document.body,
         )}
+
+      <Modal
+        titulo="Excluir registro"
+        aberto={!!paraExcluir}
+        aoFechar={() => setParaExcluir(null)}
+        larguraMax={420}
+      >
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)" }}>
+          Excluir <strong>{paraExcluir ? rotuloDoItem(paraExcluir) : ""}</strong>{" "}
+          definitivamente? Esta ação não tem desfazer — o registro sai da lista e
+          fica apenas no histórico.
+        </p>
+        {erroExcluir && (
+          <div className="alerta alerta-erro" style={{ marginTop: 12 }}>
+            {erroExcluir}
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+          <button type="button" className="btn" onClick={() => setParaExcluir(null)}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primario"
+            onClick={() => void confirmarExclusao()}
+            disabled={excluindo}
+          >
+            {excluindo ? "Excluindo…" : "Excluir"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
