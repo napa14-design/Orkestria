@@ -91,10 +91,25 @@ export function conviteAcesso(dados: ConviteAcesso): {
         </table>
       </td></tr>
 
-      <tr><td style="padding:8px 24px 4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#4a584e;">
+      <!-- Botão "à prova de balas": tabela com bgcolor e âncora com padding.
+           Cliente de e-mail descarta CSS de botão, mas respeita isto. O link
+           NÃO leva o código nem o e-mail no endereço: endereço vaza (histórico,
+           encaminhamento, proxy), e link com credencial dentro é clique-e-tome. -->
+      <tr><td align="center" style="padding:4px 24px 18px;">
+        <table role="presentation" cellpadding="0" cellspacing="0">
+          <tr><td bgcolor="${ACENTO}" style="border:2px solid ${TINTA};">
+            <a href="${dados.url}" style="display:inline-block;padding:14px 30px;color:${PAPEL};font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;">Entrar no Orkestria &rarr;</a>
+          </td></tr>
+        </table>
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a958c;padding-top:9px;">
+          Se o botão não funcionar, abra: <a href="${dados.url}" style="color:#8a958c;">${dados.url}</a>
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:0 24px 4px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#4a584e;">
         <strong style="color:${TINTA};">Como entrar</strong><br>
-        1. Abra <a href="${dados.url}" style="color:${ACENTO};">${dados.url}</a> e informe o seu e-mail.<br>
-        2. No campo de senha, digite o código acima.<br>
+        1. Clique no botão acima e informe o seu e-mail.<br>
+        2. No campo de senha, digite o código.<br>
         3. O sistema vai pedir que você crie a <strong>sua</strong> senha — só sua, e ninguém
         no sistema consegue vê-la, nem quem administra.
       </td></tr>
