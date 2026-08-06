@@ -12,8 +12,11 @@
 - **Dois campos confundiam os supervisores**, e por motivos diferentes.
 - **Intensidade: o problema era a unidade.** Multiplicador (0,5 · 1,0 · 1,5) é
   linguagem de quem escreveu a fórmula; quem usa pensa "esse banheiro suja
-  mais". Virou escala nomeada — Leve · Entre leve e médio · Médio · Entre médio e
-  pesado · Pesado — com o fator entre parênteses, para quem quiser conferir.
+  mais". Virou escala nomeada — **Muito leve · Leve · Médio · Puxado · Pesado** —
+  com o fator entre parênteses, para quem quiser conferir. "Entre leve e médio"
+  foi descartado: não é nome, é descrição de um vão, e obriga a pessoa a fazer a
+  interpolação de cabeça. "Puxado" é a palavra brasileira exata para o degrau de
+  cima — mais que o normal, sem ser extremo.
   - **A escala está ancorada nos números que o sistema já usava** (0,8 de área
     externa e 1,5 de banheiro/copa). Uma escala simétrica (0,5 … 1,5) seria mais
     bonita e **mudaria o tempo calculado de todo local já cadastrado**. Escala

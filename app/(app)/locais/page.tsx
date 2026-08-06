@@ -15,10 +15,10 @@ import type { Local, Sede, TipoLocal } from "@/types";
  * remexe nos dados é melhor que escala bonita que remexe.
  */
 const ESCALA_INTENSIDADE = [
-  { valor: "0.8", rotulo: "Leve — suja pouco (×0,8)" },
-  { valor: "0.9", rotulo: "Entre leve e médio (×0,9)" },
+  { valor: "0.8", rotulo: "Muito leve — quase não suja (×0,8)" },
+  { valor: "0.9", rotulo: "Leve — suja pouco (×0,9)" },
   { valor: "1", rotulo: "Médio — o comum (×1,0)" },
-  { valor: "1.25", rotulo: "Entre médio e pesado (×1,25)" },
+  { valor: "1.25", rotulo: "Puxado — suja mais que o comum (×1,25)" },
   { valor: "1.5", rotulo: "Pesado — suja muito (×1,5)" },
 ];
 
@@ -122,7 +122,7 @@ export default function PaginaLocais() {
             }
             return "Multiplica o tempo de todas as tarefas deste local";
           },
-          dica: "O quanto este ambiente suja e pesa na limpeza. Multiplica o tempo previsto de TODAS as tarefas do local: \"pesado\" faz cada tarefa levar 50% mais tempo que a mesma tarefa num ambiente médio. Deixe em \"Herdar do tipo do local\" na dúvida — banheiro e copa já entram como pesado, área externa como leve, o resto como médio. Escolha na mão só quando este ambiente fugir do padrão do tipo dele.",
+          dica: "O quanto este ambiente suja e pesa na limpeza. Multiplica o tempo previsto de TODAS as tarefas do local: \"pesado\" faz cada tarefa levar 50% mais tempo que a mesma tarefa num ambiente médio. Deixe em \"Herdar do tipo do local\" na dúvida — banheiro e copa já entram como pesado, área externa como muito leve, o resto como médio. Escolha na mão só quando este ambiente fugir do padrão do tipo dele.",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
