@@ -107,6 +107,28 @@ A coluna "Acesso" em `Sistema › Usuários` mostra o estado de cada pessoa — 
 própria · código enviado · código vencido · sem acesso — que é o painel de
 acompanhamento da implantação.
 
+### E-mail (opcional)
+
+Havendo SMTP configurado, gerar o código também **envia** um e-mail de
+boas-vindas com ele (`lib/email.ts` + `lib/emails/conviteAcesso.ts`). SMTP e não
+a API de um fornecedor: a mesma implementação atende Google Workspace, servidor
+próprio e Resend/SendGrid/Mailgun — trocar de caminho é trocar variáveis.
+
+Duas regras de projeto:
+
+- **Melhor esforço, nunca dependência.** `enviarEmail` não lança; o código
+  continua aparecendo na tela e a resposta diz `email: { enviado, motivo }`. Um
+  envio quebrado não pode virar uma pessoa sem acesso — e o motivo é sempre
+  exibido, inclusive o "não configurado", senão o administrador acha que algo
+  falhou.
+- **Timeouts de 10s** no transporte. Host errado ou porta bloqueada penduraria a
+  tela: medido, o padrão do nodemailer levava 21s onde o nosso corta em 10.
+
+Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+(opcional) e `APP_URL` (link do e-mail). No Google Workspace, `SMTP_PASS` é uma
+**senha de aplicativo**, nunca a senha da conta. Sem as variáveis o sistema
+funciona igual, apenas sem enviar.
+
 ## Limitações conhecidas do banco provisório (Sheets)
 
 - Sem transações nem integridade referencial — o servidor valida tudo antes de

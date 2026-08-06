@@ -29,12 +29,15 @@ export default function PaginaUsuarios() {
   const [msg, setMsg] = useState("");
   /** Código gerado, mostrado uma única vez. Depois de fechar, só gerando outro. */
   const [codigo, setCodigo] = useState("");
+  /** Envio do e-mail deu certo? Muda o alerta de verde para vermelho. */
+  const [emailOk, setEmailOk] = useState(false);
 
   function abrirCodigo(u: UsuarioListado, jaGerar: boolean) {
     setAlvo(u);
     setCodigo("");
     setMsg("");
     setEstado("idle");
+    setEmailOk(false);
     // Depois de cadastrar não faz sentido perguntar nada: a pessoa precisa do
     // código para conseguir entrar, então ele já sai gerado.
     if (jaGerar) void gerarCodigo(u);
@@ -46,15 +49,21 @@ export default function PaginaUsuarios() {
     setEstado("enviando");
     setMsg("");
     try {
-      const r = await apiPost<{ codigo: string; expira_em: string }>(
-        `/api/usuarios/${usuario.id}/codigo`,
-        {},
-      );
+      const r = await apiPost<{
+        codigo: string;
+        expira_em: string;
+        email: { enviado: boolean; motivo?: string; destino: string };
+      }>(`/api/usuarios/${usuario.id}/codigo`, {});
       setCodigo(r.codigo);
       setEstado("ok");
-      setMsg(
-        `Vale até ${new Date(r.expira_em).toLocaleDateString("pt-BR")}. Se ${usuario.nome.split(" ")[0]} tinha senha, ela foi apagada.`,
-      );
+      const validade = `Vale até ${new Date(r.expira_em).toLocaleDateString("pt-BR")}.`;
+      // O resultado do envio é dito sempre. Se ele falhou e ninguém avisar, o
+      // administrador acha que a pessoa recebeu — e ela fica sem acesso.
+      const sobreEmail = r.email.enviado
+        ? ` E-mail enviado para ${r.email.destino}.`
+        : ` E-mail NÃO enviado${r.email.motivo ? ` (${r.email.motivo})` : ""} — passe o código por outro caminho.`;
+      setMsg(`${validade}${sobreEmail}`);
+      setEmailOk(r.email.enviado);
     } catch (e) {
       setEstado("erro");
       setMsg(e instanceof ErroApi ? e.message : "Erro ao gerar o código.");
@@ -243,7 +252,7 @@ export default function PaginaUsuarios() {
       )}
       {msg && (
         <div
-          className={`alerta ${estado === "erro" ? "alerta-erro" : "alerta-ok"}`}
+          className={`alerta ${estado === "erro" || (codigo && !emailOk) ? "alerta-erro" : "alerta-ok"}`}
           style={{ marginTop: 12, marginBottom: 4 }}
         >
           {msg}

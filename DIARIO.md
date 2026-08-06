@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-08-05 — E-mail de boas-vindas com o código de primeiro acesso
+
+- Gerar o código passa a **enviar um e-mail** para a pessoa, com o código, o
+  endereço do sistema, os três passos para entrar e o aviso de que a senha que
+  ela criar ninguém vê. Antes o código só existia na tela do administrador, que
+  tinha de repassar por fora.
+- **SMTP, não a API de um fornecedor.** A mesma implementação atende o Google
+  Workspace do cliente, servidor próprio e Resend/SendGrid/Mailgun (todos têm
+  SMTP). Trocar de caminho é trocar variáveis, não código.
+- **Melhor esforço, nunca dependência.** `enviarEmail` não lança: o código
+  continua na tela e a resposta traz `email: { enviado, motivo }`. Um envio
+  quebrado não pode virar uma pessoa sem acesso.
+- **O motivo é dito até quando não há o que enviar** ("o envio de e-mail ainda
+  não foi configurado"). Um "não enviado" mudo faria o administrador achar que
+  algo falhou — e o alerta fica vermelho quando o envio não saiu, para ele não
+  fechar a janela achando que estava tudo certo.
+- **Timeouts de 10s no transporte.** Sem eles, host errado ou porta bloqueada
+  penduraria a tela: medido, o padrão do nodemailer levou **21s** onde o nosso
+  corta em **10s**.
+- HTML de e-mail conservador de propósito (tabela, estilo inline, nenhuma fonte
+  externa) e com texto puro de verdade — é o que aparece na prévia da caixa.
+- Sem as variáveis, nada muda no sistema. Verificado: sem SMTP, cadastrar e
+  gerar código seguem em 200 com o código na resposta.
+- **Falta o usuário fazer**: gerar a senha de aplicativo do Google e preencher
+  `SMTP_PASS` no `.env` local e nas variáveis de ambiente da Vercel.
+- Arquivos: `lib/email.ts`, `lib/emails/conviteAcesso.ts`,
+  `app/api/usuarios/[id]/codigo/route.ts`, `app/(app)/usuarios/page.tsx`,
+  `.env.example`, `docs/04-arquitetura.md`, `package.json` (nodemailer).
+
+---
+
 ## 2026-08-05 — Campo de sedes extras visível, e exclusão sem o `confirm` do navegador
 
 - **O campo de sedes adicionais estava invisível para quem cadastrava.** Eu o
