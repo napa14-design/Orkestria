@@ -73,7 +73,9 @@ export function conviteAcesso(dados: ConviteAcesso): {
       </td></tr>
 
       <tr><td style="padding:24px 24px 8px;">
-        <div style="font-size:21px;color:${TINTA};font-weight:bold;padding-bottom:12px;">${primeiroNome}, bem-vindo ao Orkestria.</div>
+        <!-- "Boas-vindas" e não "bem-vindo/bem-vinda": não presume o gênero de
+             quem recebe, e a maioria das coordenações de sede é de mulheres. -->
+        <div style="font-size:21px;color:${TINTA};font-weight:bold;padding-bottom:12px;">Boas-vindas, ${primeiroNome}.</div>
         <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#4a584e;">
           É aqui que a rotina da sua equipe passa a ser montada — o que hoje você faz
           na planilha. Para entrar pela primeira vez, use o código abaixo.
