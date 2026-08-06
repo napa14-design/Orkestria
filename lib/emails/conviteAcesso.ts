@@ -133,7 +133,9 @@ export function conviteAcesso(dados: ConviteAcesso): {
 </table>`;
 
   return {
-    assunto: `${primeiroNome}, seu acesso ao Orkestria (código de primeiro acesso)`,
+    // Assunto fixo, definido pelo cliente. "Bem-vindo(a)" com hífen, que é a
+    // grafia correta; o "(a)" cobre os dois gêneros sem personalizar.
+    assunto: "Bem-vindo(a) ao Orkestria — Código de acesso",
     texto,
     html,
   };
