@@ -99,6 +99,17 @@ Migrar para Turbopack passa por resolver esse import.
 sem ele, a única "correção" que o npm oferece é downgrade de `firebase-admin` e
 `exceljs`. Não remover sem rodar `npm audit`.
 
+**`firebase-admin` está preso no 13.x de propósito.** O 14 puxa `jwks-rsa@4` →
+`jose@6`, que é ESM puro (sem nenhuma build CommonJS). Na função serverless da
+Vercel o `require()` de ESM falha com `ERR_REQUIRE_ESM` **mesmo em Node 24**, que
+suporta `require(esm)` — o mesmo build funciona localmente, então não dá para
+pegar isso sem medir em produção. Quem usa essa cadeia é só o `verifyIdToken` do
+**login com Google**: ele para de carregar e o resto do sistema segue normal, o
+que faz o sintoma parecer coisa de credencial. O 13.10 traz `jose@4`, com build
+CommonJS, e mantém `npm audit` em 0. Para subir para 14, primeiro troque a
+verificação do token por algo sem `jwks-rsa` (a API REST do Identity Toolkit,
+`accounts:lookup`, resolve com a apiKey pública).
+
 ## Pendências conhecidas
 
 - Firebase Authentication (substituir cookie HMAC + senha única) — aguarda o

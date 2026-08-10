@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "description": "Sistema web de planejamento visual de rotinas operacionais, ocupação de jornada e ociosidade prevista/realizada (ASG/serviços gerais).",
-  "engines": {
-    "node": ">=22.12"
-  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
@@ -16,7 +13,7 @@
   "dependencies": {
     "exceljs": "^4.4.0",
     "firebase": "^12.14.0",
-    "firebase-admin": "^14.2.0",
+    "firebase-admin": "^13.10.0",
     "googleapis": "^174.0.1",
     "jsqr": "^1.4.0",
     "next": "^16.3.0",

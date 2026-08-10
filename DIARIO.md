@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-08-10 — Login com Google consertado: firebase-admin volta para o 13
+
+### A causa real
+
+O upgrade `firebase-admin 13.10 → 14.2` (commit `ae7af71`, feito para zerar a
+auditoria) trouxe `jwks-rsa@4` → **`jose@6`, que é ESM puro** — `"type":
+"module"`, um único `default` no `exports`, nenhuma build CommonJS. O `jwks-rsa`
+é CommonJS e faz `require('jose')`, então só funciona pelo `require(esm)` do
+Node. Na função serverless da Vercel esse caminho falha com `ERR_REQUIRE_ESM`
+**mesmo rodando Node v24.18**, que suporta `require(esm)` — algo no
+empacotamento/runtime de lá não tem isso habilitado, e não é coisa que se
+controle por código.
+
+O conserto é voltar ao **13.10**, que traz `jose@4.15.9` com
+`require → dist/node/cjs/index.js`. A fronteira CJS→ESM deixa de existir. Medido:
+**`npm audit` continua em 0** — a auditoria zerada e o Google funcionando não
+estavam em conflito de verdade. Ficou registrado no `CLAUDE.md` para ninguém
+repetir o upgrade às cegas.
+
+### Duas hipóteses minhas que estavam erradas
+
+1. **"É a versão de Node da função."** Eu tinha declarado `engines: >=22.12` e
+   mandado trocar a versão no painel da Vercel. Errado: o `process.version` no
+   próprio 503 mostrou **Node v24.18.0**, que já suporta `require(esm)`. O
+   `engines` foi removido — declarar exigência que não existe é pior que não
+   declarar nada.
+2. **"É o rastreio de arquivos / import dinâmico."** Também não: o build de
+   produção **local** (Node 24, mesmo `next build`) carrega o módulo e responde
+   401 normalmente. Só a Vercel falha.
+
+Nenhuma das duas teria caído sem instrumentar. O que fechou o caso foi imprimir
+`process.version` e o nome do módulo na mensagem de erro — dois dados, uma linha
+cada, depois de horas de dedução em cima de um 401 que mentia.
+
+### Verificado antes de subir
+
+`npx tsc --noEmit` limpo · 71 testes · `next build` limpo · `npm audit` 0 ·
+build de produção local: rota do Google devolve 401 com `auth/argument-error`
+(módulo carregou) e o login por senha devolve 401 contra o Firestore real (banco
+de pé).
+
+### Arquivos
+
+`package.json`, `package-lock.json`, `CLAUDE.md`
+
+---
+
 ## 2026-08-10 — Login com Google: a causa era a versão de Node da função
 
 ### A causa raiz, em texto
