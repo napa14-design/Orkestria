@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-08-10 — Login com Google: a causa era a versão de Node da função
+
+### A causa raiz, em texto
+
+Com o 503 informativo no ar, a produção respondeu:
+
+```
+ERR_REQUIRE_ESM — require() of ES Module /var/task/node_modules/jose/dist/webapi/index.js
+from /var/task/node_modules/jwks-rsa/src/utils.js not supported
+```
+
+O `jwks-rsa` é CommonJS e faz `require('jose')`; o `jose` v6 é **ESM puro**.
+`require()` de ESM só existe a partir do **Node 22.12** — daí o
+`engines: node >= 22` do `firebase-admin@14`. A função na Vercel roda Node mais
+antigo, então `firebase-admin/auth` não carrega. Nada a ver com token, com as
+rules do Firestore ou com o cadastro de usuários; a cadeia só é usada pelo login
+com Google, que é justamente a única coisa que estava quebrada.
+
+### O conserto
+
+É de **configuração, não de código**: Vercel › Settings › General › **Node.js
+Version → 22.x** (ou 24.x), e redeploy — a versão só muda no deploy seguinte.
+O `engines` do `package.json` passou de `">=22"` para **`">=22.12"`**, que é o
+limiar verdadeiro (`require(esm)`), não um arredondamento.
+
+Alternativas descartadas: escrever a verificação de RS256 à mão com
+`node:crypto` (código de segurança próprio para não subir uma versão de Node —
+troca ruim) e tirar `firebase-admin` de `serverExternalPackages` para o webpack
+empacotar o `jose` (o externo foi posto ali de propósito, contra este mesmo
+`ERR_REQUIRE_ESM`; mexer trocaria um problema conhecido por um desconhecido).
+
+### O que este episódio ensinou sobre diagnóstico
+
+O bug era de uma linha de configuração. O que custou tempo foi um `try` grande
+demais: ele cobria o import do módulo **e** a verificação do token, então um
+defeito de infraestrutura saía com a cara de credencial errada — e eu cheguei a
+usar o 401 como *prova* de que o módulo carregava, o que era ao contrário. Não
+foi falta de teste: nenhum teste de função pura pega isso. Foi falta de fazer o
+erro **chegar até quem pode consertar**.
+
+### Arquivos
+
+`package.json`, `DIARIO.md`
+
+---
+
 ## 2026-08-10 — Login com Google: a causa é o módulo que não carrega na Vercel
 
 Continuação direta da entrada abaixo, que subiu e mudou o sintoma.
