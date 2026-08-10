@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-08-10 — Login com Google: a causa é o módulo que não carrega na Vercel
+
+Continuação direta da entrada abaixo, que subiu e mudou o sintoma.
+
+### O que o deploy anterior revelou
+
+Com as classes de falha separadas, a produção passou a responder **500 com corpo
+vazio** em `/api/auth/google`. O resto do deploy estava intacto na mesma medição:
+`/login` 200, `/api/auth/login` 400 e 401 (Firestore respondendo), `/api/rotinas`
+401. Ou seja: **o handler não chega a rodar** — `firebase-admin/auth` não carrega
+na função serverless. Era isso que o catch antigo vestia de "token inválido".
+
+### E por que o import estático foi um passo atrás
+
+Ele estava certo sobre o rastreio de arquivos, e errado sobre observabilidade:
+com import no topo, o módulo quebra **antes de o handler existir**, o Next
+devolve 500 sem corpo, e ninguém descobre o nome do erro. Voltei ao
+`await import()` — agora **fora** do try do token e com catch próprio, que
+devolve **503** e imprime na tela o código **e um trecho da mensagem**
+(`ERR_REQUIRE_ESM` e `MODULE_NOT_FOUND` sozinhos não dizem *qual* módulo caiu, e
+é o nome do módulo que aponta o conserto).
+
+Ficou registrado como comentário na rota, para ninguém "melhorar" o import
+dinâmico de volta para estático sem saber o que se perde.
+
+### Suspeita principal
+
+`firebase-admin@14` exige `node >= 22`, provavelmente porque depende de
+`require()` de módulo ESM — que **não existe no Node 20** (`ERR_REQUIRE_ESM`) e
+funciona no 22+. Localmente, no Node 24, a cadeia inteira roda: o log chega até
+*"kid não corresponde a nenhuma chave pública conhecida"*, o que prova módulo
+carregado e chaves públicas do Google baixadas pela rede. O `engines` declarado
+na entrada anterior existe para forçar isso na Vercel; se o 503 vier com
+`ERR_REQUIRE_ESM`, a versão de Node da função é o conserto (Settings › General ›
+Node.js Version). Se vier `MODULE_NOT_FOUND`, é o rastreio de arquivos, e o
+caminho é tirar `firebase-admin` de `serverExternalPackages` ou declarar
+`outputFileTracingIncludes`.
+
+### Arquivos
+
+`app/api/auth/google/route.ts`
+
+---
+
 ## 2026-08-10 — Login com Google: o catch que culpava a pessoa por defeito do servidor
 
 ### O sintoma
