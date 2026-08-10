@@ -7,6 +7,68 @@
 
 ---
 
+## 2026-08-06 — Testes das funções puras: 71 casos, e um bug de autenticação
+
+### O bug que os testes acharam em 20 minutos
+
+`verificarSenha` **aceitava qualquer senha** quando o valor guardado era `":"`.
+O `split(":")` devolvia dois pedaços vazios, `Buffer.from("", "hex")` dava zero
+byte, o scrypt devolvia zero byte, e `timingSafeEqual(vazio, vazio)` é
+**verdadeiro**. Bastava um `senha_hash` valendo `":"` — hex ilegível ou célula
+editada à mão — para a conta virar porta aberta. Corrigido: salt e hash vazios
+recusam antes de chegar ao scrypt.
+
+Foi encontrado por um caso escrito no automático ("valor guardado inválido não
+autentica ninguém"), não por desconfiança. É o argumento inteiro a favor de ter
+suíte.
+
+### A suíte
+
+- **71 casos em 4 arquivos, 660ms.** `npm test` (vitest, uma dependência de
+  desenvolvimento). Tentei antes com o runner nativo do Node e não deu: os
+  imports internos não têm extensão, e fazer o Node aceitar isso exigiria mexer
+  em todos os arquivos do projeto.
+- **`testes/permissoes.test.ts`** — a propriedade que importa: *supervisor nunca
+  amplia o próprio alcance*. Sem sede pedida cai na principal (nunca "todas"),
+  sede fora do escopo é recusada, cookie antigo fica preso à principal,
+  `limitarSedeConsulta` nunca devolve `undefined` para quem tem escopo.
+- **`testes/calculos.test.ts`** — jornada com intervalo único e com lista,
+  regras fixo/m²/unidade, herança da intensidade pelo tipo do local, blocos,
+  ociosidade negativa como sinal de sobrecarga.
+- **`testes/validacoes.test.ts`** — sobreposição bloqueando, horários que só se
+  encostam passando, e a **tarefa de espera nos dois sentidos** — incluindo o
+  caso que prova que a proteção não foi desligada: com uma espera no dia, duas
+  tarefas normais no mesmo horário **continuam bloqueadas**.
+- **`testes/acesso.test.ts`** — senha, código e estado do tutorial. Tem um teste
+  de **uniformidade do sorteio** do código (4.000 amostras): é ele que impede a
+  volta silenciosa do viés do `byte % 30`.
+
+### Duas suposições minhas que os testes derrubaram
+
+- **A intensidade do local NÃO se aplica a tempo fixo** — só a m²/unidade, com
+  razão documentada ("evita inflar atividade que não depende da metragem"). Eu
+  esperava 45 min num banheiro; são 30. O código estava certo.
+- Os parâmetros de ocupação são `ocupacao_baixa/adequada/alta`, não o nome que
+  eu inventei. O teste agora fixa que as faixas ficam em ordem crescente —
+  fora de ordem, a classificação erra sem dar erro nenhum.
+
+### Rotação "se for seu dia" — sem código, de propósito
+
+Ao ler o código descobri que **já é expressável**: tarefa com frequência
+`semanal` + `dias_semana` é respeitada na geração e na aplicação de modelo. Uma
+tarefa por pessoa com o dia dela, e a alternativa com os dias complementares.
+
+O que exigiria código é a fila que anda ("quem fez na semana passada não faz
+nesta"): o dia teria que ir para o **item da rota padrão**, não para a tarefa —
+e não há resposta óbvia de interface, já que a rota padrão nasce de um único dia
+montado. Documentado em `docs/03` com o limite explícito, sem construir no chute.
+
+- Arquivos: `testes/` (4 testes + fixtures), `vitest.config.mts`,
+  `package.json` (script `test`), `lib/senha.ts` (correção + alfabeto exportado),
+  `docs/03-regras-de-negocio-e-calculos.md`, `CLAUDE.md`.
+
+---
+
 ## 2026-08-06 — Tarefa de espera, sede sem padrão perigoso e m²/hora visível
 
 Três melhorias que a **planilha real do Pré Sul** apontou.

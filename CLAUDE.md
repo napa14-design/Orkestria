@@ -53,7 +53,13 @@ título, o que mudou e os arquivos principais. Nunca edite entradas antigas.
 npm run dev      # desenvolvimento (http://localhost:3000)
 npm run build    # build de produção — RODAR antes de declarar pronto
 npm run start    # servidor de produção
+npm test         # testes das funções puras — RODAR antes de declarar pronto
 ```
+
+Os testes cobrem `lib/` (cálculos, validações, permissões, senha/código, estado
+do tutorial) em `testes/`. Não cobrem tela nem banco. **Mudou regra de cálculo,
+validação ou permissão? Acrescente o caso lá** — foi assim que apareceu um
+`verificarSenha` que aceitava qualquer senha quando o hash guardado era `":"`.
 
 Não há usuários de demonstração. Para rodar com `DATA_SOURCE=memory`, defina
 `DEV_ADMIN_EMAIL` e `DEV_ADMIN_SENHA` no `.env` — o seed cria só esse

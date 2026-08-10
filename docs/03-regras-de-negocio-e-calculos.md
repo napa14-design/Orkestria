@@ -108,3 +108,34 @@ Os limites vêm dos parâmetros `ocupacao_baixa`, `ocupacao_adequada` e
 Exigem justificativa: tempo real ±30% do previsto (parametrizável), tarefa não
 realizada, remanejada ou cancelada. A regra já está implementada em
 [services/execucoesService.ts](../services/execucoesService.ts).
+
+## 6. Tarefa de espera (relógio × pessoa)
+
+`tarefas.espera = true` marca a tarefa que ocupa o **relógio** mas não a pessoa
+— o caso real é o café: *"coloca a água e sai para fazer as atividades"*. Ela
+não gera `SOBREPOSICAO`, nos dois sentidos (nem a nova sobre uma existente, nem
+o contrário).
+
+**O tempo cadastrado deve ser o da pessoa, não do equipamento.** A ocupação soma
+o tempo da rotina; cadastrar uma hora de cafeteira infla a ocupação de quem, na
+prática, gastou cinco minutos.
+
+## 7. Rotação entre pessoas ("se for seu dia")
+
+Escala rotativa — a copa que é da Cristina na segunda e do David na terça — se
+expressa **sem recurso novo**, com o que já existe:
+
+1. Uma tarefa por pessoa (ex.: "Copa da infra — Cristina"), com
+   **frequência `semanal`** e `dias_semana` só do dia dela.
+2. A alternativa do "não sendo seu dia" é outra tarefa semanal, com os dias
+   complementares.
+3. Na rota padrão, cada uma atribuída à sua pessoa.
+
+`dias_semana` só é respeitado quando `frequencia = "semanal"` — em tarefa diária
+ele é ignorado (ver `modelosService`: geração e aplicação de modelo).
+
+**Limite:** isto expressa escala **semanal fixa**, não fila rotativa que anda
+("quem fez na semana passada não faz nesta"). Fila exigiria o dia no *item da
+rota padrão*, não na tarefa — e uma resposta para como o coordenador informaria
+isso, já que a rota padrão nasce de um único dia montado. Não fazer por
+enquanto: sem demanda observada, é desenho no chute.

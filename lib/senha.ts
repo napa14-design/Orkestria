@@ -15,7 +15,7 @@ export const DIAS_VALIDADE_CODIGO = 14;
  * Alfabeto sem os caracteres que se confundem ao ditar ou copiar à mão:
  * sem O/0, sem I/1/L, sem U (vira V na escrita apressada).
  */
-const ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+export const ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
 
 /**
  * Gera o código de primeiro acesso no formato `K7M-4QP-92X`.
@@ -77,9 +77,14 @@ export function hashSenha(senha: string): string {
 export function verificarSenha(senha: string, armazenado: string | undefined | null): boolean {
   if (!armazenado || !armazenado.includes(":")) return false;
   const [saltHex, hashHex] = armazenado.split(":");
+  if (!saltHex || !hashHex) return false;
   try {
     const salt = Buffer.from(saltHex, "hex");
     const esperado = Buffer.from(hashHex, "hex");
+    // Buffer vazio aceitaria QUALQUER senha: com hash de 0 byte, o scrypt
+    // devolve 0 byte e `timingSafeEqual(vazio, vazio)` é verdadeiro. Bastava
+    // um `senha_hash` valendo ":" — ou hex ilegível — para virar porta aberta.
+    if (salt.length === 0 || esperado.length === 0) return false;
     const calc = scryptSync(senha, salt, esperado.length);
     return esperado.length === calc.length && timingSafeEqual(esperado, calc);
   } catch {
