@@ -86,6 +86,15 @@ export interface Tarefa extends Auditoria {
    * Ausente/false = exigida o ano todo (independe do calendário).
    */
   depende_calendario?: boolean;
+  /**
+   * Tarefa de **espera**: ocupa o relógio, não a pessoa. O caso real é o café —
+   * "coloca a água e sai para fazer as atividades". Não gera conflito de
+   * horário com outra tarefa da mesma pessoa.
+   *
+   * O tempo cadastrado deve ser **o da pessoa**, não o do equipamento: é ele
+   * que entra na ocupação e na ociosidade.
+   */
+  espera?: boolean;
   ativo: boolean;
   observacoes: string;
 }

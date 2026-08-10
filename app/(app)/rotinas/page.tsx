@@ -231,6 +231,8 @@ export default function PaginaRotinas() {
       requisitosCatalogo: requisitos ?? [],
       qualificacoesFuncionario: (qualificacoes ?? []).filter((q) => q.funcionario_id === funcionarioId),
       data,
+      // Tarefas de espera não disputam a pessoa (café: coloca a água e sai).
+      tarefasEspera: new Set((tarefas ?? []).filter((t) => t.espera).map((t) => t.id)),
     });
   }
 

@@ -143,6 +143,34 @@ export async function getRotinasPeriodo(
   return ds.consultar("rotinas_planejadas", cond);
 }
 
+/**
+ * Ids de tarefas **de espera** entre as rotinas que colidem com a janela.
+ *
+ * Lê apenas as tarefas das rotinas que de fato se sobrepõem — normalmente
+ * nenhuma, às vezes uma. Carregar as tarefas da sede inteira custaria dezenas
+ * de leituras a cada arrasto, e essa informação só importa quando há choque.
+ */
+async function esperaEntreOsChoques(
+  rotinas: RotinaPlanejada[],
+  inicioMin: number,
+  fimMin: number,
+): Promise<Set<string>> {
+  const ids = new Set(
+    rotinas
+      .filter((r) => r.status !== "cancelada")
+      .filter((r) => {
+        const ini = hhmmParaMin(r.inicio_planejado);
+        const fim = hhmmParaMin(r.fim_planejado);
+        return inicioMin < fim && ini < fimMin;
+      })
+      .map((r) => r.tarefa_id),
+  );
+  if (ids.size === 0) return new Set();
+  const ds = await getDataSource();
+  const tarefas = await Promise.all([...ids].map((id) => ds.obter("tarefas", id)));
+  return new Set(tarefas.filter((t) => t?.espera).map((t) => t!.id));
+}
+
 export async function createRotina(
   entrada: NovaRotina,
   supervisorId: string,
@@ -210,6 +238,11 @@ export async function createRotina(
     requisitosCatalogo,
     qualificacoesFuncionario,
     data: entrada.data,
+    tarefasEspera: await esperaEntreOsChoques(
+      rotinasDoDia.filter((r) => r.funcionario_id === entrada.funcionario_id),
+      inicioMin,
+      fimMin,
+    ),
   });
   const { alertas, autorizou } = aplicarAutorizacaoManual(brutos, entrada.forcar);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
@@ -332,6 +365,11 @@ export async function updateRotina(
       requisitosCatalogo,
       qualificacoesFuncionario,
       data: destinoData,
+      tarefasEspera: await esperaEntreOsChoques(
+        rotinasDoDia.filter((r) => r.funcionario_id === destinoFuncId && r.id !== id),
+        inicioMin,
+        fimMin,
+      ),
     });
     const resultado = aplicarAutorizacaoManual(brutos, forcar);
     alertas = resultado.alertas;

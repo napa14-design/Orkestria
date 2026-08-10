@@ -100,9 +100,18 @@ export default function PaginaUsuarios() {
           rotulo: "Sede",
           tipo: "select",
           obrigatorio: true,
-          padrao: "geral",
-          opcoes: [
-            { valor: "geral", rotulo: "Geral (todas as sedes)" },
+          // SEM padrão de propósito: com "Geral" pré-selecionado, salvar um
+          // supervisor sem olhar este campo dava a ele escrita em TODAS as
+          // sedes. Escolha aberta obriga uma decisão consciente — um clique a
+          // mais no cadastro (raro) para não distribuir acesso por descuido.
+          opcoes: (form) => [
+            {
+              valor: "geral",
+              rotulo:
+                form.perfil === "supervisor"
+                  ? "Geral — TODAS as sedes (incomum para supervisor)"
+                  : "Geral (todas as sedes)",
+            },
             ...(sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
           ],
           dica: "A sede principal do usuário — é ela que abre por padrão nas telas. Para supervisor, define o alcance básico; se ele cobre mais de uma sede, acrescente as outras no campo abaixo. Administrador e gerência costumam usar \"Geral\" (todas as sedes).",

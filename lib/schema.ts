@@ -166,6 +166,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("ativo", "boolean"),
     col("observacoes"),
     ...AUDITORIA,
+    // Campo novo no FIM (o Sheets grava por posição — ver nota acima).
+    col("espera", "boolean"),
   ],
   rotinas_planejadas: [
     col("id"),

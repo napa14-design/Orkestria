@@ -36,6 +36,15 @@ export function validarAlocacao(args: {
   requisitosCatalogo?: Requisito[];
   qualificacoesFuncionario?: QualificacaoFuncionario[];
   data?: string;
+  /**
+   * Ids de tarefas **de espera** — as que ocupam o relógio, não a pessoa
+   * (ex.: café: coloca a água e sai). Elas não geram conflito de horário nem
+   * nos dois sentidos: nem a nova em cima de uma existente, nem o contrário.
+   *
+   * Sem este conjunto, tudo se comporta como antes. Quem chama e tem as
+   * tarefas em mão passa; quem não tem, não muda de comportamento.
+   */
+  tarefasEspera?: Set<string>;
 }): AlertaValidacao[] {
   const { funcionario: f, rotinasExistentes, inicioMin, fimMin } = args;
   const alertas: AlertaValidacao[] = [];
@@ -80,8 +89,14 @@ export function validarAlocacao(args: {
     }
   }
 
+  // Tarefa de espera não disputa a pessoa: o equipamento trabalha, ela não.
+  // Marcar aqui vale para os dois lados — a nova sobre uma existente e a
+  // existente sob a nova.
+  const espera = args.tarefasEspera;
+  const novaEhEspera = args.tarefa?.espera === true;
   for (const r of rotinasExistentes) {
     if (r.status === "cancelada") continue;
+    if (novaEhEspera || espera?.has(r.tarefa_id)) continue;
     const rIni = hhmmParaMin(r.inicio_planejado);
     const rFim = hhmmParaMin(r.fim_planejado);
     if (intervalosSobrepoem(inicioMin, fimMin, rIni, rFim)) {

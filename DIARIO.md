@@ -7,6 +7,60 @@
 
 ---
 
+## 2026-08-06 — Tarefa de espera, sede sem padrão perigoso e m²/hora visível
+
+Três melhorias que a **planilha real do Pré Sul** apontou.
+
+### 1. Tarefa de espera — o dia da Cristina passou a caber
+
+- A planilha tem `06:00–07:00 faz o café` **e** `06:00–07:00 limpa a sala ADM`,
+  com a explicação nas observações: *"o tempo da cafeteira é aproximado de 1h,
+  coloca a água e sai para fazer as atividades"*. Não é sobreposição de
+  trabalho — é **tempo de máquina, não de pessoa**. E o sistema recusava: em
+  `validations.ts` a sobreposição é `nivel: "erro"`, e o importador descartava a
+  linha.
+- Campo novo `tarefas.espera`: a tarefa ocupa o relógio, não a pessoa. Vale nos
+  **dois sentidos** — nem a nova sobre uma existente, nem o contrário.
+- **Sem custo de leitura**: no servidor, `esperaEntreOsChoques` lê só as tarefas
+  das rotinas que de fato colidem — normalmente nenhuma, às vezes uma. Carregar
+  as tarefas da sede a cada arrasto custaria dezenas de leituras para uma
+  informação que só importa quando há choque.
+- **Limite conhecido e deliberado**: a ocupação continua somando o tempo da
+  rotina, porque `resumoFuncionario` não recebe tarefas e enfiá-las ali tocaria
+  toda a cadeia. Por isso a dica do campo é explícita: **informe o tempo da
+  pessoa, não do equipamento**. Se alguém cadastrar uma espera de 1h, a
+  ocupação infla — se isso aparecer na prática, aí vale o refino.
+- Verificado pela API, 4 casos: café(espera) entra · limpeza no mesmo horário
+  passa · **terceira tarefa normal no mesmo horário BLOQUEIA (422)** · espera por
+  cima de normal também passa. O terceiro é o que prova que a proteção continua
+  de pé: a validação ficou ciente, não foi desligada.
+
+### 2. Sede não nasce mais em "Geral"
+
+- O formulário abria com **"Geral (todas as sedes)"** pré-selecionado. Salvar um
+  supervisor sem olhar esse campo dava a ele escrita nas 17 sedes. Removido o
+  padrão: agora abre em "— selecionar —" e exige escolha consciente. Um clique a
+  mais no cadastro (raro) para não distribuir acesso por descuido.
+- Com perfil **supervisor**, a opção passa a se chamar *"Geral — TODAS as sedes
+  (incomum para supervisor)"*. Continua possível; deixou de ser silencioso.
+
+### 3. m²/hora na lista de tarefas
+
+- Nova coluna com a produtividade que **resulta** do tempo — o mesmo número que
+  a planilha calculava à mão. É o que revela onde o tempo não fecha: 4 m²/h num
+  banheiro ao lado de 1.292 m²/h num corredor não é produtividade variando, é
+  tempo escolhido em bloco de conveniência.
+- Nenhuma decisão nova para o supervisor: coluna calculada numa tela que ele já
+  olha. Sem metragem ou sem tempo, mostra "—" em vez de inventar número.
+- Verificado: "Preparar o café" (12 m² em 30 min) mostra **24**.
+
+- Arquivos: `types/Tarefa.ts`, `lib/schema.ts`, `lib/validations.ts`,
+  `services/rotinasService.ts`, `app/(app)/rotinas/page.tsx`,
+  `app/(app)/tarefas/page.tsx`, `app/(app)/usuarios/page.tsx`.
+- `.claude/launch.json` ganhou `autoPort` — outra sessão ocupou a 3000.
+
+---
+
 ## 2026-08-06 — Tutorial: passo que ainda não dá para fazer explica o motivo
 
 - **Risco pego a tempo, no dia em que o piloto começou.** Três etapas apontam

@@ -167,6 +167,15 @@ export default function PaginaTarefas() {
           mostrarSe: (f) => f.regra_calculo === "por_unidade",
         },
         {
+          key: "espera",
+          rotulo: "A pessoa fica livre durante a tarefa",
+          tipo: "checkbox",
+          padrao: false,
+          inteira: true,
+          ajuda: "Ex.: café — coloca a água e sai. Não gera conflito de horário",
+          dica: "Marque quando o equipamento trabalha e a pessoa não: o café na cafeteira, a máquina em ciclo. Assim ela pode ter outra tarefa no mesmo horário, sem o sistema acusar conflito. IMPORTANTE: no tempo base informe os minutos QUE A PESSOA GASTA (colocar a água, ligar), não o tempo do equipamento — é o tempo dela que entra na ocupação e na ociosidade.",
+        },
+        {
           key: "frequencia",
           rotulo: "Frequência",
           tipo: "select",
@@ -291,6 +300,31 @@ export default function PaginaTarefas() {
               {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id)))}
             </strong>
           ),
+        },
+        {
+          key: "produtividade",
+          rotulo: "m²/hora",
+          /**
+           * A produtividade que RESULTA do tempo, não a que foi arbitrada.
+           *
+           * É o mesmo número que a planilha do Pré Sul calculava numa coluna à
+           * mão, e é o que revela onde o tempo não fecha: 4 m²/h num banheiro
+           * ao lado de 1.292 m²/h num corredor não é produtividade variando, é
+           * tempo escolhido em bloco de conveniência. Sem esta coluna a
+           * conversa de metodologia é opinião; com ela, é dado.
+           */
+          render: (t) => {
+            const local = localPorId(t.local_id);
+            const minutos = tempoPrevistoMin(t, local);
+            if (!local?.metragem || !minutos)
+              return <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>;
+            const porHora = local.metragem / (minutos / 60);
+            return (
+              <span className="num" title={`${local.metragem} m² em ${formatarDuracao(minutos)}`}>
+                {porHora.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+              </span>
+            );
+          },
         },
         {
           key: "prioridade",
