@@ -19,13 +19,3 @@ export function obterAppAdmin(): App {
   }
   return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
 }
-
-/**
- * Auth do Admin — import dinâmico de propósito: só quem verifica token (login
- * Google) carrega `firebase-admin/auth` e suas deps (jwks-rsa/jose). O caminho
- * do Firestore/login por senha não toca nessa cadeia.
- */
-export async function authAdmin() {
-  const { getAuth } = await import("firebase-admin/auth");
-  return getAuth(obterAppAdmin());
-}

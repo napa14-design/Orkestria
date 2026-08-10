@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Sistema web de planejamento visual de rotinas operacionais, ocupação de jornada e ociosidade prevista/realizada (ASG/serviços gerais).",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",

@@ -7,6 +7,62 @@
 
 ---
 
+## 2026-08-10 — Login com Google: o catch que culpava a pessoa por defeito do servidor
+
+### O sintoma
+
+Em produção, "Entrar com Google" respondia **401 "Não foi possível validar o
+login do Google"**. O popup funcionava e o token chegava (1186 bytes no corpo do
+`POST /api/auth/google`) — a recusa era nossa.
+
+### O erro de diagnóstico que atrasou tudo
+
+Testei a rota de fora com um token inválido, vi 401 e concluí que
+`firebase-admin/auth` carregava normalmente. **Não provava nada:** o `try` da
+rota envolvia também o `await import("firebase-admin/auth")` e o
+`getAuth(obterAppAdmin())`. Falha de módulo, credencial ausente e token
+realmente inválido saíam todos com a **mesma** mensagem e o **mesmo** status —
+um defeito de servidor vestido de erro de credencial. Diagnóstico impossível de
+fora, e a pessoa levando a culpa.
+
+### O que mudou
+
+1. **Três classes de falha separadas** em `app/api/auth/google/route.ts`:
+   servidor sem verificação disponível → **503** com texto que manda entrar por
+   e-mail e senha e avisar o administrador; token recusado → **401**. As duas
+   fazem `console.error` do erro real e mostram na tela o **código curto** do
+   Firebase (`auth/argument-error`, `auth/id-token-expired`) — o suficiente para
+   a pessoa repassar por telefone, sem vazar nada nosso.
+2. **Import estático no lugar do dinâmico.** O `await import()` existia para não
+   arrastar jwks-rsa/jose para o caminho do Firestore. O import estático **dentro
+   da rota** consegue o mesmo (o Next divide por rota) e elimina o risco de o
+   rastreio de arquivos da Vercel não levar um import dinâmico para a função
+   serverless. `authAdmin()` saiu de `lib/firebaseAdmin.ts` — era usado só aqui.
+3. **`engines.node: ">=22"` no `package.json`.** O `firebase-admin@14` declara
+   `engines: node >= 22`; o projeto não declarava nada, então a Vercel escolhia a
+   versão pelo padrão dela (Node 20 em projetos mais antigos) e o `npm install`
+   só emitia um aviso `EBADENGINE` no build. Incompatibilidade silenciosa de
+   runtime, agora declarada.
+
+### O que ficou provado e o que não
+
+Localmente a cadeia inteira está sadia: o log mostra a verificação chegando até
+*"kid não corresponde a nenhuma chave pública conhecida"* — ou seja, módulo
+carregado, projeto resolvido e **chaves públicas do Google baixadas pela rede**.
+O login por senha nunca esteve em causa: ele distingue falha de banco (503) de
+credencial errada (401), e em produção responde 401 para e-mail inexistente,
+o que prova que o Firestore responde.
+
+**A causa raiz em produção ainda não está nomeada** — só o próximo clique no
+botão do Google, com este deploy no ar, mostra o código do erro. O que esta
+entrada resolve é o sistema esconder a causa.
+
+### Arquivos
+
+`app/api/auth/google/route.ts`, `lib/firebaseAdmin.ts`, `package.json`
+
+---
+
 ## 2026-08-06 — Testes das funções puras: 71 casos, e um bug de autenticação
 
 ### O bug que os testes acharam em 20 minutos
