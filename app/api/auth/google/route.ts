@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     console.error("Login Google: verificação indisponível no servidor:", e);
     return NextResponse.json(
       {
-        erro: `A verificação do login com Google está indisponível no servidor: ${detalheDoErro(e)}. Entre com e-mail e senha e avise o administrador.`,
+        erro: `A verificação do login com Google está indisponível no servidor (Node ${process.version}): ${detalheDoErro(e)}. Entre com e-mail e senha e avise o administrador.`,
       },
       { status: 503 },
     );
