@@ -99,16 +99,10 @@ export const TRILHA: EtapaTutorial[] = [
     rota: "/tarefas",
     passos: [
       {
+        alvo: "crud-novo",
         titulo: "Agora o que se faz em cada lugar",
         texto:
-          "Tarefa é o serviço: varrer a frente, limpar o banheiro masculino, recolher o café. Toda tarefa mora num local — foi por isso que os locais vieram primeiro.",
-        avancarEm: "leitura",
-      },
-      {
-        alvo: "crud-novo",
-        titulo: "Cadastre uma tarefa do local que você acabou de criar",
-        texto:
-          "Clique em Nova tarefa. Escolha uma que você faz todo dia e sabe de cabeça quanto tempo leva — é a mais fácil de conferir depois.",
+          "Tarefa é o serviço: varrer a frente, limpar o banheiro masculino, recolher o café. Toda tarefa mora num local — foi por isso que os locais vieram primeiro. Clique em Nova tarefa e escolha uma que você faz todo dia e sabe de cabeça quanto tempo leva: é a mais fácil de conferir depois.",
         avancarEm: "clique",
       },
       {
@@ -123,6 +117,17 @@ export const TRILHA: EtapaTutorial[] = [
         titulo: "E com que frequência ela acontece",
         texto:
           "Diária, semanal, mensal. É isso que faz o sistema saber, sozinho, que a limpeza de vidro venceu — sem você precisar lembrar de nada.",
+        avancarEm: "leitura",
+      },
+      {
+        // O único dos cinco achados da planilha do Pré Sul que vira passo: é o
+        // que BLOQUEIA. Quem não souber do campo tenta reproduzir o
+        // "06:00 café + 06:00 limpa a sala" da própria planilha, leva 422 e
+        // conclui que o sistema não aceita a realidade da operação.
+        alvo: "campo-espera",
+        titulo: "A tarefa que ocupa o relógio, não a pessoa",
+        texto:
+          "Café na cafeteira, roupa na máquina: a pessoa liga e sai para fazer outra coisa. Marque aqui e o sistema aceita outra tarefa no mesmo horário — sem isso ele bloqueia como sobreposição. No tempo base, informe os minutos DA PESSOA (colocar a água, ligar), não os do equipamento.",
         avancarEm: "leitura",
       },
       {

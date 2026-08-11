@@ -7,6 +7,59 @@
 
 ---
 
+## 2026-08-11 — Tutorial ensina a tarefa de espera (e uma entra, uma sai)
+
+### Por que só uma das cinco mudanças da planilha virou passo
+
+Das cinco melhorias que a planilha do Pré Sul gerou, **só a tarefa de espera**
+entrou no tutorial. O critério foi: ela é a única que **bloqueia**. Quem não
+souber do campo tenta reproduzir o `06:00 faz o café` + `06:00 limpa a sala ADM`
+da própria planilha, leva **422** e conclui que o sistema não aceita a realidade
+da operação — o pior primeiro contato possível, porque a solução existe e a
+pessoa não a encontra.
+
+As outras quatro ficaram de fora de propósito:
+
+- **m²/hora** é coluna calculada numa tela que ele já abre; nenhuma decisão nova.
+- **Intensidade em escala nomeada** tem padrão seguro ("Herdar do tipo do
+  local"). Campo com padrão bom não precisa de tutorial — se precisasse, o padrão
+  estaria errado.
+- **A conta ao vivo** (`20 min × 3 unidades = 1h`) foi feita para *substituir*
+  explicação; explicá-la seria admitir que não funcionou.
+- **Sede não nascer em "Geral"** é tela de administrador; a trilha do supervisor
+  nem passa por lá.
+
+### A troca, para a etapa não engordar
+
+Doutrina: nada novo entra sem algo sair. A etapa "Cadastrar as tarefas"
+continua com **5 passos** — o passo de abertura (só leitura, balão centralizado)
+foi fundido no "Cadastre uma tarefa", que já era um clique obrigatório. Um
+"Entendi" a menos, mesmo conteúdo.
+
+**Correção da minha própria proposta**: eu tinha sugerido fundir o *último*
+passo ("Salve"). Estava errado — é ele que carrega o clique em `crud-salvar` que
+**conclui a etapa**; fundi-lo deixaria a etapa sem fim. A fusão certa era a outra
+ponta.
+
+### Verificado na tela (build de produção, `DATA_SOURCE=memory`)
+
+Percorrida a etapa inteira: `Agora o que se faz em cada lugar` (avança por
+clique no destaque, não por "Entendi") → `Aqui está a diferença para a planilha`
+→ `E com que frequência ela acontece` → **`A tarefa que ocupa o relógio, não a
+pessoa`** → `Salve`. O alvo `campo-espera` existe e está visível, e **nenhum
+alarme de "tutorial desatualizado"** dispara. `scripts/conferir-trilha.mjs`
+passa nas 11 etapas — e ele confere `campo-*` pela chave real no formulário da
+tela, não por string solta.
+
+Não consegui tirar print: o painel do navegador não estava compondo quadros
+nesta sessão. A confirmação acima é por leitura do DOM, não visual.
+
+### Arquivos
+
+`lib/tutorial/trilha.ts`
+
+---
+
 ## 2026-08-10 — Login com Google consertado: firebase-admin volta para o 13
 
 ### A causa real
