@@ -7,6 +7,63 @@
 
 ---
 
+## 2026-08-11 — Reduzir superfície: rejeitado item a item, com evidência
+
+**Nenhuma mudança de código, e é o resultado.** A tarefa era esconder o que não tem
+uso e fundir telas (sugestões da 3ª rodada da crítica externa). Fui conferir cada
+item **no código** em vez de implementar a lista.
+
+### Os três "esconder já"
+
+| Item | Veredito |
+|---|---|
+| "Duplicar e modelos" enquanto não houver modelo | **Errado** — é o único caminho para **criar** o primeiro modelo. O código já documenta isso (`FiltersBar.tsx`): *"quem monta um evento monta no DIA e precisa salvar o modelo ali mesmo"*. Esconder trancaria a porta por dentro. |
+| "Repetir dia anterior" quando houver rota padrão | **Já feito** — `page.tsx:665` condiciona a `!temRotaPadrao`. Os dois painéis são mutuamente exclusivos desde antes. |
+| Controles de camada enquanto tudo for diário | Mesma armadilha do primeiro (bloquearia criar a primeira camada), e o seletor **já** só aparece ao marcar "rota padrão". |
+
+A agenda já era disciplinada. A crítica propôs a partir do inventário que eu mandei,
+não do código — e não tinha como saber.
+
+### A tela que ele apagaria amanhã
+
+**Capacitações** — "zero qualificações, nenhum domínio próprio observável".
+**Não apaguei.** É painel de cobertura de treinamento e alerta de validade, nascido do
+diagnóstico de capacitação dos ASGs; está vazio porque **ninguém cadastrou
+qualificação ainda**. Apagar seria confundir "sem uso ainda" com "sem necessidade" —
+o mesmo erro que já corrigi hoje no "zero dia fechado" e nas "336 tarefas diárias".
+Virou **ADR-013**, porque é a terceira vez.
+
+### Uma redução que eu tentei e desfiz
+
+Tirar **Categorias** e **Requisitos** do menu (existem só para preencher campos de
+Tarefas). Implementei, testei o raciocínio e **revertei**: a app faz o escopo de papel
+**pelo próprio menu** — não há sessão no cliente das páginas —, então sumir do menu
+não os move para Tarefas, deixa-os alcançáveis **só por URL**, inclusive para o
+administrador. Isso é regressão disfarçada de simplificação. Árvore voltou byte a byte.
+
+### A medição que reenquadra a tarefa
+
+**27 telas no total, mas o supervisor vê 19** — e o caminho diário são **3**: Central →
+Rotina do dia → Acompanhamento. O próprio crítico disse que *"o número 27 isoladamente
+não é o problema; a métrica é quantas escolhas ficam visíveis no caminho diário"*. Por
+essa métrica o produto já está perto do alvo, e o excesso é **administrativo**.
+
+### O que fica esperando decisão sua
+
+As fusões de tela, porque cada uma junta coisas com propósitos diferentes e nenhuma é
+questão de estado verificável: Acompanhamento absorver "Conferir ficha" e "Serviços
+eventuais"; Qualificações (CRUD) absorver Capacitações (painel); "Tempos por pessoa"
+virar seção do funcionário; **"Calendário acadêmico" + "Feriados e recessos" virarem um
+calendário operacional** — esta última fundiria o que eu criei hoje, e é a que eu acho
+mais defensável; e os painéis saírem da navegação do supervisor, que é remover acesso e
+portanto decisão de produto.
+
+### Arquivos
+
+`DIARIO.md`. No vault: **ADR-013**.
+
+---
+
 ## 2026-08-11 — O "zero" da Central passa a ter nome, e dia fechado não é erro
 
 Tarefas #21 e #23 juntas: as duas dependiam da Central saber que o dia está fechado.
