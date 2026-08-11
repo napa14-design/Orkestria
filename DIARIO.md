@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-08-11 — A geração do dia fica manual. Decidido, não postergado
+
+**Nenhuma mudança de código** — e é justamente o ponto: nada havia sido construído
+para a automação, então não há nada a remover.
+
+O dono do produto respondeu a pergunta que a crítica externa deixou em aberto
+(*"qual problema operacional a automação resolve?"*): **deixa manual.** O supervisor
+clica em "Gerar o dia" e cuida das exceções. Não é "ainda não" — é a resposta.
+Registrado como **ADR-011** no vault.
+
+O argumento que decide: "Gerar o dia" já é **um clique**. A automação eliminaria
+**3 cliques por dia** (as 3 sedes com rota padrão) e traria calendário operacional,
+reconciliação, máquina de estados do dia, monitoramento e recuperação de falha
+parcial. Quatro subsistemas por três cliques.
+
+### A fila encolheu, e vale saber por quê
+
+Boa parte dela existia para **proteger a automação**, não a operação:
+
+- **Automação por sede elegível** — encerrada. O portão de comissionamento em dois
+  estágios sai de pauta junto.
+- **Semântica do dia criado sem ação humana** — encerrada por o caso deixar de
+  existir. Sem cron, todo dia gerado tem autor no histórico. Era a melhor pergunta da
+  crítica, e vai embora com o que a motivava.
+- **Identidade do bloco por item da rota** — **continua, e agora por mérito próprio**:
+  é defeito do fluxo *manual*. Ajustar um horário na rota e gerar de novo deixa o
+  bloco antigo e cria o novo ao lado; a coordenadora vê a tarefa duplicada e não
+  entende por quê.
+- **Feriado** — cai de pré-requisito para melhoria. O risco que dava urgência era o
+  cron gerando sozinho num 7 de setembro. Manualmente, ninguém clica.
+- **Geração sombra** — muda de propósito, não de valor: deixa de ser instrumento de
+  comissionamento e passa a ser diagnóstico ("a rota padrão ainda descreve o dia que
+  a coordenadora monta?"). Sem necessidade de cron nem de série persistida.
+
+### O que sobrevive da crítica externa mesmo sem automação
+
+Escritas em `Promise.all` **não são atômicas** — registro de execução e retomada
+idempotente seguem desejáveis para a geração manual também. E a **cegueira comum** de
+sombra e geração compartilharem a mesma função continua valendo: a sombra valida o
+algoritmo, não a regra.
+
+### Arquivos
+
+`DIARIO.md`. No vault: `Referência/Decisões (ADR).md` (**ADR-011**).
+
+---
+
 ## 2026-08-11 — Camada diz se acrescenta ou substitui o dia (e a 2ª rodada da crítica)
 
 Segunda consulta ao crítico externo (Codex `gpt-5.6-sol`, `xhigh`). Ele **retirou o
