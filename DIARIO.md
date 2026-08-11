@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-08-11 — Correção: o "zero fechado" era operação que não começou
+
+Correção da entrada abaixo, no mesmo dia, porque ela virou registro errado no
+repo e no vault.
+
+**O fato que faltava:** as coordenadoras **começam a construir as rotinas em
+11/08**. Os 1.862 blocos em 9 dias esparsos eram montagem e teste do dono do
+produto, não uso operacional.
+
+**O que isso derruba:** o argumento central da decisão — meu e da crítica externa
+— era *"automatizar aumenta a entrada de um processo cuja saída nunca
+funcionou"*. Zero execuções confirmadas não indicava saída quebrada; indicava que
+a operação não havia começado. O número estava certo; a **inferência** sobre ele,
+errada.
+
+**O que se mantém, e por outro motivo:** não construir a automação agora. Não por
+dúvida de adoção, mas porque os **pré-requisitos valem independente dela** —
+feriado (hoje "Gerar o dia" num feriado monta um dia cheio), identidade do bloco
+por item da rota (mudar horário duplica em vez de reconciliar) e a semântica do
+dia criado sem ação humana. E porque em duas semanas de operação real existirá o
+dado que hoje não existe.
+
+**O prazo que eu dei estava errado.** Eu disse "meses, não semanas", porque o
+portão de 10 dias fechados parecia intransponível para quem fechou zero. Com a
+operação começando hoje, são ~2 semanas — e os pré-requisitos levam
+aproximadamente o mesmo tempo, então eles deixam de ser atraso e passam a ser
+trabalho em paralelo.
+
+**Lição de método:** "zero saída" pode significar processo quebrado **ou**
+processo que não começou, e a diferença não está no banco — está na pergunta ao
+usuário. Eu medi 12 coleções e não perguntei. Corrigido no ADR-009 e no devlog.
+
+### Arquivos
+
+`DIARIO.md`. No vault: `Referência/Decisões (ADR).md` (ADR-009) e
+`Projetos/Orkestria — Devlog.md`.
+
+---
+
 ## 2026-08-11 — Decisão: a geração automática do dia espera o ciclo fechar
 
 **Nenhuma mudança de código.** É registro de decisão, porque ela contraria um
