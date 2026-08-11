@@ -179,6 +179,128 @@ export async function criarQualificacoesEmLote(
   return res;
 }
 
+export interface LinhaRenovacao {
+  id: string;
+  funcionario_nome: string;
+  requisito_nome: string;
+  /** Validade atual. Vazio nunca aparece aqui — quem não expira não é renovado. */
+  de: string;
+  para: string;
+}
+
+export interface PlanoRenovacao {
+  renovaria: LinhaRenovacao[];
+  /** Validade atual já é igual ou posterior à nova: renovar seria retroceder. */
+  ja_em_dia: number;
+  /** "Não expira": pôr prazo não é renovar, é restringir. Fica de fora. */
+  sem_prazo: number;
+  /** Par escolhido que a pessoa não tem — renovação não cria qualificação. */
+  nao_tem: number;
+}
+
+/**
+ * **Monta o plano de renovação — e não escreve nada.**
+ *
+ * A prévia da tela e a aplicação chamam **esta mesma função**: prévia com regra
+ * própria mente, e mentir na prévia de uma escrita em massa é o pior lugar
+ * possível para errar.
+ *
+ * Três coisas ficam **de fora** de propósito:
+ * - quem já tem validade igual ou posterior (renovar seria retroceder a data);
+ * - quem **não expira** — pôr prazo não é renovar, é restringir;
+ * - par que a pessoa não tem — renovação não cria qualificação (isso é o lote).
+ */
+export async function planejarRenovacao(dados: {
+  funcionarioIds: string[];
+  requisitoIds: string[];
+  validade: string;
+}): Promise<PlanoRenovacao> {
+  const funcionarioIds = new Set((dados.funcionarioIds ?? []).filter(Boolean));
+  const requisitoIds = new Set((dados.requisitoIds ?? []).filter(Boolean));
+  if (funcionarioIds.size === 0 || requisitoIds.size === 0 || !dados.validade)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "RENOVACAO_INCOMPLETA",
+        mensagem: "Escolha pessoas, capacitações e a nova validade.",
+      },
+    ]);
+
+  const ds = await getDataSource();
+  const [existentes, funcionarios, requisitos] = await Promise.all([
+    ds.listar("qualificacoes_funcionario"),
+    ds.listar("funcionarios"),
+    ds.listar("requisitos"),
+  ]);
+  const nomeFunc = new Map(funcionarios.map((f) => [f.id, f.nome]));
+  const nomeReq = new Map(requisitos.map((r) => [r.id, r.nome]));
+
+  const plano: PlanoRenovacao = { renovaria: [], ja_em_dia: 0, sem_prazo: 0, nao_tem: 0 };
+  const encontrados = new Set<string>();
+  for (const q of existentes) {
+    if (!funcionarioIds.has(q.funcionario_id) || !requisitoIds.has(q.requisito_id)) continue;
+    encontrados.add(`${q.funcionario_id}|${q.requisito_id}`);
+    if (!q.validade) {
+      plano.sem_prazo++;
+      continue;
+    }
+    if (q.validade >= dados.validade) {
+      plano.ja_em_dia++;
+      continue;
+    }
+    plano.renovaria.push({
+      id: q.id,
+      funcionario_nome: nomeFunc.get(q.funcionario_id) ?? q.funcionario_id,
+      requisito_nome: nomeReq.get(q.requisito_id) ?? q.requisito_id,
+      de: q.validade,
+      para: dados.validade,
+    });
+  }
+  plano.nao_tem = funcionarioIds.size * requisitoIds.size - encontrados.size;
+  plano.renovaria.sort(
+    (a, b) => a.funcionario_nome.localeCompare(b.funcionario_nome) || a.requisito_nome.localeCompare(b.requisito_nome),
+  );
+  return plano;
+}
+
+/**
+ * Aplica a renovação, **recalculando o plano** antes de escrever.
+ *
+ * `esperado` é quantas linhas a pessoa viu na prévia: se a base mudou nesse meio
+ * (alguém renovou, alguém apagou), a operação **para** e manda revisar, em vez de
+ * gravar um conjunto diferente do que foi aprovado. Mesmo cuidado do
+ * `resolverProximaExcecao`, que recalcula antes de mover rotina.
+ */
+export async function aplicarRenovacao(
+  dados: { funcionarioIds: string[]; requisitoIds: string[]; validade: string; esperado?: number },
+  autor: string,
+): Promise<{ renovadas: number; plano: PlanoRenovacao }> {
+  const plano = await planejarRenovacao(dados);
+  if (dados.esperado !== undefined && dados.esperado !== plano.renovaria.length)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "PREVIA_DESATUALIZADA",
+        mensagem: `A prévia mostrava ${dados.esperado} renovação(ões) e agora são ${plano.renovaria.length} — a base mudou. Revise antes de confirmar.`,
+      },
+    ]);
+
+  const ds = await getDataSource();
+  const agora = agoraISO();
+  for (let i = 0; i < plano.renovaria.length; i += 20) {
+    await Promise.all(
+      plano.renovaria.slice(i, i + 20).map((linha) =>
+        ds.atualizar("qualificacoes_funcionario", linha.id, {
+          validade: linha.para,
+          atualizado_por: autor,
+          atualizado_em: agora,
+        }),
+      ),
+    );
+  }
+  return { renovadas: plano.renovaria.length, plano };
+}
+
 export async function updateQualificacao(
   id: string,
   mudancas: Partial<Dados>,

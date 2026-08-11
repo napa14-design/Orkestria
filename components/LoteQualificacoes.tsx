@@ -14,7 +14,7 @@
 import { useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { apiPost, ErroApi } from "@/lib/clientApi";
-import { hojeISO } from "@/lib/dateUtils";
+import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
 import { NIVEIS_QUALIFICACAO } from "@/types";
 import type { Funcionario, Requisito, Sede } from "@/types";
 
@@ -23,6 +23,21 @@ interface Resultado {
   ja_tinham: number;
   recusadas: number;
   detalhes: string[];
+}
+
+interface LinhaRenovacao {
+  id: string;
+  funcionario_nome: string;
+  requisito_nome: string;
+  de: string;
+  para: string;
+}
+
+interface PlanoRenovacao {
+  renovaria: LinhaRenovacao[];
+  ja_em_dia: number;
+  sem_prazo: number;
+  nao_tem: number;
 }
 
 export default function LoteQualificacoes({
@@ -36,6 +51,10 @@ export default function LoteQualificacoes({
 }) {
   const { mutate } = useSWRConfig();
   const [aberto, setAberto] = useState(false);
+  /** Mesma seleção, verbo diferente: lançar cria; renovar só mexe em quem já tem. */
+  const [modo, setModo] = useState<"lancar" | "renovar">("lancar");
+  /** Prévia da renovação. Vem do servidor e é limpa a cada mudança de seleção. */
+  const [plano, setPlano] = useState<PlanoRenovacao | null>(null);
   const [sedeFiltro, setSedeFiltro] = useState("");
   const [pessoas, setPessoas] = useState<Set<string>>(new Set());
   const [capacitacoes, setCapacitacoes] = useState<Set<string>>(new Set());
@@ -66,6 +85,54 @@ export default function LoteQualificacoes({
     else proximo.add(id);
     return proximo;
   };
+
+  /** Prévia: pede o plano ao servidor, que é quem vai executar. Não escreve nada. */
+  async function verPrevia() {
+    setMensagem(null);
+    setSalvando(true);
+    try {
+      const r = await apiPost<{ plano: PlanoRenovacao }>("/api/qualificacoes/renovar", {
+        funcionario_ids: [...pessoas],
+        requisito_ids: [...capacitacoes],
+        validade,
+      });
+      setPlano(r.plano);
+    } catch (err) {
+      setMensagem({
+        texto: err instanceof ErroApi ? err.message : "Não foi possível montar a prévia.",
+        erro: true,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function renovar() {
+    if (!plano) return;
+    setMensagem(null);
+    setSalvando(true);
+    try {
+      const r = await apiPost<{ renovadas: number }>("/api/qualificacoes/renovar", {
+        funcionario_ids: [...pessoas],
+        requisito_ids: [...capacitacoes],
+        validade,
+        aplicar: true,
+        // O que a pessoa VIU. Se a base mudou no meio, o servidor recusa.
+        esperado: plano.renovaria.length,
+      });
+      await mutate("/api/qualificacoes");
+      setPlano(null);
+      setMensagem({ texto: `${r.renovadas} validade(s) renovada(s) para ${validade}.` });
+    } catch (err) {
+      setPlano(null);
+      setMensagem({
+        texto: err instanceof ErroApi ? err.message : "Não foi possível renovar.",
+        erro: true,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   async function lancar() {
     if (!confirmando) {
@@ -110,7 +177,7 @@ export default function LoteQualificacoes({
         onClick={() => setAberto(!aberto)}
         aria-expanded={aberto}
       >
-        {aberto ? "▾" : "▸"} Lançar em lote (turma ou pessoa com vários treinamentos)
+        {aberto ? "▾" : "▸"} Lote: lançar novas ou renovar validade (turma inteira)
       </button>
 
       {mensagem && (
@@ -121,10 +188,34 @@ export default function LoteQualificacoes({
 
       {aberto && (
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            {(
+              [
+                ["lancar", "Lançar novas"],
+                ["renovar", "Renovar validade"],
+              ] as const
+            ).map(([valor, rotulo]) => (
+              <label key={valor} style={{ display: "flex", gap: 6, fontSize: 13, alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="modo-lote"
+                  checked={modo === valor}
+                  onChange={() => {
+                    setModo(valor);
+                    setPlano(null);
+                    setConfirmando(false);
+                    setMensagem(null);
+                  }}
+                />
+                <strong>{rotulo}</strong>
+              </label>
+            ))}
+          </div>
+
           <p style={{ fontSize: 12, color: "var(--tinta-3)", margin: 0 }}>
-            Marque as pessoas e as capacitações: o sistema cruza as duas listas. Quem já tem a
-            capacitação é <strong>pulado</strong>, com a validade preservada — renovar é editar na
-            lista abaixo.
+            {modo === "lancar"
+              ? "Marque as pessoas e as capacitações: o sistema cruza as duas listas. Quem já tem a capacitação é pulado, com a validade preservada."
+              : "Renova a validade de quem JÁ TEM a capacitação — não cria nada. Você vê a lista do que vai mudar antes de confirmar. Fica de fora quem já está com data igual ou posterior e quem não expira."}
           </p>
 
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -149,19 +240,32 @@ export default function LoteQualificacoes({
               </select>
             </label>
             <label className="campo">
-              <span className="rotulo">Validade (vazio = não expira)</span>
-              <input type="date" value={validade} min={hojeISO()} onChange={(e) => setValidade(e.target.value)} />
+              <span className="rotulo">
+                {modo === "lancar" ? "Validade (vazio = não expira)" : "Nova validade"}
+              </span>
+              <input
+                type="date"
+                value={validade}
+                min={hojeISO()}
+                onChange={(e) => {
+                  setValidade(e.target.value);
+                  setPlano(null);
+                  setConfirmando(false);
+                }}
+              />
             </label>
-            <label className="campo">
-              <span className="rotulo">Nível</span>
-              <select value={nivel} onChange={(e) => setNivel(e.target.value)}>
-                {NIVEIS_QUALIFICACAO.map((n) => (
-                  <option key={n.valor} value={n.valor}>
-                    {n.rotulo}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {modo === "lancar" && (
+              <label className="campo">
+                <span className="rotulo">Nível</span>
+                <select value={nivel} onChange={(e) => setNivel(e.target.value)}>
+                  {NIVEIS_QUALIFICACAO.map((n) => (
+                    <option key={n.valor} value={n.valor}>
+                      {n.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
@@ -188,6 +292,7 @@ export default function LoteQualificacoes({
                       onChange={() => {
                         setPessoas(alternar(pessoas, f.id));
                         setConfirmando(false);
+                        setPlano(null);
                       }}
                     />
                     {f.nome}
@@ -213,6 +318,7 @@ export default function LoteQualificacoes({
                       onChange={() => {
                         setCapacitacoes(alternar(capacitacoes, r.id));
                         setConfirmando(false);
+                        setPlano(null);
                       }}
                     />
                     {r.tipo === "aptidao" ? "🩺" : "🎓"} {r.nome}
@@ -227,21 +333,76 @@ export default function LoteQualificacoes({
             </div>
           </div>
 
+          {/* Prévia: a lista exata do que vai mudar, montada pelo servidor que vai
+              executar. Nada é escrito até o segundo clique. */}
+          {modo === "renovar" && plano && (
+            <div style={{ border: "1px solid var(--linha)", padding: 10, display: "grid", gap: 8 }}>
+              <strong style={{ fontSize: 13 }}>
+                {plano.renovaria.length === 0
+                  ? "Nada a renovar com esta seleção."
+                  : `${plano.renovaria.length} validade(s) vão mudar:`}
+              </strong>
+              {plano.renovaria.length > 0 && (
+                <div style={{ maxHeight: 200, overflowY: "auto", display: "grid", gap: 2 }}>
+                  {plano.renovaria.map((l) => (
+                    <span key={l.id} style={{ fontSize: 12 }}>
+                      {l.funcionario_nome} · {l.requisito_nome}:{" "}
+                      <span className="num" style={{ color: "var(--tinta-3)" }}>
+                        {formatarDataBR(l.de)}
+                      </span>{" "}
+                      → <strong className="num">{formatarDataBR(l.para)}</strong>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>
+                Fora do plano: {plano.ja_em_dia} já com data igual ou posterior · {plano.sem_prazo}{" "}
+                que não expiram · {plano.nao_tem} sem essa capacitação.
+              </span>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-primario" disabled={total === 0 || salvando} onClick={() => void lancar()}>
-              {salvando
-                ? "Lançando…"
-                : confirmando
-                  ? `Confirmar ${total} lançamento(s)?`
-                  : `Lançar ${pessoas.size} pessoa(s) × ${capacitacoes.size} capacitação(ões)`}
-            </button>
-            {confirmando && (
+            {modo === "lancar" ? (
+              <button className="btn btn-primario" disabled={total === 0 || salvando} onClick={() => void lancar()}>
+                {salvando
+                  ? "Lançando…"
+                  : confirmando
+                    ? `Confirmar ${total} lançamento(s)?`
+                    : `Lançar ${pessoas.size} pessoa(s) × ${capacitacoes.size} capacitação(ões)`}
+              </button>
+            ) : plano ? (
+              <>
+                <button
+                  className="btn btn-primario"
+                  disabled={salvando || plano.renovaria.length === 0}
+                  onClick={() => void renovar()}
+                >
+                  {salvando ? "Renovando…" : `Confirmar ${plano.renovaria.length} renovação(ões)`}
+                </button>
+                <button className="btn btn-mini" onClick={() => setPlano(null)}>
+                  refazer a prévia
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn"
+                disabled={total === 0 || !validade || salvando}
+                onClick={() => void verPrevia()}
+              >
+                {salvando ? "Calculando…" : "Ver o que vai mudar"}
+              </button>
+            )}
+            {modo === "lancar" && confirmando && (
               <button className="btn btn-mini" onClick={() => setConfirmando(false)}>
                 cancelar
               </button>
             )}
-            {total > 0 && !confirmando && (
+            {modo === "lancar" && total > 0 && !confirmando && (
               <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>= {total} registro(s)</span>
+            )}
+            {modo === "renovar" && !validade && (
+              <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>informe a nova validade</span>
             )}
           </div>
         </div>

@@ -7,6 +7,64 @@
 
 ---
 
+## 2026-08-11 — Renovação em lote: a prévia é a mesma conta que a escrita
+
+A entrada anterior deixou a **renovação em lote** de fora com uma razão escrita:
+*"sobrescrever data em massa é destrutivo e merece desenho próprio — provavelmente com
+preview do que vai mudar"*. É esse desenho.
+
+### O caso real
+
+"A turma toda renovou o NR." Hoje isso é abrir 15 modais e digitar a mesma data 15
+vezes. O lote de ontem não resolvia de propósito: ele **preserva** validade existente,
+e renovar é justamente sobrescrever.
+
+### Por que a prévia não é enfeite
+
+Sobrescrever data é destrutivo e **silencioso** — a data antiga não volta. Então a
+prévia não é um resumo bonito da intenção: é **o próprio plano**. `planejarRenovacao`
+calcula a lista e não escreve nada; `aplicarRenovacao` chama a **mesma função** e só
+grava o que ela devolveu. A prévia não pode mentir porque não existe uma segunda conta
+de onde a mentira sairia — é o mesmo padrão da geração sombra × geração real.
+
+### O que fica fora do plano, e por quê
+
+| Fora | Motivo |
+|---|---|
+| Validade igual ou posterior à nova | Renovar seria **retroceder** a data de quem já está em dia |
+| Qualificação sem prazo | Não expira — pôr data nela é criar um vencimento que não existia |
+| Par que a pessoa não tem | Renovar não é cadastrar; para isso existe "Lançar novas" |
+
+Os três aparecem **contados** no rodapé da prévia, não desaparecem calados: *"Fora do
+plano: 0 já com data igual ou posterior · 1 que não expiram · 0 sem essa capacitação"*.
+
+### Prévia velha é recusada
+
+Entre ver a prévia e confirmar, alguém pode mexer na base. A confirmação manda de volta
+`esperado` (o número que a pessoa **viu**); o servidor recalcula e, se não bater, para:
+*"A prévia mostrava 5 renovação(ões) e agora são 4 — a base mudou. Revise antes de
+confirmar"*. Sem isso, o clique aplicaria uma decisão tomada sobre outra realidade.
+
+### Verificado (15 checagens)
+
+As duas que importam: **a prévia não alterou nada** (coleção inteira comparada byte a
+byte antes e depois) e **a prévia desatualizada foi recusada com 422** e a frase acima.
+Além delas: planeja as 4 vencendo; deixa de fora a que não expira, a que já está em dia
+e a pessoa sem o par; cada linha traz `de → para`; aplicar muda só o que estava na
+prévia, não cria registro novo, não retrocede a que estava em dia; sem validade nova →
+422 explicando. Conferido no navegador: 5 linhas `de → para` e o botão "Confirmar 5
+renovação(ões)".
+
+Permissão: a rota checa `podeAlterarSede` de **cada** pessoa do lote — nem prévia de
+gente de outra sede. `tsc` limpo, build limpo, 117 testes.
+
+### Arquivos
+
+`services/qualificacoesService.ts`, `app/api/qualificacoes/renovar/route.ts` (novo),
+`components/LoteQualificacoes.tsx`
+
+---
+
 ## 2026-08-11 — Qualificações em lote: pessoas × capacitações numa chamada
 
 Pergunta do dono do produto: *"se o funcionário tiver 20 qualificações, tem que ir 20x
