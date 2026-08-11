@@ -64,6 +64,24 @@ export function hojeISO(): string {
   return `${pegar("year")}-${pegar("month")}-${pegar("day")}`;
 }
 
+const FORMATO_HORA = new Intl.DateTimeFormat("en-GB", {
+  timeZone: FUSO_OPERACAO,
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/**
+ * Hora agora ("HH:mm") **no fuso da operação**, pelo mesmo motivo de `hojeISO`:
+ * no servidor (UTC) seriam três horas adiante, e "o horário já passou?" daria
+ * verdadeiro para bloco que ainda não aconteceu.
+ */
+export function agoraHHMM(): string {
+  const partes = FORMATO_HORA.formatToParts(new Date());
+  const pegar = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "00";
+  return `${pegar("hour")}:${pegar("minute")}`;
+}
+
 /** Soma (ou subtrai) dias de uma data YYYY-MM-DD. */
 export function somarDias(iso: string, dias: number): string {
   const d = new Date(`${iso}T12:00:00`);

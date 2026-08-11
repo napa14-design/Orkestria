@@ -16,7 +16,14 @@ import {
 } from "@/lib/calculations";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
-import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO, somarDias } from "@/lib/dateUtils";
+import {
+  agoraHHMM,
+  formatarDataBR,
+  formatarDuracao,
+  hhmmParaMin,
+  hojeISO,
+  somarDias,
+} from "@/lib/dateUtils";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -110,6 +117,10 @@ export default function PaginaAcompanhamento() {
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
   const hoje = hojeISO();
+  /** Fechamento do dia: dois toques (o segundo confirma) e declaração de EPI à parte. */
+  const [declararEpi, setDeclararEpi] = useState(false);
+  const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
+  const [fechando, setFechando] = useState(false);
   const { data: rotinasAnteriores } = useSWR<RotinaPlanejada[]>(
     sedeId ? `/api/rotinas?de=${somarDias(hoje, -7)}&ate=${somarDias(hoje, -1)}&sede=${sedeId}` : null,
     fetcher,
@@ -146,6 +157,73 @@ export default function PaginaAcompanhamento() {
   );
 
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
+
+  /**
+   * O que o fechamento por exceção alcança: só o que **já passou do horário** e
+   * segue sem registro. Confirmar bloco futuro seria afirmar o que não aconteceu.
+   * (O servidor recalcula tudo isto — aqui é só para a tela saber o que dizer.)
+   */
+  const fechamento = useMemo(() => {
+    // Futuro ≠ hoje: num dia futuro nada terminou, seja que hora for.
+    const limite = data > hoje ? "00:00" : data === hoje ? agoraHHMM() : "23:59";
+    const alvos = linhas.filter(
+      (r) =>
+        !execucaoPorRotina.has(r.id) &&
+        (r.status === "planejada" || r.status === "pendente") &&
+        r.fim_planejado <= limite,
+    );
+    const epis = new Set<string>();
+    let comEpi = 0;
+    for (const r of alvos) {
+      const nomes = (tarefaPorId.get(r.tarefa_id)?.requisitos ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((id) => reqPorId.get(id))
+        .filter((req) => req?.tipo === "epi")
+        .map((req) => req!.nome);
+      if (nomes.length > 0) comEpi++;
+      for (const n of nomes) epis.add(n);
+    }
+    return { total: alvos.length, comEpi, epis: [...epis].sort() };
+  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, data, hoje]);
+
+  async function fecharDia() {
+    if (!confirmandoFechamento) {
+      setConfirmandoFechamento(true);
+      return;
+    }
+    setConfirmandoFechamento(false);
+    setMensagem(null);
+    setFechando(true);
+    try {
+      const r = await apiPost<{
+        confirmadas: number;
+        ja_registradas: number;
+        aguardando_horario: number;
+        sem_declaracao: number;
+        epis_declarados: string[];
+      }>("/api/execucoes/confirmar-dia", { sede: sedeId, data, declarar_epi: declararEpi });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+      setDeclararEpi(false);
+      setMensagem({
+        texto:
+          `${r.confirmadas} tarefa(s) confirmadas como planejado` +
+          (r.epis_declarados.length > 0 ? ` (EPIs declarados: ${r.epis_declarados.join(", ")})` : "") +
+          (r.sem_declaracao > 0
+            ? ` · ${r.sem_declaracao} exigem EPI e ficaram de fora — registre uma a uma ou marque a declaração`
+            : "") +
+          (r.aguardando_horario > 0 ? ` · ${r.aguardando_horario} ainda não terminaram` : "") +
+          ".",
+      });
+    } catch (err) {
+      setMensagem({
+        texto: err instanceof ErroApi ? err.message : "Não foi possível fechar o dia.",
+        erro: true,
+      });
+    } finally {
+      setFechando(false);
+    }
+  }
 
   function tarefaExigeEpi(tarefaId: string): boolean {
     const tarefa = tarefaPorId.get(tarefaId);
@@ -340,6 +418,60 @@ export default function PaginaAcompanhamento() {
           role="status"
         >
           {mensagem.texto}
+        </div>
+      )}
+
+      {/* Fechamento por exceção. Confirmar era UMA AÇÃO POR BLOCO: numa sede de 277
+          blocos, a promessa de validar o dia em 5 minutos era aritmeticamente
+          impossível. Registre os desvios acima e feche o resto aqui. */}
+      {fechamento.total > 0 && (
+        <div
+          className="painel entra"
+          style={{ marginBottom: 16, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "grid", gap: 8 }}
+        >
+          <span style={{ fontSize: 13 }}>
+            <strong>{fechamento.total} tarefa(s)</strong> já passaram do horário e seguem sem
+            registro. Registre acima o que fugiu do plano — depois feche o resto de uma vez.
+          </span>
+          {fechamento.epis.length > 0 && (
+            <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)", alignItems: "flex-start" }}>
+              <input
+                type="checkbox"
+                checked={declararEpi}
+                onChange={(e) => {
+                  setDeclararEpi(e.target.checked);
+                  setConfirmandoFechamento(false);
+                }}
+              />
+              <span>
+                Declaro que os EPIs foram usados nas {fechamento.comEpi} tarefa(s) que os exigem:{" "}
+                <strong>{fechamento.epis.join(", ")}</strong>. Sem esta declaração, essas tarefas
+                ficam de fora e você as registra uma a uma.
+              </span>
+            </label>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              className="btn btn-primario"
+              disabled={fechando}
+              onClick={() => void fecharDia()}
+              title="Confirma como planejado o que já passou do horário e não tem registro"
+            >
+              {confirmandoFechamento
+                ? `Confirmar ${declararEpi ? fechamento.total : fechamento.total - fechamento.comEpi} como planejado?`
+                : "✓ Fechar o dia como planejado"}
+            </button>
+            {confirmandoFechamento && (
+              <button className="btn btn-mini" onClick={() => setConfirmandoFechamento(false)}>
+                cancelar
+              </button>
+            )}
+            {!declararEpi && fechamento.comEpi > 0 && (
+              <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>
+                {fechamento.comEpi} com EPI ficarão de fora
+              </span>
+            )}
+          </div>
         </div>
       )}
 

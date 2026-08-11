@@ -6,9 +6,11 @@
  */
 import { cobraDesvio, exigeJustificativa } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraHHMM, hojeISO } from "@/lib/dateUtils";
 import type { ExecucaoRealizada, StatusRealizado, StatusRotina } from "@/types";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
+import { getRotinasByData } from "./rotinasService";
 
 const STATUS_ROTINA_POR_EXECUCAO: Record<StatusRealizado, StatusRotina> = {
   conforme_planejado: "realizada",
@@ -35,6 +37,130 @@ export async function getExecucoes(
   return cond.length
     ? ds.consultar("execucoes_realizadas", cond)
     : ds.listar("execucoes_realizadas");
+}
+
+export interface ResultadoFechamentoDia {
+  confirmadas: number;
+  /** Já tinham registro: o fechamento não mexe no que foi decidido antes. */
+  ja_registradas: number;
+  /** O horário ainda não terminou — confirmar seria afirmar o que não aconteceu. */
+  aguardando_horario: number;
+  /** Exigem EPI e a declaração não foi feita. */
+  sem_declaracao: number;
+  /** EPIs que a declaração cobriu, por nome, para ecoar na tela. */
+  epis_declarados: string[];
+}
+
+/**
+ * **Fecha o dia por exceção**: confirma como planejado tudo o que já passou do
+ * horário e ainda não tem registro.
+ *
+ * Por que existe: confirmar era **uma ação por bloco**. Numa sede de 277 blocos,
+ * a hipótese da doutrina ("validar o dia comum em até 5 minutos") era
+ * aritmeticamente impossível — 277 cliques a 1s dão 4m37s antes de ler qualquer
+ * coisa. O custo passa a ser **1 + desvios**.
+ *
+ * **Nunca sobrescreve decisão anterior**: bloco com registro é contado e deixado
+ * como está. O supervisor registra os desvios primeiro; isto fecha o resto.
+ *
+ * **EPI**: 53% a 68% dos itens das rotas reais exigem EPI, e o caminho de um toque
+ * não pode afirmar uso de EPI (a validação do servidor barra). Então esses blocos
+ * só entram com `declararEpi`, e aí `epis_confirmados` recebe os **nomes** dos EPIs
+ * da tarefa — a mesma semântica da ficha ORK3, onde uma declaração nominal cobre o
+ * dia inteiro em vez de uma caixa por tarefa. Sem a declaração, eles são pulados e
+ * contados, nunca confirmados em silêncio.
+ */
+export async function confirmarDiaComoPlanejado(
+  opts: { sedeId: string; data: string; declararEpi?: boolean },
+  supervisorId: string,
+): Promise<ResultadoFechamentoDia> {
+  const ds = await getDataSource();
+  const [rotinas, execucoes, requisitos, tarefas] = await Promise.all([
+    getRotinasByData(opts.data, opts.sedeId),
+    getExecucoes(opts.data, opts.data, opts.sedeId),
+    ds.listar("requisitos"),
+    ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: opts.sedeId }]),
+  ]);
+
+  const jaRegistrada = new Set(execucoes.map((e) => e.rotina_id));
+  const nomeDoEpi = new Map(requisitos.filter((r) => r.tipo === "epi").map((r) => [r.id, r.nome]));
+  const tMap = new Map(tarefas.map((t) => [t.id, t]));
+  const episDaTarefa = (tarefaId: string): string[] =>
+    (tMap.get(tarefaId)?.requisitos ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((id) => nomeDoEpi.get(id))
+      .filter((n): n is string => !!n);
+
+  // Só o que já terminou. Três casos, e juntar dois deles era um bug: com
+  // `data >= hoje`, um dia FUTURO usava a hora de agora como limite e confirmava
+  // como realizado o que ainda não tinha acontecido.
+  const hoje = hojeISO();
+  const limite = opts.data > hoje ? "00:00" : opts.data === hoje ? agoraHHMM() : "23:59";
+
+  const res: ResultadoFechamentoDia = {
+    confirmadas: 0,
+    ja_registradas: 0,
+    aguardando_horario: 0,
+    sem_declaracao: 0,
+    epis_declarados: [],
+  };
+  const declarados = new Set<string>();
+  const aConfirmar: Array<{ rotina: (typeof rotinas)[number]; epis: string[] }> = [];
+
+  for (const rotina of rotinas) {
+    // A ordem importa: registrar um desvio muda o `status` da rotina, então
+    // checar status antes de contar fazia o bloco desaparecer da conta — as somas
+    // não fechavam com o total do dia e ninguém saberia dizer por quê.
+    if (jaRegistrada.has(rotina.id) || (rotina.status !== "planejada" && rotina.status !== "pendente")) {
+      res.ja_registradas++;
+      continue;
+    }
+    if (rotina.fim_planejado > limite) {
+      res.aguardando_horario++;
+      continue;
+    }
+    const epis = episDaTarefa(rotina.tarefa_id);
+    if (epis.length > 0 && !opts.declararEpi) {
+      res.sem_declaracao++;
+      continue;
+    }
+    for (const e of epis) declarados.add(e);
+    aConfirmar.push({ rotina, epis });
+  }
+
+  await emLotes(aConfirmar, ({ rotina, epis }) =>
+    registrarExecucao(
+      {
+        rotina_id: rotina.id,
+        data_execucao: rotina.data,
+        status_realizado: "conforme_planejado",
+        inicio_real: rotina.inicio_planejado,
+        fim_real: rotina.fim_planejado,
+        tempo_real_min: rotina.tempo_previsto_min,
+        justificativa: "",
+        observacao:
+          epis.length > 0
+            ? "Fechamento do dia: conforme o planejamento, com declaração de EPI do supervisor."
+            : "Fechamento do dia: conforme o planejamento.",
+        supervisor_id: supervisorId,
+        epis_confirmados: epis.join(", "),
+      },
+      // Sem atalho quando há EPI: aí a declaração é de verdade, e o servidor
+      // deve tratá-la como o formulário completo.
+      { confirmacaoRapida: epis.length === 0 },
+    ),
+  );
+  res.confirmadas = aConfirmar.length;
+  res.epis_declarados = [...declarados].sort();
+  return res;
+}
+
+/** Lotes paralelos: um dia cheio tem centenas de blocos. */
+async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25): Promise<void> {
+  for (let i = 0; i < itens.length; i += lote) {
+    await Promise.all(itens.slice(i, i + lote).map(fn));
+  }
 }
 
 export async function registrarExecucao(

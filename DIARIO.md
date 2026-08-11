@@ -7,6 +7,83 @@
 
 ---
 
+## 2026-08-11 — Fechar o dia por exceção: de 277 cliques para 1 + desvios
+
+A 3ª rodada da crítica externa perguntava sobre camadas por dia da semana. O achado
+foi outro, e é o mais grave do dia: **a hipótese central do produto era
+aritmeticamente impossível.**
+
+### O furo
+
+A doutrina promete *"gerar e validar um dia comum em até 5 minutos"*. Confirmar o
+realizado custava **uma ação por bloco**: o botão "Confirmar realizados" da agenda é
+só um **link** para o Acompanhamento, e lá cada linha tem seu próprio
+`confirmarConforme`. **Dionísio Torres tem 277 blocos** — a 1 segundo por clique, que
+é irreal, são **4m37s** antes de ler qualquer coisa ou tratar exceção.
+
+Ninguém tinha percebido porque **zero dias foram fechados** até hoje. E o tutorial
+**anunciava isso como qualidade**: *"num dia de quarenta tarefas, trinta e cinco são
+trinta e cinco cliques"*.
+
+### A medição que mudou o desenho
+
+Antes de construir, medi quantos itens exigem **EPI**: **58% no DT** (161 de 277),
+**68% no Eusébio**, **53% no Benfica**. E o servidor **proíbe** o atalho de um toque
+em tarefa com EPI (`EPI_EXIGE_CONFIRMACAO`) — declaração vazia tem custo jurídico.
+
+Ou seja: um lote que simplesmente pulasse EPI resolveria menos da metade e deixaria
+~161 **formulários** — pior que cliques. **O gargalo real era a declaração de EPI por
+bloco**, não a confirmação por bloco. A crítica não tinha esse dado.
+
+A saída tem precedente no próprio produto: a ficha **ORK3** já trocou N caixas por
+EPI por **uma declaração nominal** por ficha. O caminho digital passa a fazer o
+mesmo: **uma declaração que nomeia os EPIs**, cobrindo o dia.
+
+### Como ficou
+
+`POST /api/execucoes/confirmar-dia { sede, data, declarar_epi }` +
+`confirmarDiaComoPlanejado`. Regras:
+
+- confirma como planejado o que **já passou do horário** e não tem registro;
+- **nunca sobrescreve** decisão anterior — bloco com registro é contado e deixado;
+- tarefa com EPI **só** entra com a declaração, e aí `epis_confirmados` recebe os
+  **nomes**; sem ela, fica de fora, contada e visível na tela;
+- dois toques no botão, e o painel diz quantas ficariam de fora.
+
+### Dois bugs meus que a verificação pegou
+
+1. **Dia futuro sendo confirmado.** Eu escrevi `data >= hoje ? agoraHHMM() : "23:59"`,
+   juntando "hoje" com "futuro": num dia futuro ele usava a hora de agora como limite e
+   **confirmou 37 blocos que nunca aconteceram**. São três casos, não dois.
+2. **Contas que não fechavam.** Registrar um desvio muda o `status` da rotina, e o meu
+   `continue` por status vinha **antes** da contagem — o bloco era pulado sem entrar em
+   nenhum contador, e a soma não batia com o total do dia.
+
+E um detalhe de método: as três "falhas" de EPI na primeira rodada do teste eram de
+**dados** (a planilha importada não traz requisito de EPI). Em vez de supor que o ramo
+mais sensível funcionava, **construí o cenário** — criei o requisito e prendi a 3
+tarefas. Sem isso, o caminho com implicação jurídica ficaria sem teste.
+
+### Verificado (rota real do Pré Sul, 61 blocos)
+
+Sem declaração: **57 confirmadas · 1 já registrada** (o desvio) **· 3 fora por EPI**,
+e as somas fecham com o total. Com declaração: as 3 entram, `epis_declarados` traz
+`Luvas nitrílicas`, e só esses 3 registros têm `epis_confirmados`. O desvio segue
+`nao_realizada`. Rodar de novo: 0 confirmadas, 61 já registradas. Dia futuro: **0
+confirmadas, 62 aguardando horário**. Painel conferido no navegador.
+
+**Um dia de 61 blocos fechou em 2 chamadas** — um desvio e um fechamento.
+
+117 testes (3 novos de `agoraHHMM`, que é hora **no fuso da operação** pelo mesmo
+motivo de `hojeISO`), `tsc` limpo, build limpo. Discussão completa: **ADR-012**.
+
+### Arquivos
+
+`services/execucoesService.ts`, `app/api/execucoes/confirmar-dia/route.ts` (novo),
+`app/(app)/acompanhamento/page.tsx`, `lib/dateUtils.ts`, `testes/datas.test.ts`
+
+---
+
 ## 2026-08-11 — Facultativos entram: calendário 2026 fechado com 20 registros
 
 Complemento da entrada abaixo. Por decisão do dono do produto, os **pontos

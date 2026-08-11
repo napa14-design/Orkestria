@@ -10,7 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { feriadoDoDia } from "@/lib/calculations";
-import { diaDaSemana, hojeISO } from "@/lib/dateUtils";
+import { agoraHHMM, diaDaSemana, hojeISO } from "@/lib/dateUtils";
 
 describe("hojeISO no fuso da operação", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -52,6 +52,34 @@ describe("hojeISO no fuso da operação", () => {
     vi.setSystemTime(new Date("2026-08-12T01:30:00Z")); // 22:30 de terça em Fortaleza
     expect(hojeISO()).toBe("2026-08-11");
     expect(diaDaSemana(hojeISO())).toBe(2); // terça
+  });
+});
+
+describe("agoraHHMM no fuso da operação", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const em = (utc: string) => {
+    vi.setSystemTime(new Date(utc));
+    return agoraHHMM();
+  };
+
+  it("desconta as 3 horas de Fortaleza", () => {
+    expect(em("2026-08-11T12:00:00Z")).toBe("09:00");
+    expect(em("2026-08-11T23:30:00Z")).toBe("20:30");
+  });
+
+  it("vira o dia sem virar a hora errada", () => {
+    // 02:00 UTC do dia 12 = 23:00 do dia 11 em Fortaleza. Se isto devolvesse
+    // "02:00", o fechamento do dia acharia que nada tinha terminado ainda.
+    expect(em("2026-08-12T02:00:00Z")).toBe("23:00");
+    expect(em("2026-08-12T03:00:00Z")).toBe("00:00");
+  });
+
+  it("sai sempre com dois dígitos, para comparar como texto", () => {
+    // O fechamento compara `fim_planejado <= agoraHHMM()` como string.
+    expect(em("2026-08-11T12:05:00Z")).toBe("09:05");
+    expect(em("2026-08-11T13:00:00Z")).toMatch(/^\d{2}:\d{2}$/u);
   });
 });
 
