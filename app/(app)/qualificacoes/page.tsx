@@ -7,6 +7,7 @@
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import LoteQualificacoes from "@/components/LoteQualificacoes";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
 import { NIVEIS_QUALIFICACAO, NIVEL_ORDEM } from "@/types";
@@ -23,7 +24,15 @@ export default function PaginaQualificacoes() {
   const hoje = hojeISO();
 
   return (
-    <CrudManager<QualificacaoFuncionario>
+    <>
+      {/* Lote acima da lista: é implantação (turma inteira, ou pessoa com vários
+          treinamentos), e vem recolhido para não pesar em quem só confere validade. */}
+      <LoteQualificacoes
+        funcionarios={funcionarios ?? []}
+        requisitos={requisitos ?? []}
+        sedes={sedes ?? []}
+      />
+      <CrudManager<QualificacaoFuncionario>
       titulo="Qualificações"
       subtitulo="Aptidões e treinamentos que cada funcionário possui. A agenda bloqueia tarefas cujo requisito a pessoa não tem ou está vencido. EPIs são exigidos pela tarefa, não cadastrados aqui."
       endpoint="/api/qualificacoes"
@@ -111,6 +120,7 @@ export default function PaginaQualificacoes() {
           },
         },
       ]}
-    />
+      />
+    </>
   );
 }

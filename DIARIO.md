@@ -7,6 +7,65 @@
 
 ---
 
+## 2026-08-11 — Qualificações em lote: pessoas × capacitações numa chamada
+
+Pergunta do dono do produto: *"se o funcionário tiver 20 qualificações, tem que ir 20x
+no modal?"* Tinha. E o caso real é pior que o do exemplo.
+
+### O custo que existia
+
+`CrudManager` puro: **um registro por modal**. Uma pessoa com 20 treinamentos custava
+20 rodadas **reescolhendo a pessoa** toda vez. E a forma mais comum na realidade é a
+inversa — uma **turma** de 15 pessoas fazendo o mesmo NR na mesma data custava 15
+rodadas reescolhendo o treinamento.
+
+### Por que isto passa no portão
+
+A doutrina põe **ação em massa** explicitamente na **implantação**, que *"acontece uma
+vez, pode ser pesada"*. O que não pode engordar é o ato diário — e este caminho não
+aparece nele: o painel fica **recolhido** por padrão, acima da lista.
+
+E há um motivo operacional além do conforto, que a crítica externa já tinha apontado:
+*"qualificação que bloqueia com base vazia precisa aparecer na implantação, antes de
+virar exceção às 7h da manhã"*. Hoje a produção tem **zero** qualificações e a agenda
+bloqueia tarefa com requisito — encher essa base barato evita a exceção na hora ruim.
+
+### Como funciona
+
+Marca pessoas, marca capacitações, e o sistema **cruza as duas listas**: 4 pessoas × 3
+capacitações = 12 registros numa chamada. Filtro de sede encurta a lista, "marcar
+todas" resolve a turma, e validade e nível valem para o lote.
+
+**Não sobrescreve validade existente.** Par que já existe é **contado e deixado como
+está** — renovar é editar. Isso é deliberado: um lote que atualizasse datas apagaria,
+por descuido, a validade certa de quem já estava cadastrado.
+
+**Recusa individual não derruba o lote:** EPI não é qualificação possuída, então
+entra na conta de recusadas com o motivo em português, e o resto do lote passa.
+
+### Verificado (14 checagens)
+
+4×3 → 12 criadas com validade e nível do lote, sede derivada do funcionário; repetir o
+lote → 0 criadas, 12 já existentes; **a validade que eu editei à mão antes de repetir
+foi preservada**; capacitação nova no meio → cria só as 4 dela e pula as 12; EPI →
+1 recusada com motivo e o resto seguindo; lote vazio → 422 explicando. Painel conferido
+no navegador: vem recolhido, abre com as duas listas e a contagem no botão.
+
+`tsc` limpo, build limpo, 117 testes.
+
+### O que NÃO foi feito
+
+**Renovação em lote** ("a turma toda renovou o NR"), que é o caso recorrente. Fica de
+fora por ora porque sobrescrever data em massa é destrutivo e merece desenho próprio —
+provavelmente com preview do que vai mudar.
+
+### Arquivos
+
+`services/qualificacoesService.ts`, `app/api/qualificacoes/lote/route.ts` (novo),
+`components/LoteQualificacoes.tsx` (novo), `app/(app)/qualificacoes/page.tsx`
+
+---
+
 ## 2026-08-11 — Reduzir superfície: rejeitado item a item, com evidência
 
 **Nenhuma mudança de código, e é o resultado.** A tarefa era esconder o que não tem

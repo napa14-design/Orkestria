@@ -92,6 +92,93 @@ export async function createQualificacao(dados: Dados, autor: string): Promise<Q
   });
 }
 
+export interface ResultadoLoteQualificacoes {
+  criadas: number;
+  /** Pares que já existiam — o lote não mexe em validade já cadastrada. */
+  ja_tinham: number;
+  recusadas: number;
+  /** Até 8 motivos, para a pessoa entender o que ficou de fora. */
+  detalhes: string[];
+}
+
+/**
+ * Lança **várias pessoas × várias capacitações** de uma vez.
+ *
+ * Por que existe: o cadastro era um registro por modal. Uma pessoa com 20
+ * treinamentos custava 20 rodadas reescolhendo a pessoa; e o caso real é pior —
+ * uma **turma** de 15 pessoas fazendo o mesmo NR na mesma data custava 15 rodadas
+ * reescolhendo o treinamento. A doutrina põe **ação em massa** explicitamente na
+ * implantação, que pode ser pesada; o que não pode engordar é o ato diário, e este
+ * não aparece nele.
+ *
+ * **Não sobrescreve validade existente**: par que já existe é contado e deixado
+ * como está — renovar é editar, para ninguém apagar uma data por engano num lote.
+ */
+export async function criarQualificacoesEmLote(
+  dados: {
+    funcionarioIds: string[];
+    requisitoIds: string[];
+    validade?: string;
+    nivel?: string;
+    observacao?: string;
+  },
+  autor: string,
+): Promise<ResultadoLoteQualificacoes> {
+  const funcionarioIds = [...new Set(dados.funcionarioIds ?? [])].filter(Boolean);
+  const requisitoIds = [...new Set(dados.requisitoIds ?? [])].filter(Boolean);
+  if (funcionarioIds.length === 0 || requisitoIds.length === 0)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "LOTE_VAZIO",
+        mensagem: "Escolha ao menos uma pessoa e ao menos uma capacitação.",
+      },
+    ]);
+  exigirNivelValido(dados.nivel);
+
+  const ds = await getDataSource();
+  // Uma leitura só: o par a criar é o produto menos o que já existe. Sem isto,
+  // cada par repetiria a consulta de duplicata do caminho unitário.
+  const existentes = await ds.listar("qualificacoes_funcionario");
+  const jaTem = new Set(existentes.map((q) => `${q.funcionario_id}|${q.requisito_id}`));
+
+  const res: ResultadoLoteQualificacoes = { criadas: 0, ja_tinham: 0, recusadas: 0, detalhes: [] };
+  const aCriar: Array<{ funcionarioId: string; requisitoId: string }> = [];
+  for (const funcionarioId of funcionarioIds) {
+    for (const requisitoId of requisitoIds) {
+      if (jaTem.has(`${funcionarioId}|${requisitoId}`)) res.ja_tinham++;
+      else aCriar.push({ funcionarioId, requisitoId });
+    }
+  }
+
+  for (let i = 0; i < aCriar.length; i += 20) {
+    await Promise.all(
+      aCriar.slice(i, i + 20).map(async ({ funcionarioId, requisitoId }) => {
+        try {
+          await createQualificacao(
+            {
+              funcionario_id: funcionarioId,
+              requisito_id: requisitoId,
+              validade: dados.validade ?? "",
+              nivel: (dados.nivel ?? "apto") as QualificacaoFuncionario["nivel"],
+              observacao: dados.observacao ?? "",
+            },
+            autor,
+          );
+          res.criadas++;
+        } catch (e) {
+          // Recusa individual não derruba o lote: o resto entra e a pessoa lê o
+          // que ficou de fora.
+          res.recusadas++;
+          if (res.detalhes.length < 8)
+            res.detalhes.push(e instanceof Error ? e.message : "Erro ao criar qualificação.");
+        }
+      }),
+    );
+  }
+  return res;
+}
+
 export async function updateQualificacao(
   id: string,
   mudancas: Partial<Dados>,
