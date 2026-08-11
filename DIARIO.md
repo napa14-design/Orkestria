@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-08-11 — "Hoje" passa a ser o dia de Fortaleza, não o do servidor
+
+Bug achado ao responder uma pergunta simples do dono do produto ("o sistema sabe
+que hoje é terça?"). O dia da **semana** estava certo; **qual data é hoje**, não.
+
+### O furo
+
+`hojeISO()` usava o fuso de quem executa (`new Date().getDate()`). No navegador
+dava certo **por coincidência** — a coordenadora está em Fortaleza. No servidor da
+Vercel, que roda em **UTC**, das **21h às 23h59** o "hoje" já era o dia seguinte.
+
+Quem sofria: a **Central do dia**. Ela calcula a data no servidor
+(`centralDiaService.ts:163`) e busca rotinas, execuções e ausências dela. Às 21h15
+mostraria o dia de amanhã — vazio, sem nada para confirmar. E não é hipótese: a
+rota do Pré Sul tem blocos às **20:30 e 21:00**, exatamente o turno que fecharia o
+dia. O outro uso servidor-side (janela padrão do histórico) só deslocava 3h.
+
+### O conserto
+
+`FUSO_OPERACAO = "America/Fortaleza"` e `hojeISO()` calculando por
+`Intl.DateTimeFormat.formatToParts` nesse fuso. Ganho lateral: cliente e servidor
+passam a concordar **sempre**, em vez de concordarem enquanto o navegador estiver
+no Brasil. É código, não configuração da Vercel — então vale em qualquer deploy.
+
+### O teste foi validado contra o código antigo
+
+8 casos novos em `testes/datas.test.ts`, com o relógio fixado em UTC (é assim que o
+servidor vê o mundo): 20:30, 22:30, 23:59 e 00:00 de Fortaleza. **Revertendo
+`hojeISO` para a versão antiga, 4 deles falham** com
+`expected '2026-08-12' to be '2026-08-11'` — o bug reproduzido. Sem essa
+conferência, seria teste que passa em tudo e não prova nada.
+
+Um caso registra o caso simétrico que ainda está por vir: um cron às **02:00 UTC**
+geraria o dia de **ontem**. Fica travado antes de a tarefa #18 existir.
+
+### Arquivos
+
+`lib/dateUtils.ts`, `testes/datas.test.ts`
+
+---
+
 ## 2026-08-11 — Rota padrão em camadas: a de todo dia + a de cada dia da semana
 
 Pedido do dono do produto, atendido — e **eu tinha rejeitado pelo argumento

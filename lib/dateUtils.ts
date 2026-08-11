@@ -28,10 +28,40 @@ export function formatarDuracao(min: number): string {
   return neg ? `-${texto}` : texto;
 }
 
-/** Data de hoje no formato YYYY-MM-DD (fuso local). */
+/**
+ * Fuso da operação. **Não é preferência de exibição: é a definição de "hoje".**
+ * A jornada acontece em Fortaleza, e é o dia de lá que decide qual rotina é a de
+ * hoje.
+ */
+export const FUSO_OPERACAO = "America/Fortaleza";
+
+const FORMATO_DIA = new Intl.DateTimeFormat("en-CA", {
+  timeZone: FUSO_OPERACAO,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Data de hoje (YYYY-MM-DD) **no fuso da operação**, não no do ambiente.
+ *
+ * Era `new Date().getFullYear()/getMonth()/getDate()`, ou seja, o fuso de quem
+ * executa. No navegador dava certo por coincidência (a coordenadora está em
+ * Fortaleza); no servidor da Vercel, que roda em **UTC**, das 21h às 23h59 o
+ * "hoje" já era o dia seguinte. Quem sofria era a **Central do dia**, que calcula
+ * a data no servidor: às 21h15 ela mostrava o dia de amanhã, vazio — justamente
+ * no horário em que o turno da noite (a rota do Pré Sul tem blocos às 20:30 e
+ * 21:00) fecharia o dia.
+ *
+ * Fixar o fuso também faz cliente e servidor concordarem sempre, em vez de
+ * concordarem só enquanto o navegador estiver no Brasil.
+ */
 export function hojeISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // `formatToParts` em vez de `format`: não depende de o locale montar a string
+  // na ordem ano-mês-dia.
+  const partes = FORMATO_DIA.formatToParts(new Date());
+  const pegar = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+  return `${pegar("year")}-${pegar("month")}-${pegar("day")}`;
 }
 
 /** Soma (ou subtrai) dias de uma data YYYY-MM-DD. */
