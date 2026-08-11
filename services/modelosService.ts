@@ -6,13 +6,20 @@
  */
 import {
   blocosOcupados,
-  jornadaDoDia,
   statusPeriodoLetivo,
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { diaDaSemana, hhmmParaMin, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
+import {
+  chaveMaterializacao,
+  compararRotaComODia,
+  type ContextoProjecao,
+  type ItemDescartado,
+  type MotivoDescarte,
+  projetarDiaDaRota,
+} from "@/lib/projecaoDia";
 import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
@@ -280,81 +287,24 @@ export async function gerarDiaDaRotaPadrao(
   data: string,
   supervisorId: string,
 ): Promise<ResultadoGeracao> {
-  const itens = await getRotaPadrao(sedeId);
-  if (itens.length === 0) return { semRota: true, geradas: 0, puladas: 0, detalhes: [] };
+  const carregado = await carregarRotaEContexto(sedeId, data);
+  if (!carregado) return { semRota: true, geradas: 0, puladas: 0, detalhes: [] };
+  const { itens, ctx, locais, params } = carregado;
 
-  const ds = await getDataSource();
-  const chave = (f: string, t: string, i: string) => `${f}|${t}|${i}`;
-  const existentes = await getRotinasByData(data, sedeId);
-  const jaTem = new Set(
-    existentes
-      .filter((r) => r.status !== "cancelada")
-      .map((r) => chave(r.funcionario_id, r.tarefa_id, r.inicio_planejado)),
-  );
-  const [tarefas, locais, funcionarios, periodos, params] = await Promise.all([
-    ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
-    ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
-    ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
-    ds.consultar("periodos_letivos", [{ campo: "sede_id", op: "==", valor: sedeId }]),
-    resolverParametros(sedeId),
-  ]);
-  const tMap = new Map(tarefas.map((t) => [t.id, t]));
-  const lMap = new Map(locais.map((l) => [l.id, l]));
-  const fMap = new Map(funcionarios.map((f) => [f.id, f]));
-  const letivoFora = statusPeriodoLetivo(periodos, sedeId, data) === "fora";
-  const dow = diaDaSemana(data); // 0=dom … 6=sáb
-  const agora = agoraISO();
+  const { materializar, descartados } = projetarDiaDaRota(itens, ctx);
 
-  // Presença de todos os funcionários numa só rodada (era 1 query por item).
-  const idsFunc = [...new Set(itens.map((i) => i.funcionario_id))];
-  const ausentes = await Promise.all(idsFunc.map((id) => ausenteEm(id, data)));
-  const ausente = new Map(idsFunc.map((id, i) => [id, ausentes[i] !== null]));
-
-  const res: ResultadoGeracao = { geradas: 0, puladas: 0, detalhes: [] };
-  const nota = (m: string) => {
-    if (res.detalhes.length < 8) res.detalhes.push(m);
+  const res: ResultadoGeracao = {
+    geradas: 0,
+    puladas: descartados.length,
+    detalhes: explicarDescartes(descartados, ctx),
   };
 
-  const aCriar: RotinaPlanejada[] = [];
-  for (const it of itens) {
-    if (jaTem.has(chave(it.funcionario_id, it.tarefa_id, it.inicio_planejado))) {
-      res.puladas++;
-      continue;
-    }
-    const t = tMap.get(it.tarefa_id);
-    const f = fMap.get(it.funcionario_id);
-    if (!t || !f) {
-      res.puladas++;
-      continue;
-    }
-    if (t.depende_calendario && letivoFora) {
-      res.puladas++;
-      nota(`${it.inicio_planejado} ${t.nome_tarefa}: fora do período letivo`);
-      continue;
-    }
-    // Tarefa semanal só entra nos dias configurados (ex.: "seg,qua,sex").
-    if (t.frequencia === "semanal") {
-      const dias = parseDiasSemana(t.dias_semana);
-      if (dias.length && !dias.includes(dow)) {
-        res.puladas++;
-        nota(`${it.inicio_planejado} ${t.nome_tarefa}: não é do dia da semana`);
-        continue;
-      }
-    }
-    if (!jornadaDoDia(f, data).trabalha) {
-      res.puladas++;
-      nota(`${f.nome}: folga pela escala em ${data}`);
-      continue;
-    }
-    if (ausente.get(it.funcionario_id)) {
-      res.puladas++;
-      nota(`${f.nome}: ausente — redistribuir no Remanejo`);
-      continue;
-    }
-
-    const previsto = it.duracao_min ?? tempoPrevistoMin(t, lMap.get(it.local_id) ?? undefined);
-    const fim = minParaHHMM(hhmmParaMin(it.inicio_planejado) + previsto);
-    const rotina: RotinaPlanejada = {
+  const ds = await getDataSource();
+  const agora = agoraISO();
+  const aCriar: RotinaPlanejada[] = materializar.map((it) => {
+    const tarefa = ctx.tarefas.get(it.tarefa_id)!;
+    const previsto = it.duracao_min ?? tempoPrevistoMin(tarefa, locais.get(it.local_id) ?? undefined);
+    return {
       id: idMaterializacao(data, it.funcionario_id, it.tarefa_id, it.inicio_planejado),
       data,
       funcionario_id: it.funcionario_id,
@@ -362,7 +312,7 @@ export async function gerarDiaDaRotaPadrao(
       tarefa_id: it.tarefa_id,
       local_id: it.local_id,
       inicio_planejado: it.inicio_planejado,
-      fim_planejado: fim,
+      fim_planejado: minParaHHMM(hhmmParaMin(it.inicio_planejado) + previsto),
       tempo_previsto_min: previsto,
       tempo_visual_min: tempoVisualMin(previsto, params.bloco_agenda_min),
       blocos_ocupados: blocosOcupados(previsto, params.bloco_agenda_min),
@@ -372,16 +322,202 @@ export async function gerarDiaDaRotaPadrao(
       criado_em: agora,
       atualizado_em: agora,
     };
-    aCriar.push(rotina);
-  }
+  });
 
   // Grava em lotes paralelos — escrita 1 a 1 levava ~2 min para um dia cheio.
-  const LOTE = 25;
-  for (let i = 0; i < aCriar.length; i += LOTE) {
-    await Promise.all(aCriar.slice(i, i + LOTE).map((r) => ds.criar("rotinas_planejadas", r)));
-  }
+  await emLotes(aCriar, (r) => ds.criar("rotinas_planejadas", r));
   res.geradas = aCriar.length;
   return res;
+}
+
+/**
+ * Tudo que a projeção precisa do banco, numa só passada — compartilhado entre a
+ * geração de verdade e a **geração sombra**, para as duas julgarem pelos mesmos
+ * dados. Devolve `null` quando a sede não tem rota padrão.
+ */
+async function carregarRotaEContexto(sedeId: string, data: string) {
+  const itens = await getRotaPadrao(sedeId);
+  if (itens.length === 0) return null;
+
+  const ds = await getDataSource();
+  const existentes = await getRotinasByData(data, sedeId);
+  const [tarefas, locais, funcionarios, periodos, params] = await Promise.all([
+    ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.consultar("periodos_letivos", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    resolverParametros(sedeId),
+  ]);
+
+  // Presença de todos os funcionários numa só rodada (era 1 query por item).
+  const idsFunc = [...new Set(itens.map((i) => i.funcionario_id))];
+  const ausencias = await Promise.all(idsFunc.map((id) => ausenteEm(id, data)));
+
+  const ctx: ContextoProjecao = {
+    data,
+    tarefas: new Map(tarefas.map((t) => [t.id, t])),
+    funcionarios: new Map(funcionarios.map((f) => [f.id, f])),
+    jaNoDia: new Set(
+      existentes
+        .filter((r) => r.status !== "cancelada")
+        .map((r) => chaveMaterializacao(r.funcionario_id, r.tarefa_id, r.inicio_planejado)),
+    ),
+    ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
+    letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
+  };
+  return { itens, existentes, ctx, locais: new Map(locais.map((l) => [l.id, l])), params };
+}
+
+/**
+ * Motivos em português para o supervisor, no máximo 8 — o texto vai para a tela
+ * do "Gerar o dia". `ja_no_dia` e `cadastro_removido` não geram linha: o primeiro
+ * é o caso normal (idempotência) e o segundo não tem nome para exibir.
+ */
+function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao): string[] {
+  const linhas: string[] = [];
+  for (const { item, motivo } of descartados) {
+    if (linhas.length >= 8) break;
+    const tarefa = ctx.tarefas.get(item.tarefa_id);
+    const funcionario = ctx.funcionarios.get(item.funcionario_id);
+    if (motivo === "fora_do_periodo_letivo")
+      linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do período letivo`);
+    else if (motivo === "outro_dia_da_semana")
+      linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: não é do dia da semana`);
+    else if (motivo === "folga_pela_escala")
+      linhas.push(`${funcionario?.nome}: folga pela escala em ${ctx.data}`);
+    else if (motivo === "pessoa_ausente")
+      linhas.push(`${funcionario?.nome}: ausente — redistribuir no Remanejo`);
+  }
+  return linhas;
+}
+
+export interface RelatorioSombra {
+  sede_id: string;
+  data: string;
+  semRota?: boolean;
+  /** Itens da rota padrão da sede. */
+  itens_na_rota: number;
+  /** Blocos que existem no dia (planejados à mão ou gerados antes). */
+  blocos_no_dia: number;
+  /** A geração criaria estes agora. */
+  materializaria: number;
+  /** Já presentes: a rota e o dia concordam. */
+  preservados: number;
+  descartes: Record<MotivoDescarte, number>;
+  divergencia: {
+    /** A rota tem, o dia não — e não é caso de bloco movido. */
+    so_na_rota: number;
+    /** O dia tem, a rota não: acréscimo manual do supervisor. */
+    so_no_dia: number;
+    /** Mesma pessoa+tarefa em outro horário: a rota está desatualizada. */
+    movidos: number;
+  };
+  /** Amostra legível das divergências (no máximo 20 linhas). */
+  amostra: string[];
+}
+
+/**
+ * **Geração sombra**: calcula o que a geração automática produziria e confronta
+ * com o dia que existe — **sem escrever bloco nenhum**.
+ *
+ * É instrumento de medição, não feature: não aparece em tela nenhuma do
+ * supervisor. Serve para responder, com número, se a rota padrão sobrevive ao
+ * contato com a operação antes de deixarmos um cron escrever por conta própria.
+ */
+export async function projetarDiaSombra(sedeId: string, data: string): Promise<RelatorioSombra> {
+  const vazio = (): Record<MotivoDescarte, number> => ({
+    ja_no_dia: 0,
+    cadastro_removido: 0,
+    fora_do_periodo_letivo: 0,
+    outro_dia_da_semana: 0,
+    folga_pela_escala: 0,
+    pessoa_ausente: 0,
+  });
+
+  const carregado = await carregarRotaEContexto(sedeId, data);
+  if (!carregado) {
+    return {
+      sede_id: sedeId,
+      data,
+      semRota: true,
+      itens_na_rota: 0,
+      blocos_no_dia: 0,
+      materializaria: 0,
+      preservados: 0,
+      descartes: vazio(),
+      divergencia: { so_na_rota: 0, so_no_dia: 0, movidos: 0 },
+      amostra: [],
+    };
+  }
+  const { itens, existentes, ctx } = carregado;
+  const { materializar, descartados } = projetarDiaDaRota(itens, ctx);
+  const vivos = existentes.filter((r) => r.status !== "cancelada");
+
+  // Compara só o que a rota REALMENTE prevê para esta data: o que ela criaria
+  // mais o que já está lá. Comparar a rota inteira somaria os descartes legítimos
+  // (tarefa de outro dia da semana, folga, ausência) à divergência — o relatório
+  // diário acusaria "faltam 2 blocos" num dia perfeito. Foi o que a verificação
+  // com a rota real do Pré Sul pegou: as duas tarefas semanais "escala de segunda"
+  // e "escala de terça" apareciam como falta numa quarta-feira.
+  const aplicaveis = [
+    ...materializar,
+    ...descartados.filter((d) => d.motivo === "ja_no_dia").map((d) => d.item),
+  ];
+  const div = compararRotaComODia(aplicaveis, vivos);
+
+  const descartes = vazio();
+  for (const d of descartados) descartes[d.motivo]++;
+
+  const nome = (id: string) => ctx.funcionarios.get(id)?.nome ?? id;
+  const tarefa = (id: string) => ctx.tarefas.get(id)?.nome_tarefa ?? id;
+  const amostra = [
+    ...div.movidos.map(
+      (m) => `MOVIDO ${nome(m.item.funcionario_id)} / ${tarefa(m.item.tarefa_id)}: rota ${m.de} → dia ${m.para}`,
+    ),
+    ...div.soNaRota.map(
+      (i) => `SÓ NA ROTA ${i.inicio_planejado} ${nome(i.funcionario_id)} / ${tarefa(i.tarefa_id)}`,
+    ),
+    ...div.soNoDia.map(
+      (r) => `SÓ NO DIA ${r.inicio_planejado} ${nome(r.funcionario_id)} / ${tarefa(r.tarefa_id)}`,
+    ),
+  ].slice(0, 20);
+
+  return {
+    sede_id: sedeId,
+    data,
+    itens_na_rota: itens.length,
+    blocos_no_dia: vivos.length,
+    materializaria: materializar.length,
+    preservados: descartes.ja_no_dia,
+    descartes,
+    divergencia: {
+      so_na_rota: div.soNaRota.length,
+      so_no_dia: div.soNoDia.length,
+      movidos: div.movidos.length,
+    },
+    amostra,
+  };
+}
+
+/**
+ * Sedes que têm rota padrão — uma consulta só, em vez de varrer as 18 sedes para
+ * descobrir que 15 não têm nada a projetar.
+ */
+export async function sedesComRotaPadrao(): Promise<string[]> {
+  const ds = await getDataSource();
+  const itens = await ds.consultar("modelos_rotina", [{ campo: "padrao", op: "==", valor: true }]);
+  return [...new Set(itens.filter((m) => !m.evento).map((m) => m.sede_id))].sort();
+}
+
+/** Geração sombra de uma data: uma sede, ou todas as que têm rota padrão. */
+export async function projetarSombraDoDia(
+  data: string,
+  sedeId?: string,
+): Promise<RelatorioSombra[]> {
+  const sedes = sedeId ? [sedeId] : await sedesComRotaPadrao();
+  const relatorios: RelatorioSombra[] = [];
+  for (const sede of sedes) relatorios.push(await projetarDiaSombra(sede, data));
+  return relatorios;
 }
 
 export async function excluirModelo(nome: string, sedeId: string): Promise<number> {

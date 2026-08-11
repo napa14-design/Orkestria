@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-08-11 — Geração sombra: medir a rota sem escrever bloco
+
+Primeiro item da ordem acordada no ADR-009. **Nada muda para o supervisor**: não
+há tela, botão nem menu novo.
+
+### O que é
+
+`GET /api/sombra?data=AAAA-MM-DD[&sede_id=…]` (admin, sem página) calcula o que a
+geração automática produziria e confronta com o dia que existe de verdade — **sem
+criar rotina nenhuma**. Serve para responder com número, ao longo das primeiras
+semanas de operação real, se a rota padrão sobrevive ao contato com o dia. Sem
+esse dado, ligar um cron para escrever o dia é aposta.
+
+Devolve por sede: itens na rota, blocos no dia, quantos materializaria, quantos
+já concordam, os descartes por motivo, e a divergência separada em três —
+**movidos** (mesma pessoa+tarefa em outro horário), **só na rota** e **só no
+dia** (acréscimo manual) — mais uma amostra em português.
+
+### A decisão de desenho que importa
+
+A geração real fazia três coisas juntas: buscar, decidir e gravar. O **decidir**
+saiu para `lib/projecaoDia.ts` como função pura, e agora a geração de verdade e a
+sombra usam **a mesma**. Se a sombra reimplementasse as regras de descarte, as
+duas divergiriam em silêncio e o relatório passaria a mentir com aparência de
+medição. `gerarDiaDaRotaPadrao` ficou com o que é dela: montar o documento e
+gravar em lote.
+
+### Dois erros meus, achados pela verificação com dados reais
+
+1. **A comparação somava descarte legítimo à divergência.** Eu confrontava a rota
+   **inteira** com o dia, então as tarefas semanais "escala de segunda" e "escala
+   de terça" apareciam como *falta* numa quarta-feira: o relatório acusaria
+   divergência num dia perfeito. Corrigido — compara só o que a rota prevê para
+   **aquela** data (o que criaria + o que já está lá).
+2. **Meus testes estavam errados duas vezes, não o código.** `dias_semana` é CSV
+   **numérico** (`"1,3,5"`), não `"seg,qua,sex"` — escrever nome faz o parse
+   devolver `[]` e a tarefa passa a valer todo dia. E a escala padrão do fixture é
+   `seg_sex`, então no sábado a pessoa não trabalha e o motivo relatado é a folga,
+   não o dia da semana.
+
+### Verificado com a rota real do Pré Sul, não com o seed
+
+O seed de demonstração tem agenda cheia — três intervalos por pessoa e tarefas
+longas —, e o validador recusa qualquer movimentação (corretamente). Com a
+planilha do Pré Sul importada (5 pessoas, 45 locais, 63 tarefas) o caso principal
+saiu de ponta a ponta:
+
+- geração previu 61 e gerou 61, pulando as 2 tarefas de outro dia da semana;
+- segunda passada: 0 criadas, 63 puladas (idempotente);
+- depois de gerar, divergência zero e 61 preservados;
+- bloco movido → `movidos: 1`, e a amostra saiu como
+  `MOVIDO CRISTINA SOUSA / Ferver água para o café: rota 11:25 → dia 07:00`;
+- e nesse estado `materializaria: 1` — **a prova medida da tarefa #16**: a geração
+  recriaria o bloco das 11:25 ao lado do das 07:00, porque a chave inclui o
+  horário;
+- bloco apagado → aparece em `só na rota`;
+- rodar a sombra não alterou nenhum bloco do dia intocado.
+
+85 testes (14 novos em `testes/projecao.test.ts`), `tsc` limpo, build limpo.
+
+### Arquivos
+
+`lib/projecaoDia.ts` (novo), `services/modelosService.ts`,
+`app/api/sombra/route.ts` (novo), `testes/projecao.test.ts` (novo)
+
+---
+
 ## 2026-08-11 — Correção: o "zero fechado" era operação que não começou
 
 Correção da entrada abaixo, no mesmo dia, porque ela virou registro errado no
