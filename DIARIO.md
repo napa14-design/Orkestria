@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-08-11 — Os 14 feriados de 2026 cadastrados em produção
+
+**Mudança de dados, não de código.** A base de produção passou de 0 para **14**
+registros em `feriados`, todos com sede vazia (valem para as 18).
+
+### O que entrou
+
+Só o que é **feriado por lei**. Datas móveis calculadas, não recordadas: Páscoa
+2026 em 05/04 pelo algoritmo gregoriano, e daí a Sexta-feira Santa (03/04).
+
+| Âmbito | Datas |
+|---|---|
+| Nacionais | 01/01 · 03/04 (Sexta-feira Santa) · 21/04 · 01/05 · 07/09 · 12/10 · 02/11 · 15/11 · 20/11 (Consciência Negra, nacional desde a Lei 14.759/2023) · 25/12 |
+| Ceará | 19/03 (São José) · 25/03 (Data Magna) |
+| Fortaleza | 13/04 (aniversário) · 15/08 (N. Sra. da Assunção, padroeira) |
+
+Dois caem em dia não útil e foram cadastrados de propósito: **15/11 é domingo** e
+**15/08 é sábado** — e o sábado importa, porque quem tem escala `seg_sab` seria
+programado nele.
+
+### O que NÃO entrou, e por quê
+
+Facultativos são **decisão da operação, não da lei**, e ASG frequentemente trabalha
+justamente quando a escola está vazia (limpeza pesada). Ficaram de fora, para o dono
+do produto decidir: Carnaval (16 e 17/02) e Cinzas (18/02), Corpus Christi (04/06),
+Dia do Servidor Público (28/10), véspera de Natal (24/12) e de Ano Novo (31/12).
+
+### Como foi feito
+
+Script temporário chamando `createFeriado` — o serviço, não o banco direto, para
+passar pela validação e pela auditoria (`historico`), com autor `ia02@px.com.br`.
+**Idempotente**: rodei duas vezes e a segunda passada não criou nada ("já existia",
+total segue 14). Script apagado depois.
+
+---
+
 ## 2026-08-11 — Feriados e recessos: o dia fechado passa a existir
 
 Última da fila aberta pelo ADR-009. Tabela `feriados` + tela em **Estrutura ›
