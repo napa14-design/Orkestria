@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-08-11 — Facultativos entram: calendário 2026 fechado com 20 registros
+
+Complemento da entrada abaixo. Por decisão do dono do produto, os **pontos
+facultativos** também fecham o dia. A base de produção foi de 14 para **20**
+registros em `feriados`.
+
+| Registro | Datas |
+|---|---|
+| Carnaval | **16 a 17/02** — um registro de intervalo |
+| Quarta-feira de Cinzas | 18/02 — **separada de propósito** |
+| Corpus Christi | 04/06 |
+| Dia do Servidor Público | 28/10 |
+| Véspera de Natal | 24/12 |
+| Véspera de Ano Novo | 31/12 |
+
+**Por que a Cinzas ficou fora do intervalo do Carnaval:** ela costuma valer só até
+as 14h, então é a mais provável de a operação querer reabrir. Separada, basta
+desmarcar "ativo"; dentro do intervalo, exigiria mexer em datas.
+
+Nenhuma das seis cai em fim de semana — todas são dias úteis, então todas mudam o
+comportamento de verdade.
+
+### Provado em produção, não só listado
+
+`projetarDiaSombra` contra a base real (Dionísio Torres, rota de 277 itens):
+
+| Data | Resultado |
+|---|---|
+| 07/09 Independência | `fechado=Independência` · materializaria **0** |
+| **17/02** (2º dia do intervalo) | `fechado=Carnaval` · **0** — o intervalo funciona |
+| 18/02 Cinzas | `fechado=Quarta-feira de Cinzas` · **0** |
+| 08/09 dia comum | aberto · materializaria **277** |
+
+Scripts temporários, idempotentes, apagados depois. Nenhuma mudança de código.
+
+---
+
 ## 2026-08-11 — Os 14 feriados de 2026 cadastrados em produção
 
 **Mudança de dados, não de código.** A base de produção passou de 0 para **14**
