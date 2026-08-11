@@ -501,7 +501,9 @@ export default function PaginaRotinas() {
     try {
       const r = await apiPost<{
         semRota?: boolean;
+        fechado?: string;
         geradas: number;
+        atualizadas?: number;
         puladas: number;
         detalhes: string[];
       }>("/api/rotinas/gerar", { sede: sedeId, data });
@@ -514,12 +516,24 @@ export default function PaginaRotinas() {
             mensagem: "Esta sede ainda não tem rota padrão. Monte um dia e salve como rota padrão.",
           },
         ]);
+      } else if (r.fechado) {
+        // Dia fechado por feriado/recesso: nada foi criado, e a pessoa precisa
+        // saber que foi decisão do cadastro, não falha.
+        setAlertas([
+          {
+            nivel: "erro",
+            codigo: "GERAR",
+            mensagem: `Nada foi gerado: ${r.fechado} — esta data está cadastrada como dia sem operação. Se houver trabalho, ajuste em Estrutura › Feriados e recessos.`,
+          },
+        ]);
       } else {
         setAlertas([
           {
             nivel: "alerta",
             codigo: "GERAR",
             mensagem: `${r.geradas} tarefa(s) geradas da rota padrão${
+              r.atualizadas ? ` · ${r.atualizadas} alinhada(s) ao horário novo da rota` : ""
+            }${
               r.puladas > 0 ? ` · ${r.puladas} puladas (já existiam, ausência ou conflito)` : ""
             }. Revise as exceções abaixo.`,
           },

@@ -186,6 +186,7 @@ function seed(): Banco {
     historico: [],
     ausencias: [],
     periodos_letivos: [],
+    feriados: [],
     parametros: [
       { id: "p1", chave: "bloco_agenda_min", valor: "15", tipo: "numero", descricao: "Tamanho do bloco/snap da agenda em minutos (15 = granularidade fina)", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p2", chave: "ocupacao_baixa", valor: "60", tipo: "percentual", descricao: "Limite para considerar funcionário subutilizado", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },

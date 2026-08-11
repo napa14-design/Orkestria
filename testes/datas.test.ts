@@ -9,6 +9,7 @@
  * Os horários abaixo são UTC de propósito: é assim que o servidor vê o mundo.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { feriadoDoDia } from "@/lib/calculations";
 import { diaDaSemana, hojeISO } from "@/lib/dateUtils";
 
 describe("hojeISO no fuso da operação", () => {
@@ -51,6 +52,55 @@ describe("hojeISO no fuso da operação", () => {
     vi.setSystemTime(new Date("2026-08-12T01:30:00Z")); // 22:30 de terça em Fortaleza
     expect(hojeISO()).toBe("2026-08-11");
     expect(diaDaSemana(hojeISO())).toBe(2); // terça
+  });
+});
+
+describe("feriadoDoDia", () => {
+  const base = {
+    id: "f1",
+    sede_id: "",
+    nome: "Independência",
+    data_inicio: "2026-09-07",
+    data_fim: "2026-09-07",
+    ativo: true,
+    criado_por: "teste",
+    criado_em: "2026-01-01T00:00:00.000Z",
+    atualizado_por: "teste",
+    atualizado_em: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("sem sede cadastrada, fecha TODAS as sedes", () => {
+    expect(feriadoDoDia([base], "aldeota", "2026-09-07")?.nome).toBe("Independência");
+    expect(feriadoDoDia([base], "eusebio", "2026-09-07")?.nome).toBe("Independência");
+  });
+
+  it("dia de fora não fecha", () => {
+    expect(feriadoDoDia([base], "aldeota", "2026-09-08")).toBeNull();
+    expect(feriadoDoDia([base], "aldeota", "2026-09-06")).toBeNull();
+  });
+
+  it("intervalo fecha o miolo e as pontas (recesso é uma linha só)", () => {
+    const recesso = { ...base, nome: "Recesso de julho", data_inicio: "2026-07-01", data_fim: "2026-07-15" };
+    for (const dia of ["2026-07-01", "2026-07-08", "2026-07-15"]) {
+      expect(feriadoDoDia([recesso], "aldeota", dia)?.nome).toBe("Recesso de julho");
+    }
+    expect(feriadoDoDia([recesso], "aldeota", "2026-07-16")).toBeNull();
+  });
+
+  it("feriado de UMA sede não fecha as outras", () => {
+    const soAldeota = { ...base, sede_id: "aldeota", nome: "Dedetização" };
+    expect(feriadoDoDia([soAldeota], "aldeota", "2026-09-07")?.nome).toBe("Dedetização");
+    expect(feriadoDoDia([soAldeota], "eusebio", "2026-09-07")).toBeNull();
+  });
+
+  it("inativo não fecha nada", () => {
+    expect(feriadoDoDia([{ ...base, ativo: false }], "aldeota", "2026-09-07")).toBeNull();
+  });
+
+  it("sem sede na consulta, só os globais valem", () => {
+    const soAldeota = { ...base, sede_id: "aldeota" };
+    expect(feriadoDoDia([soAldeota], undefined, "2026-09-07")).toBeNull();
+    expect(feriadoDoDia([base], undefined, "2026-09-07")?.nome).toBe("Independência");
   });
 });
 

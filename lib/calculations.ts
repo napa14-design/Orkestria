@@ -7,6 +7,7 @@
  */
 import type {
   ClassificacaoOcupacao,
+  Feriado,
   Funcionario,
   Local,
   ParametrosResolvidos,
@@ -41,6 +42,32 @@ export function statusPeriodoLetivo(
     return dias.length === 0 || dias.includes(dow);
   });
   return dentro ? "dentro" : "fora";
+}
+
+/**
+ * O dia está fechado por feriado/recesso? Devolve o registro que fecha, ou `null`.
+ *
+ * Registro com `sede_id` vazio vale para **todas** as sedes — é como se cadastra
+ * feriado nacional, estadual e municipal uma única vez (as 18 sedes são em
+ * Fortaleza). Com `sede_id` preenchido, fecha só aquela.
+ *
+ * Não confundir com período letivo: aquele responde "esta tarefa que depende do
+ * calendário é exigida hoje?"; este responde "existe operação hoje?".
+ */
+export function feriadoDoDia(
+  feriados: Feriado[],
+  sedeId: string | undefined,
+  dataISO: string,
+): Feriado | null {
+  return (
+    feriados.find(
+      (f) =>
+        f.ativo &&
+        (!f.sede_id || f.sede_id === sedeId) &&
+        f.data_inicio <= dataISO &&
+        dataISO <= f.data_fim,
+    ) ?? null
+  );
 }
 
 /**

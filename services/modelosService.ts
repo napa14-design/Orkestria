@@ -6,6 +6,7 @@
  */
 import {
   blocosOcupados,
+  feriadoDoDia,
   statusPeriodoLetivo,
   tempoPrevistoMin,
   tempoVisualMin,
@@ -359,6 +360,8 @@ export async function aplicarModelo(
 
 export interface ResultadoGeracao {
   semRota?: boolean;
+  /** Nome do feriado/recesso que fecha o dia. Presente = nada foi gerado. */
+  fechado?: string;
   geradas: number;
   /** Blocos alinhados à rota (ela mudou de horário/duração depois de gerado). */
   atualizadas?: number;
@@ -380,6 +383,10 @@ export async function gerarDiaDaRotaPadrao(
 ): Promise<ResultadoGeracao> {
   const carregado = await carregarRotaEContexto(sedeId, data);
   if (!carregado) return { semRota: true, geradas: 0, puladas: 0, detalhes: [] };
+  // Dia fechado não se monta: recusa em vez de gerar zero em silêncio, para a
+  // pessoa saber que o sistema sabe.
+  if (carregado.feriado)
+    return { fechado: carregado.feriado.nome, geradas: 0, puladas: 0, detalhes: [] };
   const { itens, ctx, locais, params } = carregado;
 
   const { materializar, atualizar, descartados } = projetarDiaDaRota(itens, ctx);
@@ -457,11 +464,13 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
 
   const ds = await getDataSource();
   const existentes = await getRotinasByData(data, sedeId);
-  const [tarefas, locais, funcionarios, periodos, params] = await Promise.all([
+  const [tarefas, locais, funcionarios, periodos, feriados, params] = await Promise.all([
     ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("periodos_letivos", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    // Coleção pequena e sem consulta possível por "vazio OU esta sede": lê tudo.
+    ds.listar("feriados"),
     resolverParametros(sedeId),
   ]);
 
@@ -477,7 +486,14 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
     letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
   };
-  return { itens, existentes, ctx, locais: new Map(locais.map((l) => [l.id, l])), params };
+  return {
+    itens,
+    existentes,
+    ctx,
+    locais: new Map(locais.map((l) => [l.id, l])),
+    params,
+    feriado: feriadoDoDia(feriados, sedeId, data),
+  };
 }
 
 /**
@@ -523,6 +539,8 @@ export interface RelatorioSombra {
   sede_id: string;
   data: string;
   semRota?: boolean;
+  /** Feriado/recesso que fecha o dia — nada seria gerado. */
+  fechado?: string;
   /** Itens da rota padrão da sede. */
   itens_na_rota: number;
   /** Blocos que existem no dia (planejados à mão ou gerados antes). */
@@ -576,6 +594,21 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
       semRota: true,
       itens_na_rota: 0,
       blocos_no_dia: 0,
+      materializaria: 0,
+      atualizaria: 0,
+      preservados: 0,
+      descartes: vazio(),
+      divergencia: { so_na_rota: 0, so_no_dia: 0, movidos: 0 },
+      amostra: [],
+    };
+  }
+  if (carregado.feriado) {
+    return {
+      sede_id: sedeId,
+      data,
+      fechado: carregado.feriado.nome,
+      itens_na_rota: carregado.itens.length,
+      blocos_no_dia: carregado.existentes.filter((r) => r.status !== "cancelada").length,
       materializaria: 0,
       atualizaria: 0,
       preservados: 0,

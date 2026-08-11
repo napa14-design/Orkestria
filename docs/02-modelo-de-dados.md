@@ -231,6 +231,29 @@ administrador (catálogo global por sede).
 | dias_semana | string | CSV de índices 0..6 (dias com aula); vazio = todos os dias do intervalo |
 | ativo, auditoria | | |
 
+### feriados
+Dias em que **não há operação**: feriado, recesso, dedetização, evento que fecha a
+sede. Cadastro de administrador. Um registro cobre um **intervalo** — recesso de
+julho é uma linha, não quinze.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| sede_id | string | **vazio = todas as sedes** — o caso comum, já que as 18 são em Fortaleza (feriado nacional/estadual/municipal se cadastra uma vez). Preenchido, fecha só aquela sede |
+| nome | string | aparece na recusa da geração: "Independência", "Recesso de julho" |
+| data_inicio, data_fim | YYYY-MM-DD | intervalo inclusivo; iguais quando é um dia só |
+| ativo, auditoria | | |
+
+**Efeito:** `feriadoDoDia` (em `lib/calculations.ts`) é consultada pela geração do
+dia e pela geração sombra — as duas pela mesma função. Data fechada faz o "Gerar o
+dia" **recusar**, informando o nome, em vez de gerar zero em silêncio.
+
+Não confundir com `periodos_letivos`: aquele responde *"esta tarefa que depende do
+calendário é exigida hoje?"*; este responde *"existe operação hoje?"*.
+
+**Escopo deliberadamente raso:** existe ou não existe operação. Não há "operação
+reduzida" porque nada leria esse estado hoje — equipe reduzida se resolve na escala
+e nas ausências, que já existem.
+
 ### historico
 Log de alterações preenchido automaticamente: toda escrita em qualquer tabela
 gera um registro com autor (da sessão) e horário. Implementado como decorator

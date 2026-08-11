@@ -12,6 +12,7 @@ import type {
   Local,
   ModeloRotinaItem,
   Parametro,
+  Feriado,
   PeriodoLetivo,
   QualificacaoFuncionario,
   RegistroHistorico,
@@ -41,6 +42,7 @@ export interface MapaTabelas {
   modelos_rotina: ModeloRotinaItem;
   ausencias: Ausencia;
   periodos_letivos: PeriodoLetivo;
+  feriados: Feriado;
   historico: RegistroHistorico;
 }
 
@@ -289,6 +291,16 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("data_inicio"),
     col("data_fim"),
     col("dias_semana"),
+    col("ativo", "boolean"),
+    ...AUDITORIA,
+  ],
+  feriados: [
+    col("id"),
+    // Vazio = todas as sedes.
+    col("sede_id"),
+    col("nome"),
+    col("data_inicio"),
+    col("data_fim"),
     col("ativo", "boolean"),
     ...AUDITORIA,
   ],

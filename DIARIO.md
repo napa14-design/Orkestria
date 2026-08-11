@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-08-11 — Feriados e recessos: o dia fechado passa a existir
+
+Última da fila aberta pelo ADR-009. Tabela `feriados` + tela em **Estrutura ›
+Feriados e recessos** (admin).
+
+### O que resolve
+
+Não existia como dizer "a sede não opera neste dia". Consequências: gerar um 7 de
+setembro por engano produzia um dia cheio que ninguém ia trabalhar, e um dia fechado
+ficava **indistinguível** de um dia que ninguém planejou.
+
+Agora `feriadoDoDia` é consultada pela geração **e** pela geração sombra — as duas
+pela mesma função — e o "Gerar o dia" **recusa**, dizendo o nome:
+*"Nada foi gerado: Independência — esta data está cadastrada como dia sem operação."*
+Recusar em vez de gerar zero em silêncio é o ponto: a pessoa fica sabendo que o
+sistema sabe.
+
+### Decisões de escopo
+
+- **Um registro cobre um intervalo.** Recesso de julho é uma linha, não quinze.
+- **Sede vazia = todas**, e é a primeira opção do formulário. As 18 sedes são em
+  Fortaleza, então feriado nacional, estadual e municipal se cadastra **uma vez**.
+  Sede preenchida serve para o que fecha só uma unidade — dedetização, obra.
+- **Escopo raso de propósito: existe ou não existe operação.** A crítica externa
+  sugeriu quatro estados (aberta/fechada/reduzida/especial) e camadas
+  país→estado→município. Fica em dois estados e uma tabela porque **nada leria** os
+  outros hoje: equipe reduzida já se resolve na escala e nas ausências. Com a
+  geração manual (ADR-011), esta tarefa virou melhoria — e melhoria não paga
+  hierarquia de quatro níveis.
+
+### Verificado (rota real do Pré Sul, memória)
+
+7 de setembro cadastrado → geração recusa com o nome, **0 blocos criados**, dia
+continua vazio de verdade, e a sombra também marca `fechado`. Dia seguinte gera
+normal (62). Feriado de **uma** sede não fecha a outra. Recesso de 05 a 09/10 fecha
+os três dias testados e libera 12/10. Intervalo invertido recusado com 422. A
+listagem por sede inclui os globais e não mostra o da outra sede. Tela conferida no
+navegador: intervalo numa linha, "todas as sedes" vs. sede, selo de situação.
+
+114 testes (6 novos de `feriadoDoDia`), `tsc` limpo, build limpo.
+
+### Arquivos
+
+`types/Feriado.ts` (novo), `types/index.ts`, `lib/schema.ts`, `lib/memoryStore.ts`,
+`lib/calculations.ts`, `services/feriadosService.ts` (novo),
+`app/api/feriados/route.ts` + `[id]/route.ts` (novos),
+`app/(app)/feriados/page.tsx` (novo), `components/AppShell.tsx`,
+`services/modelosService.ts`, `app/(app)/rotinas/page.tsx`, `testes/datas.test.ts`,
+`docs/02-modelo-de-dados.md`
+
+---
+
 ## 2026-08-11 — Identidade do bloco pelo item da rota (e o dublê que mentia)
 
 Conserto do defeito do fluxo **manual**: ajustar um horário na rota padrão e clicar
