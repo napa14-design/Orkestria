@@ -517,13 +517,14 @@ export default function PaginaRotinas() {
           },
         ]);
       } else if (r.fechado) {
-        // Dia fechado por feriado/recesso: nada foi criado, e a pessoa precisa
-        // saber que foi decisão do cadastro, não falha.
+        // **Dia fechado é estado resolvido, não erro.** Era `nivel: "erro"` —
+        // vermelho, cara de falha — para uma situação em que o sistema fez
+        // exatamente o certo.
         setAlertas([
           {
-            nivel: "erro",
+            nivel: "alerta",
             codigo: "GERAR",
-            mensagem: `Nada foi gerado: ${r.fechado} — esta data está cadastrada como dia sem operação. Se houver trabalho, ajuste em Estrutura › Feriados e recessos.`,
+            mensagem: `Hoje a sede não opera: ${r.fechado}. Nada a montar. Se houver trabalho nesta data, ajuste em Estrutura › Feriados e recessos.`,
           },
         ]);
       } else {

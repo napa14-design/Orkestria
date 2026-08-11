@@ -1,4 +1,5 @@
 import {
+  feriadoDoDia,
   funcionarioNoDia,
   jornadaDoDia,
   jornadaLiquidaMin,
@@ -6,7 +7,7 @@ import {
 } from "@/lib/calculations";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
-import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
+import { agoraHHMM, hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import {
   limitarSedeConsulta,
   podeAlterarSede,
@@ -26,14 +27,22 @@ import { getAusencias } from "./ausenciasService";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { getExecucoes } from "./execucoesService";
 import { getFuncionarios } from "./funcionariosService";
+import { getRotaPadrao } from "./modelosService";
 import { resolverParametros } from "./parametrosService";
 import { getQualificacoes } from "./qualificacoesService";
 import { getRotinasByData, updateRotina } from "./rotinasService";
 import { getTarefas } from "./tarefasService";
 
+/**
+ * Minutos desde a meia-noite **no fuso da operação**.
+ *
+ * Era `new Date().getHours()`, ou seja, a hora do ambiente: no servidor (UTC) dava
+ * três horas adiante, e a Central passava a considerar "já terminou" um bloco que
+ * ainda não tinha acontecido. Mesmo bug do `hojeISO`, que já foi corrigido — este
+ * ficou vivo aqui.
+ */
 function minutosAgora(): number {
-  const agora = new Date();
-  return agora.getHours() * 60 + agora.getMinutes();
+  return hhmmParaMin(agoraHHMM());
 }
 
 /**
@@ -166,13 +175,17 @@ export async function getCentralDia(
   const sedeId = limitarSedeConsulta(sessao, sedeSolicitada);
   const ds = await getDataSource();
 
-  const [sede, funcionarios, rotinas, execucoes, ausencias] = await Promise.all([
+  const [sede, funcionarios, rotinas, execucoes, ausencias, feriados] = await Promise.all([
     sedeId ? ds.obter("sedes", sedeId) : Promise.resolve(null),
     getFuncionarios(sedeId),
     getRotinasByData(data, sedeId),
     getExecucoes(data, data, sedeId),
     getAusencias({ data, sedeId }),
+    // Coleção de uma dúzia de linhas por ano. Sem isto, "nenhum bloco hoje" e
+    // "hoje a sede não abre" ficam indistinguíveis na tela.
+    ds.listar("feriados"),
   ]);
+  const feriado = feriadoDoDia(feriados, sedeId, data);
 
   const funcionariosAtivos = funcionarios.filter((funcionario) => funcionario.ativo);
   const ausentesIds = new Set(ausencias.map((ausencia) => ausencia.funcionario_id));
@@ -204,6 +217,22 @@ export async function getCentralDia(
       quantidade: 1,
       href: "/conta",
       acao: "Ver minha conta",
+    });
+  } else if (feriado) {
+    // **Dia fechado é estado resolvido, não exceção.** A Central não pede decisão
+    // nenhuma: nada foi planejado porque a sede não opera, e isso é a resposta.
+    // Antes, este dia caía em "o dia ainda não foi montado" e mandava gerar — o
+    // supervisor seguiria a sugestão e a geração recusaria.
+    acoes.push({
+      id: "sede-fechada",
+      nivel: "ok",
+      titulo: `Hoje a sede não opera: ${feriado.nome}`,
+      descricao:
+        rotinasValidas.length > 0
+          ? `Ainda há ${rotinasValidas.length} bloco(s) planejado(s) nesta data — provavelmente gerados antes do feriado ser cadastrado. Revise se alguém vai trabalhar.`
+          : "Não há nada a montar nem a confirmar. Se houver trabalho hoje, ajuste em Estrutura › Feriados e recessos.",
+      href: rotinasValidas.length > 0 ? "/rotinas" : "/feriados",
+      acao: rotinasValidas.length > 0 ? "Ver o que ficou planejado" : "Ver feriados",
     });
   } else {
     if (funcionariosAtivos.length === 0) {
@@ -271,14 +300,30 @@ export async function getCentralDia(
           acao: podeCorrigirCadastro ? "Preparar tarefas" : "Ver tarefas",
         });
       } else {
-        acoes.push({
-          id: "dia-nao-montado",
-          nivel: "atencao",
-          titulo: "O dia ainda não foi montado",
-          descricao: `${disponiveis.length} pessoa(s) estão disponíveis e ainda não têm uma agenda para hoje.`,
-          href: "/rotinas",
-          acao: "Gerar o dia",
-        });
+        // "Gerar o dia" só é uma ação de verdade se existir rota padrão. Sem ela, a
+        // Central mandava gerar, o supervisor clicava e a geração recusava — um
+        // beco. A leitura extra é paga só neste galho, que é justamente onde ela
+        // decide o que dizer.
+        const temRotaPadrao = sedeId ? (await getRotaPadrao(sedeId)).length > 0 : false;
+        acoes.push(
+          temRotaPadrao
+            ? {
+                id: "dia-nao-montado",
+                nivel: "atencao",
+                titulo: "O dia ainda não foi montado",
+                descricao: `${disponiveis.length} pessoa(s) estão disponíveis e ainda não têm uma agenda para hoje.`,
+                href: "/rotinas",
+                acao: "Gerar o dia",
+              }
+            : {
+                id: "sem-rota-padrao",
+                nivel: "atencao",
+                titulo: "Esta sede ainda não tem uma rota padrão",
+                descricao: `${disponiveis.length} pessoa(s) disponíveis, mas não há de onde gerar o dia. Monte um dia na agenda e salve como rota padrão — a partir daí, montar o dia vira um clique.`,
+                href: "/rotinas",
+                acao: "Montar o primeiro dia",
+              },
+        );
       }
     }
 

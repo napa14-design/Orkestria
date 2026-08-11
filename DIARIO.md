@@ -7,6 +7,61 @@
 
 ---
 
+## 2026-08-11 — O "zero" da Central passa a ter nome, e dia fechado não é erro
+
+Tarefas #21 e #23 juntas: as duas dependiam da Central saber que o dia está fechado.
+
+### O problema
+
+"Nenhum bloco hoje" podia significar cinco coisas, e a Central mostrava todas
+igual. Pior: no dia sem rota padrão ela mandava **"Gerar o dia"** — o supervisor
+seguiria a sugestão e a geração recusaria. Um beco sem saída sugerido pela própria
+tela.
+
+### Os cinco estados agora
+
+| Situação | O que a Central diz |
+|---|---|
+| sem rota padrão | *"Esta sede ainda não tem uma rota padrão"* · **Montar o primeiro dia** |
+| com rota, dia não gerado | *"O dia ainda não foi montado"* · **Gerar o dia** |
+| dia gerado | as duas somem; sobra o que realmente pende |
+| **data fechada** | *"Hoje a sede não opera: {nome}"*, nível **ok**, **fila vazia** — não pede decisão |
+| cadastro impede montar | inalterado (sem equipe / sem tarefa utilizável) |
+
+**Dia fechado é estado resolvido, não exceção** — foi a crítica externa e ela está
+certa. Na tela de Rotinas o feriado também deixou de sair em **vermelho**
+(`nivel: "erro"` → `alerta`): o sistema fez o certo, não falhou.
+
+Um caso que só apareceu ao escrever o teste: quando o feriado é cadastrado **depois**
+de o dia ter sido gerado, a Central avisa que sobraram N blocos planejados e manda
+revisar quem vai trabalhar. Nem o desenho nem a crítica previram isso.
+
+### Outro bug de fuso, ainda vivo
+
+`minutosAgora()` na Central usava `new Date().getHours()` — **a hora do servidor**.
+Em UTC, três horas adiante: a Central considerava "já terminou" bloco que ainda não
+aconteceu, e pedia confirmação de tarefa em andamento. Agora usa `agoraHHMM()`, no
+fuso da operação. A crítica havia avisado: *"garantir que 'hoje' deriva da operação
+em todos os pontos, não apenas na Central"* — e o ponto era a Central.
+
+### Custo
+
+Uma leitura de `feriados` por carga (coleção de ~20 linhas). E `getRotaPadrao` é
+consultada **só no galho** em que o dia está vazio — que é exatamente onde ela decide
+o que dizer.
+
+### Verificado
+
+Os cinco estados, um a um, com a rota real do Pré Sul: 62 blocos gerados, feriado
+cadastrado por cima, fila esvaziando, e a API devolvendo `fechado` com o nome.
+117 testes, `tsc` limpo, build limpo.
+
+### Arquivos
+
+`services/centralDiaService.ts`, `app/(app)/rotinas/page.tsx`
+
+---
+
 ## 2026-08-11 — Fechar o dia por exceção: de 277 cliques para 1 + desvios
 
 A 3ª rodada da crítica externa perguntava sobre camadas por dia da semana. O achado
