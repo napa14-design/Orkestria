@@ -11,7 +11,14 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { diaDaSemana, hhmmParaMin, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
+import {
+  diaDaSemana,
+  hhmmParaMin,
+  minParaHHMM,
+  parseDiasSemana,
+  rotularDiasSemana,
+  serializarDiasSemana,
+} from "@/lib/dateUtils";
 import {
   chaveMaterializacao,
   compararRotaComODia,
@@ -40,6 +47,8 @@ export interface ResumoModelo {
   padrao: boolean;
   /** Modelo de evento (formatura, feira…) — aplicado sob demanda, nunca no "Gerar o dia". */
   evento: boolean;
+  /** Dias em que esta camada vale (CSV numérico). Vazio = todo dia. */
+  dias_semana: string;
   criado_por: string;
   criado_em: string;
   /** Faixa de horário do modelo (menor início / maior fim) — só para exibição. */
@@ -63,6 +72,7 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
       atual.itens++;
       if (item.padrao) atual.padrao = true;
       if (item.evento) atual.evento = true;
+      if (item.dias_semana) atual.dias_semana = item.dias_semana;
     } else
       grupos.set(chave, {
         nome_modelo: item.nome_modelo,
@@ -70,6 +80,7 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
         itens: 1,
         padrao: item.padrao === true,
         evento: item.evento === true,
+        dias_semana: item.dias_semana ?? "",
         criado_por: item.criado_por,
         criado_em: item.criado_em,
       });
@@ -120,7 +131,7 @@ export async function salvarModelo(
   dataOrigem: string,
   sedeId: string,
   autor: string,
-  opts: { padrao?: boolean; comDuracao?: boolean; evento?: boolean } = {},
+  opts: { padrao?: boolean; comDuracao?: boolean; evento?: boolean; diasSemana?: string } = {},
 ): Promise<{ itens: number }> {
   const nomeLimpo = nome.trim();
   if (!nomeLimpo)
@@ -145,6 +156,18 @@ export async function salvarModelo(
         nivel: "erro",
         codigo: "MODELO_VAZIO",
         mensagem: `Não há rotinas em ${dataOrigem} para salvar como modelo.`,
+      },
+    ]);
+
+  // Normaliza os dias: "3,1,1" → "1,3". Item sem dias vale todo dia.
+  const diasLimpos = serializarDiasSemana(parseDiasSemana(opts.diasSemana));
+  if (opts.evento && diasLimpos)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "MODELO_EVENTO_COM_DIAS",
+        mensagem:
+          "Modelo de evento não tem dia da semana: ele é aplicado na data do evento, sob demanda.",
       },
     ]);
 
@@ -178,17 +201,18 @@ export async function salvarModelo(
     ...(opts.comDuracao ? { duracao_min: r.tempo_previsto_min } : {}),
     ...(opts.padrao ? { padrao: true } : {}),
     ...(opts.evento ? { evento: true } : {}),
+    ...(diasLimpos ? { dias_semana: diasLimpos } : {}),
     criado_por: autor,
     criado_em: agora,
   }));
 
-  // 1) cria os novos; 2) só uma rota padrão por sede (desmarca as demais);
-  // 3) remove os antigos do mesmo nome — tudo em lotes paralelos.
+  // 1) cria os novos; 2) remove os antigos do mesmo nome — em lotes paralelos.
+  //
+  // **Não desmarca mais as outras camadas padrão.** A rota padrão da sede passou a
+  // ser a UNIÃO das camadas marcadas como padrão, cada uma com seus dias: a de
+  // todo dia mais a de segunda mais a de sábado. Desmarcar as demais era o que
+  // impedia isso — salvar a camada da terça apagava a da segunda em silêncio.
   await emLotes(novos, (item) => ds.criar("modelos_rotina", item));
-  if (opts.padrao) {
-    const desmarcar = todos.filter((m) => m.padrao && m.nome_modelo !== nomeLimpo);
-    await emLotes(desmarcar, (m) => ds.atualizar("modelos_rotina", m.id, { padrao: false }));
-  }
   await emLotes(antigos, (m) => ds.excluir("modelos_rotina", m.id));
   return { itens: rotinas.length };
 }
@@ -379,7 +403,11 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
     if (linhas.length >= 8) break;
     const tarefa = ctx.tarefas.get(item.tarefa_id);
     const funcionario = ctx.funcionarios.get(item.funcionario_id);
-    if (motivo === "fora_do_periodo_letivo")
+    if (motivo === "item_de_outro_dia")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: a rota "${item.nome_modelo}" não vale hoje (${rotularDiasSemana(item.dias_semana)})`,
+      );
+    else if (motivo === "fora_do_periodo_letivo")
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do período letivo`);
     else if (motivo === "outro_dia_da_semana")
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: não é do dia da semana`);
@@ -428,6 +456,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
   const vazio = (): Record<MotivoDescarte, number> => ({
     ja_no_dia: 0,
     cadastro_removido: 0,
+    item_de_outro_dia: 0,
     fora_do_periodo_letivo: 0,
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,

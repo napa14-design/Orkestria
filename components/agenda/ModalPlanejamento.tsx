@@ -8,6 +8,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { apiDelete, apiPost, ErroApi, fetcher } from "@/lib/clientApi";
+import { rotularDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import type { ResumoModelo, ResultadoAplicacao } from "@/services/modelosService";
 
 const DIAS_SEMANA = [
@@ -111,6 +112,8 @@ export default function ModalPlanejamento({
   const [dias, setDias] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
   const [nomeNovoModelo, setNomeNovoModelo] = useState("");
   const [padraoNovo, setPadraoNovo] = useState(false);
+  /** Dias em que a rota padrão sendo salva vale. Vazio = todo dia. */
+  const [diasPadrao, setDiasPadrao] = useState<Set<number>>(new Set());
   const [eventoNovo, setEventoNovo] = useState(false);
   const [modeloEscolhido, setModeloEscolhido] = useState("");
   /** Confirmação em dois toques, no lugar do confirm() do navegador. */
@@ -158,17 +161,24 @@ export default function ModalPlanejamento({
         padrao: padraoNovo,
         com_duracao: true,
         evento: eventoNovo,
+        dias_semana: padraoNovo ? serializarDiasSemana([...diasPadrao]) : "",
       });
       await mutateModelos();
       const nome = nomeNovoModelo;
       const eraEvento = eventoNovo;
+      const diasSalvos = padraoNovo ? serializarDiasSemana([...diasPadrao]) : "";
       // Zera os flags: o modal fica montado, e um "padrão" esquecido faria o
       // PRÓXIMO modelo salvo roubar a rota padrão da sede sem ninguém notar.
       setNomeNovoModelo("");
       setPadraoNovo(false);
       setEventoNovo(false);
+      setDiasPadrao(new Set());
       return `Modelo "${nome}" salvo com ${r.itens} tarefa(s)${
-        padraoNovo ? " (rota padrão da sede)" : eraEvento ? " (modelo de evento)" : ""
+        padraoNovo
+          ? ` (rota padrão da sede${diasSalvos ? `, ${rotularDiasSemana(diasSalvos)}` : ", todo dia"})`
+          : eraEvento
+            ? " (modelo de evento)"
+            : ""
       }.`;
     });
   }
@@ -269,6 +279,42 @@ export default function ModalPlanejamento({
             />
             Marcar como <strong>rota padrão</strong> da sede (usada no "Gerar o dia")
           </label>
+          {/* A rota padrão da sede é a UNIÃO das camadas marcadas como padrão. Dá
+              para ter a de todo dia + a de segunda + a de sábado, e o "Gerar o
+              dia" monta o que vale na data. Nenhum dia marcado = todo dia. */}
+          {padraoNovo && (
+            <div style={{ paddingLeft: 22, display: "grid", gap: 6 }}>
+              <span className="rotulo">Esta rota vale em</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                {/* Mesma lista e mesmo visual do seletor de período acima. */}
+                {DIAS_SEMANA.map((d) => {
+                  const marcado = diasPadrao.has(d.idx);
+                  return (
+                    <button
+                      key={d.idx}
+                      type="button"
+                      className={`btn ${marcado ? "btn-primario" : ""}`}
+                      style={{ padding: "4px 10px" }}
+                      aria-pressed={marcado}
+                      onClick={() => {
+                        const proximo = new Set(diasPadrao);
+                        if (marcado) proximo.delete(d.idx);
+                        else proximo.add(d.idx);
+                        setDiasPadrao(proximo);
+                      }}
+                    >
+                      {d.rotulo}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
+                {diasPadrao.size === 0
+                  ? "Nenhum dia marcado = vale todo dia."
+                  : `Vale só em ${rotularDiasSemana(serializarDiasSemana([...diasPadrao]))}. Salve as outras rotas com os dias delas — elas se somam, não se substituem.`}
+              </p>
+            </div>
+          )}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
             <input
               type="checkbox"
@@ -294,7 +340,9 @@ export default function ModalPlanejamento({
                 {(() => {
                   const todos = modelos ?? [];
                   const rotulo = (m: ResumoModelo) =>
-                    `${m.nome_modelo} (${m.itens} tarefas${m.inicio ? ` · ${m.inicio}–${m.fim}` : ""})`;
+                    `${m.nome_modelo} (${m.itens} tarefas${m.inicio ? ` · ${m.inicio}–${m.fim}` : ""}${
+                      m.dias_semana ? ` · ${rotularDiasSemana(m.dias_semana)}` : ""
+                    })`;
                   const rotas = todos.filter((m) => !m.evento);
                   const eventos = todos.filter((m) => m.evento);
                   return (

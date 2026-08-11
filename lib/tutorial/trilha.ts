@@ -269,7 +269,7 @@ export const TRILHA: EtapaTutorial[] = [
         alvo: "ensinar-rota",
         titulo: "Ensinar esta rota",
         texto:
-          "Clique aqui. O sistema guarda a montagem deste dia como a rota padrão da sede. Nos próximos dias, um botão monta tudo — já pulando quem faltou e quem está de folga.",
+          "Clique aqui. O sistema guarda a montagem deste dia como a rota padrão da sede. Nos próximos dias, um botão monta tudo — já pulando quem faltou e quem está de folga. Se a segunda (ou o sábado) tiver serviço próprio, monte esse dia e salve como outra rota marcando só os dias dela: as rotas se somam.",
         avancarEm: "clique",
       },
       {

@@ -108,6 +108,55 @@ describe("projetarDiaDaRota", () => {
     );
   });
 
+  it("item da rota vale só nos dias dele", () => {
+    const segundaSo = item({ dias_semana: "1" });
+    const funcionarios = new Map([["f1", funcionario({ escala: "seg_sab" })]]);
+    expect(projetarDiaDaRota([segundaSo], contexto()).materializar).toHaveLength(1);
+    const noSabado = projetarDiaDaRota([segundaSo], contexto({ funcionarios, data: SABADO }));
+    expect(noSabado.descartados[0].motivo).toBe("item_de_outro_dia");
+  });
+
+  it("item sem dias vale todo dia (rotas salvas antes do campo existir)", () => {
+    const funcionarios = new Map([["f1", funcionario({ escala: "seg_sab" })]]);
+    expect(
+      projetarDiaDaRota([item({ dias_semana: "" })], contexto({ funcionarios, data: SABADO }))
+        .materializar,
+    ).toHaveLength(1);
+    expect(
+      projetarDiaDaRota([item({ dias_semana: undefined })], contexto({ funcionarios, data: SABADO }))
+        .materializar,
+    ).toHaveLength(1);
+  });
+
+  it("camadas se somam: a de todo dia mais a de segunda", () => {
+    // É o desenho da rota padrão: união das camadas, não substituição.
+    const todoDia = item({ id: "todos", tarefa_id: "t1" });
+    const soSegunda = item({ id: "seg", tarefa_id: "t2", dias_semana: "1", inicio_planejado: "09:00" });
+    const ctx = contexto();
+    ctx.tarefas.set("t2", tarefa({ id: "t2", nome_tarefa: "Encerar" }));
+
+    const naSegunda = projetarDiaDaRota([todoDia, soSegunda], ctx);
+    expect(naSegunda.materializar.map((i) => i.id)).toEqual(["todos", "seg"]);
+
+    const naTerca = projetarDiaDaRota([todoDia, soSegunda], { ...ctx, data: "2026-08-11" });
+    expect(naTerca.materializar.map((i) => i.id)).toEqual(["todos"]);
+    expect(naTerca.descartados[0].motivo).toBe("item_de_outro_dia");
+  });
+
+  it("o dia do ITEM é checado antes do dia da TAREFA", () => {
+    // Os dois motivos dizem "não é hoje", mas o texto na tela é diferente: um cita
+    // a rota, o outro cita a tarefa. A ordem decide qual a pessoa lê.
+    const ctx = contexto({
+      tarefas: new Map([["t1", tarefa({ frequencia: "semanal", dias_semana: "2" })]]),
+    });
+    expect(projetarDiaDaRota([item({ dias_semana: "3" })], ctx).descartados[0].motivo).toBe(
+      "item_de_outro_dia",
+    );
+    expect(projetarDiaDaRota([item({ dias_semana: "1" })], ctx).descartados[0].motivo).toBe(
+      "outro_dia_da_semana",
+    );
+  });
+
   it("pula quem está ausente", () => {
     const ctx = contexto({ ausentes: new Set(["f1"]) });
     expect(projetarDiaDaRota([item()], ctx).descartados[0].motivo).toBe("pessoa_ausente");

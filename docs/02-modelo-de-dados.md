@@ -131,9 +131,18 @@ de linhas com o mesmo `nome_modelo` + `sede_id`.
 | funcionario_id, tarefa_id, local_id | string | o que será recriado ao aplicar |
 | inicio_planejado | HH:mm | |
 | duracao_min | number | duração do item no snapshot (rota padrão); a geração reproduz fielmente sem recalcular |
-| padrao | boolean | marca este modelo como a **rota padrão** da sede (só um por sede) |
+| padrao | boolean | marca este item como parte da **rota padrão** da sede. A rota padrão é a **união** dos itens marcados assim — a sede pode ter a camada de todo dia + camadas por dia da semana |
 | evento | boolean | marca o modelo como **rotina de um tipo de evento** (formatura, feira, prova). **Excludente com `padrao`** — se um evento virasse rota padrão, o "Gerar o dia" montaria a programação do evento todos os dias. |
+| dias_semana | string | CSV numérico (0=dom … 6=sáb) dos dias em que **este item** vale. Vazio = todo dia (é o valor de toda rota salva antes deste campo). Excludente com `evento`: evento não tem dia da semana, é aplicado na data dele |
 | criado_por, criado_em | auditoria | |
+
+**Rota padrão em camadas.** A recorrência mora no **item**, não na tarefa. O
+`dias_semana` da *tarefa* se aplica a toda ocorrência dela na rota, então não
+consegue expressar "Maria na segunda, João na quarta" nem "mesma tarefa, outro
+horário no sábado" — os dois itens sobreviveriam nos dois dias. No item, consegue.
+O supervisor salva a rota de todo dia e, depois, uma camada por dia da semana
+(marcando os dias); o "Gerar o dia" monta a união do que vale na data. Camadas
+**se somam**, não se substituem.
 
 Aplicar um modelo recria as rotinas passando pelas validações normais —
 itens que conflitam na data de destino são pulados e contabilizados.

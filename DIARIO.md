@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-08-11 — Rota padrão em camadas: a de todo dia + a de cada dia da semana
+
+Pedido do dono do produto, atendido — e **eu tinha rejeitado pelo argumento
+errado**. Aleguei que várias rotas fariam "a operação crescer", mas cadastrar rota
+é **implantação**, e a doutrina diz que implantação *"acontece uma vez, pode ser
+pesada"*. O que não podia engordar era o ato diário, e ele continua sendo um
+clique. O pedido passava no portão; a minha objeção não.
+
+### O desenho
+
+A recorrência mora no **item da rota** (`modelos_rotina.dias_semana`, CSV numérico,
+vazio = todo dia), não no modelo nem na tarefa. Consequências:
+
+- A **rota padrão da sede é a união** dos itens marcados como padrão. A sede tem a
+  camada de todo dia, mais a camada da segunda, mais a do sábado. O "Gerar o dia"
+  monta o que vale na data.
+- Camadas **se somam**, não se substituem. Foi preciso **remover o "desmarcar as
+  demais"** do `salvarModelo`: era ele que fazia salvar a camada da terça apagar a
+  da segunda em silêncio.
+- Atende os dois usos sem escolher um: camadas que compõem, ou uma rota inteira por
+  dia da semana (basta salvar cada dia com o seu).
+
+**Por que no item e não na tarefa:** o `dias_semana` da *tarefa* se aplica a toda
+ocorrência dela na rota. Com ele não dá para dizer "Maria na segunda, João na
+quarta" (os dois itens sobreviveriam nos dois dias) nem "mesma tarefa, outro
+horário no sábado". No item, dá. Foi a crítica externa que apontou o nível certo.
+
+### O que a pessoa vê
+
+No modal de modelos, marcar "rota padrão" revela um seletor de dias com o **mesmo
+visual do seletor de período** que já existia ali. Nenhum dia marcado = todo dia,
+dito na tela. O catálogo passa a mostrar os dias de cada camada
+(`Extra da segunda (2 tarefas · seg)`), e o "Gerar o dia" explica o descarte:
+*"a rota 'Extra da segunda' não vale hoje (seg)"* — motivo novo
+`item_de_outro_dia`, separado do descarte por tarefa semanal, porque o texto que a
+pessoa lê é diferente.
+
+Uma frase entrou no passo "Ensinar esta rota" do tutorial; **nenhum passo novo**.
+
+### Medido em produção, e é o que motivou o desenho
+
+As 336 tarefas das 3 sedes com rota padrão são **todas `frequência: diária`** —
+nenhuma semanal, nenhuma com dias. O mecanismo que já existia (dias na tarefa)
+está 100% sem uso, e por isso a variação por dia da semana não estava no dado. Isso
+não era falta de rota por dia; era falta de dizer ao sistema o que não é diário.
+
+### Verificado com a rota real do Pré Sul
+
+- duas camadas coexistem: `Rota padrão[todo dia]:63` + `Extra da segunda[seg]:2`;
+- salvar a segunda **não** desmarcou a primeira;
+- **segunda-feira**: 64 materializadas (62 da diária + 2 da segunda);
+- **terça-feira**: 62, com os 2 itens da segunda descartados e explicados na tela;
+- a diferença entre os dias é exatamente a camada extra;
+- rota antiga (sem dias) segue valendo todo dia.
+
+89 testes (4 novos de camadas e precedência), `tsc` limpo, build limpo,
+`conferir-trilha` nas 11 etapas.
+
+### Arquivos
+
+`types/ModeloRotina.ts`, `lib/schema.ts`, `lib/projecaoDia.ts`,
+`services/modelosService.ts`, `app/api/modelos/route.ts`,
+`components/agenda/ModalPlanejamento.tsx`, `lib/tutorial/trilha.ts`,
+`testes/projecao.test.ts`, `docs/02-modelo-de-dados.md`
+
+---
+
 ## 2026-08-11 — Geração sombra: medir a rota sem escrever bloco
 
 Primeiro item da ordem acordada no ADR-009. **Nada muda para o supervisor**: não

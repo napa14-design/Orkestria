@@ -19,7 +19,10 @@ export type MotivoDescarte =
   | "ja_no_dia"
   /** Tarefa ou funcionário do item saiu do cadastro depois de a rota ser salva. */
   | "cadastro_removido"
+  /** O item da rota vale só em certos dias da semana, e hoje não é um deles. */
+  | "item_de_outro_dia"
   | "fora_do_periodo_letivo"
+  /** A TAREFA é semanal e hoje não está nos dias dela. */
   | "outro_dia_da_semana"
   | "folga_pela_escala"
   | "pessoa_ausente";
@@ -81,6 +84,13 @@ export function projetarDiaDaRota(
     const funcionario = ctx.funcionarios.get(item.funcionario_id);
     if (!tarefa || !funcionario) {
       descartar(item, "cadastro_removido");
+      continue;
+    }
+    // Recorrência do próprio item: é o que permite a sede ter a camada de todo
+    // dia mais camadas por dia da semana. Vazio = todo dia (rotas antigas).
+    const diasDoItem = parseDiasSemana(item.dias_semana);
+    if (diasDoItem.length && !diasDoItem.includes(dow)) {
+      descartar(item, "item_de_outro_dia");
       continue;
     }
     if (tarefa.depende_calendario && ctx.letivoFora) {
