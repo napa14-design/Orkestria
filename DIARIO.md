@@ -7,6 +7,88 @@
 
 ---
 
+## 2026-08-11 — Camada diz se acrescenta ou substitui o dia (e a 2ª rodada da crítica)
+
+Segunda consulta ao crítico externo (Codex `gpt-5.6-sol`, `xhigh`). Ele **retirou o
+argumento central da primeira rodada** — *"retiro 'a saída nunca funcionou'; o
+produto saiu de adoção aparentemente quebrada para implantação controlada ainda não
+validada"* — mantendo a decisão de não automatizar. E achou uma **bomba real** no que
+eu tinha entregado horas antes.
+
+### A bomba, e o conserto
+
+Duas camadas com a mesma tarefa em horários diferentes podiam significar três coisas:
+"mudou de horário na segunda", "acontece duas vezes na segunda" ou "cadastrei sem
+perceber". A minha união silenciosa escolhia sempre a terceira leitura — **somar**. O
+caminho natural para o erro era salvar o **dia inteiro** da segunda como camada, em
+vez de só os extras: a segunda receberia tudo duas vezes, e onde o horário diferisse
+duplicaria de verdade.
+
+Agora a intenção é **declarada** (`modelos_rotina.substitui`): ao escolher dias, o
+formulário exige dizer se a camada **acrescenta** ao dia ou **substitui** o dia —
+**sem opção pré-marcada**, porque o padrão silencioso era o fail-open que ele
+apontou. Resolução: se há camada que substitui valendo na data, só ela monta (as
+outras saem com o motivo novo `substituido_por_camada`); senão, união das que
+acrescentam.
+
+Travas no serviço, com mensagem em português: substituir **exige** dizer os dias, e
+**duas camadas não podem substituir o mesmo dia** (o erro nomeia a conflitante).
+
+**Limite conhecido e deliberado:** marcar `substitui` **não remove** blocos de um dia
+já gerado — a geração só acrescenta. Isso é reconciliação, e vai junto com a máquina
+de estados do dia.
+
+### Ele contestou os meus números — e me obrigou a provar o denominador
+
+*"63+2 deveria dar 65 na segunda e 63 na terça; você mediu 64 e 62."* Medido:
+
+| Dia | Itens | Materializa | Por quê |
+|---|---|---|---|
+| seg 17/08 | 65 | 64 | −1 tarefa "escala de terça" |
+| ter 18/08 | 65 | 62 | −1 "escala de segunda" −2 camada da segunda |
+| qua 19/08 | 65 | 61 | −2 as duas semanais −2 camada |
+
+A rota tem **duas** tarefas semanais, então **uma sempre cai**. Os números estavam
+certos e `materializaria + descartes = itens` fecha nos três dias — mas **o meu
+relato omitia o denominador**, e ele estava certo em não aceitar a verificação como
+fechada. Segunda vez hoje que falho no relato, não no código.
+
+### O que ele concedeu, e o que sobrou
+
+Concedeu as três recusas que eu havia feito com evidência. Mas trocou uma por um
+risco válido e **aberto**: `Promise.all` **não é atômico** — falha no meio deixa parte
+dos blocos criada e o log divergindo do dado. Falta registro de execução (esperado ×
+gravado) e retomada idempotente.
+
+E aceitei uma crítica ao que eu tinha apresentado como a melhor decisão do dia:
+compartilhar a mesma função entre sombra e geração elimina divergência, mas cria
+**cegueira comum** — a sombra mede "o que este algoritmo faria", não "se a regra está
+certa".
+
+### A pergunta que fica para o dono do produto
+
+*"Qual problema operacional a automação resolve? Hoje 'Gerar o dia' já é um clique."*
+São **3 cliques/dia** hoje, contra quatro subsistemas novos. Se o valor é "o dia
+pronto antes do turno começar" ou "impedir esquecimento", precisa ser dito e medido.
+Registrado no ADR-009 como decisão pendente do produto.
+
+### Verificado
+
+Rota real do Pré Sul, em dia **ainda não gerado** (nos já gerados tudo cai em
+`ja_no_dia`, checado primeiro e corretamente — as 3 "falhas" da primeira tentativa
+eram do meu roteiro): 67 itens → materializa 2, `substituido_por_camada` 65,
+descartes fechando com o total; terça intacta (62); as duas travas recusando com 422.
+100 testes (3 novos de substituição), `tsc` limpo, build limpo.
+
+### Arquivos
+
+`types/ModeloRotina.ts`, `lib/schema.ts`, `lib/projecaoDia.ts`,
+`services/modelosService.ts`, `app/api/modelos/route.ts`,
+`components/agenda/ModalPlanejamento.tsx`, `testes/projecao.test.ts`,
+`docs/02-modelo-de-dados.md`. No vault: ADR-009 (rodada 2) e **ADR-010**.
+
+---
+
 ## 2026-08-11 — "Hoje" passa a ser o dia de Fortaleza, não o do servidor
 
 Bug achado ao responder uma pergunta simples do dono do produto ("o sistema sabe

@@ -267,6 +267,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     // Campos novos no FIM (o Sheets grava por posição — ver nota acima).
     col("evento", "boolean"),
     col("dias_semana"),
+    col("substitui", "boolean"),
   ],
   ausencias: [
     col("id"),

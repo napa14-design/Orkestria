@@ -49,6 +49,8 @@ export interface ResumoModelo {
   evento: boolean;
   /** Dias em que esta camada vale (CSV numérico). Vazio = todo dia. */
   dias_semana: string;
+  /** Nos dias em que vale, substitui o dia inteiro em vez de acrescentar. */
+  substitui: boolean;
   criado_por: string;
   criado_em: string;
   /** Faixa de horário do modelo (menor início / maior fim) — só para exibição. */
@@ -73,6 +75,7 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
       if (item.padrao) atual.padrao = true;
       if (item.evento) atual.evento = true;
       if (item.dias_semana) atual.dias_semana = item.dias_semana;
+      if (item.substitui) atual.substitui = true;
     } else
       grupos.set(chave, {
         nome_modelo: item.nome_modelo,
@@ -81,6 +84,7 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
         padrao: item.padrao === true,
         evento: item.evento === true,
         dias_semana: item.dias_semana ?? "",
+        substitui: item.substitui === true,
         criado_por: item.criado_por,
         criado_em: item.criado_em,
       });
@@ -131,7 +135,13 @@ export async function salvarModelo(
   dataOrigem: string,
   sedeId: string,
   autor: string,
-  opts: { padrao?: boolean; comDuracao?: boolean; evento?: boolean; diasSemana?: string } = {},
+  opts: {
+    padrao?: boolean;
+    comDuracao?: boolean;
+    evento?: boolean;
+    diasSemana?: string;
+    substitui?: boolean;
+  } = {},
 ): Promise<{ itens: number }> {
   const nomeLimpo = nome.trim();
   if (!nomeLimpo)
@@ -161,6 +171,15 @@ export async function salvarModelo(
 
   // Normaliza os dias: "3,1,1" → "1,3". Item sem dias vale todo dia.
   const diasLimpos = serializarDiasSemana(parseDiasSemana(opts.diasSemana));
+  if (opts.substitui && !diasLimpos)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SUBSTITUI_SEM_DIAS",
+        mensagem:
+          "Uma rota que substitui o dia precisa dizer em quais dias ela vale — substituir todo dia é a própria rota de todo dia.",
+      },
+    ]);
   if (opts.evento && diasLimpos)
     throw new ErroValidacao([
       {
@@ -179,6 +198,26 @@ export async function salvarModelo(
   const antigos = todos.filter((m) => m.nome_modelo === nomeLimpo);
   // Sobrescrever o modelo que É a rota padrão sem remarcá-lo deixaria a sede sem
   // rota padrão em silêncio (o "Gerar o dia" pararia de achar o quê gerar).
+  // Duas camadas substituindo o MESMO dia não têm resolução possível: o dia
+  // seria montado por uma das duas, arbitrariamente. Barra na entrada.
+  if (opts.substitui) {
+    const diasNovos = parseDiasSemana(diasLimpos);
+    const conflitante = todos.find(
+      (m) =>
+        m.padrao &&
+        m.substitui &&
+        m.nome_modelo !== nomeLimpo &&
+        parseDiasSemana(m.dias_semana).some((d) => diasNovos.includes(d)),
+    );
+    if (conflitante)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "DUAS_CAMADAS_SUBSTITUEM",
+          mensagem: `"${conflitante.nome_modelo}" já substitui o dia em ${rotularDiasSemana(conflitante.dias_semana)}. Duas rotas não podem substituir o mesmo dia — mude os dias, ou salve esta como rota que acrescenta.`,
+        },
+      ]);
+  }
   if (!opts.padrao && antigos.some((m) => m.padrao))
     throw new ErroValidacao([
       {
@@ -202,6 +241,7 @@ export async function salvarModelo(
     ...(opts.padrao ? { padrao: true } : {}),
     ...(opts.evento ? { evento: true } : {}),
     ...(diasLimpos ? { dias_semana: diasLimpos } : {}),
+    ...(opts.substitui ? { substitui: true } : {}),
     criado_por: autor,
     criado_em: agora,
   }));
@@ -407,6 +447,10 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(
         `${item.inicio_planejado} ${tarefa?.nome_tarefa}: a rota "${item.nome_modelo}" não vale hoje (${rotularDiasSemana(item.dias_semana)})`,
       );
+    else if (motivo === "substituido_por_camada")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: hoje outra rota substitui o dia, e "${item.nome_modelo}" ficou de fora`,
+      );
     else if (motivo === "fora_do_periodo_letivo")
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do período letivo`);
     else if (motivo === "outro_dia_da_semana")
@@ -457,6 +501,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     ja_no_dia: 0,
     cadastro_removido: 0,
     item_de_outro_dia: 0,
+    substituido_por_camada: 0,
     fora_do_periodo_letivo: 0,
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,

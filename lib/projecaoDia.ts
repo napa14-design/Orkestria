@@ -21,6 +21,8 @@ export type MotivoDescarte =
   | "cadastro_removido"
   /** O item da rota vale só em certos dias da semana, e hoje não é um deles. */
   | "item_de_outro_dia"
+  /** Hoje existe camada que SUBSTITUI o dia, e este item não é dela. */
+  | "substituido_por_camada"
   | "fora_do_periodo_letivo"
   /** A TAREFA é semanal e hoje não está nos dias dela. */
   | "outro_dia_da_semana"
@@ -65,11 +67,31 @@ export function chaveMaterializacao(
   return `${funcionarioId}|${tarefaId}|${inicio}`;
 }
 
+/** O item vale no dia da semana `dow`? Sem dias declarados = vale todo dia. */
+function valeNoDia(item: ModeloRotinaItem, dow: number): boolean {
+  const dias = parseDiasSemana(item.dias_semana);
+  return dias.length === 0 || dias.includes(dow);
+}
+
+/**
+ * Camadas que SUBSTITUEM o dia hoje (por `nome_modelo`).
+ *
+ * Quando existe alguma, o dia é montado **só** por ela: é o caso de "a segunda
+ * tem programação própria", em que somar a rota de todo dia duplicaria o dia
+ * inteiro. Sem nenhuma, o dia é a união das camadas que acrescentam.
+ */
+export function camadasQueSubstituem(itens: ModeloRotinaItem[], dow: number): Set<string> {
+  return new Set(
+    itens.filter((i) => i.substitui === true && valeNoDia(i, dow)).map((i) => i.nome_modelo),
+  );
+}
+
 export function projetarDiaDaRota(
   itens: ModeloRotinaItem[],
   ctx: ContextoProjecao,
 ): Projecao {
   const dow = diaDaSemana(ctx.data);
+  const substitutas = camadasQueSubstituem(itens, dow);
   const materializar: ModeloRotinaItem[] = [];
   const descartados: ItemDescartado[] = [];
   const descartar = (item: ModeloRotinaItem, motivo: MotivoDescarte) =>
@@ -88,9 +110,13 @@ export function projetarDiaDaRota(
     }
     // Recorrência do próprio item: é o que permite a sede ter a camada de todo
     // dia mais camadas por dia da semana. Vazio = todo dia (rotas antigas).
-    const diasDoItem = parseDiasSemana(item.dias_semana);
-    if (diasDoItem.length && !diasDoItem.includes(dow)) {
+    if (!valeNoDia(item, dow)) {
       descartar(item, "item_de_outro_dia");
+      continue;
+    }
+    // Hoje tem camada que substitui o dia: só ela monta.
+    if (substitutas.size > 0 && !substitutas.has(item.nome_modelo)) {
+      descartar(item, "substituido_por_camada");
       continue;
     }
     if (tarefa.depende_calendario && ctx.letivoFora) {

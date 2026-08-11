@@ -114,6 +114,11 @@ export default function ModalPlanejamento({
   const [padraoNovo, setPadraoNovo] = useState(false);
   /** Dias em que a rota padrão sendo salva vale. Vazio = todo dia. */
   const [diasPadrao, setDiasPadrao] = useState<Set<number>>(new Set());
+  /**
+   * Como a camada entra no dia. Começa **vazio de propósito**: escolher dias sem
+   * dizer a intenção era o caminho para duplicar o dia em silêncio.
+   */
+  const [modoCamada, setModoCamada] = useState<"" | "acrescenta" | "substitui">("");
   const [eventoNovo, setEventoNovo] = useState(false);
   const [modeloEscolhido, setModeloEscolhido] = useState("");
   /** Confirmação em dois toques, no lugar do confirm() do navegador. */
@@ -153,6 +158,10 @@ export default function ModalPlanejamento({
   }
 
   function salvarModelo() {
+    if (padraoNovo && diasPadrao.size > 0 && !modoCamada) {
+      setErro("Diga se esta rota acrescenta ao dia ou substitui o dia nesses dias.");
+      return;
+    }
     executar(async () => {
       const r = await apiPost<{ itens: number }>("/api/modelos", {
         nome: nomeNovoModelo,
@@ -162,6 +171,7 @@ export default function ModalPlanejamento({
         com_duracao: true,
         evento: eventoNovo,
         dias_semana: padraoNovo ? serializarDiasSemana([...diasPadrao]) : "",
+        substitui: padraoNovo && modoCamada === "substitui",
       });
       await mutateModelos();
       const nome = nomeNovoModelo;
@@ -173,9 +183,11 @@ export default function ModalPlanejamento({
       setPadraoNovo(false);
       setEventoNovo(false);
       setDiasPadrao(new Set());
+      const modoSalvo = modoCamada;
+      setModoCamada("");
       return `Modelo "${nome}" salvo com ${r.itens} tarefa(s)${
         padraoNovo
-          ? ` (rota padrão da sede${diasSalvos ? `, ${rotularDiasSemana(diasSalvos)}` : ", todo dia"})`
+          ? ` (rota padrão da sede${diasSalvos ? `, ${rotularDiasSemana(diasSalvos)}${modoSalvo === "substitui" ? ", substituindo o dia" : ""}` : ", todo dia"})`
           : eraEvento
             ? " (modelo de evento)"
             : ""
@@ -308,11 +320,45 @@ export default function ModalPlanejamento({
                   );
                 })}
               </div>
-              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
-                {diasPadrao.size === 0
-                  ? "Nenhum dia marcado = vale todo dia."
-                  : `Vale só em ${rotularDiasSemana(serializarDiasSemana([...diasPadrao]))}. Salve as outras rotas com os dias delas — elas se somam, não se substituem.`}
-              </p>
+              {diasPadrao.size === 0 ? (
+                <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
+                  Nenhum dia marcado = vale todo dia. É a rota base da sede.
+                </p>
+              ) : (
+                <div style={{ display: "grid", gap: 4 }}>
+                  <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
+                    Vale só em <strong>{rotularDiasSemana(serializarDiasSemana([...diasPadrao]))}</strong>. E
+                    nesses dias ela:
+                  </p>
+                  {/* Sem opção pré-marcada de propósito: escolher os dias sem dizer a
+                      intenção fazia o dia duplicar em silêncio quando alguém salvava o
+                      dia INTEIRO como camada em vez de só os extras. */}
+                  <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
+                    <input
+                      type="radio"
+                      name="modo-camada"
+                      checked={modoCamada === "acrescenta"}
+                      onChange={() => setModoCamada("acrescenta")}
+                    />
+                    <span>
+                      <strong>acrescenta</strong> ao dia — some com a rota de todo dia (use para o
+                      serviço extra da segunda)
+                    </span>
+                  </label>
+                  <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
+                    <input
+                      type="radio"
+                      name="modo-camada"
+                      checked={modoCamada === "substitui"}
+                      onChange={() => setModoCamada("substitui")}
+                    />
+                    <span>
+                      <strong>substitui</strong> o dia — só ela monta esses dias (use quando o dia
+                      tem programação própria)
+                    </span>
+                  </label>
+                </div>
+              )}
             </div>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
@@ -342,7 +388,7 @@ export default function ModalPlanejamento({
                   const rotulo = (m: ResumoModelo) =>
                     `${m.nome_modelo} (${m.itens} tarefas${m.inicio ? ` · ${m.inicio}–${m.fim}` : ""}${
                       m.dias_semana ? ` · ${rotularDiasSemana(m.dias_semana)}` : ""
-                    })`;
+                    }${m.substitui ? " · substitui o dia" : ""})`;
                   const rotas = todos.filter((m) => !m.evento);
                   const eventos = todos.filter((m) => m.evento);
                   return (

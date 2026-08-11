@@ -134,6 +134,7 @@ de linhas com o mesmo `nome_modelo` + `sede_id`.
 | padrao | boolean | marca este item como parte da **rota padrão** da sede. A rota padrão é a **união** dos itens marcados assim — a sede pode ter a camada de todo dia + camadas por dia da semana |
 | evento | boolean | marca o modelo como **rotina de um tipo de evento** (formatura, feira, prova). **Excludente com `padrao`** — se um evento virasse rota padrão, o "Gerar o dia" montaria a programação do evento todos os dias. |
 | dias_semana | string | CSV numérico (0=dom … 6=sáb) dos dias em que **este item** vale. Vazio = todo dia (é o valor de toda rota salva antes deste campo). Excludente com `evento`: evento não tem dia da semana, é aplicado na data dele |
+| substitui | boolean | **como a camada entra no dia**: `true` = substitui o dia inteiro nos dias em que vale; ausente = acrescenta. Exige `dias_semana` preenchido, e **duas camadas não podem substituir o mesmo dia** (barrado no serviço) |
 | criado_por, criado_em | auditoria | |
 
 **Rota padrão em camadas.** A recorrência mora no **item**, não na tarefa. O
@@ -141,8 +142,26 @@ de linhas com o mesmo `nome_modelo` + `sede_id`.
 consegue expressar "Maria na segunda, João na quarta" nem "mesma tarefa, outro
 horário no sábado" — os dois itens sobreviveriam nos dois dias. No item, consegue.
 O supervisor salva a rota de todo dia e, depois, uma camada por dia da semana
-(marcando os dias); o "Gerar o dia" monta a união do que vale na data. Camadas
-**se somam**, não se substituem.
+(marcando os dias); o "Gerar o dia" monta o que vale na data.
+
+**A intenção da camada é declarada, não inferida.** A união silenciosa era ambígua:
+duas camadas com a mesma tarefa em horários diferentes podiam significar "mudou de
+horário na segunda", "acontece duas vezes na segunda" ou "cadastrei sem perceber", e
+o sistema escolhia sempre a terceira leitura — duplicando. Salvar o **dia inteiro**
+da segunda como camada era o caminho natural para o erro. Por isso, ao escolher
+dias, o formulário exige dizer:
+
+- **acrescenta** — soma à rota de todo dia (serviço extra da segunda);
+- **substitui** — só ela monta esses dias (a segunda tem programação própria).
+
+Resolução na projeção: se existe camada `substitui` valendo na data, o dia é montado
+**só** por ela (as outras saem com o motivo `substituido_por_camada`); caso
+contrário, é a união das camadas que acrescentam.
+
+**Limite conhecido:** marcar uma camada como `substitui` **não remove** blocos de um
+dia que já foi gerado — a geração só acrescenta. Reconciliação (o que fazer com o
+que já existe quando a rota muda) é assunto próprio, junto com a máquina de estados
+do dia.
 
 Aplicar um modelo recria as rotinas passando pelas validações normais —
 itens que conflitam na data de destino são pulados e contabilizados.

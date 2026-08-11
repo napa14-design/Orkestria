@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
-    const { nome, data_origem, sede_id, padrao, com_duracao, evento, dias_semana } =
+    const { nome, data_origem, sede_id, padrao, com_duracao, evento, dias_semana, substitui } =
       await req.json();
     if (!nome || !data_origem || !sede_id)
       return ok({ erro: "Informe nome, data_origem e sede_id." }, 400);
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
         comDuracao: !!com_duracao,
         evento: !!evento,
         diasSemana: typeof dias_semana === "string" ? dias_semana : "",
+        substitui: !!substitui,
       }),
       201,
     );

@@ -143,6 +143,51 @@ describe("projetarDiaDaRota", () => {
     expect(naTerca.descartados[0].motivo).toBe("item_de_outro_dia");
   });
 
+  it("camada que SUBSTITUI monta o dia sozinha", () => {
+    // A ambiguidade que isto fecha: salvar o dia INTEIRO da segunda como camada
+    // fazia a segunda receber tudo duas vezes, e onde o horário diferia duplicava
+    // de verdade. Agora a intenção é declarada.
+    const base = item({ id: "base", nome_modelo: "Todo dia" });
+    const segunda = item({
+      id: "seg",
+      nome_modelo: "Segunda própria",
+      dias_semana: "1",
+      substitui: true,
+      inicio_planejado: "09:00",
+    });
+
+    const naSegunda = projetarDiaDaRota([base, segunda], contexto());
+    expect(naSegunda.materializar.map((i) => i.id)).toEqual(["seg"]);
+    expect(naSegunda.descartados[0]).toMatchObject({ motivo: "substituido_por_camada" });
+
+    // Na terça a camada não vale, então a base volta a montar o dia.
+    const naTerca = projetarDiaDaRota([base, segunda], contexto({ data: "2026-08-11" }));
+    expect(naTerca.materializar.map((i) => i.id)).toEqual(["base"]);
+    expect(naTerca.descartados[0].motivo).toBe("item_de_outro_dia");
+  });
+
+  it("camada que acrescenta continua somando (padrão de quem não marcou substituir)", () => {
+    const base = item({ id: "base", nome_modelo: "Todo dia" });
+    const extra = item({ id: "extra", nome_modelo: "Extra segunda", dias_semana: "1", inicio_planejado: "09:00" });
+    expect(projetarDiaDaRota([base, extra], contexto()).materializar.map((i) => i.id)).toEqual([
+      "base",
+      "extra",
+    ]);
+  });
+
+  it("substituição só vale nos dias da camada, não nos outros", () => {
+    const base = item({ id: "base", nome_modelo: "Todo dia" });
+    const sabado = item({
+      id: "sab",
+      nome_modelo: "Sábado próprio",
+      dias_semana: "6",
+      substitui: true,
+    });
+    // Segunda: a camada de sábado não vale, e a base monta normalmente.
+    const p = projetarDiaDaRota([base, sabado], contexto());
+    expect(p.materializar.map((i) => i.id)).toEqual(["base"]);
+  });
+
   it("o dia do ITEM é checado antes do dia da TAREFA", () => {
     // Os dois motivos dizem "não é hoje", mas o texto na tela é diferente: um cita
     // a rota, o outro cita a tarefa. A ordem decide qual a pessoa lê.
