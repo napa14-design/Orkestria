@@ -23,6 +23,10 @@ export type MotivoDescarte =
   | "item_de_outro_dia"
   /** Hoje existe camada que SUBSTITUI o dia, e este item não é dela. */
   | "substituido_por_camada"
+  /** O bloco existe mas já saiu do planejado (realizado, cancelado…): não se mexe. */
+  | "bloco_ja_iniciado"
+  /** O bloco existe e foi movido À MÃO: a decisão humana vence a rota. */
+  | "movido_a_mao"
   | "fora_do_periodo_letivo"
   /** A TAREFA é semanal e hoje não está nos dias dela. */
   | "outro_dia_da_semana"
@@ -34,9 +38,17 @@ export interface ItemDescartado {
   motivo: MotivoDescarte;
 }
 
+/** O bloco existe e a rota mudou: alinhar em vez de criar outro ao lado. */
+export interface ItemParaAtualizar {
+  item: ModeloRotinaItem;
+  bloco: RotinaPlanejada;
+}
+
 export interface Projecao {
   /** Itens que a geração criaria agora. */
   materializar: ModeloRotinaItem[];
+  /** Blocos que a geração atualizaria (a rota mudou de horário/duração). */
+  atualizar: ItemParaAtualizar[];
   descartados: ItemDescartado[];
 }
 
@@ -44,8 +56,8 @@ export interface ContextoProjecao {
   data: string;
   tarefas: Map<string, Tarefa>;
   funcionarios: Map<string, Funcionario>;
-  /** Chaves já presentes no dia (rotinas não canceladas). */
-  jaNoDia: Set<string>;
+  /** Blocos do dia que contam (canceladas já filtradas por quem chama). */
+  blocosDoDia: RotinaPlanejada[];
   /** Ids de funcionários com ausência registrada na data. */
   ausentes: Set<string>;
   letivoFora: boolean;
@@ -93,12 +105,42 @@ export function projetarDiaDaRota(
   const dow = diaDaSemana(ctx.data);
   const substitutas = camadasQueSubstituem(itens, dow);
   const materializar: ModeloRotinaItem[] = [];
+  const atualizar: ItemParaAtualizar[] = [];
   const descartados: ItemDescartado[] = [];
   const descartar = (item: ModeloRotinaItem, motivo: MotivoDescarte) =>
     descartados.push({ item, motivo });
 
+  // Bloco por item da rota que o gerou — a identidade que sobrevive a mudança de
+  // horário. E a chave antiga como rede: bloco criado à mão ou gerado antes deste
+  // campo existir não tem `origem_item_id`, e não pode ser duplicado por isso.
+  const porItem = new Map<string, RotinaPlanejada>();
+  const chavesDoDia = new Set<string>();
+  for (const b of ctx.blocosDoDia) {
+    if (b.origem_item_id) porItem.set(b.origem_item_id, b);
+    chavesDoDia.add(chaveMaterializacao(b.funcionario_id, b.tarefa_id, b.inicio_planejado));
+  }
+
   for (const item of itens) {
-    if (ctx.jaNoDia.has(chaveMaterializacao(item.funcionario_id, item.tarefa_id, item.inicio_planejado))) {
+    const existente = porItem.get(item.id);
+    if (existente) {
+      if (existente.status !== "planejada") {
+        descartar(item, "bloco_ja_iniciado");
+        continue;
+      }
+      // Mão humana vence a rota: se o bloco não está mais onde a rota o pôs,
+      // alguém o moveu de propósito.
+      if (existente.origem_inicio && existente.inicio_planejado !== existente.origem_inicio) {
+        descartar(item, "movido_a_mao");
+        continue;
+      }
+      const horarioMudou = existente.inicio_planejado !== item.inicio_planejado;
+      const duracaoMudou =
+        item.duracao_min != null && existente.tempo_previsto_min !== item.duracao_min;
+      if (horarioMudou || duracaoMudou) atualizar.push({ item, bloco: existente });
+      else descartar(item, "ja_no_dia");
+      continue;
+    }
+    if (chavesDoDia.has(chaveMaterializacao(item.funcionario_id, item.tarefa_id, item.inicio_planejado))) {
       descartar(item, "ja_no_dia");
       continue;
     }
@@ -140,7 +182,7 @@ export function projetarDiaDaRota(
     }
     materializar.push(item);
   }
-  return { materializar, descartados };
+  return { materializar, atualizar, descartados };
 }
 
 export interface BlocoMovido {

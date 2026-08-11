@@ -10,7 +10,7 @@ import {
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, getDataSource } from "@/lib/datasource";
 import {
   diaDaSemana,
   hhmmParaMin,
@@ -20,7 +20,6 @@ import {
   serializarDiasSemana,
 } from "@/lib/dateUtils";
 import {
-  chaveMaterializacao,
   compararRotaComODia,
   type ContextoProjecao,
   type ItemDescartado,
@@ -31,7 +30,13 @@ import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
-import { createRotina, getRotinasByData, idMaterializacao } from "./rotinasService";
+import {
+  createRotina,
+  getRotinasByData,
+  idDeItemDaRota,
+  idItemDeRota,
+  idMaterializacao,
+} from "./rotinasService";
 
 /** Executa `fn` em lotes paralelos (evita centenas de escritas sequenciais). */
 async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25): Promise<void> {
@@ -227,8 +232,22 @@ export async function salvarModelo(
       },
     ]);
 
+  // Número da ocorrência de cada par pessoa+tarefa, na ordem do dia: é o que
+  // permite o id do item ser estável sem depender do horário.
+  const ocorrencia = new Map<string, number>();
+  const ordenadas = [...rotinas].sort((a, b) =>
+    hhmmParaMin(a.inicio_planejado) - hhmmParaMin(b.inicio_planejado),
+  );
+  const numeroDaOcorrencia = new Map<string, number>();
+  for (const r of ordenadas) {
+    const par = `${r.funcionario_id}|${r.tarefa_id}`;
+    const n = (ocorrencia.get(par) ?? 0) + 1;
+    ocorrencia.set(par, n);
+    numeroDaOcorrencia.set(r.id, n);
+  }
+
   const novos: ModeloRotinaItem[] = rotinas.map((r) => ({
-    id: novoId(),
+    id: idItemDeRota(nomeLimpo, r.funcionario_id, r.tarefa_id, numeroDaOcorrencia.get(r.id) ?? 1),
     nome_modelo: nomeLimpo,
     sede_id: sedeId,
     funcionario_id: r.funcionario_id,
@@ -253,7 +272,13 @@ export async function salvarModelo(
   // todo dia mais a de segunda mais a de sábado. Desmarcar as demais era o que
   // impedia isso — salvar a camada da terça apagava a da segunda em silêncio.
   await emLotes(novos, (item) => ds.criar("modelos_rotina", item));
-  await emLotes(antigos, (m) => ds.excluir("modelos_rotina", m.id));
+  // Só os órfãos: com id estável, a maioria dos "antigos" tem o MESMO id dos novos
+  // — apagar por lista cegamente deletaria o que acabou de ser gravado.
+  const idsNovos = new Set(novos.map((n) => n.id));
+  await emLotes(
+    antigos.filter((m) => !idsNovos.has(m.id)),
+    (m) => ds.excluir("modelos_rotina", m.id),
+  );
   return { itens: rotinas.length };
 }
 
@@ -335,6 +360,8 @@ export async function aplicarModelo(
 export interface ResultadoGeracao {
   semRota?: boolean;
   geradas: number;
+  /** Blocos alinhados à rota (ela mudou de horário/duração depois de gerado). */
+  atualizadas?: number;
   puladas: number;
   detalhes: string[];
 }
@@ -355,7 +382,7 @@ export async function gerarDiaDaRotaPadrao(
   if (!carregado) return { semRota: true, geradas: 0, puladas: 0, detalhes: [] };
   const { itens, ctx, locais, params } = carregado;
 
-  const { materializar, descartados } = projetarDiaDaRota(itens, ctx);
+  const { materializar, atualizar, descartados } = projetarDiaDaRota(itens, ctx);
 
   const res: ResultadoGeracao = {
     geradas: 0,
@@ -365,26 +392,51 @@ export async function gerarDiaDaRotaPadrao(
 
   const ds = await getDataSource();
   const agora = agoraISO();
+
+  /** Tempo previsto do item: a duração do snapshot, ou o cálculo da tarefa. */
+  const previstoDoItem = (it: ModeloRotinaItem) =>
+    it.duracao_min ??
+    tempoPrevistoMin(ctx.tarefas.get(it.tarefa_id)!, locais.get(it.local_id) ?? undefined);
+
+  const medidas = (inicio: string, previsto: number) => ({
+    inicio_planejado: inicio,
+    fim_planejado: minParaHHMM(hhmmParaMin(inicio) + previsto),
+    tempo_previsto_min: previsto,
+    tempo_visual_min: tempoVisualMin(previsto, params.bloco_agenda_min),
+    blocos_ocupados: blocosOcupados(previsto, params.bloco_agenda_min),
+  });
+
+  // Alinha à rota o bloco que ela mesma gerou e ninguém tocou. É o conserto do
+  // defeito antigo: mover 08:00 → 09:00 na rota deixava o bloco das 08:00 no dia
+  // e criava outro às 09:00.
+  await emLotes(atualizar, ({ item, bloco }) => {
+    const previsto = previstoDoItem(item);
+    return ds.atualizar("rotinas_planejadas", bloco.id, {
+      ...medidas(item.inicio_planejado, previsto),
+      origem_inicio: item.inicio_planejado,
+      atualizado_em: agora,
+    });
+  });
+  res.atualizadas = atualizar.length;
+
   const aCriar: RotinaPlanejada[] = materializar.map((it) => {
-    const tarefa = ctx.tarefas.get(it.tarefa_id)!;
-    const previsto = it.duracao_min ?? tempoPrevistoMin(tarefa, locais.get(it.local_id) ?? undefined);
+    const previsto = previstoDoItem(it);
     return {
-      id: idMaterializacao(data, it.funcionario_id, it.tarefa_id, it.inicio_planejado),
+      id: idDeItemDaRota(data, it.id),
       data,
       funcionario_id: it.funcionario_id,
       sede_id: sedeId,
       tarefa_id: it.tarefa_id,
       local_id: it.local_id,
-      inicio_planejado: it.inicio_planejado,
-      fim_planejado: minParaHHMM(hhmmParaMin(it.inicio_planejado) + previsto),
-      tempo_previsto_min: previsto,
-      tempo_visual_min: tempoVisualMin(previsto, params.bloco_agenda_min),
-      blocos_ocupados: blocosOcupados(previsto, params.bloco_agenda_min),
+      ...medidas(it.inicio_planejado, previsto),
       status: "planejada",
       observacao: "Rota padrão",
       supervisor_id: supervisorId,
       criado_em: agora,
       atualizado_em: agora,
+      // Proveniência: de qual item da rota veio, e o que a rota dizia na hora.
+      origem_item_id: it.id,
+      origem_inicio: it.inicio_planejado,
     };
   });
 
@@ -421,11 +473,7 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     data,
     tarefas: new Map(tarefas.map((t) => [t.id, t])),
     funcionarios: new Map(funcionarios.map((f) => [f.id, f])),
-    jaNoDia: new Set(
-      existentes
-        .filter((r) => r.status !== "cancelada")
-        .map((r) => chaveMaterializacao(r.funcionario_id, r.tarefa_id, r.inicio_planejado)),
-    ),
+    blocosDoDia: existentes.filter((r) => r.status !== "cancelada"),
     ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
     letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
   };
@@ -455,6 +503,14 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do período letivo`);
     else if (motivo === "outro_dia_da_semana")
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: não é do dia da semana`);
+    else if (motivo === "bloco_ja_iniciado")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: já saiu do planejado (realizada ou cancelada) — não foi mexido`,
+      );
+    else if (motivo === "movido_a_mao")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: foi movido à mão no dia — a rota não sobrescreve`,
+      );
     else if (motivo === "folga_pela_escala")
       linhas.push(`${funcionario?.nome}: folga pela escala em ${ctx.data}`);
     else if (motivo === "pessoa_ausente")
@@ -473,6 +529,8 @@ export interface RelatorioSombra {
   blocos_no_dia: number;
   /** A geração criaria estes agora. */
   materializaria: number;
+  /** A geração ALINHARIA estes: a rota mudou de horário/duração depois de gerada. */
+  atualizaria: number;
   /** Já presentes: a rota e o dia concordam. */
   preservados: number;
   descartes: Record<MotivoDescarte, number>;
@@ -502,6 +560,8 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     cadastro_removido: 0,
     item_de_outro_dia: 0,
     substituido_por_camada: 0,
+    bloco_ja_iniciado: 0,
+    movido_a_mao: 0,
     fora_do_periodo_letivo: 0,
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,
@@ -517,6 +577,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
       itens_na_rota: 0,
       blocos_no_dia: 0,
       materializaria: 0,
+      atualizaria: 0,
       preservados: 0,
       descartes: vazio(),
       divergencia: { so_na_rota: 0, so_no_dia: 0, movidos: 0 },
@@ -524,7 +585,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     };
   }
   const { itens, existentes, ctx } = carregado;
-  const { materializar, descartados } = projetarDiaDaRota(itens, ctx);
+  const { materializar, atualizar, descartados } = projetarDiaDaRota(itens, ctx);
   const vivos = existentes.filter((r) => r.status !== "cancelada");
 
   // Compara só o que a rota REALMENTE prevê para esta data: o que ela criaria
@@ -535,9 +596,19 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
   // e "escala de terça" apareciam como falta numa quarta-feira.
   const aplicaveis = [
     ...materializar,
-    ...descartados.filter((d) => d.motivo === "ja_no_dia").map((d) => d.item),
+    ...descartados
+      .filter((d) => d.motivo === "ja_no_dia" || d.motivo === "movido_a_mao" || d.motivo === "bloco_ja_iniciado")
+      .map((d) => d.item),
   ];
-  const div = compararRotaComODia(aplicaveis, vivos);
+  // O que a geração vai ALINHAR sai dos dois lados da comparação: não é
+  // divergência, é trabalho já contabilizado em `atualizaria`. Deixá-lo dentro
+  // fazia o mesmo bloco aparecer como "vai alinhar" E como "só na rota" — dupla
+  // contagem no relatório que existe justamente para ser confiável.
+  const idsAlinhados = new Set(atualizar.map((a) => a.bloco.id));
+  const div = compararRotaComODia(
+    aplicaveis,
+    vivos.filter((b) => !idsAlinhados.has(b.id)),
+  );
 
   const descartes = vazio();
   for (const d of descartados) descartes[d.motivo]++;
@@ -545,6 +616,10 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
   const nome = (id: string) => ctx.funcionarios.get(id)?.nome ?? id;
   const tarefa = (id: string) => ctx.tarefas.get(id)?.nome_tarefa ?? id;
   const amostra = [
+    ...atualizar.map(
+      (a) =>
+        `ALINHARIA ${nome(a.item.funcionario_id)} / ${tarefa(a.item.tarefa_id)}: bloco ${a.bloco.inicio_planejado} → rota ${a.item.inicio_planejado}`,
+    ),
     ...div.movidos.map(
       (m) => `MOVIDO ${nome(m.item.funcionario_id)} / ${tarefa(m.item.tarefa_id)}: rota ${m.de} → dia ${m.para}`,
     ),
@@ -562,6 +637,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     itens_na_rota: itens.length,
     blocos_no_dia: vivos.length,
     materializaria: materializar.length,
+    atualizaria: atualizar.length,
     preservados: descartes.ja_no_dia,
     descartes,
     divergencia: {

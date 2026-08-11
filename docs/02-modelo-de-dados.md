@@ -159,9 +159,15 @@ Resolução na projeção: se existe camada `substitui` valendo na data, o dia �
 contrário, é a união das camadas que acrescentam.
 
 **Limite conhecido:** marcar uma camada como `substitui` **não remove** blocos de um
-dia que já foi gerado — a geração só acrescenta. Reconciliação (o que fazer com o
-que já existe quando a rota muda) é assunto próprio, junto com a máquina de estados
-do dia.
+dia que já foi gerado — a geração só acrescenta ou alinha, nunca apaga.
+
+**Id do item é estável** (`mi_<camada>_<funcionário>_<tarefa>_<ocorrência>`), e não
+aleatório. A única forma de mudar a rota é **re-salvá-la** a partir de um dia
+montado; com id aleatório, todo vínculo `origem_item_id` dos blocos já gerados se
+perdia a cada salvamento e a geração criava duplicatas. O horário **não** entra na
+identidade — é justamente ele que muda. Limite: se a mesma pessoa faz a mesma tarefa
+duas vezes na camada e uma é removida, a numeração da outra desloca e o vínculo se
+perde.
 
 Aplicar um modelo recria as rotinas passando pelas validações normais —
 itens que conflitam na data de destino são pulados e contabilizados.

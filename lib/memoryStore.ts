@@ -230,8 +230,23 @@ export class MemoryDataSource implements DataSource {
     return (achado as MapaTabelas[K] | undefined) ?? null;
   }
 
+  /**
+   * Grava por id, **sobrescrevendo** se já existir — o mesmo que o Firestore faz
+   * (`doc(id).set()`).
+   *
+   * Antes era `push` puro, e as duas fontes discordavam da mesma chamada: em
+   * produção, gravar com id existente substituía o documento; em memória,
+   * duplicava a linha. Isso tornava o modo memória **mais gentil que a produção** e
+   * escondia bugs em quem depende de id determinístico — inclusive a garantia
+   * "dois cliques simultâneos gravam o mesmo doc", que nunca foi de fato exercida
+   * aqui.
+   */
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
-    (banco()[tabela] as MapaTabelas[K][]).push(registro);
+    const lista = banco()[tabela] as Array<MapaTabelas[K] & { id: string }>;
+    const { id } = registro as { id: string };
+    const posicao = lista.findIndex((r) => r.id === id);
+    if (posicao >= 0) lista[posicao] = registro as MapaTabelas[K] & { id: string };
+    else lista.push(registro as MapaTabelas[K] & { id: string });
     return registro;
   }
 

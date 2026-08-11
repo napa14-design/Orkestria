@@ -72,6 +72,52 @@ export function idMaterializacao(
   return `m_${data}_${funcionarioId}_${tarefaId}_${inicio.replace(/:/g, "")}`;
 }
 
+/**
+ * Id determinístico do bloco gerado pela **rota padrão**, derivado de
+ * data + item da rota.
+ *
+ * Diferença que importa em relação a `idMaterializacao`: o id do item **não muda
+ * quando o horário dele muda**. Então mover uma tarefa de 08:00 para 09:00 na rota
+ * continua apontando para o mesmo documento, e a geração atualiza o bloco em vez
+ * de criar outro ao lado. A proteção contra dois cliques simultâneos (mesmo id →
+ * last-write-wins) continua valendo.
+ */
+export function idDeItemDaRota(data: string, itemId: string): string {
+  return `ri_${data}_${itemId}`;
+}
+
+/**
+ * Id **estável** de um item de rota, derivado de camada + pessoa + tarefa +
+ * número da ocorrência (1ª, 2ª… vez que aquela pessoa faz aquela tarefa na
+ * camada).
+ *
+ * Por que estável e por que sem o horário: a única forma de mudar a rota hoje é
+ * **re-salvá-la** a partir de um dia montado. Com id aleatório a cada salvamento,
+ * todo vínculo `origem_item_id` dos blocos já gerados se perdia, e a geração
+ * criava blocos duplicados ao lado — exatamente o defeito que a proveniência veio
+ * consertar. Tirando o horário da identidade, mover uma tarefa de 08:00 para 09:00
+ * mantém o mesmo item, e o bloco é **atualizado**.
+ *
+ * Limite conhecido: se a pessoa faz a mesma tarefa duas vezes na camada e uma
+ * delas é removida, a numeração da outra desloca e o vínculo se perde (o bloco
+ * antigo fica e um novo nasce). Vale o caso comum.
+ */
+export function idItemDeRota(
+  nomeModelo: string,
+  funcionarioId: string,
+  tarefaId: string,
+  ocorrencia: number,
+): string {
+  const nome = nomeModelo
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/gu, "")
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "")
+    .slice(0, 24);
+  return `mi_${nome}_${funcionarioId}_${tarefaId}_${ocorrencia}`;
+}
+
 export interface NovaRotina {
   data: string;
   funcionario_id: string;

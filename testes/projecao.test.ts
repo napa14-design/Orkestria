@@ -42,7 +42,7 @@ function contexto(parcial: Partial<ContextoProjecao> = {}): ContextoProjecao {
     data: SEGUNDA,
     tarefas: new Map([["t1", tarefa()]]),
     funcionarios: new Map([["f1", funcionario()]]),
-    jaNoDia: new Set(),
+    blocosDoDia: [],
     ausentes: new Set(),
     letivoFora: false,
     ...parcial,
@@ -57,10 +57,72 @@ describe("projetarDiaDaRota", () => {
   });
 
   it("pula o que já está no dia (idempotência)", () => {
-    const ctx = contexto({ jaNoDia: new Set([chaveMaterializacao("f1", "t1", "08:00")]) });
+    // Bloco sem `origem_item_id`: criado à mão ou gerado antes da proveniência
+    // existir. Cai na rede da chave antiga, e não pode ser duplicado.
+    const ctx = contexto({ blocosDoDia: [rotina({ inicio_planejado: "08:00" })] });
     const p = projetarDiaDaRota([item()], ctx);
     expect(p.materializar).toHaveLength(0);
+    expect(p.atualizar).toHaveLength(0);
     expect(p.descartados[0].motivo).toBe("ja_no_dia");
+  });
+
+  it("a rota mudou de horário: ATUALIZA o bloco em vez de criar outro", () => {
+    // O defeito que isto conserta: identidade por funcionário+tarefa+início fazia
+    // mover 08:00 → 09:00 deixar o bloco velho e criar um novo ao lado.
+    const bloco = rotina({
+      id: "ri_2026-08-10_m1",
+      inicio_planejado: "08:00",
+      origem_item_id: "m1",
+      origem_inicio: "08:00",
+    });
+    const p = projetarDiaDaRota([item({ id: "m1", inicio_planejado: "09:00" })], contexto({ blocosDoDia: [bloco] }));
+    expect(p.materializar).toHaveLength(0);
+    expect(p.atualizar).toHaveLength(1);
+    expect(p.atualizar[0].bloco.id).toBe("ri_2026-08-10_m1");
+    expect(p.atualizar[0].item.inicio_planejado).toBe("09:00");
+  });
+
+  it("bloco movido À MÃO não é sobrescrito pela rota", () => {
+    const bloco = rotina({
+      inicio_planejado: "10:00", // a coordenadora arrastou
+      origem_item_id: "m1",
+      origem_inicio: "08:00", // a rota tinha posto às 08:00
+    });
+    const p = projetarDiaDaRota([item({ id: "m1", inicio_planejado: "09:00" })], contexto({ blocosDoDia: [bloco] }));
+    expect(p.atualizar).toHaveLength(0);
+    expect(p.materializar).toHaveLength(0);
+    expect(p.descartados[0].motivo).toBe("movido_a_mao");
+  });
+
+  it("bloco que já saiu do planejado não é tocado", () => {
+    const bloco = rotina({
+      inicio_planejado: "08:00",
+      origem_item_id: "m1",
+      origem_inicio: "08:00",
+      status: "realizada",
+    });
+    const p = projetarDiaDaRota([item({ id: "m1", inicio_planejado: "09:00" })], contexto({ blocosDoDia: [bloco] }));
+    expect(p.atualizar).toHaveLength(0);
+    expect(p.descartados[0].motivo).toBe("bloco_ja_iniciado");
+  });
+
+  it("rota e bloco iguais: não cria, não atualiza", () => {
+    const bloco = rotina({ inicio_planejado: "08:00", origem_item_id: "m1", origem_inicio: "08:00" });
+    const p = projetarDiaDaRota([item({ id: "m1" })], contexto({ blocosDoDia: [bloco] }));
+    expect(p.materializar).toHaveLength(0);
+    expect(p.atualizar).toHaveLength(0);
+    expect(p.descartados[0].motivo).toBe("ja_no_dia");
+  });
+
+  it("duração mudou na rota: também alinha", () => {
+    const bloco = rotina({
+      inicio_planejado: "08:00",
+      tempo_previsto_min: 30,
+      origem_item_id: "m1",
+      origem_inicio: "08:00",
+    });
+    const p = projetarDiaDaRota([item({ id: "m1", duracao_min: 45 })], contexto({ blocosDoDia: [bloco] }));
+    expect(p.atualizar).toHaveLength(1);
   });
 
   it("pula item cuja tarefa ou pessoa saiu do cadastro", () => {
@@ -211,7 +273,7 @@ describe("projetarDiaDaRota", () => {
     // Um item que também estaria ausente e fora do dia da semana deve ser
     // relatado como "já no dia" — é o motivo mais alto na ordem.
     const ctx = contexto({
-      jaNoDia: new Set([chaveMaterializacao("f1", "t1", "08:00")]),
+      blocosDoDia: [rotina({ inicio_planejado: "08:00" })],
       ausentes: new Set(["f1"]),
       tarefas: new Map([["t1", tarefa({ frequencia: "semanal", dias_semana: "2" })]]),
     });

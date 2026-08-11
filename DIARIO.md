@@ -7,6 +7,84 @@
 
 ---
 
+## 2026-08-11 — Identidade do bloco pelo item da rota (e o dublê que mentia)
+
+Conserto do defeito do fluxo **manual**: ajustar um horário na rota padrão e clicar
+"Gerar o dia" de novo deixava o bloco antigo no dia e criava outro ao lado.
+
+### Como ficou
+
+O bloco passa a guardar **de onde veio**: `origem_item_id` (o item da rota) e
+`origem_inicio` (o que a rota dizia quando ele foi materializado). O id do doc virou
+`ri_<data>_<item>`, que **não muda quando o horário muda**.
+
+Com isso a geração ganhou um terceiro resultado, além de criar e pular:
+**atualizar**. Regra, na ordem:
+
+| Situação | O que a geração faz |
+|---|---|
+| bloco do item existe e a rota mudou de horário/duração | **alinha** o bloco |
+| bloco existe e ainda está onde a rota o pôs | não faz nada |
+| bloco foi **movido à mão** (`inicio ≠ origem_inicio`) | **não** sobrescreve — a mão humana vence |
+| bloco já saiu do planejado (realizado/cancelado) | não toca |
+| não existe bloco do item, mas há bloco na mesma pessoa+tarefa+hora | não duplica |
+| nada disso | cria |
+
+A sombra passou a prever isso (`atualizaria`, com a linha `ALINHARIA … bloco 11:25 →
+rota 07:00`), e **o que vai ser alinhado saiu da conta de divergência** — estava
+sendo contado duas vezes, como "vai alinhar" **e** como "só na rota".
+
+### O furo que apareceu no meio: id de item aleatório
+
+A única forma de mudar a rota hoje é **re-salvá-la** de um dia montado, e o
+`salvarModelo` criava itens com `novoId()`. Ou seja: todo re-salvamento quebrava
+todos os vínculos e o conserto nunca dispararia. O id do item passou a ser estável —
+`mi_<camada>_<funcionário>_<tarefa>_<ocorrência>` —, **sem o horário**, que é o que
+muda. E o `salvarModelo` passou a apagar só os **órfãos**: com id estável, a maioria
+dos "antigos" tem o mesmo id dos novos, e apagar a lista cegamente deletaria o que
+acabou de ser gravado.
+
+### O bug de verdade: o modo memória era mais gentil que a produção
+
+Ao verificar, a rota virou **126 itens** em vez de 63. A causa não estava no meu
+código: **`criar` no modo memória fazia `push` puro**, enquanto o Firestore faz
+`doc(id).set()` — **sobrescreve**. As duas fontes discordavam da mesma chamada.
+
+Isso é pior que o sintoma. Torna inútil qualquer verificação de idempotência feita só
+em memória — **inclusive a garantia "dois cliques simultâneos gravam o mesmo doc",
+que está documentada como verificada em 25/06 e nunca foi exercida de verdade**: o
+teste passava pela checagem de duplicata, não pelo id. Corrigido: `criar` em memória
+grava por id, substituindo. Três casos novos em `testes/datasource-memoria.test.ts`
+travam o contrato, incluindo a corrida.
+
+### Verificado com a rota real do Pré Sul
+
+61 blocos gerados, todos com proveniência e id `ri_…`; movi o café de 11:25 para
+07:00 na rota, re-salvei (63 itens, ids estáveis); a sombra previu
+`atualizaria: 1, materializaria: 0` com divergência **zerada**; gerar de novo deu
+**0 criadas, 1 alinhada, 61 → 61 blocos**, o bloco no horário novo e nada no antigo.
+Depois movi um bloco à mão: a rota **não** desfez (`atualizadas: 0`) e a tela
+explicou — *"foi movido à mão no dia — a rota não sobrescreve"*.
+
+108 testes (6 de identidade/reconciliação + 3 do contrato do DataSource), `tsc`
+limpo, build limpo.
+
+### O que NÃO foi feito, de propósito
+
+A geração nunca **apaga**: item removido da rota deixa o bloco no dia. E
+`aplicarModelo`/`duplicarDia`/importação seguem com o id antigo
+(`m_data_func_tarefa_hora`) — a mudança ficou no caminho da rota padrão, que é o do
+defeito relatado.
+
+### Arquivos
+
+`types/RotinaPlanejada.ts`, `lib/schema.ts`, `lib/projecaoDia.ts`,
+`lib/memoryStore.ts`, `services/rotinasService.ts`, `services/modelosService.ts`,
+`testes/projecao.test.ts`, `testes/datasource-memoria.test.ts`,
+`docs/02-modelo-de-dados.md`
+
+---
+
 ## 2026-08-11 — A geração do dia fica manual. Decidido, não postergado
 
 **Nenhuma mudança de código** — e é justamente o ponto: nada havia sido construído

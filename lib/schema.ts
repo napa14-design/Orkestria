@@ -186,6 +186,9 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("supervisor_id"),
     col("criado_em"),
     col("atualizado_em"),
+    // Campos novos no FIM (o Sheets grava por posição — ver nota acima).
+    col("origem_item_id"),
+    col("origem_inicio"),
   ],
   execucoes_realizadas: [
     col("id"),
