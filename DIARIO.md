@@ -7,6 +7,90 @@
 
 ---
 
+## 2026-08-11 — Decisão: a geração automática do dia espera o ciclo fechar
+
+**Nenhuma mudança de código.** É registro de decisão, porque ela contraria um
+pedido do dono do produto e alguém vai querer reabrir.
+
+### O pedido e por que ele fazia sentido
+
+Cadastrar rotas padrão por dia da semana (seg…sáb) e o cron gerar o dia sozinho,
+sobrando ao supervisor só registrar falta. A doutrina até favorece: ela diz que o
+"Gerar o dia" nasceu para se aposentar, e automatizar remove operação em vez de
+adicionar.
+
+### O que a medição de produção mostrou
+
+Contado em 11/08 (agregação `count()`, leitura barata): 18 sedes, **3** com rota
+padrão, 336 tarefas, 35 funcionários, 1.862 blocos planejados em **9 dias
+esparsos** (o último em 04/08), e **zero** registros em `execucoes_realizadas` —
+**nenhum dia foi fechado**. Zero ausências. As 3 sedes sem rota padrão são
+esperadas (fase de teste); o que não é esperado é que as sedes que **planejaram**
+nunca fecharam.
+
+Automatizar aqui aumentaria a **entrada** de um processo cuja **saída nunca
+funcionou** — converteria baixa adoção em milhares de registros com aparência de
+operação. Decisão: não construir a automação agora. Registrado como
+**ADR-009** no vault.
+
+### Três erros meus, derrubados pela crítica externa
+
+Consultei o Codex (`gpt-5.6-sol`, esforço `xhigh`) com um briefing que incluía a
+doutrina, o estado medido e o pedido explícito de contestação. Três coisas que eu
+havia afirmado nesta mesma sessão caíram:
+
+1. **"A idempotência protege a regeração."** Não protege. O
+   `idMaterializacao` (`m_data_func_tarefa_inicio`) só evita gravar o **mesmo**
+   bloco duas vezes. Se a rota mudar 08:00 → 09:00, o bloco das 08:00 **fica** e o
+   das 09:00 nasce ao lado. A identidade que reconcilia é `data|id_do_item_da_rota`.
+2. **"Ter rota padrão já é o interruptor da automação"** — proposta minha, de
+   minutos antes. É quebra semântica: hoje `padrao` significa "fonte do clique
+   manual", não "autorização para o sistema escrever todo dia".
+3. **O campo "vale nos dias"** que eu propus tem furo de seleção: uma rota "todos
+   os dias" e outra "sábado" são **ambas** válidas no sábado. Falta a invariante
+   *exatamente um perfil resolvido por sede/data*.
+
+E o custo que eu estimei estava errado: usei ~40 itens por rota (peguei do texto
+do tutorial); a média medida é **143**. Nas 18 sedes seriam ~5.160 escritas/dia
+com o log de histórico — 26% da franquia gratuita, não os ~1.400 que eu disse.
+
+### Duas críticas dele que NÃO se aplicam
+
+Verificadas contra o código, e registradas para ninguém "consertar" o que não está
+quebrado:
+
+- **Limite de 500 do `WriteBatch`**: não usamos batch. `emLotes` faz `Promise.all`
+  em fatias de 25, com escritas individuais.
+- **"A mesma tarefa varia entre sedes"**: impossível no nosso modelo — tarefa
+  pertence a um local, e o local a uma sede (hierarquia obrigatória). Sobra a
+  versão estreita, válida: `dias_semana` na tarefa não expressa "mesma tarefa,
+  outro horário no sábado".
+
+Uma terceira crítica — "confirmar realizado por bloco é o maior buraco" — nasceu de
+**omissão do meu briefing**: o mecanismo existe (um clique na linha para o que
+correu como planejado, formulário só no desvio). O buraco é de uso, não de
+mecanismo.
+
+### Ordem acordada
+
+1. Descobrir **por que nenhum dia foi fechado** — sem código, perguntando às
+   coordenadoras. Vale mais que tirar o clique de gerar.
+2. **Geração sombra**: calcular o que o cron geraria e comparar com o planejado à
+   mão, sem escrever bloco nenhum.
+3. **Calendário operacional** em camadas (Brasil → Ceará → Fortaleza → exceção da
+   sede). Já é necessário hoje: clicar "Gerar o dia" num feriado monta um dia cheio.
+4. **Identidade por item da rota** — pré-requisito de qualquer regeração.
+5. **Definir o que é um dia criado sem ação humana** (rascunho? aprovado?): se
+   contar como "planejado", contamina ocupação e ociosidade com dias que ninguém viu.
+6. Só então a automação, por sede elegível.
+
+### Arquivos
+
+`DIARIO.md`. No vault: `Referência/Decisões (ADR).md` (ADR-009) e
+`Projetos/Orkestria — Devlog.md` (🔁 Materialização + pendências).
+
+---
+
 ## 2026-08-11 — Tutorial ensina a tarefa de espera (e uma entra, uma sai)
 
 ### Por que só uma das cinco mudanças da planilha virou passo
