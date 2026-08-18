@@ -12,6 +12,7 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import type { CondicaoConsulta, DataSource } from "./datasource";
 import { obterAppAdmin } from "./firebaseAdmin";
+import { semUndefined } from "./semUndefined";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 export class FirebaseDataSource implements DataSource {
@@ -44,7 +45,7 @@ export class FirebaseDataSource implements DataSource {
 
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
     const { id } = registro as { id: string };
-    await this.db.collection(tabela).doc(id).set(registro);
+    await this.db.collection(tabela).doc(id).set(semUndefined(registro));
     return registro;
   }
 
@@ -58,7 +59,7 @@ export class FirebaseDataSource implements DataSource {
     return this.db.runTransaction(async (tx) => {
       const doc = await tx.get(ref);
       if (!doc.exists) throw new Error(`Registro ${id} não encontrado em ${tabela}.`);
-      const atualizado = { ...(doc.data() as MapaTabelas[K]), ...mudancas };
+      const atualizado = { ...(doc.data() as MapaTabelas[K]), ...semUndefined(mudancas) };
       tx.set(ref, atualizado);
       return atualizado;
     });

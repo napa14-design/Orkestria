@@ -348,7 +348,8 @@ export default function PaginaRotinas() {
       }
       forcar = true;
     }
-    const fim = minParaHHMM(hhmmParaMin(inicio) + rotina.tempo_visual_min);
+    // Espelha o servidor: o fim é o real, não o do bloco (ver createRotina).
+    const fim = minParaHHMM(hhmmParaMin(inicio) + rotina.tempo_previsto_min);
     const otimista = { ...rotina, funcionario_id: funcionarioId, inicio_planejado: inicio, fim_planejado: fim };
     setSelecionado(funcionarioId);
     try {

@@ -7,6 +7,86 @@
 
 ---
 
+## 2026-08-18 — CESIU importada: dois bugs que só o Firestore real mostrou
+
+A coordenação mandou a "Rota de Trabalho ASG — CESIU **Rota Diaria utopia**" (o nome é
+dela). Três ASGs, 86 locais, 151 tarefas. O pedido: importar, consertar os horários
+errados e **deixar a sobrecarga comprovada no sistema**.
+
+### O que a planilha não conseguia provar
+
+8 linhas com FIM antes do INÍCIO; 7 em que a coluna TEMPO não bate com FIM−INÍCIO; 3
+sobreposições reais (uma pessoa em dois consultórios ao mesmo tempo); e a prova de
+copiar-colar: os seis horários de FIM das linhas 30–35 do Jeová são **idênticos, minuto
+a minuto**, aos da Eveline — mas o turno dele começa ao meio-dia. As colunas "Área por
+local (m²)" e "Produtividade" existem no cabeçalho e estão **100 % vazias**: a planilha
+tenta ser o que o Orkestria calcula e para no meio. Documento com aritmética
+contraditória não sustenta reivindicação de sobrecarga numa mesa; a primeira conferência
+derruba.
+
+### Os dois bugs
+
+**1. `undefined` em campo opcional derrubava a escrita.** `categoria_id` saía `undefined`
+quando a planilha não traz categoria. O banco de memória guarda; o **Firestore recusa o
+documento inteiro**. A primeira tentativa parou no meio: **86 locais criados, zero
+tarefas**. Consertado na fronteira (`lib/semUndefined.ts`), aplicado **nos dois bancos**
+— o falso não pode ser mais gentil que o real, senão a falha só aparece em produção. É a
+mesma família do `criar` que fazia `push` em memória e `set` no Firestore.
+
+**2. Tarefa curta reservava o bloco inteiro.** `createRotina` gravava
+`fim_planejado = início + tempo VISUAL` (arredondado para cima). A validação de
+sobreposição compara contra esse fim. Uma tarefa de 5 min começando 06:45 era gravada
+terminando **07:15** — a CESIU usa bloco de **30 min** —, e a seguinte era recusada com
+`SOBREPOSICAO`. Efeito real: **"Gerar o dia" a partir da rota padrão pularia quase tudo**
+naquela sede, porque 92 das 151 tarefas duram 5 ou 10 min. O clique único que justifica a
+rota padrão simplesmente não funcionaria. Agora o fim gravado é o real; `tempo_visual_min`
+e `blocos_ocupados` seguem valendo para a grade (altura clicável, arrasto, resize).
+
+O achado veio do dono do produto: *"o sistema tinha que aceitar mais de 1 tarefa por
+bloco"*. Estava certo — e a minha explicação anterior estava errada: eu havia dito que a
+tela mostraria 156–188 %, número que **eu** tinha somado e que tela nenhuma exibe (a
+ocupação usa `tempo_previsto_min`; a função até documenta *"não o tempo visual"*).
+
+### Como os horários foram consertados
+
+Quatro regras, com relatório linha a linha (45 ajustes): duração real = FIM−INÍCIO (a
+coluna TEMPO é derivada e está velha); FIM quebrado → mediana da mesma tarefa nas outras
+abas; quem invade outra tarefa ou o intervalo sai do horário declarado; e a fila
+(deslocadas + as 24 **sem horário nenhum**, com duração de tarefas iguais) entra depois da
+última tarefa — **passando da saída**, que é a prova.
+
+### O resultado, calculado pelo sistema
+
+| | Serviço | Jornada | Ocupação | Termina | Após a saída |
+|---|---|---|---|---|---|
+| Gleydison | 585 min | 510 | **115 %** | 18:30 (sai 16:30) | 11 tarefas |
+| Eveline | 600 min | 510 | **118 %** | 19:40 (sai 18:00) | 9 tarefas |
+| Jeová | 495 min | 480 | **103 %** | 22:10 (sai 21:00) | 7 tarefas |
+
+A conta é **conservadora**: ficou de fora tudo que está nos rodapés da planilha — pintura
+de salas e corredores, capinação do entorno, mangueira às terças e sextas, vidros das
+recepções, rega das plantas e a organização da pós **aos sábados**, que os três fazem. Não
+inventei duração para prosa. E mesmo descontando as tarefas da cauda que repetem uma já
+agendada no mesmo dia (6 das 9 da Eveline), os três seguem acima de 100 %: 112 %, 106 % e
+109 %.
+
+Isso também tira a CESIU do zero — era a sede **principal e vazia** do único coordenador
+real do piloto, o achado que a 4ª consulta ao gpt-5.6-sol apontou como o bloqueio de fato.
+
+### Verificado
+
+Analisador do próprio sistema: **0 erros**, 46 avisos (27 são "fora do expediente" — a
+sobrecarga dita pelo sistema). Gravado: 86 locais reaproveitados, 90 tarefas, 3 pessoas,
+151 blocos, 151 itens de rota padrão. `categoria_id` ausente do documento; blocos com
+`previsto=10min` e `fim` real. **125 testes** (eram 117), `tsc` limpo, build limpo.
+
+### Arquivos
+
+`lib/semUndefined.ts` (novo), `lib/firebaseClient.ts`, `lib/memoryStore.ts`,
+`services/rotinasService.ts`, `app/(app)/rotinas/page.tsx`,
+`testes/sem-undefined.test.ts` (novo), `testes/tarefa-curta.test.ts` (novo),
+`testes/datasource-memoria.test.ts`
+
 ## 2026-08-11 — Renovação em lote: a prévia é a mesma conta que a escrita
 
 A entrada anterior deixou a **renovação em lote** de fora com uma razão escrita:

@@ -257,7 +257,12 @@ export async function createRotina(
       : tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined);
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
-  const fimMin = inicioMin + visual;
+  // O fim é o REAL (início + previsto), não o do bloco arredondado. `visual` e
+  // `blocos_ocupados` seguem valendo para a grade (altura mínima clicável e o
+  // arrasto), mas quem decide sobreposição é o relógio: uma tarefa de 5 min NÃO
+  // reserva os 15 do bloco. Sem isso, rotas com muita tarefa curta — a CESIU tem
+  // 92 de 5 e 10 min — perdem quase tudo por SOBREPOSICAO ao gerar o dia.
+  const fimMin = inicioMin + previsto;
 
   const candidata: Partial<RotinaPlanejada> = {
     data: entrada.data,
@@ -385,7 +390,8 @@ export async function updateRotina(
     : atual.tempo_visual_min;
 
   const inicioMin = hhmmParaMin(destinoInicio);
-  const fimMin = inicioMin + novoVisual;
+  // Mesmo motivo do createRotina: o fim gravado é o real.
+  const fimMin = inicioMin + novoPrevisto;
 
   let alertas: AlertaValidacao[] = [];
   const mudouPosicao =

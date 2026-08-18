@@ -61,3 +61,24 @@ describe("MemoryDataSource.criar", () => {
     expect((await ds.listar("sedes")).filter((s) => s.id === "sede-teste")).toHaveLength(1);
   });
 });
+
+/**
+ * Campo opcional gravado como `undefined`.
+ *
+ * O Firestore **recusa o documento inteiro** (`Cannot use "undefined" as a
+ * Firestore value`), e o modo memória guardava sem reclamar — de novo o falso
+ * mais gentil que o real. Custou uma importação pela metade em produção: os 86
+ * locais da CESIU criados e nenhuma tarefa, porque `categoria_id` vinha
+ * `undefined` quando a planilha não trazia categoria.
+ */
+describe("undefined em campo opcional", () => {
+  it("a chave não é gravada (é o que o Firestore faz depois do semUndefined)", async () => {
+    const ds = new MemoryDataSource();
+    await ds.criar("sedes", { ...sede(), codigo: undefined, grupo: undefined });
+    const guardada = await ds.obter("sedes", "sede-teste");
+    expect(guardada).not.toBeNull();
+    expect(Object.hasOwn(guardada!, "codigo")).toBe(false);
+    expect(Object.hasOwn(guardada!, "grupo")).toBe(false);
+    expect(guardada!.nome_sede).toBe("Sede de teste");
+  });
+});
