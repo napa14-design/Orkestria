@@ -61,6 +61,15 @@ export default function CardRotina({
 }: CardRotinaProps) {
   const durMin = hhmmParaMin(run.fim) - hhmmParaMin(run.inicio);
   const nome = tarefa?.nome_tarefa ?? "Tarefa";
+  /**
+   * Card curto demais para o texto padrão. A escala é ~2,4px por minuto, então
+   * uma tarefa de 5min tem 12px de altura — e uma linha de 12px com entrelinha
+   * 1,15 mais o respiro pede ~17px. O texto era simplesmente cortado no meio.
+   * Rotas com muita tarefa curta não são exceção: na CESIU são 92 de 151.
+   * Aqui o card aperta a tipografia e devolve o espaço que estava reservado
+   * para o "×" (que só aparece no hover), em vez de esconder o nome da tarefa.
+   */
+  const micro = altura < 20;
 
   return (
     <div
@@ -91,7 +100,7 @@ export default function CardRotina({
           ? `repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(156,13,56,0.16) 5px, rgba(156,13,56,0.16) 10px), ${fundo}`
           : fundo,
         color: "var(--tinta)",
-        padding: "2px 8px",
+        padding: micro ? "0 6px" : "2px 8px",
         overflow: "hidden",
         zIndex: 5,
         borderRadius: 3,
@@ -122,14 +131,14 @@ export default function CardRotina({
       <div
         style={{
           fontWeight: 600,
-          fontSize: compacto ? 11 : 12,
-          lineHeight: 1.15,
-          paddingRight: 14,
+          fontSize: micro ? 10 : compacto ? 11 : 12,
+          lineHeight: micro ? 1 : 1.15,
+          paddingRight: micro ? 4 : 14,
           color: "var(--tinta)",
           overflow: "hidden",
           display: "-webkit-box",
           WebkitBoxOrient: "vertical",
-          WebkitLineClamp: compacto ? 1 : 3,
+          WebkitLineClamp: micro || compacto ? 1 : 3,
         }}
       >
         {nome}

@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-08-18 — Card curto: o texto cabe em vez de ser cortado
+
+Segunda observação do dono do produto olhando a CESIU: *"e esses textos cortados nos
+cards?"*. Fui medir antes de mexer, e o diagnóstico foi mais específico do que a
+aparência sugeria.
+
+**Não havia sobreposição** — o posicionamento estava correto (0 cards sobrepostos nas
+três colunas). O problema era só de altura: a escala é ~2,4px por minuto, então uma
+tarefa de **5 min ocupa 12px**, e uma linha de 12px com entrelinha 1,15 mais o respiro
+pede ~17px. O texto era cortado no meio. Contagem: **21 cards abaixo de 18px no Jeová**,
+4 no Gleydison, 1 na Eveline.
+
+E um detalhe que só o DOM mostra: o rótulo reservava **14px à direita** para o botão "×"
+— num card de 12px de altura. Espaço morto onde não sobrava espaço.
+
+Novo degrau `micro` (altura < 20px), abaixo do `compacto` que já existia: fonte 10,
+entrelinha 1, sem respiro vertical e sem a reserva do "×" (que aparece só no hover de
+qualquer jeito). **Nenhum nome de tarefa foi escondido** — a alternativa seria trocar o
+texto por um traço colorido, e aí uma rota de 21 consultórios seguidos vira uma pilha de
+listras anônimas, que é pior para quem precisa ler a rota.
+
+Rota com muita tarefa curta não é exceção: na CESIU são **92 de 151**.
+
+### Verificado
+
+Antes: praticamente todo card de 5 e 10 min com o rótulo serrado. Depois: **11 casos**,
+todos de 22px com nome longo, onde o `-webkit-line-clamp` corta **com reticências** — que
+é o comportamento certo, não texto partido ao meio. Conferido na tela, comparando com a
+captura anterior. `tsc` limpo, build limpo, 125 testes.
+
+### Arquivos
+
+`components/agenda/CardRotina.tsx`
+
 ## 2026-08-18 — Tarefa que passa da saída agora se identifica
 
 Pedido do dono do produto depois de olhar a agenda da CESIU: *"as tarefas depois da
