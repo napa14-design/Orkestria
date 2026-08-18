@@ -311,6 +311,17 @@ export default function AgendaGrid({
                 ) : (
                   <div className="num" style={{ fontSize: 10, opacity: 0.75 }}>
                     {f.entrada}–{f.saida} · líq. {formatarDuracao(jornadaLiquidaMin(f))}
+                    {/* Quantas tarefas do dia terminam depois da saída. Fica aqui
+                        porque é onde o olho vai antes de descer a coluna — e um
+                        card solto no fim do dia não conta a extensão do problema. */}
+                    {(() => {
+                      const n = runs.filter((r) => hhmmParaMin(r.fim) > hhmmParaMin(f.saida)).length;
+                      return n > 0 ? (
+                        <span style={{ color: "var(--acento)", fontWeight: 700 }}>
+                          {" "}· {n} passa{n > 1 ? "m" : ""} da saída
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </button>
@@ -485,6 +496,8 @@ export default function AgendaGrid({
                       espinha={est.espinha ?? catPorId.get(tarefa?.categoria_id ?? "")?.cor ?? "#3a6ea5"}
                       fundo={est.fundo}
                       visualBlocos={Math.max(1, Math.round(durMin / blocoMin))}
+                      passaDaSaida={hhmmParaMin(run.fim) > hhmmParaMin(f.saida)}
+                      saida={f.saida}
                       rotuloResize={emResize ? formatarDuracao(resize.blocos * blocoMin) : undefined}
                       podeRedimensionar={!!aoRedimensionar && unico}
                       aoIniciarArrasto={aoIniciarArrasto}

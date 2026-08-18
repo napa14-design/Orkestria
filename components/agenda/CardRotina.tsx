@@ -20,6 +20,14 @@ interface CardRotinaProps {
   espinha: string;
   fundo: string;
   visualBlocos: number;
+  /**
+   * A tarefa termina depois da saída do funcionário. Não bloqueia nada — o
+   * sistema permite de propósito (rota que não cabe na jornada é o dado que
+   * interessa) —, mas precisa ser VISÍVEL, senão passa por tarefa normal.
+   */
+  passaDaSaida?: boolean;
+  /** Hora de saída, só para explicar no tooltip. */
+  saida?: string;
   /** Duração formatada exibida durante o arrasto da alça (só quando emResize). */
   rotuloResize?: string;
   podeRedimensionar: boolean;
@@ -41,6 +49,8 @@ export default function CardRotina({
   espinha,
   fundo,
   visualBlocos,
+  passaDaSaida,
+  saida,
   rotuloResize,
   podeRedimensionar,
   aoIniciarArrasto,
@@ -54,7 +64,7 @@ export default function CardRotina({
 
   return (
     <div
-      className="agenda-card-tarefa pop-card"
+      className={`agenda-card-tarefa pop-card${passaDaSaida ? " passa-da-saida" : ""}`}
       draggable={unico && !emResize}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", JSON.stringify({ tipo: "mover", rotina_id: run.id }));
@@ -73,19 +83,29 @@ export default function CardRotina({
         right: 3,
         height: altura - 2,
         boxSizing: "border-box",
-        background: fundo,
+        // Hachura amaranto por cima do fundo do status: o mesmo desenho das
+        // faixas de "fora do turno" e de ocioso, para ler como a mesma família.
+        // Precisa ser inline — a faixa `.celula-fora-jornada` fica ATRÁS do card,
+        // e classe CSS não vence `background`/`border` inline.
+        background: passaDaSaida
+          ? `repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(156,13,56,0.16) 5px, rgba(156,13,56,0.16) 10px), ${fundo}`
+          : fundo,
         color: "var(--tinta)",
         padding: "2px 8px",
         overflow: "hidden",
         zIndex: 5,
         borderRadius: 3,
-        border: "1px solid var(--linha)",
-        borderLeft: `4px solid ${espinha}`,
+        border: passaDaSaida ? "1px dashed var(--acento)" : "1px solid var(--linha)",
+        borderLeft: `4px solid ${passaDaSaida ? "var(--acento)" : espinha}`,
         boxShadow: "1px 1.5px 0 rgba(34,49,39,0.10)",
         cursor: "pointer",
       }}
       title={`${nome} · ${run.inicio}–${run.fim} · ${formatarDuracao(durMin)}${
         run.membros.length > 1 ? ` (${run.membros.length} blocos contíguos)` : ""
+      }${
+        passaDaSaida
+          ? `\n⚠ Passa da saída${saida ? ` (${saida})` : ""} — este serviço não cabe na jornada.`
+          : ""
       }\nArraste para mover.`}
     >
       <button

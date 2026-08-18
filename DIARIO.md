@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-08-18 — Tarefa que passa da saída agora se identifica
+
+Pedido do dono do produto depois de olhar a agenda da CESIU: *"as tarefas depois da
+saída podiam ter alguma sinalização"*. Estava certo — na tela, as três tarefas da Eveline
+às 18:30, 19:00 e 19:30 (ela sai às 18:00) eram **idênticas** às do horário normal.
+
+A faixa `.celula-fora-jornada` já pintava o **fundo** fora do turno, mas o card fica por
+cima e some com ela. Ou seja: o sinal existia e era encoberto exatamente onde importava.
+
+Três marcas, todas no card:
+
+- **espinha amaranto** (`var(--acento)`) no lugar da cor da categoria — visível mesmo no
+  card de 14px, que é o mínimo da grade;
+- **hachura amaranto** na mesma diagonal das faixas de intervalo e de ocioso, para ler
+  como a mesma família visual;
+- **borda tracejada**, porque tracejado já significa "não é firme" no resto da interface.
+
+E, no cabeçalho da coluna, a **contagem**: `08:00–18:00 · líq. 8h30 · 10 passam da saída`.
+Um card solto no fim do dia não diz a extensão do problema; o número no topo diz, e é
+onde o olho vai antes de descer a coluna.
+
+A regra é **termina depois da saída**, não *começa* depois — assim a tarefa que
+atravessa o fim do expediente também conta. Por isso a Eveline aparece com 10 e não com
+9: a limpeza do Consultório 03, das 17:55 às 18:05, atravessa.
+
+Nada disso bloqueia: rota que não cabe na jornada é o dado que interessa, e o sistema
+continua deixando gravar. O que mudou é que **agora ela se identifica**.
+
+Detalhe que custou uma volta: escrevi a marca em `globals.css` e ela não apareceu — o
+card define `background` e `border` **inline**, e estilo inline vence classe. Movido para
+o inline (com o porquê comentado no código) e a regra de CSS morta foi removida em vez de
+ficar lá parecendo que funciona.
+
+Verificado no navegador, por estilo computado: 28 cards marcados (10 + 11 + 7), borda
+`dashed rgb(156,13,56)`, hachura presente; card normal segue `solid` com a espinha da
+categoria. `tsc` limpo, build limpo, 125 testes.
+
+### Arquivos
+
+`components/agenda/CardRotina.tsx`, `components/agenda/AgendaGrid.tsx`, `app/globals.css`
+
 ## 2026-08-18 — CESIU importada: dois bugs que só o Firestore real mostrou
 
 A coordenação mandou a "Rota de Trabalho ASG — CESIU **Rota Diaria utopia**" (o nome é
