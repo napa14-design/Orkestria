@@ -7,6 +7,68 @@
 
 ---
 
+## 2026-08-20 — Errata do emulador: eu não tinha verificado o que disse ter verificado
+
+A entrada anterior afirma que o contrato passou a rodar contra o Firestore com
+`npm run emulador`. Os **190 testes são reais** e passaram contra um emulador
+Firestore de verdade — mas **o emulador não era o que o comando sobe**.
+
+### O que aconteceu
+
+Subi o emulador em segundo plano, esperei a porta 8080 responder, rodei a suíte,
+vi 190 verdes e declarei feito. **Não li o log.** Quando fui parar o processo,
+achei emuladores de outro projeto rodando e, aí sim, abri o log:
+
+```
+!  firestore: Port 8080 is not open on 127.0.0.1, could not start Firestore Emulator.
+Error: Could not start Firestore Emulator, port taken.
+```
+
+O meu nunca subiu. A 8080 já estava ocupada por um emulador de outro projeto, e a
+suíte rodou dentro dele.
+
+**Consequência técnica: nenhuma.** É Firestore de verdade, e o emulador isola por
+`projectId` — meus documentos foram para o namespace `orkestria-emulador`, não
+para os dados do outro projeto. Conferi as duas coleções nos dois namespaces:
+**zero documentos deixados para trás**, porque o `afterAll` do contrato limpa o
+que cria.
+
+**Consequência prática: o comando que documentei nunca tinha sido exercido.**
+
+### O conserto
+
+- A porta do projeto passou de **8080 para 8085**. A 8080 é a padrão de todo
+  mundo; usá-la garante colisão com qualquer outro projeto aberto na máquina — e
+  a colisão falha **calada**, porque a suíte roda alegremente contra o emulador
+  alheio.
+- `CLAUDE.md` ganhou o aviso em destaque: **confira que o emulador subiu antes de
+  confiar no resultado**, com esta história como exemplo.
+- `.gitignore` passou a ignorar `firestore-debug.log` e companhia, que o emulador
+  larga na raiz.
+
+Refeito com a porta nova e **lendo o log desta vez**:
+
+```
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ Firestore │ 127.0.0.1:8085 │
+
+190 passed (190)
+```
+
+### O padrão, que já apareceu antes nesta semana
+
+É a terceira vez: o teste de mutação com `--reporter=basic` que nunca rodava, a
+suspeita do `fim_planejado` que eu quase reportei sem conferir, e agora isto.
+**Verde não é evidência quando você não olhou de onde ele veio.** O anterior eu
+peguei porque o baseline saiu vermelho e era impossível; este só peguei por
+acaso, ao parar o processo.
+
+`tsc` limpo, **167 testes** sem emulador, **190** com.
+
+### Arquivos
+
+`firebase.json`, `CLAUDE.md`, `.gitignore`
+
 ## 2026-08-20 — O contrato passou a rodar nos DOIS bancos: 190 testes
 
 Desde que o contrato de `DataSource` foi escrito eu vinha repetindo a mesma

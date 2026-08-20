@@ -12,3 +12,8 @@ credentials.json
 
 # projeto separado que roda nesta pasta
 jogo-monstrinhos/
+
+# emulador do Firestore (logs locais)
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

@@ -69,14 +69,21 @@ do Firestore. Para provar que os dois concordam, suba o emulador numa janela e
 rode a suíte com a variável na outra:
 
 ```powershell
-npm run emulador                              # deixe rodando
-$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080" # e então:
+npm run emulador                              # deixe rodando — CONFIRA que subiu
+$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8085" # e então:
 npm test                                      # 190 testes, não 167
 ```
 
 A variável é a **trava de segurança**: sem ela o adaptador do Firestore nem é
 construído, então não existe caminho para o teste escrever na base real. Se ela
 apontar para host não-local, o contrato para de propósito.
+
+⚠️ **Confira que o emulador subiu antes de confiar no resultado.** A porta é a
+**8085**, e não a 8080 padrão, justamente porque a 8080 costuma estar ocupada por
+emulador de outro projeto — e aí o `emulators:start` falha com *"port taken"*
+enquanto a suíte roda alegremente contra o emulador alheio. Aconteceu comigo em
+20/08: os testes passaram, o resultado era tecnicamente válido (é Firestore de
+verdade), mas o comando documentado não era o que estava servindo.
 
 Três bugs de produção nasceram do banco de memória ser mais permissivo que o
 Firestore (`push` × `set`, `undefined` aceito, `undefined` apagando valor no
