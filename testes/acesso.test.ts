@@ -50,8 +50,22 @@ describe("senha guardada", () => {
 
 describe("problemaNaSenha", () => {
   it("recusa senha curta", () => {
-    expect(problemaNaSenha("a".repeat(MIN_SENHA - 1))).toBeTruthy();
-    expect(problemaNaSenha("a".repeat(MIN_SENHA))).toBeNull();
+    expect(problemaNaSenha("boa" + "x".repeat(MIN_SENHA - 4))).toBeTruthy();
+    expect(problemaNaSenha("boa" + "x".repeat(MIN_SENHA - 3))).toBeNull();
+  });
+
+  it("recusa senha só de números — 6 dígitos caem em 19 min sem freio", () => {
+    // Medido em 20/08: 56ms por verificação, login sem limite de tentativas.
+    // O tamanho não salva: 10 dígitos ainda é um espaço pequeno para máquina.
+    expect(problemaNaSenha("123456")).toBeTruthy();
+    expect(problemaNaSenha("1234567890")).toBeTruthy();
+    expect(problemaNaSenha("98765432109876")).toBeTruthy();
+    expect(problemaNaSenha("1234senha56")).toBeNull(); // com letra, passa
+  });
+
+  it("recusa o mesmo caractere repetido, por mais longo que seja", () => {
+    expect(problemaNaSenha("a".repeat(MIN_SENHA))).toBeTruthy();
+    expect(problemaNaSenha("a".repeat(40))).toBeTruthy();
   });
 
   it("recusa só espaços", () => {

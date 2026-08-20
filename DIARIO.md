@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-08-20 — Senha: mínimo de 10 e recusa de senha trivial
+
+Itens 1 e 2 da auditoria anterior, aprovados pelo dono do produto. O item 3
+(bloqueio após N tentativas) fica **de fora de propósito**: coordenadora trancada
+às 7h da manhã é a exceção na hora ruim contra a qual a doutrina existe.
+
+### O que mudou
+
+- `MIN_SENHA`: **6 → 10**. Todas as telas leem a constante, então login e conta
+  já dizem "ao menos 10" sem tocar em nenhum texto.
+- `problemaNaSenha` recusa **senha só de números** e **um caractere repetido**.
+
+A regra dos números tem número: medido em 20/08, uma verificação custa **56 ms**
+de scrypt e o login não tem freio. Varrer todas as senhas de 6 dígitos leva 15,6 h
+em série — **19 minutos com 50 requisições em paralelo**. E tamanho não salva:
+`98765432109876` tem 14 dígitos e continua sendo um espaço pequeno para máquina,
+por isso a regra não olha o comprimento.
+
+### Ninguém foi trancado fora
+
+Nada revalida senha no login — `verificarSenha` só compara. As duas pessoas com
+conta em produção seguem entrando com a senha que têm, mesmo que tenha menos de
+10 caracteres. A regra nova só vale **na hora de definir uma senha**.
+
+O outro lado disso: **as senhas atuais continuam sendo o que eram**. Se alguma for
+curta ou só numérica, o conserto é trocá-la — a regra sozinha não alcança o
+passado.
+
+### Verificado pela API de verdade
+
+| Senha | Resultado |
+|---|---|
+| `123456` | recusa — curta |
+| `1234567890` | **recusa — só números** |
+| `98765432109876` | **recusa — tamanho não salva** |
+| `aaaaaaaaaa` | recusa — caractere repetido |
+| `SenhaBoa2026` | aceita |
+| `1234senha56` | aceita |
+
+E login com a senha antiga (curta): **OK**.
+
+Um tropeço no caminho: a primeira sonda mandou `nova_senha` e a rota espera
+`senha`, então tudo chegou vazio e **toda** senha foi recusada por tamanho —
+inclusive uma de 12 caracteres. O defeito era da sonda, não do código. Vermelho
+também precisa ser conferido antes de virar diagnóstico.
+
+`tsc` limpo, build limpo, **177 testes** (eram 175).
+
+### Arquivos
+
+`lib/sessionConstants.ts`, `lib/senha.ts`, `testes/acesso.test.ts`
+
 ## 2026-08-20 — Auditoria de senha e código: o que está bom, e a conta que falta
 
 Continuação da auditoria de autenticação. A entrada anterior consertou o cookie;

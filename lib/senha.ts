@@ -63,6 +63,15 @@ export function problemaNaSenha(nova: string, proibida?: string): string | null 
   if (senha.length < MIN_SENHA)
     return `A senha precisa ter ao menos ${MIN_SENHA} caracteres.`;
   if (senha.trim().length === 0) return "A senha não pode ser só espaços.";
+  // Medido em 20/08: uma verificação custa ~56 ms de scrypt, e o login não tem
+  // freio de tentativas. Com isso, varrer TODAS as senhas só de dígitos leva
+  // 15,6 h em série — 19 minutos com 50 requisições em paralelo. Não é teoria:
+  // é o tamanho do espaço vezes o custo por tentativa.
+  if (/^\d+$/u.test(senha))
+    return "Não use uma senha só de números — ela é curta demais para o computador, mesmo parecendo longa para você.";
+  // "aaaaaaaaaa" passa em qualquer regra de tamanho e não vale nada.
+  if (new Set(senha).size === 1)
+    return "Não repita o mesmo caractere — misture letras e números.";
   if (proibida && normalizarCodigo(senha) === normalizarCodigo(proibida))
     return "Escolha uma senha diferente do código que você recebeu — ele já passou por outras mãos.";
   return null;

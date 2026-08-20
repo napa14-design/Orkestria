@@ -6,4 +6,4 @@
 export const COOKIE_SESSAO = "rf_sessao";
 
 /** Mínimo de caracteres da senha pessoal (validado no servidor, exibido na tela). */
-export const MIN_SENHA = 6;
+export const MIN_SENHA = 10;
