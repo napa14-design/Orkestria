@@ -25,8 +25,13 @@
  * segurança: sem `FIRESTORE_EMULATOR_HOST` os testes nem constroem o adaptador,
  * então não existe caminho para escrever na base real por engano.
  *
- *     npx firebase-tools emulators:start --only firestore
- *     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm test
+ *     npm run emulador                       # porta 8085 (ver firebase.json)
+ *     FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npm test
+ *
+ * ⚠️ Confira no log que subiu ("All emulators ready"). A porta é 8085 e não a
+ * 8080 padrão porque a 8080 costuma estar ocupada por emulador de outro projeto
+ * — e aí o `emulators:start` falha calado enquanto a suíte roda contra o
+ * emulador alheio. Aconteceu em 20/08.
  *
  * ## O que este contrato NÃO cobre
  *

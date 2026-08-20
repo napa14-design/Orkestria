@@ -7,6 +7,61 @@
 
 ---
 
+## 2026-08-20 — Sessão: o segredo público e o token eterno
+
+Auditoria da área de autenticação, que ainda não tinha sido olhada — e não tinha
+**nenhum teste**. Dois defeitos, os dois na credencial que decide quem é
+administrador.
+
+### 1. O segredo de desenvolvimento em produção
+
+```ts
+function segredo(): string {
+  return process.env.AUTH_SECRET ?? "segredo-dev-inseguro";
+}
+```
+
+Sem `AUTH_SECRET`, todo cookie é assinado com uma string **que está escrita neste
+repositório**, público no GitHub. Qualquer pessoa monta um payload com
+`perfil: "administrador"`, assina com o valor que leu no código, e entra. Nada no
+sistema acusa — a assinatura confere.
+
+Agora **falha fechando**: em produção, segredo ausente ou igual ao de
+desenvolvimento faz o sistema recusar assinar, com mensagem dizendo o que fazer.
+Aplicação fora do ar é recuperável; sessão forjada não é nem detectável.
+
+### 2. O token não expirava
+
+`MAX_IDADE_S = 12h` era só o `maxAge` do cookie — **dica para o navegador**.
+`verificarToken` nunca olhava data nenhuma. Um token copiado de um log, de uma
+captura de tela ou de uma máquina compartilhada **valia para sempre**.
+
+A validade passou para dentro do payload, que é assinado. Cookie emitido antes
+disto não tem `exp` e é recusado: quem estiver com sessão aberta entra de novo uma
+vez, e ninguém fica com token eterno.
+
+### Os testes que não existiam
+
+`testes/sessao.test.ts`, 8 casos, incluindo os que importam: **payload adulterado
+para virar administrador não cola**; assinatura de outro segredo não cola; token
+sem `exp` (o formato antigo) não cola; `exp` que não é número não cola; e em
+produção o segredo de desenvolvimento é recusado.
+
+### ⚠️ NÃO PUBLICADO — depende de conferência
+
+O push publica automaticamente. Se `AUTH_SECRET` **não** estiver definida na
+Vercel, esta trava derruba a aplicação no próximo deploy. Hoje ela não derruba
+justamente porque cai no segredo público — que é o defeito.
+
+Commitado local; publicar só depois de confirmar a variável no painel da Vercel.
+
+`tsc` limpo, build limpo, **175 testes** (eram 167).
+
+### Arquivos
+
+`lib/session.ts`, `testes/sessao.test.ts` (novo), `testes/datasource-contrato.test.ts`
+(comentário: a porta é 8085)
+
 ## 2026-08-20 — Errata do emulador: eu não tinha verificado o que disse ter verificado
 
 A entrada anterior afirma que o contrato passou a rodar contra o Firestore com
