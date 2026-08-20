@@ -263,7 +263,9 @@ export class MemoryDataSource implements DataSource {
     const lista = banco()[tabela] as Array<MapaTabelas[K] & { id: string }>;
     const i = lista.findIndex((r) => r.id === id);
     if (i === -1) throw new Error(`Registro ${id} não encontrado em ${tabela}.`);
-    lista[i] = { ...lista[i], ...mudancas };
+    // Igual ao Firestore: `undefined` significa "não mexi neste campo", não
+    // "apague". Quem limpa um campo grava string vazia.
+    lista[i] = { ...lista[i], ...semUndefined(mudancas) };
     return lista[i];
   }
 

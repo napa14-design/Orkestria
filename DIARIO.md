@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-08-20 — Contrato de DataSource: a mesma bateria nos dois bancos
+
+Auditoria de QA. O ponto de partida não foram os bugs, foi **o buraco que os
+deixou passar**: em dois dias, dois defeitos chegaram à produção e nenhum dos 125
+testes pegou.
+
+### O que a medição mostrou
+
+| Camada | Linhas | Testada |
+|---|---|---|
+| `lib/` (funções puras) | 4.337 | 10 módulos |
+| `services/` (regra + **toda escrita**) | 3.876 · 83 funções | **zero** |
+| `app/` + `components/` | 14.706 | zero |
+
+Os testes importavam 10 módulos, **todos de `lib/`** — e os dois bugs nasceram em
+`services/`. Cobertura invertida ao risco: o que é puro e fácil estava coberto; o
+que toca banco, não.
+
+### O defeito que a auditoria achou, e ele era meu
+
+`semUndefined` tinha sido aplicado ao `criar` dos **dois** bancos, mas ao
+`atualizar` **só do Firestore**. Ou seja: consertei metade do bug de 18/08 e criei
+um novo na outra metade, com um teste que cobria só a metade consertada. Em
+memória, `atualizar({campo: undefined})` **apagava** o valor; no Firestore,
+preservava. Corrigido em `lib/memoryStore.ts`.
+
+### O contrato
+
+`testes/datasource-contrato.test.ts`: **17 casos rodados contra qualquer
+implementação de `DataSource`**. Memória sempre; Firestore só com o emulador —
+e essa é a trava de segurança, porque sem `FIRESTORE_EMULATOR_HOST` o adaptador
+nem é construído, então não existe caminho para escrever na base real por engano.
+Há uma segunda trava: se a variável apontar para host não-local, o contrato para.
+
+Os casos não são genéricos: cada um dos três incidentes virou um teste nomeado.
+
+### Provado por mutação, não por "passou"
+
+Contrato que passa não prova nada — o que prova é ele **ficar vermelho quando o
+bug volta**. Reintroduzi os três defeitos históricos, um a um:
+
+| Bug reintroduzido | Contrato |
+|---|---|
+| baseline | `exit 0` · 17 passam |
+| 25/06 — `criar` com `push` | **`exit 1`** · caem "substitui, não duplica" e "dois criar concorrentes" |
+| 18/08 — `criar` sem `semUndefined` | **`exit 1`** · cai "undefined grava SEM a chave" |
+| 20/08 — `atualizar` sem `semUndefined` | **`exit 1`** · cai "undefined PRESERVA o valor" |
+
+Um susto no caminho que vale registrar: a primeira rodada usou
+`--reporter=basic`, que **não existe no vitest 4** — o carregador estourava e o
+teste nunca rodava. Os três "pegou" iniciais vinham da palavra "failed" na
+mensagem de erro do reporter, não de teste vermelho. Refeito pelo código de saída.
+
+### O que o contrato NÃO cobre, e continua em aberto
+
+**Índice composto**: o emulador não exige índice, então consulta multi-campo passa
+lá e pode falhar em produção. Segue sendo responsabilidade do
+`firestore.indexes.json`. Hoje as duas consultas compostas que existem batem com
+os dois índices declarados — conferido.
+
+`tsc` limpo, build limpo, **144 testes** (eram 125) + 1 pulada.
+
+### Arquivos
+
+`testes/datasource-contrato.test.ts` (novo), `lib/memoryStore.ts`,
+`testes/datasource-memoria.test.ts`
+
 ## 2026-08-18 — Card curto: o texto cabe em vez de ser cortado
 
 Segunda observação do dono do produto olhando a CESIU: *"e esses textos cortados nos

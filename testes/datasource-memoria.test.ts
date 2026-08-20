@@ -82,3 +82,29 @@ describe("undefined em campo opcional", () => {
     expect(guardada!.nome_sede).toBe("Sede de teste");
   });
 });
+
+/**
+ * `atualizar` com campo `undefined`.
+ *
+ * O `criar` já foi alinhado nos dois bancos, mas o `atualizar` não: o Firestore
+ * aplica `semUndefined` (a chave é ignorada e o valor antigo permanece) e a
+ * memória fazia o spread cru, apagando o valor. Mesma família do bug do
+ * `categoria_id`, e introduzida ao consertar metade dele.
+ */
+describe("atualizar com undefined", () => {
+  it("undefined NÃO apaga o valor gravado (é 'não mexi', não 'limpe')", async () => {
+    const ds = new MemoryDataSource();
+    await ds.criar("sedes", { ...sede(), codigo: "PQL1" });
+    await ds.atualizar("sedes", "sede-teste", { nome_sede: "Novo nome", codigo: undefined });
+    const guardada = await ds.obter("sedes", "sede-teste");
+    expect(guardada?.nome_sede).toBe("Novo nome");
+    expect(guardada?.codigo).toBe("PQL1");
+  });
+
+  it("string vazia CONTINUA limpando o campo (é assim que o sistema limpa)", async () => {
+    const ds = new MemoryDataSource();
+    await ds.criar("sedes", { ...sede(), codigo: "PQL1" });
+    await ds.atualizar("sedes", "sede-teste", { codigo: "" });
+    expect((await ds.obter("sedes", "sede-teste"))?.codigo).toBe("");
+  });
+});
