@@ -223,6 +223,60 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(r).toEqual([]);
     });
 
+    // ── gravarLote: tudo ou nada ───────────────────────────────────────
+    it("lote grava todas as operações", async () => {
+      sujeira.push(["sedes", `${P}lote-1`], ["sedes", `${P}lote-2`]);
+      await ds.gravarLote([
+        { tipo: "criar", tabela: "sedes", registro: sede("lote-1") },
+        { tipo: "criar", tabela: "sedes", registro: sede("lote-2") },
+      ]);
+      expect(await ds.obter("sedes", `${P}lote-1`)).not.toBeNull();
+      expect(await ds.obter("sedes", `${P}lote-2`)).not.toBeNull();
+    });
+
+    it("lote com UMA operação inválida não grava NADA — o caso da CESIU", async () => {
+      // Em 18/08 a importação parou com 86 locais criados e nenhuma tarefa,
+      // porque as escritas eram soltas. Com lote, ou entra tudo ou não entra
+      // nada. `atualizar` de registro inexistente é a falha usada aqui porque
+      // vale igual nos dois bancos.
+      sujeira.push(["sedes", `${P}atomico-1`], ["sedes", `${P}atomico-2`]);
+      await expect(
+        ds.gravarLote([
+          { tipo: "criar", tabela: "sedes", registro: sede("atomico-1") },
+          { tipo: "atualizar", tabela: "sedes", id: `${P}nao-existe-mesmo`, mudancas: { nome_sede: "x" } },
+          { tipo: "criar", tabela: "sedes", registro: sede("atomico-2") },
+        ]),
+      ).rejects.toThrow();
+      expect(await ds.obter("sedes", `${P}atomico-1`)).toBeNull();
+      expect(await ds.obter("sedes", `${P}atomico-2`)).toBeNull();
+    });
+
+    it("lote mistura tabelas — é o que põe dado e auditoria no mesmo commit", async () => {
+      sujeira.push(["sedes", `${P}misto`], ["feriados", `${P}misto`]);
+      await ds.gravarLote([
+        { tipo: "criar", tabela: "sedes", registro: sede("misto") },
+        { tipo: "criar", tabela: "feriados", registro: feriado("misto", "2026-12-25") },
+      ]);
+      expect(await ds.obter("sedes", `${P}misto`)).not.toBeNull();
+      expect(await ds.obter("feriados", `${P}misto`)).not.toBeNull();
+    });
+
+    it("lote faz criar, atualizar e excluir numa operação só", async () => {
+      sujeira.push(["sedes", `${P}multi-a`], ["sedes", `${P}multi-b`]);
+      await criarSede(sede("multi-a", { codigo: "ANTIGO" }));
+      await criarSede(sede("multi-b"));
+      await ds.gravarLote([
+        { tipo: "atualizar", tabela: "sedes", id: `${P}multi-a`, mudancas: { codigo: "NOVO" } },
+        { tipo: "excluir", tabela: "sedes", id: `${P}multi-b` },
+      ]);
+      expect((await ds.obter("sedes", `${P}multi-a`))?.codigo).toBe("NOVO");
+      expect(await ds.obter("sedes", `${P}multi-b`)).toBeNull();
+    });
+
+    it("lote vazio não quebra", async () => {
+      await expect(ds.gravarLote([])).resolves.toBeUndefined();
+    });
+
     it("consultar enxerga o que acabou de ser gravado", async () => {
       // Sem isto, um serviço que grava e relê na mesma chamada (a importação
       // faz exatamente isso) pode ver o estado velho.

@@ -12,7 +12,7 @@
  * atomicidade perfeita, mas a requisição não termina antes da auditoria.
  */
 import { usuarioAtual } from "./contextoUsuario";
-import type { CondicaoConsulta, DataSource } from "./datasource";
+import type { CondicaoConsulta, DataSource, OperacaoLote } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
@@ -79,6 +79,47 @@ export class HistoricoDataSource implements DataSource {
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     await this.interno.excluir(tabela, id);
     await this.logar(tabela, id, "excluir", "");
+  }
+
+  /**
+   * O ponto alto do decorator: os registros de auditoria entram **no mesmo
+   * lote** que o dado. Antes, cada escrita gerava um log separado — se o log
+   * falhasse, o dado ficava sem rastro; se o dado falhasse no meio, os logs já
+   * gravados descreviam escritas que não aconteceram.
+   *
+   * É exatamente a "otimização futura correta" que o comentário do topo deste
+   * arquivo previa: batch com dado + log, em vez de voltar a fire-and-forget.
+   */
+  async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    const agora = new Date().toISOString();
+    const usuario = usuarioAtual();
+    const logs: OperacaoLote[] = [];
+    for (const op of operacoes) {
+      if (op.tabela === "historico") continue; // sem recursão
+      const registroId = op.tipo === "criar" ? (op.registro as { id: string }).id : op.id;
+      const resumo =
+        op.tipo === "criar"
+          ? nomeDoRegistro(op.registro as unknown as Record<string, unknown>)
+          : op.tipo === "atualizar"
+            ? Object.keys(op.mudancas)
+                .filter((c) => !["atualizado_por", "atualizado_em"].includes(c))
+                .join(", ")
+            : "";
+      logs.push({
+        tipo: "criar",
+        tabela: "historico",
+        registro: {
+          id: crypto.randomUUID(),
+          tabela: op.tabela,
+          registro_id: registroId,
+          acao: op.tipo,
+          resumo,
+          usuario,
+          criado_em: agora,
+        } as MapaTabelas["historico"],
+      });
+    }
+    await this.interno.gravarLote([...operacoes, ...logs]);
   }
 
   private async logar(

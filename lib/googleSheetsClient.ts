@@ -8,7 +8,7 @@
  * O frontend NUNCA chama este módulo — apenas as rotas de API via services.
  */
 import { google, type sheets_v4 } from "googleapis";
-import { type CondicaoConsulta, type DataSource, filtrarEmMemoria } from "./datasource";
+import { type CondicaoConsulta, type DataSource, filtrarEmMemoria, type OperacaoLote } from "./datasource";
 import {
   cabecalho,
   linhaParaObjeto,
@@ -115,6 +115,21 @@ export class GoogleSheetsDataSource implements DataSource {
     });
     this.cache.delete(tabela);
     return atualizado;
+  }
+
+  /**
+   * **Não é atômico** — a API do Sheets não oferece transação. Grava em sequência
+   * e deixa o erro subir; um lote interrompido fica pela metade, e é impossível
+   * fazer melhor por aqui. Está implementado para o contrato fechar e para que a
+   * limitação fique escrita em vez de virar surpresa. O Sheets é a fonte
+   * provisória: em produção o `DATA_SOURCE` é `firebase`.
+   */
+  async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    for (const op of operacoes) {
+      if (op.tipo === "criar") await this.criar(op.tabela, op.registro);
+      else if (op.tipo === "atualizar") await this.atualizar(op.tabela, op.id, op.mudancas);
+      else await this.excluir(op.tabela, op.id);
+    }
   }
 
   async excluir(tabela: NomeTabela, id: string): Promise<void> {

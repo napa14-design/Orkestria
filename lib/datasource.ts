@@ -27,6 +27,18 @@ export type CondicaoConsulta = {
   valor: string | number | boolean;
 };
 
+/**
+ * Uma escrita dentro de um lote atômico. Ver `DataSource.gravarLote`.
+ *
+ * O tipo é frouxo de propósito (`NomeTabela` genérico em vez de `K` amarrado):
+ * um lote mistura tabelas — é justamente isso que permite gravar o dado e o
+ * registro de auditoria no MESMO commit.
+ */
+export type OperacaoLote =
+  | { tipo: "criar"; tabela: NomeTabela; registro: MapaTabelas[NomeTabela] }
+  | { tipo: "atualizar"; tabela: NomeTabela; id: string; mudancas: Partial<MapaTabelas[NomeTabela]> }
+  | { tipo: "excluir"; tabela: NomeTabela; id: string };
+
 export interface DataSource {
   listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]>;
   /** Consulta filtrada no servidor (Firestore: where). Reduz leituras. */
@@ -42,6 +54,23 @@ export interface DataSource {
     mudancas: Partial<MapaTabelas[K]>,
   ): Promise<MapaTabelas[K]>;
   excluir(tabela: NomeTabela, id: string): Promise<void>;
+  /**
+   * Grava várias escritas como UMA operação.
+   *
+   * Existe porque `Promise.all` de escritas soltas deixa estado pela metade
+   * quando uma falha — e não é hipótese: em 18/08 a importação da CESIU parou
+   * com **86 locais criados e nenhuma tarefa**, porque um campo `undefined`
+   * derrubou a gravação no meio.
+   *
+   * Garantia por implementação:
+   *  - **Firestore**: `WriteBatch` — atômico de verdade. O limite do Firestore é
+   *    de 500 escritas por lote, então lotes maiores são partidos em pedaços
+   *    atômicos entre si (all-or-nothing por pedaço, não no conjunto).
+   *  - **memória**: tira uma cópia antes e desfaz tudo se qualquer uma falhar.
+   *  - **Sheets**: **não é atômico** — a API não oferece transação. Grava em
+   *    sequência e propaga o erro; está aqui para o contrato fechar.
+   */
+  gravarLote(operacoes: OperacaoLote[]): Promise<void>;
 }
 
 /** Aplica as condições em memória (usado por memory e Sheets). */

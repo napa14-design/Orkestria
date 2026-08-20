@@ -7,6 +7,80 @@
 
 ---
 
+## 2026-08-20 — Escrita em lote virou operação atômica, com a auditoria junto
+
+O último item em aberto da auditoria, e o de maior consequência: **`Promise.all`
+de escritas soltas deixa estado pela metade**. Não era hipótese — em 18/08 a
+importação da CESIU parou com **86 locais criados e nenhuma tarefa**.
+
+### O desenho
+
+`DataSource` ganhou `gravarLote(operacoes)`. Um lote mistura tabelas de propósito,
+porque é isso que permite gravar **o dado e o registro de auditoria no mesmo
+commit** — que é, palavra por palavra, a "otimização futura correta" que o
+comentário no topo do `lib/historico.ts` já previa desde que foi escrito.
+
+Garantia por implementação, cada uma com o que realmente consegue dar:
+
+| | Garantia |
+|---|---|
+| **Firestore** | `WriteBatch` — atômico de verdade, partido em pedaços de 500 escritas |
+| **memória** | cópia antes, desfaz tudo se qualquer uma falhar |
+| **Sheets** | **não é atômico** — a API não tem transação; grava em sequência e o comentário diz isso em vez de fingir |
+
+O `HistoricoDataSource` monta os registros de auditoria e os anexa ao **mesmo**
+lote. Antes, cada escrita gerava um log separado: se o log falhasse o dado ficava
+sem rastro, e se o dado falhasse no meio os logs já gravados descreviam escritas
+que não aconteceram.
+
+### A verificação que fecha o caso
+
+Testei contra o **Firestore de produção**, sem gravar nada (o commit nunca é
+chamado):
+
+```
+1ª operação (válida) aceita
+2ª operação REJEITADA ao montar: Cannot use "undefined" as a Firestore value…
+(nenhum commit foi chamado — nada foi gravado)
+```
+
+É a **mesma mensagem** do incidente da CESIU. O `batch.set()` valida ao montar,
+antes de qualquer escrita — então aquele caso, hoje, falharia com **zero
+documentos gravados** em vez de 86 órfãos. Vale para qualquer tamanho de lote.
+
+### Onde foi ligado
+
+- **Importação**: as quatro escritas (locais, tarefas, funcionários, rotinas) eram
+  quatro `emLotes` sequenciais. Agora são acumuladas e gravadas **numa operação
+  só** — ou a sede inteira entra, ou não entra nada.
+- **Geração do dia**: alinhamentos e criações num lote só. Gerar o dia é uma
+  operação, não N; não fica metade alinhado e metade não.
+
+### O limite, dito de frente
+
+Dado + log dobram as escritas, e o teto do Firestore é 500 por lote — então a
+atomicidade total vale até **~250 registros**. Um dia de Dionísio Torres (277
+blocos) passa disso e vira dois pedaços atômicos entre si. Não fica documento pela
+metade nunca, mas pode faltar um pedaço; como o id é determinístico, repetir
+completa. O que **não** depende de tamanho é o caso da CESIU: erro de validação
+estoura ao montar, e aí não escreve nada.
+
+### Verificado
+
+5 casos novos no contrato de DataSource (lote grava tudo; **uma operação inválida
+não grava nada**; mistura tabelas; faz criar+atualizar+excluir junto; lote vazio
+não quebra) — e eles rodam contra os dois bancos quando o emulador existir.
+Importação ponta a ponta reconferida: **151, 43, 84, 194 — idêntico ao de antes**
+do refactor.
+
+`tsc` limpo, build limpo, **166 testes** (eram 161).
+
+### Arquivos
+
+`lib/datasource.ts`, `lib/firebaseClient.ts`, `lib/memoryStore.ts`,
+`lib/googleSheetsClient.ts`, `lib/historico.ts`, `services/importacaoService.ts`,
+`services/modelosService.ts`, `testes/datasource-contrato.test.ts`
+
 ## 2026-08-20 — Segunda auditoria: as 57 portas, a integridade dos dados, e a desculpa que caiu
 
 Auditoria mais dura que a primeira, no espírito de "o que mata isso, e que

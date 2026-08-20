@@ -5,7 +5,7 @@
  * do Google. Os dados vivem no processo do servidor — reiniciou, voltou ao
  * seed. Exclusivo para desenvolvimento/demonstração.
  */
-import { type CondicaoConsulta, type DataSource, filtrarEmMemoria } from "./datasource";
+import { type CondicaoConsulta, type DataSource, filtrarEmMemoria, type OperacaoLote } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
 import { semUndefined } from "./semUndefined";
@@ -281,5 +281,27 @@ export class MemoryDataSource implements DataSource {
     const lista = banco()[tabela] as Array<{ id: string }>;
     const i = lista.findIndex((r) => r.id === id);
     if (i !== -1) lista.splice(i, 1);
+  }
+
+  /**
+   * Tudo ou nada, como o `WriteBatch` do Firestore: guarda uma cópia das tabelas
+   * tocadas e desfaz se qualquer escrita falhar. Sem isto o banco falso seria
+   * outra vez mais permissivo que o real — um lote meio aplicado aqui passaria
+   * no teste e só quebraria em produção.
+   */
+  async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    const b = banco() as Record<string, unknown[]>;
+    const tocadas = [...new Set(operacoes.map((o) => o.tabela))];
+    const copia = new Map(tocadas.map((t) => [t, [...b[t]]]));
+    try {
+      for (const op of operacoes) {
+        if (op.tipo === "criar") await this.criar(op.tabela, op.registro);
+        else if (op.tipo === "atualizar") await this.atualizar(op.tabela, op.id, op.mudancas);
+        else await this.excluir(op.tabela, op.id);
+      }
+    } catch (erro) {
+      for (const [t, antes] of copia) b[t] = antes;
+      throw erro;
+    }
   }
 }

@@ -11,7 +11,7 @@ import {
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
-import { agoraISO, getDataSource } from "@/lib/datasource";
+import { agoraISO, getDataSource, type OperacaoLote } from "@/lib/datasource";
 import {
   diaDaSemana,
   hhmmParaMin,
@@ -423,13 +423,20 @@ export async function gerarDiaDaRotaPadrao(
   // Alinha à rota o bloco que ela mesma gerou e ninguém tocou. É o conserto do
   // defeito antigo: mover 08:00 → 09:00 na rota deixava o bloco das 08:00 no dia
   // e criava outro às 09:00.
-  await emLotes(atualizar, ({ item, bloco }) => {
+  // Alinhamentos e criações vão num LOTE só, no fim: gerar o dia é uma operação,
+  // não N. Se algo falha no meio, o dia não fica metade alinhado e metade não.
+  const escritas: OperacaoLote[] = atualizar.map(({ item, bloco }) => {
     const previsto = previstoDoItem(item);
-    return ds.atualizar("rotinas_planejadas", bloco.id, {
-      ...medidas(item.inicio_planejado, previsto),
-      origem_inicio: item.inicio_planejado,
-      atualizado_em: agora,
-    });
+    return {
+      tipo: "atualizar" as const,
+      tabela: "rotinas_planejadas" as const,
+      id: bloco.id,
+      mudancas: {
+        ...medidas(item.inicio_planejado, previsto),
+        origem_inicio: item.inicio_planejado,
+        atualizado_em: agora,
+      },
+    };
   });
   res.atualizadas = atualizar.length;
 
@@ -454,8 +461,8 @@ export async function gerarDiaDaRotaPadrao(
     };
   });
 
-  // Grava em lotes paralelos — escrita 1 a 1 levava ~2 min para um dia cheio.
-  await emLotes(aCriar, (r) => ds.criar("rotinas_planejadas", r));
+  for (const r of aCriar) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: r });
+  await ds.gravarLote(escritas);
   res.geradas = aCriar.length;
 
   // Confere o dia com as MESMAS regras do arrasto manual. A premissa antiga

@@ -7,7 +7,7 @@
  * id determinístico e as entidades casam por nome).
  */
 import { blocosOcupados, tempoVisualMin } from "@/lib/calculations";
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, getDataSource, novoId, type OperacaoLote } from "@/lib/datasource";
 import { hhmmParaMin } from "@/lib/dateUtils";
 import type { Analise } from "@/lib/importacaoRota";
 import type { Funcionario, Local, RotinaPlanejada, Tarefa } from "@/types";
@@ -27,10 +27,6 @@ function turnoDoHorario(entrada: string, saida: string): Funcionario["turno"] {
   if (ini >= 18 * 60) return "noite";
   if (ini >= 12 * 60) return "tarde";
   return "manha";
-}
-
-async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25): Promise<void> {
-  for (let i = 0; i < itens.length; i += lote) await Promise.all(itens.slice(i, i + lote).map(fn));
 }
 
 export interface ResultadoImportacao {
@@ -103,7 +99,11 @@ export async function aplicarImportacao(
     });
     res.locais.criados++;
   }
-  await emLotes(novosLocais, (x) => ds.criar("locais", x));
+  // As escritas não vão uma a uma: são acumuladas e gravadas num LOTE só, no
+  // fim. É o conserto da importação pela metade de 18/08 (86 locais criados,
+  // nenhuma tarefa) — agora ou a sede inteira entra, ou não entra nada.
+  const escritas: OperacaoLote[] = [];
+  for (const x of novosLocais) escritas.push({ tipo: "criar", tabela: "locais", registro: x });
 
   // ── tarefas (únicas por nome + local) ─────────────────────────────────
   const idTarefa = new Map(tarefasEx.map((t) => [`${chave(t.nome_tarefa)}@${t.local_id}`, t.id]));
@@ -136,7 +136,7 @@ export async function aplicarImportacao(
     });
     res.tarefas.criadas++;
   }
-  await emLotes(novasTarefas, (x) => ds.criar("tarefas", x));
+  for (const x of novasTarefas) escritas.push({ tipo: "criar", tabela: "tarefas", registro: x });
 
   // ── funcionários ──────────────────────────────────────────────────────
   const idFunc = new Map(funcsEx.map((f) => [chave(f.nome), f.id]));
@@ -164,7 +164,7 @@ export async function aplicarImportacao(
     });
     res.funcionarios.criados++;
   }
-  await emLotes(novosFuncs, (x) => ds.criar("funcionarios", x));
+  for (const x of novosFuncs) escritas.push({ tipo: "criar", tabela: "funcionarios", registro: x });
 
   // ── rotinas do dia (id determinístico → reimportar não duplica) ────────
   const jaTem = new Set(
@@ -192,7 +192,8 @@ export async function aplicarImportacao(
     });
     res.rotinas.criadas++;
   }
-  await emLotes(novasRotinas, (x) => ds.criar("rotinas_planejadas", x));
+  for (const x of novasRotinas) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: x });
+  await ds.gravarLote(escritas);
 
   // Mesmas regras do arrasto manual, sobre o dia inteiro: o que já existia mais
   // o que acabou de entrar.
