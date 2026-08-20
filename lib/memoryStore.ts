@@ -212,6 +212,14 @@ function banco(): Banco {
   return globalComBanco.__orkestriaDb;
 }
 
+/**
+ * Volta o banco ao seed. Existe como costura de teste: sem isto, um caso
+ * contamina o outro (o banco vive no `globalThis` para sobreviver ao HMR).
+ */
+export function reiniciarBanco(): void {
+  globalComBanco.__orkestriaDb = seed();
+}
+
 export class MemoryDataSource implements DataSource {
   async listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
     return [...banco()[tabela]] as MapaTabelas[K][];

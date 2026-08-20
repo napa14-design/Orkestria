@@ -7,6 +7,83 @@
 
 ---
 
+## 2026-08-20 — Segunda auditoria: as 57 portas, a integridade dos dados, e a desculpa que caiu
+
+Auditoria mais dura que a primeira, no espírito de "o que mata isso, e que
+evidência eu tenho de que não pode acontecer?". Enumerei conjuntos **completos**
+em vez de amostrar, e medi a base em vez de confiar no código.
+
+### O que NÃO tem problema (e vale dizer)
+
+- **57 rotas de API, nenhum buraco de autorização.** Enumerei todas, método a
+  método. As que escrevem sem `podeEscrever` usam outra guarda correta
+  (`podeGerenciarUsuarios`, `podeGerenciarCatalogo`, ou `perfil !== "administrador"`
+  inline). As duas mais perigosas — `migrar-firebase` e `setup` — são admin **e**
+  travadas por ambiente: a migração recusa quando `DATA_SOURCE=firebase`, ou seja,
+  é inerte em produção. Defesa em profundidade.
+- **Exclusão não deixa órfão.** `deleteSede` e `deleteFuncionario` contam os
+  vínculos, **bloqueiam** com mensagem em português e apontam a saída certa
+  ("marque como Inativo"). Testado nos dois.
+- **Integridade referencial**: varri 17 coleções e 18 relações de chave
+  estrangeira em 3.400 documentos. **Zero FK órfã, zero campo obrigatório vazio,
+  zero e-mail duplicado, zero sede herdada errada.**
+
+### Achado 1 — três parâmetros com `id` corrompido
+
+`bloco_agenda_min` de Dionísio Torres, Benfica e Eusébio estão gravados com o
+campo `id` valendo a **string `"undefined"`** (o id do documento está certo). Não
+vieram do código atual — `createParametro` usa `novoId()` para os dois.
+
+Efeito: a leitura funciona (filtra por chave+sede, não por id), então o bloco de
+15 min dessas três sedes está valendo. Mas **editar qualquer um dos três pela tela
+falha**: a URL vira `/api/parametros/undefined`, o documento não existe e o erro
+que aparece é *"Registro undefined não encontrado em parametros"*. E os três
+compartilham o mesmo `id`, então são indistinguíveis por ele.
+
+Não corrigi: é escrita em produção e não foi pedida. O conserto é gravar o campo
+`id` igual ao id do documento — três documentos.
+
+### Achado 2 — 58 blocos onde o desenho e a conta discordam
+
+`(fim − início) ≠ tempo_previsto_min` em 58 de 2.164 blocos (52 em DT, 6 em
+Benfica, todos "planejada"). A agenda **desenha** pelo intervalo e a ocupação
+**conta** pelo previsto — então o mesmo bloco aparece com 50 min e vale 30.
+Somados: a agenda desenha **2.170 min** onde a ocupação conta **1.815** — 355 min
+de divergência.
+
+Onze são explicados pelo arredondamento antigo (`fim = início + tempo VISUAL`,
+consertado em 18/08). **Os outros 47 não são.** São dados de junho, de uma versão
+anterior do importador.
+
+Suspeitei de bug vivo — que `fim_planejado` só fosse recalculado quando a posição
+mudasse — **e estava errado**: `redimensionou` entra em `mudouPosicao`. Conferi
+antes de reportar, e o teste ficou escrito para que a suspeita não precise ser
+investigada de novo.
+
+### Achado 3 — a desculpa da primeira auditoria caiu
+
+A primeira auditoria disse que `services/` tinha zero testes porque "toca banco".
+**Não toca**: `getDataSource()` cai em memória quando `DATA_SOURCE` não está
+definido, e o vitest não define. Escrevi um teste chamando `createRotina` e
+`updateRotina` direto — **três dos quatro casos passaram na primeira execução**,
+sem nenhuma infraestrutura.
+
+O quarto falhou por um motivo bom: escolhi mover o bloco para 09:00, que é o
+lanche da Aurilene no seed, e a validação recusou corretamente.
+
+Ou seja: as 3.876 linhas onde nasceram todos os bugs desta semana **sempre foram
+testáveis em processo**. Ninguém testava. `testes/rotina-invariantes.test.ts` é o
+primeiro; trava a invariante do bloco no criar, no mover e no redimensionar.
+
+`lib/memoryStore.ts` ganhou `reiniciarBanco()` como costura de teste — o banco vive
+no `globalThis` para sobreviver ao HMR, então sem isso um caso contamina o outro.
+
+`tsc` limpo, build limpo, **161 testes** (eram 157).
+
+### Arquivos
+
+`testes/rotina-invariantes.test.ts` (novo), `lib/memoryStore.ts`
+
 ## 2026-08-20 — Os 45 blocos impossíveis saíram da base
 
 Item 3 e último da auditoria de QA. Os itens 1 e 2 impediram o defeito de voltar;
