@@ -7,6 +7,71 @@
 
 ---
 
+## 2026-08-20 — Os 45 blocos impossíveis saíram da base
+
+Item 3 e último da auditoria de QA. Os itens 1 e 2 impediram o defeito de voltar;
+este limpou o que ele já tinha deixado.
+
+### O que eram
+
+**42 pares sobrepostos** (38 blocos distintos) e **7 blocos dentro do próprio
+almoço**, em Dionísio Torres e Benfica, entre 24/06 e 04/08.
+
+O levantamento derrubou a hipótese fácil: **`mesma tarefa nos dois lados: 0`** —
+nenhuma era duplicata. Em todos os 42 pares as tarefas eram **diferentes**
+("Varrição externa" × "Limpar o refeitório"; "Anatomia (Lab 1)" × "CRM"). O campo
+`obs` mostrou como nasceram: quase todo par tem um lado `"Rota padrão"` e outro
+`""`, com horários de criação distintos — em Benfica 07/08, os `""` às **19:01** e
+os `"Rota padrão"` às **19:49**. O dia foi montado de um jeito e a rota padrão
+gerada **por cima**, sem checagem de conflito. É exatamente o furo fechado no
+item 2.
+
+### Por que eu tinha recomendado NÃO mexer
+
+Como não eram duplicatas, cancelar um lado apaga serviço que alguém planejou, e
+escolher qual sobra é decisão operacional, não técnica. Em DT vários pares foram
+criados **no mesmo minuto**, então a regra decidiria por milissegundo.
+
+O dono do produto respondeu o que só ele sabia: **DT e Benfica eram dados de
+teste**. Com isso a objeção cai — não há serviço real a preservar — e a correção
+foi autorizada.
+
+### Como foi feito
+
+`status: "cancelada"`, **não exclusão**: é estado de primeira classe, some das
+contas de ocupação e **pode ser desfeito**. Cada bloco recebeu no `observacao` o
+motivo ("Cancelado na correção de 20/08: sobrepunha X (14:30–14:45)"), e cada
+alteração gerou registro em `historico` — 45 deles, como toda escrita do sistema.
+
+Regra: em cada par, cancelar o **criado por último** — o que entrou por cima do
+dia já montado. Os 7 do intervalo não têm par: foram cancelados por serem, eles
+mesmos, o bloco impossível.
+
+Fluxo em três passos, o mesmo da renovação em lote: prévia → aplicar → conferir.
+
+### Conferido na base inteira, não só no que mexi
+
+```
+blocos totais: 2164 · cancelados: 45 · ativos: 2119
+sobreposições restantes: 0
+dentro do intervalo restantes: 0
+registros de historico do reparo: 45
+```
+
+### O que sobra para a operação decidir
+
+**O lanche da Fernanda/Zenir.** Quatro dos sete casos de intervalo eram a mesma
+coisa repetida: "Limpeza dos WCs 6º andar", 09:00–09:30, com lanche cadastrado
+09:00–09:15. Cancelei o bloco, mas se o horário do lanche no cadastro é que está
+errado, o conserto certo é lá — e aí a tarefa deveria voltar. Uma linha resolve,
+e só quem conhece a rotina dela sabe qual dos dois é o certo.
+
+Nenhuma mudança de código nesta entrada: 157 testes seguem passando.
+
+### Arquivos
+
+`DIARIO.md` (só registro; o reparo foi script de manutenção, não mudança de código)
+
 ## 2026-08-20 — A regra da agenda passou a valer nas 4 portas, não em 1
 
 Item 2 da auditoria de QA. O achado era este: a invariante da agenda — não pode
