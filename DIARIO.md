@@ -7,6 +7,70 @@
 
 ---
 
+## 2026-08-20 — Auditoria de senha e código: o que está bom, e a conta que falta
+
+Continuação da auditoria de autenticação. A entrada anterior consertou o cookie;
+esta olha a credencial em si. **Sem mudança de código** — o que achei é decisão de
+produto, e vai com número em vez de opinião.
+
+Antes: a trava do `AUTH_SECRET` **foi publicada** (`334ff38`), depois de o dono do
+produto confirmar que a variável existe na Vercel.
+
+### O que está bom, e é bastante
+
+- **scrypt com salt por senha**, comparação em tempo constante, e o buraco do
+  `senha_hash = ":"` fechado **com o porquê escrito no código** — hash de 0 byte
+  fazia `timingSafeEqual(vazio, vazio)` aceitar qualquer senha.
+- **Código de primeiro acesso**: 9 caracteres de um alfabeto de 30 = **44 bits**,
+  sorteados com rejeição para não enviesar pelo módulo (`byte % 30` direto faria
+  os 16 primeiros saírem 12% mais). Alfabeto sem O/0, I/1/L e U, porque o código
+  é ditado por telefone.
+- **Uso único de verdade**: `definirSenhaUsuario` apaga o código junto, e
+  `codigoConfere` recusa quem já tem senha. Expiração de 14 dias conferida, e
+  falha fechando se a data estiver ausente ou ilegível.
+- **Não vaza quais e-mails existem**: mensagem idêntica para e-mail inexistente,
+  código errado, código vencido e conta que já tem senha. Está comentado no código
+  como decisão, não por acaso.
+
+### O que falta: nenhum freio de tentativas
+
+`/api/auth/login` aceita tentativas ilimitadas. Não há contador, atraso nem
+bloqueio — busquei por `rate limit`, `tentativas`, `lockout`, `throttle` e não
+existe nada.
+
+Medi o custo real de uma verificação nesta máquina: **56,3 ms** (scrypt). Daí sai
+o tempo para varrer o espaço inteiro de uma senha de 6 caracteres, que é o mínimo
+que o sistema aceita hoje (`MIN_SENHA = 6`):
+
+| Senha de 6 | Combinações | Serial | Com 50 em paralelo |
+|---|---|---|---|
+| **só dígitos** | 1,0 × 10⁶ | 15,6 h | **19 minutos** |
+| minúsculas | 3,1 × 10⁸ | 201 dias | 4 dias |
+| alfanumérica | 5,7 × 10¹⁰ | 101 anos | 2 anos |
+| alfanumérica de 10 | 8,4 × 10¹⁷ | — | — |
+
+O risco não é abstrato: **uma senha numérica de 6 dígitos cai em 19 minutos**. E
+como scrypt custa 56 ms de CPU, tentativa ilimitada também é conta na Vercel — o
+atacante gasta uma requisição, nós gastamos processamento.
+
+### As três saídas, com o custo de cada uma
+
+1. **Recusar senha trivial** (só dígitos, um caractere repetido) ao definir. Mata
+   a linha dos 19 minutos, não estende senha de ninguém, e só aparece na hora de
+   escolher. É a mais barata.
+2. **Subir `MIN_SENHA`** de 6 para 10. Leva o pior caso para 2 anos. Afeta só
+   senha nova; ninguém é deslogado.
+3. **Bloqueio após N tentativas.** É o padrão da indústria e o que eu **não**
+   faria sem decisão sua: coordenadora trancada às 7h da manhã é exatamente a
+   "exceção na hora ruim" contra a qual a doutrina existe.
+
+Minha recomendação: **1 + 2**, e deixar o bloqueio de fora enquanto forem duas
+pessoas usando o sistema.
+
+### Arquivos
+
+Nenhum. Diagnóstico.
+
 ## 2026-08-20 — Sessão: o segredo público e o token eterno
 
 Auditoria da área de autenticação, que ainda não tinha sido olhada — e não tinha
