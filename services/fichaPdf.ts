@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CAPACIDADE_TAREFAS, CARD, cabeNaFicha, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
+import { CAPACIDADE_TAREFAS, CARD, cabeNaFicha, fatiarEmPaginas, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -35,6 +35,9 @@ interface FichaInput {
   qr: string;
   tarefas: LinhaFicha[];
   epis: string[];
+  /** 1-based. Só aparece impresso quando a pessoa tem mais de uma página. */
+  pagina: number;
+  paginas: number;
 }
 
 function trunc(font: PDFFont, s: string, size: number, maxW: number): string {
@@ -109,7 +112,11 @@ async function desenhaFicha(
     nomeX = x0 + 6 + lw + 22;
   }
   page.drawText(f.nome, { x: nomeX, y: yTop - 44, size: 18, font: bold, color: TINTA });
-  page.drawText(`${f.sedeNome}  -  ${f.dataBR}`, { x: nomeX, y: yTop - 59, size: 9, font: reg, color: CINZA });
+  // "Página 1 de 2" só aparece quando há mais de uma: numa ficha de folha única
+  // seria ruído, e em duas é a diferença entre a pessoa saber que falta assinar
+  // a outra ou achar que o dia dela acabou no meio.
+  const marcaPagina = f.paginas > 1 ? `  -  Página ${f.pagina} de ${f.paginas}` : "";
+  page.drawText(`${f.sedeNome}  -  ${f.dataBR}${marcaPagina}`, { x: nomeX, y: yTop - 59, size: 9, font: reg, color: CINZA });
 
   // QR (o leitor o localiza sozinho — posição é só visual)
   const qrPng = await doc.embedPng(await QRCode.toBuffer(f.qr, { margin: 1, scale: 6 }));
@@ -241,18 +248,9 @@ export async function gerarFichasPdf(
       .sort((a, b) => hhmmParaMin(a.inicio_planejado) - hhmmParaMin(b.inicio_planejado));
     if (!doFunc.length) continue;
 
-    const epis: string[] = [];
-    const vistos = new Set<string>();
     const tarefasFicha: LinhaFicha[] = doFunc.map((r) => {
       const t = tPorId.get(r.tarefa_id);
       const l = lPorId.get(r.local_id);
-      for (const id of (t?.requisitos ?? "").split(",").filter(Boolean)) {
-        const req = reqPorId.get(id);
-        if (req?.tipo === "epi" && !vistos.has(req.nome)) {
-          vistos.add(req.nome);
-          epis.push(req.nome);
-        }
-      }
       return {
         ini: r.inicio_planejado,
         fim: r.fim_planejado,
@@ -262,15 +260,46 @@ export async function gerarFichasPdf(
         dur: formatarDuracao(r.tempo_previsto_min),
       };
     });
-    // QR ORK2: carrega o nº impresso de tarefas e os códigos das linhas (ordem
-    // impressa) — a conferência casa por código, não por posição, e usa este n
-    // na geometria (blindado contra a rotina mudar depois de imprimir).
-    const codigos = doFunc.map((r) => codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado));
-    // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A versão
-    // no QR é o que faz o leitor escolher a geometria certa — fichas ORK2 já
-    // impressas continuam sendo lidas pelo layout antigo.
-    const qr = `ORK3|${sedeId}|${data}|${f.id}|${doFunc.length}|${codigos.join(",")}`;
-    entradas.push({ nome: f.nome, sedeNome, dataBR, qr, tarefas: tarefasFicha, epis });
+    // Uma ENTRADA POR PÁGINA. Quem tem mais tarefas do que cabe numa folha ganha
+    // quantas folhas precisar — antes disto a ficha saía com as marcas por cima
+    // da declaração de EPI e as últimas caixas fora da página (a CESIU tem
+    // pessoas com 54 blocos no dia).
+    const paginasRotinas = fatiarEmPaginas(doFunc);
+    const paginasTarefas = fatiarEmPaginas(tarefasFicha);
+    paginasRotinas.forEach((rotinasDaPagina, i) => {
+      // Códigos e nº de tarefas do QR são os DESTA página: cada folha é lida
+      // sozinha, e o leitor usa esse `n` para a geometria.
+      const codigos = rotinasDaPagina.map((r) =>
+        codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado),
+      );
+      // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A
+      // versão no QR é o que faz o leitor escolher a geometria certa — fichas
+      // ORK2 já impressas continuam sendo lidas pelo layout antigo.
+      const qr = `ORK3|${sedeId}|${data}|${f.id}|${rotinasDaPagina.length}|${codigos.join(",")}`;
+      // EPIs DESTA página: declarar os do dia inteiro numa folha que só cobre a
+      // manhã faria a pessoa afirmar mais do que a folha registra.
+      const episDaPagina: string[] = [];
+      const jaNaPagina = new Set<string>();
+      for (const r of rotinasDaPagina) {
+        for (const id of (tPorId.get(r.tarefa_id)?.requisitos ?? "").split(",").filter(Boolean)) {
+          const req = reqPorId.get(id);
+          if (req?.tipo === "epi" && !jaNaPagina.has(req.nome)) {
+            jaNaPagina.add(req.nome);
+            episDaPagina.push(req.nome);
+          }
+        }
+      }
+      entradas.push({
+        nome: f.nome,
+        sedeNome,
+        dataBR,
+        qr,
+        tarefas: paginasTarefas[i],
+        epis: episDaPagina,
+        pagina: i + 1,
+        paginas: paginasRotinas.length,
+      });
+    });
   }
 
   const doc = await PDFDocument.create();

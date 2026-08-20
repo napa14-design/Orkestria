@@ -139,6 +139,26 @@ export function cabeNaFicha(n: number): boolean {
   return n <= CAPACIDADE_TAREFAS;
 }
 
+/**
+ * Divide as tarefas do dia em páginas que cabem.
+ *
+ * Cada página é **autossuficiente**: leva o próprio QR, a própria declaração de
+ * EPI e as próprias assinaturas. No mundo real as folhas se separam, e o leitor
+ * processa uma imagem por vez — se a declaração ficasse só na última, uma folha
+ * solta viraria registro sem EPI nenhum.
+ *
+ * Lista vazia devolve **uma** página vazia, e não nenhuma: quem chama espera
+ * sempre ao menos uma folha para a pessoa.
+ */
+export function fatiarEmPaginas<T>(itens: T[]): T[][] {
+  if (itens.length === 0) return [[]];
+  const paginas: T[][] = [];
+  for (let i = 0; i < itens.length; i += CAPACIDADE_TAREFAS) {
+    paginas.push(itens.slice(i, i + CAPACIDADE_TAREFAS));
+  }
+  return paginas;
+}
+
 /** Posição (canto inferior-esquerdo) de cada fiducial para desenhar. */
 export function fidRects(): [number, number][] {
   const { x0, x1, yBot, yTop } = CARD;

@@ -7,6 +7,64 @@
 
 ---
 
+## 2026-08-20 — Ficha paginada: a CESIU voltou a ter papel
+
+A auditoria anterior descobriu que a ficha comporta 30 tarefas e que a CESIU tem
+pessoas com 43 e 54 blocos — o conserto imediato foi **recusar** em vez de
+imprimir errado, o que deixou aquela sede sem ficha em papel. Agora tem.
+
+### A decisão de desenho
+
+Cada página é **autossuficiente**: QR próprio, declaração de EPI própria, as duas
+assinaturas. Poderia ser mais econômico pôr a declaração só na última folha, mas
+no mundo real as folhas se separam e o leitor processa **uma imagem por vez** —
+uma folha solta viraria registro sem EPI nenhum.
+
+O QR de cada página leva **as tarefas daquela página** (`n` e os códigos), então o
+leitor não precisou de mudança nenhuma: ele já usava o `n` do QR para a geometria.
+
+E a lista de EPIs é a **daquela página**. Declarar os EPIs do dia inteiro numa
+folha que só cobre a manhã faria a pessoa afirmar mais do que a folha registra.
+
+`fatiarEmPaginas` ficou em `lib/fichaGeometria.ts`, junto da capacidade de que ela
+depende — mesma fonte única que o gerador e o leitor já compartilham.
+
+### Verificado gerando o PDF de verdade, e olhando a folha
+
+Importei a rota real da CESIU e gerei as fichas:
+
+```
+Gleydison  43 blocos → 2 páginas
+Eveline    54 blocos → 2 páginas
+Jeová      54 blocos → 2 páginas
+PDF: 6 páginas   (antes seriam 3, com o layout quebrado)
+```
+
+Abri o PDF em vez de confiar na contagem. A folha 1 do Gleydison traz "Página 1 de
+2" no cabeçalho e termina em 15:30–16:10; a folha 2 começa em 16:10–16:20 — corte
+exato, nada duplicado, nada perdido. As duas têm QR, fiduciais nos quatro cantos,
+Observações e as duas linhas de assinatura.
+
+A CESIU não tem EPI cadastrado nas tarefas, então o bloco de declaração não
+aparece nela — o que é o certo, mas não prova a parte que mexi. Gerei também as
+fichas da sede do seed, que tem EPI: a **Aurilene declara 4 EPIs e a Naiane 3**,
+cada uma o que as tarefas dela exigem. É a prova de que a lista é por página, e
+não o catálogo da sede.
+
+### O que ficou de fora
+
+A recusa continua no código como **rede**: com a paginação nenhuma folha passa da
+capacidade, mas `desenhaFicha` segue recusando se receber mais. É uma página que
+nunca deveria ser impressa — e prefiro que exista a descobrir de novo pelo papel
+assinado.
+
+`tsc` limpo, build limpo, **198 testes** (eram 194): o fatiador não perde nem
+duplica tarefa para nenhum tamanho de dia até 120, e toda página resultante cabe.
+
+### Arquivos
+
+`lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `testes/ficha-omr.test.ts`
+
 ## 2026-08-20 — Auditoria da ficha e do OMR: a ficha da CESIU sairia errada
 
 A trilha que produz o **papel assinado** por funcionário e supervisor, e que não

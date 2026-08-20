@@ -15,6 +15,7 @@ import {
   CAPACIDADE_TAREFAS,
   CARD,
   cabeNaFicha,
+  fatiarEmPaginas,
   EPI,
   EPI_CAPACIDADE,
   codigoLinha,
@@ -99,6 +100,35 @@ describe("geometria da ficha", () => {
 
   it("a capacidade declarada bate com o layout", () => {
     expect(EPI_CAPACIDADE).toBe(EPI.porColuna * EPI.colX.length);
+  });
+});
+
+describe("fatiarEmPaginas", () => {
+  it("uma folha quando cabe", () => {
+    const itens = Array.from({ length: CAPACIDADE_TAREFAS }, (_, i) => i);
+    expect(fatiarEmPaginas(itens)).toHaveLength(1);
+  });
+
+  it("quebra exatamente na capacidade, sem perder nem repetir tarefa", () => {
+    // 54 é o caso real: o Jeová, da CESIU.
+    const itens = Array.from({ length: 54 }, (_, i) => i);
+    const paginas = fatiarEmPaginas(itens);
+    expect(paginas.length).toBe(Math.ceil(54 / CAPACIDADE_TAREFAS));
+    expect(paginas.flat()).toEqual(itens); // nada some, nada duplica, ordem mantida
+    for (const p of paginas) expect(cabeNaFicha(p.length)).toBe(true);
+  });
+
+  it("todas as páginas cabem, para qualquer tamanho de dia", () => {
+    for (let n = 1; n <= 120; n++) {
+      const paginas = fatiarEmPaginas(Array.from({ length: n }, (_, i) => i));
+      expect(paginas.flat().length, `n=${n}`).toBe(n);
+      for (const p of paginas) expect(cabeNaFicha(p.length), `n=${n}`).toBe(true);
+    }
+  });
+
+  it("dia vazio devolve UMA folha vazia, não nenhuma", () => {
+    // Quem chama espera sempre ao menos uma folha por pessoa.
+    expect(fatiarEmPaginas([])).toEqual([[]]);
   });
 });
 
