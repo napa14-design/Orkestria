@@ -7,6 +7,59 @@
 
 ---
 
+## 2026-08-20 — Fechar o dia ganhou teste: a metade do produto que nunca rodou
+
+Em 7 semanas de piloto houve **0 execuções registradas**. O confronto previsto ×
+realizado — a razão de o sistema existir — nunca foi exercido em produção. E a
+função que faz isso tinha **zero testes**, apesar de já ter tido dois bugs.
+
+Os dois foram achados **por medição, não por teste**, porque não havia teste:
+
+1. `data >= hoje` juntava HOJE e FUTURO. Um dia futuro usava a hora de agora como
+   limite e **confirmava como realizado o que ainda não tinha acontecido** — 37
+   blocos futuros entraram assim.
+2. A checagem de `status` vinha **antes** da contagem, então um bloco com desvio
+   **sumia das somas**: elas não fechavam com o total do dia, e não havia como
+   explicar a diferença.
+
+### O teste que importa
+
+`somaFecha()`: **confirmadas + já registradas + aguardando horário + sem
+declaração === total de blocos do dia**. É a invariante que os dois bugs
+violaram, e agora ela é checada em sete dos dez casos.
+
+Os outros cobrem o que o piloto vai encontrar: dia passado confirma; dia futuro
+**não confirma nada**; hoje confirma só o que já terminou; desvio já registrado é
+contado e **não é sobrescrito** (o supervisor decide antes, o fechamento pega o
+resto); tarefa que exige EPI **não entra sem declaração**, e com declaração grava
+os **nomes** dos EPIs; rodar duas vezes não duplica; dia vazio não quebra.
+
+### Validado por mutação
+
+Teste que passa não prova que pega bug. Reintroduzi os dois defeitos históricos:
+
+| Bug reintroduzido | Resultado |
+|---|---|
+| baseline | `exit 0` · 10 passam |
+| `data >= hoje` | **`exit 1`** · cai "dia FUTURO não confirma nada" |
+| status antes da contagem | **`exit 1`** · caem **três**, entre elas "as somas fecham" |
+
+O segundo derrubar três é o sinal de que a invariante pega o defeito por mais de
+um ângulo — inclusive pela idempotência, que quebra junto.
+
+### Sobre a testabilidade
+
+Estes são testes de **serviço**, não de função pura: chamam
+`confirmarDiaComoPlanejado` de verdade, contra o banco de memória, sem
+infraestrutura nenhuma. É a segunda leva desde que a auditoria derrubou a desculpa
+de que `services/` não dava para testar.
+
+`tsc` limpo, build limpo, **208 testes** (eram 198).
+
+### Arquivos
+
+`testes/fechamento-dia.test.ts` (novo)
+
 ## 2026-08-20 — Ficha paginada: a CESIU voltou a ter papel
 
 A auditoria anterior descobriu que a ficha comporta 30 tarefas e que a CESIU tem
