@@ -7,6 +7,72 @@
 
 ---
 
+## 2026-08-20 — O buraco das 07:15 na CESIU: uma tarefa que meu conversor engoliu
+
+O dono do produto olhou a agenda e perguntou: *"tá certo esse buraco aqui?"*. Não
+estava.
+
+### O defeito
+
+A linha 7 da aba do Gleydison é `"Entrada clinica"` — um **setor de verdade**
+(limpeza de área externa, 07:15–07:45, 30 min). Meu conversor decidia o que era
+marco de jornada pelo **nome**:
+
+```python
+re.match(r"^(ENTRADA|SAIDA|SAÍDA|INTERVALO)", s.upper())
+```
+
+"Entrada clinica" casa. A tarefa foi tratada como o cabeçalho do turno e **sumiu
+da importação**, deixando 30 minutos vazios na agenda.
+
+O critério certo nunca foi o nome: é a **coluna A**. Marco não tem funcionário;
+tarefa tem. Só o Gleydison tinha uma linha com esse padrão.
+
+### O que isso diz sobre como eu trabalhei
+
+Eu **já tinha achado esse bug** durante a análise da planilha, e escrevi na hora:
+*"'Entrada clinica' é tarefa, não marco — o filtro pegou pela palavra 'ENTRADA'.
+Refazendo com o critério certo"*. Refiz **no script de análise**. O **conversor**,
+que é quem gera o arquivo importado, ficou com o teste velho.
+
+Consertei o diagnóstico e publiquei o gerador com o defeito. E o número que saiu
+dali virou apresentação: 115%.
+
+### O número muda
+
+| | Publicado antes | Correto |
+|---|---|---|
+| **Gleydison** | 43 tarefas · 585 min · **115%** | **44 · 615 min · 121%** |
+| Eveline | 54 · 600 min · 118% | inalterado |
+| Jeová | 54 · 525 min · 109% | inalterado |
+
+A ocupação dele estava **subestimada em 30 minutos**. Errou para menos — mas
+errado é errado, e era o número que iria para a mesa.
+
+### O conserto
+
+Critério trocado no conversor (coluna A, não nome), arquivo regerado — **exatamente
+uma linha a mais**, na posição do buraco, sem horário duplicado — e reimportado.
+
+A idempotência da importação fez o trabalho: **1 local, 1 tarefa e 1 rotina
+criados**; 86 locais, 90 tarefas e 151 rotinas reaproveitados. Rota padrão
+regravada com 152 itens, senão o buraco voltaria no próximo dia gerado.
+
+Conferido na base: `07:10–07:15 → 07:15–07:45 → 07:45–07:55`, encadeado.
+
+### O que fica
+
+Achei três bugs meus nesta sessão olhando dados; **este quem achou foi uma pessoa
+olhando a tela**. Eu vejo números que fecham entre si — 43 tarefas somam 585
+minutos, coerente — e não vejo que falta um pedaço da rotina de alguém. Vale como
+regra: rota importada tem de ser **olhada** por quem conhece a operação, antes de
+o número virar argumento.
+
+### Arquivos
+
+Nenhum no repositório — o conserto foi no conversor da planilha (fora do repo) e
+nos dados de produção.
+
 ## 2026-08-20 — Fechar o dia ganhou teste: a metade do produto que nunca rodou
 
 Em 7 semanas de piloto houve **0 execuções registradas**. O confronto previsto ×
