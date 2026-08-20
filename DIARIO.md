@@ -7,6 +7,83 @@
 
 ---
 
+## 2026-08-20 — Auditoria da ficha e do OMR: a ficha da CESIU sairia errada
+
+A trilha que produz o **papel assinado** por funcionário e supervisor, e que não
+tinha **teste nenhum**.
+
+### O desenho está certo, e isso precisa ser dito
+
+O OMR é **sugestão, não decisão**. A tela de conferência mostra cada marca com o
+percentual de tinta, contorna de amarelo o que ficou na faixa duvidosa (5%–20%,
+que atravessa o limiar de 12%) e deixa **todas as caixas editáveis**. O que é
+gravado é o que a pessoa confirmou, não o que a máquina achou. Para um registro
+com valor probatório, é a arquitetura certa.
+
+O casamento também é sólido: desde o ORK2 o QR leva o **código de cada linha**
+(`codigoLinha`, FNV-1a), então a marca casa por identidade e não por posição —
+mudar a agenda depois de imprimir não desloca as marcas. E `parseQR` devolve
+`null` para lixo em vez de adivinhar, o que evitaria gravar execução na pessoa ou
+no dia errado.
+
+### O achado: a ficha comporta 30 tarefas, e ninguém checava
+
+A geometria já tinha quebrado uma vez — com ~22 tarefas a lista colidia com o
+título dos EPIs, porque o topo do bloco era fixo em 350. O conserto tornou o topo
+dinâmico, **e a colisão apenas se mudou para n=31**. Ninguém percebeu porque não
+havia teste.
+
+Medido:
+
+| Tarefas | Última caixa | 1º EPI | |
+|---|---|---|---|
+| 27 | y=329,6 | 281,0 | ok |
+| **31** | y=276,8 | 281,0 | **colide** |
+| 43 | y=118,4 | 281,0 | colide |
+| **54** | **y=−26,8** | 281,0 | colide · **abaixo da borda da página** |
+
+**Isso vale para a CESIU, importada ontem**: Gleydison tem 43 blocos no dia,
+Eveline e Jeová têm 54. Imprimir a ficha deles hoje produziria um papel em que as
+marcas se sobrepõem à declaração de EPI e as últimas caixas **nem são impressas** —
+e o leitor amostraria fora do cartão. Assinado assim mesmo.
+
+### O conserto
+
+`CAPACIDADE_TAREFAS` passou a ser **derivada da própria invariante**, com um laço
+que acha o último `n` que não colide. Um número escrito à mão envelheceria de novo
+no próximo ajuste de layout; este recalcula sozinho.
+
+E o gerador **recusa em vez de imprimir errado**: acima da capacidade sai uma
+página nomeando a pessoa, dizendo quantas tarefas ela tem, qual o limite, e o que
+fazer (imprimir por turno ou usar o acompanhamento digital). Falha **só naquela
+pessoa** — o resto da sede continua imprimindo.
+
+### O que fica em aberto
+
+**Paginação.** Recusar é o certo hoje; o certo de verdade é a ficha continuar na
+página seguinte, com QR próprio por página. É trabalho de verdade e merece
+decisão, não um encaixe.
+
+**O QR não é autenticado** — `ORK3|sede|data|func|n|códigos` em texto puro. Ele
+identifica a rotina, não prova origem. Num processo interno em que o supervisor é
+quem escaneia, o risco é baixo; para valor probatório, é limitação a saber.
+
+Segue valendo a pendência antiga: **os nomes dos EPIs não vão no QR**, e a
+conferência os reconstrói dos requisitos atuais — se mudarem entre imprimir e
+conferir, o gravado diverge do papel assinado. É a decisão com o Murilo.
+
+### Verificado
+
+17 casos novos: invariantes da geometria para **todo** `n` até a capacidade, prova
+de que a capacidade é o máximo real (n+1 colide), `codigoLinha` sem colisão em
+3.000 linhas, e `parseQR` recusando seis formas de lixo.
+
+`tsc` limpo, build limpo, **194 testes** (eram 177).
+
+### Arquivos
+
+`lib/fichaGeometria.ts`, `services/fichaPdf.ts`, `testes/ficha-omr.test.ts` (novo)
+
 ## 2026-08-20 — Senha: mínimo de 10 e recusa de senha trivial
 
 Itens 1 e 2 da auditoria anterior, aprovados pelo dono do produto. O item 3

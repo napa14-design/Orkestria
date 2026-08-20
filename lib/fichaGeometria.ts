@@ -112,6 +112,33 @@ export function declaracaoPos(n: number): { x: number; y: number } {
   return epiPos(0, n);
 }
 
+/**
+ * Quantas tarefas cabem numa ficha — **derivado**, não escolhido.
+ *
+ * A partir de certo `n` a lista de tarefas desce até encostar na primeira caixa
+ * do bloco de EPI (que tem piso em `EPI.pisoTopo` e não desce mais). Daí em
+ * diante a ficha impressa fica errada: as marcas se sobrepõem e, por volta de
+ * `n = 49`, as últimas caixas caem **abaixo da borda da página** e nem são
+ * impressas — o leitor amostraria fora do cartão.
+ *
+ * Já aconteceu antes com o topo do bloco fixo em 350 (colidia em ~22). O topo
+ * virou dinâmico e a colisão foi para 31 — continuava existindo, só mais longe.
+ * Por isso o limite é **calculado da própria invariante**: mexer no layout
+ * recalcula o número, em vez de deixar um valor escrito à mão envelhecer.
+ */
+export const CAPACIDADE_TAREFAS = (() => {
+  const raioAmostra = (CAIXA_LADO * 0.55) / 2;
+  for (let n = 1; n <= 200; n++) {
+    if (epiPos(0, n).y >= tarefaY(n, n) - 2 * raioAmostra) return n - 1;
+  }
+  return 200;
+})();
+
+/** A ficha de `n` tarefas pode ser impressa numa página sem sobrepor nada? */
+export function cabeNaFicha(n: number): boolean {
+  return n <= CAPACIDADE_TAREFAS;
+}
+
 /** Posição (canto inferior-esquerdo) de cada fiducial para desenhar. */
 export function fidRects(): [number, number][] {
   const { x0, x1, yBot, yTop } = CARD;

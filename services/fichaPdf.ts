@@ -8,7 +8,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
-import { CARD, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
+import { CAPACIDADE_TAREFAS, CARD, cabeNaFicha, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
 const TINTA = rgb(0.13, 0.19, 0.15);
@@ -71,6 +71,29 @@ async function desenhaFicha(
   f: FichaInput,
   marcarTodas: boolean,
 ) {
+  // Mais tarefas do que cabe = ficha ERRADA, não ficha apertada: as marcas se
+  // sobrepõem à declaração de EPI e as últimas caixas caem fora da página. Como
+  // este papel é assinado, é melhor uma página dizendo o que houve do que uma
+  // ficha que parece boa e é lida errado. Falha só nesta pessoa — o resto da
+  // sede continua imprimindo.
+  if (!cabeNaFicha(f.tarefas.length)) {
+    const aviso = doc.addPage([PAGINA.W, PAGINA.H]);
+    aviso.drawText(`Ficha não emitida: ${f.nome}`, { x: 60, y: PAGINA.H - 90, size: 14, font: fonts.bold, color: ACENTO });
+    const texto = [
+      `${f.tarefas.length} tarefas no dia — a ficha comporta ${CAPACIDADE_TAREFAS}.`,
+      "",
+      "Acima disso as caixas de marcação passam por cima da declaração de EPIs",
+      "e as últimas saem fora da página, então a leitura sairia errada.",
+      "",
+      "O que fazer agora: imprimir por turno (filtrar a agenda) ou registrar",
+      "esta pessoa pelo acompanhamento digital, em vez da ficha em papel.",
+    ];
+    texto.forEach((linha, i) => {
+      aviso.drawText(linha, { x: 60, y: PAGINA.H - 120 - i * 16, size: 10, font: fonts.reg, color: TINTA });
+    });
+    return;
+  }
+
   const page = doc.addPage([PAGINA.W, PAGINA.H]);
   const { x0, x1, yBot, yTop } = CARD;
   const { reg, bold, obl } = fonts;
