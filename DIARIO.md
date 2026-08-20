@@ -7,6 +7,78 @@
 
 ---
 
+## 2026-08-20 — A regra da agenda passou a valer nas 4 portas, não em 1
+
+Item 2 da auditoria de QA. O achado era este: a invariante da agenda — não pode
+sobrepor, não pode cair no intervalo, não pode sem o requisito exigido — era
+aplicada em **1 das 4 portas** que criam `rotinas_planejadas`.
+
+| Caminho | Antes |
+|---|---|
+| `createRotina` (arrastar) | ✅ `validarAlocacao` completo |
+| `duplicarDia` (copiar) | ⚠️ só sobreposição, **reimplementada inline** |
+| `gerarDiaDaRotaPadrao` (**o clique principal**) | ❌ nenhuma |
+| `aplicarImportacao` | ❌ nenhuma |
+
+Não era risco teórico. Medido na base: **38 sobreposições e 7 blocos dentro do
+próprio intervalo**, gravados desde junho, em silêncio. A premissa que justificava
+não validar — *"a rota é dado já validado"* — é falsa quando a rota nasce de uma
+importação, que também não validava.
+
+### O que foi feito
+
+`lib/validacaoDoDia.ts` (novo): função **pura**, valida um dia inteiro com as
+mesmas regras do arrasto. Ficou em `lib/` de propósito — é o que a torna testável
+e o que evita a quarta reimplementação da mesma regra.
+
+**Não bloqueia.** Rota que não cabe na jornada é o dado que interessa; o que muda é
+que para de sair calado. A geração e a importação passaram a devolver
+`comProblema` + a explicação em português no resultado que a tela já mostra.
+
+Duas exclusões deliberadas e documentadas no código:
+
+- **`FORA_DO_EXPEDIENTE` não é reportado.** É o caso dos 27 blocos propositais da
+  CESIU, e já é sinalizado onde importa (hachura amaranto no card, contagem no
+  cabeçalho). Reportar de novo afogaria os que importam.
+- **`SOBRECARGA` também não** — é `nivel: "alerta"` e apareceria em *todo* bloco de
+  uma sede acima de 100%.
+
+### O bug que o teste ponta a ponta pegou (e o unitário não)
+
+A primeira rodada acusou **302 problemas numa importação limpa de 151 blocos**. Eu
+relia o dia **depois** de gravar e ainda concatenava os novos: cada bloco
+sobrepunha a própria cópia. Os 13 testes unitários passavam — o defeito estava na
+ligação, não na regra. Corrigido nos dois caminhos (relê e não soma).
+
+### Verificado ponta a ponta
+
+Cenário do defeito: importar por cima de um dia já montado.
+
+- 1ª importação (dia limpo): 151 blocos, **`comProblema` ausente** — sem falso positivo
+- 2ª importação deslocada 5 min: **84 blocos acusados**, `84× SOBREPOSICAO`, com a
+  frase *"Gleydison às 06:50 (Deixar garrafas de café): Sobreposição com tarefa já
+  planejada às 06:45"*
+- E **não bloqueou**: os 194 blocos foram gravados
+- Cópia de dia: 152 copiadas, 42 puladas, sem falso positivo
+
+`tsc` limpo, build limpo, **157 testes** (eram 144).
+
+### Continua em aberto
+
+Os **38 + 7 já gravados** em DT e Benfica. A validação vale para escrita nova; o
+que está lá continua lá. É o item 3 da auditoria.
+
+E uma leitura amplificada que achei de passagem: `duplicarDia` chama
+`getRotinasByData(dataDestino)` **sem sede**, lendo o dia das 18 sedes para filtrar
+em memória — exatamente o que o índice composto existe para evitar. Não mexi: passar
+a sede muda o alcance da checagem de conflito e merece decisão própria.
+
+### Arquivos
+
+`lib/validacaoDoDia.ts` (novo), `testes/validacao-dia.test.ts` (novo),
+`services/modelosService.ts`, `services/importacaoService.ts`,
+`services/rotinasService.ts`
+
 ## 2026-08-20 — Contrato de DataSource: a mesma bateria nos dois bancos
 
 Auditoria de QA. O ponto de partida não foram os bugs, foi **o buraco que os

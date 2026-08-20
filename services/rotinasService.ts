@@ -15,6 +15,7 @@ import {
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao, validarRotina } from "@/lib/validations";
+import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
@@ -455,7 +456,7 @@ export async function duplicarDia(
   datasDestino: string[],
   sedeId: string,
   supervisorId: string,
-): Promise<{ copiadas: number; puladas: number }> {
+): Promise<{ copiadas: number; puladas: number; comProblema?: number; detalhes?: string[] }> {
   const ds = await getDataSource();
   const origem = (await getRotinasByData(dataOrigem, sedeId)).filter(
     (r) => r.status !== "cancelada",
@@ -469,6 +470,17 @@ export async function duplicarDia(
   const chave = (r: { funcionario_id: string; tarefa_id: string; inicio_planejado: string }) =>
     `${r.funcionario_id}|${r.tarefa_id}|${r.inicio_planejado}`;
   const idsFunc = [...new Set(origem.map((r) => r.funcionario_id))];
+
+  // Contexto da validação: carregado UMA vez, não muda com a data de destino.
+  const [funcionarios, tarefas, locais, requisitos, qualificacoes, parametros] = await Promise.all([
+    ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    ds.listar("requisitos"),
+    ds.consultar("qualificacoes_funcionario", [{ campo: "sede_id", op: "==", valor: sedeId }]),
+    resolverParametros(sedeId),
+  ]);
+  const problemas: ProblemaDoDia[] = [];
 
   for (const dataDestino of datasDestino) {
     if (dataDestino === dataOrigem) continue;
@@ -523,6 +535,24 @@ export async function duplicarDia(
       await Promise.all(copias.slice(i, i + LOTE).map((c) => ds.criar("rotinas_planejadas", c)));
     }
     copiadas += copias.length;
+
+    // A cópia já pula ausente, duplicata e sobreposição. O que sobra é o que
+    // depende da DATA — qualificação que venceu entre a origem e o destino — e o
+    // que possa ter entrado torto por um caminho que não validava.
+    problemas.push(
+      ...validarDia({
+        blocos: await getRotinasByData(dataDestino, sedeId),
+        funcionarios: new Map(funcionarios.map((f) => [f.id, f])),
+        tarefas: new Map(tarefas.map((t) => [t.id, t])),
+        locais: new Map(locais.map((l) => [l.id, l])),
+        parametros,
+        data: dataDestino,
+        requisitos,
+        qualificacoes,
+      }),
+    );
   }
-  return { copiadas, puladas };
+  return problemas.length
+    ? { copiadas, puladas, comProblema: problemas.length, detalhes: resumirProblemas(problemas) }
+    : { copiadas, puladas };
 }

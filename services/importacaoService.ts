@@ -11,6 +11,7 @@ import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hhmmParaMin } from "@/lib/dateUtils";
 import type { Analise } from "@/lib/importacaoRota";
 import type { Funcionario, Local, RotinaPlanejada, Tarefa } from "@/types";
+import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
 import { getRotinasByData, idMaterializacao } from "./rotinasService";
@@ -38,6 +39,12 @@ export interface ResultadoImportacao {
   funcionarios: { criados: number; reaproveitados: number };
   rotinas: { criadas: number; jaExistiam: number };
   rotaPadrao: number; // itens salvos como rota padrão (0 = não salvou)
+  /**
+   * Blocos que a agenda MANUAL teria recusado. A planilha é conferida contra si
+   * mesma em `analisarRota`, mas nada comparava o resultado com o que JÁ estava
+   * no dia — importar por cima de um dia gerado duplicava a pessoa em silêncio.
+   */
+  comProblema?: number;
   avisos: string[];
 }
 
@@ -186,6 +193,26 @@ export async function aplicarImportacao(
     res.rotinas.criadas++;
   }
   await emLotes(novasRotinas, (x) => ds.criar("rotinas_planejadas", x));
+
+  // Mesmas regras do arrasto manual, sobre o dia inteiro: o que já existia mais
+  // o que acabou de entrar.
+  // Relê o dia DEPOIS de gravar — os novos blocos já estão lá. Concatenar
+  // `novasRotinas` aqui contaria cada um duas vezes e faria todo bloco
+  // "sobrepor a si mesmo" (302 falsos positivos num dia de 151 blocos).
+  const doDia = await getRotinasByData(data, sedeId);
+  const problemas = validarDia({
+    blocos: doDia,
+    funcionarios: new Map([...funcsEx, ...novosFuncs].map((f) => [f.id, f])),
+    tarefas: new Map([...tarefasEx, ...novasTarefas].map((t) => [t.id, t])),
+    locais: new Map([...locaisEx, ...novosLocais].map((l) => [l.id, l])),
+    parametros: params,
+    data,
+    requisitos,
+  });
+  if (problemas.length) {
+    res.comProblema = problemas.length;
+    avisos.push(...resumirProblemas(problemas));
+  }
 
   // ── rota padrão (opcional) ────────────────────────────────────────────
   if (opts.salvarPadrao && res.rotinas.criadas + res.rotinas.jaExistiam > 0) {

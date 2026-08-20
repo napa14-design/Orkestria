@@ -27,7 +27,8 @@ import {
   type MotivoDescarte,
   projetarDiaDaRota,
 } from "@/lib/projecaoDia";
-import type { ModeloRotinaItem, RotinaPlanejada } from "@/types";
+import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
+import type { ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -366,6 +367,12 @@ export interface ResultadoGeracao {
   /** Blocos alinhados à rota (ela mudou de horário/duração depois de gerado). */
   atualizadas?: number;
   puladas: number;
+  /**
+   * Blocos que a agenda MANUAL teria recusado (sobreposição, dentro do
+   * intervalo, requisito faltando, restrição de gênero). Não impede a geração —
+   * rota que não cabe é o dado que interessa —, mas para de sair em silêncio.
+   */
+  comProblema?: number;
   detalhes: string[];
 }
 
@@ -450,7 +457,48 @@ export async function gerarDiaDaRotaPadrao(
   // Grava em lotes paralelos — escrita 1 a 1 levava ~2 min para um dia cheio.
   await emLotes(aCriar, (r) => ds.criar("rotinas_planejadas", r));
   res.geradas = aCriar.length;
+
+  // Confere o dia com as MESMAS regras do arrasto manual. A premissa antiga
+  // ("a rota é dado já validado") não vale quando a rota nasceu de importação,
+  // que também não validava — e foi por aí que 38 sobreposições entraram.
+  const problemas = validarDia({
+    // Relê em vez de somar `ctx.blocosDoDia + aCriar`: os blocos que a rota
+    // ALINHOU acabaram de mudar de horário, e o contexto ainda tem o antigo.
+    blocos: await getRotinasByData(data, sedeId),
+    funcionarios: ctx.funcionarios,
+    tarefas: ctx.tarefas,
+    locais,
+    parametros: params,
+    data,
+    ...(await contextoDeRequisitos(ctx.tarefas, sedeId)),
+  });
+  if (problemas.length) {
+    res.comProblema = problemas.length;
+    res.detalhes.push(...resumirProblemas(problemas));
+  }
   return res;
+}
+
+/**
+ * Requisitos e qualificações — só quando alguma tarefa da sede exige algo que
+ * BLOQUEIA (treinamento/aptidão). EPI não bloqueia, e hoje as 201 tarefas com
+ * requisito na produção referenciam só EPI: nesse caso não custa leitura nenhuma.
+ */
+async function contextoDeRequisitos(tarefas: Map<string, Tarefa>, sedeId: string) {
+  const exigidos = new Set<string>();
+  for (const t of tarefas.values()) {
+    for (const id of String(t.requisitos ?? "").split(",")) {
+      if (id.trim()) exigidos.add(id.trim());
+    }
+  }
+  if (exigidos.size === 0) return {};
+  const ds = await getDataSource();
+  const requisitos = (await ds.listar("requisitos")).filter((r) => exigidos.has(r.id));
+  if (!requisitos.some((r) => r.tipo !== "epi")) return {}; // só EPI: não bloqueia
+  const qualificacoes = await ds.consultar("qualificacoes_funcionario", [
+    { campo: "sede_id", op: "==", valor: sedeId },
+  ]);
+  return { requisitos, qualificacoes };
 }
 
 /**
