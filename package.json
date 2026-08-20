@@ -8,7 +8,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "test": "vitest run",
-    "test:ver": "vitest"
+    "test:ver": "vitest",
+    "emulador": "npx --yes firebase-tools emulators:start --only firestore --project ociosidade-88ce4"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

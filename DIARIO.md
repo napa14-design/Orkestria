@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-08-20 — O contrato passou a rodar nos DOIS bancos: 190 testes
+
+Desde que o contrato de `DataSource` foi escrito eu vinha repetindo a mesma
+ressalva: *"os dois bancos concordam" está verificado de um lado só*. A perna do
+Firestore ficava pulada por falta de emulador. Acabou.
+
+### O que faltava, e não era muito
+
+Java 21 já estava na máquina. Faltavam duas coisas: um `firebase.json` com a
+configuração do emulador, e uma porta em `obterAppAdmin()`.
+
+A porta é a parte que merece explicação. `obterAppAdmin()` exigia service account
+sempre — mas **com `FIRESTORE_EMULATOR_HOST` definida o SDK manda TODO o tráfego
+do Firestore para o emulador, qualquer que seja a credencial**. Exigir service
+account nesse caso não protegia nada; só impedia o contrato de rodar contra o
+Firestore de verdade, que é o único jeito de provar o que ele promete.
+
+Não instalei `firebase-tools` como dependência: são ~100 MB para um comando que
+roda de vez em quando. O `npm run emulador` usa `npx`, e o que ficou versionado é
+a configuração.
+
+### O resultado
+
+```
+npm test                                    167 testes, perna do Firestore pulada
+FIRESTORE_EMULATOR_HOST=... npm test        190 testes, as duas pernas
+```
+
+**Os 23 casos do contrato passam idênticos nos dois bancos.** Inclui os cinco de
+atomicidade — então `gravarLote` está verificado contra a semântica real do
+Firestore, não contra a minha imitação em memória.
+
+### Por que isso importa mais do que parece
+
+Três bugs de produção desta semana nasceram do banco de memória ser **mais
+permissivo** que o Firestore: `push` em vez de `set`, `undefined` aceito, e
+`undefined` apagando valor no `atualizar`. O contrato existe para essa família não
+voltar — e até hoje ele só provava metade. Agora prova inteiro.
+
+A trava de segurança continua: sem a variável o adaptador do Firestore **nem é
+construído**, então não há caminho para o teste escrever na base real; e se ela
+apontar para host não-local, o contrato para de propósito.
+
+Documentado em `CLAUDE.md`, na seção de comandos, com o passo a passo das duas
+janelas.
+
+`tsc` limpo, **167 testes** sem emulador, **190** com.
+
+### Arquivos
+
+`firebase.json` (novo), `lib/firebaseAdmin.ts`, `package.json`, `CLAUDE.md`
+
 ## 2026-08-20 — Três parâmetros ilegíveis para edição, e a porta fechada
 
 Último item aberto da segunda auditoria.

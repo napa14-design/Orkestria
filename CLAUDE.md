@@ -53,13 +53,35 @@ título, o que mudou e os arquivos principais. Nunca edite entradas antigas.
 npm run dev      # desenvolvimento (http://localhost:3000)
 npm run build    # build de produção — RODAR antes de declarar pronto
 npm run start    # servidor de produção
-npm test         # testes das funções puras — RODAR antes de declarar pronto
+npm test         # testes — RODAR antes de declarar pronto
+npm run emulador # emulador do Firestore (precisa de Java; usa npx, sem instalar nada)
 ```
 
-Os testes cobrem `lib/` (cálculos, validações, permissões, senha/código, estado
-do tutorial) em `testes/`. Não cobrem tela nem banco. **Mudou regra de cálculo,
-validação ou permissão? Acrescente o caso lá** — foi assim que apareceu um
-`verificarSenha` que aceitava qualquer senha quando o hash guardado era `":"`.
+Os testes cobrem `lib/`, o **contrato do `DataSource`** e as invariantes do bloco
+planejado via `services/`. **Mudou regra de cálculo, validação ou permissão?
+Acrescente o caso lá** — foi assim que apareceu um `verificarSenha` que aceitava
+qualquer senha quando o hash guardado era `":"`.
+
+### Rodar o contrato contra o Firestore de verdade
+
+`npm test` sozinho roda o contrato só contra o banco de memória e **pula** a perna
+do Firestore. Para provar que os dois concordam, suba o emulador numa janela e
+rode a suíte com a variável na outra:
+
+```powershell
+npm run emulador                              # deixe rodando
+$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080" # e então:
+npm test                                      # 190 testes, não 167
+```
+
+A variável é a **trava de segurança**: sem ela o adaptador do Firestore nem é
+construído, então não existe caminho para o teste escrever na base real. Se ela
+apontar para host não-local, o contrato para de propósito.
+
+Três bugs de produção nasceram do banco de memória ser mais permissivo que o
+Firestore (`push` × `set`, `undefined` aceito, `undefined` apagando valor no
+`atualizar`). O contrato existe para essa família não voltar — e ele só prova o
+que promete quando roda **nos dois**.
 
 Não há usuários de demonstração. Para rodar com `DATA_SOURCE=memory`, defina
 `DEV_ADMIN_EMAIL` e `DEV_ADMIN_SENHA` no `.env` — o seed cria só esse
