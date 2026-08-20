@@ -12,7 +12,7 @@
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import type { CondicaoConsulta, DataSource, OperacaoLote } from "./datasource";
 import { obterAppAdmin } from "./firebaseAdmin";
-import { semUndefined } from "./semUndefined";
+import { exigirId, semUndefined } from "./semUndefined";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 export class FirebaseDataSource implements DataSource {
@@ -44,7 +44,7 @@ export class FirebaseDataSource implements DataSource {
   }
 
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
-    const { id } = registro as { id: string };
+    const id = exigirId(tabela, registro);
     await this.db.collection(tabela).doc(id).set(semUndefined(registro));
     return registro;
   }
@@ -86,7 +86,7 @@ export class FirebaseDataSource implements DataSource {
     for (let i = 0; i < operacoes.length; i += LIMITE) {
       const lote = this.db.batch();
       for (const op of operacoes.slice(i, i + LIMITE)) {
-        const ref = this.db.collection(op.tabela).doc(op.tipo === "criar" ? (op.registro as { id: string }).id : op.id);
+        const ref = this.db.collection(op.tabela).doc(op.tipo === "criar" ? exigirId(op.tabela, op.registro) : op.id);
         if (op.tipo === "criar") lote.set(ref, semUndefined(op.registro));
         else if (op.tipo === "atualizar") lote.update(ref, semUndefined(op.mudancas));
         else lote.delete(ref);

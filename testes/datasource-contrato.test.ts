@@ -223,6 +223,16 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(r).toEqual([]);
     });
 
+    it("criar SEM id é recusado com mensagem útil", async () => {
+      // O campo `id` é o id do documento. Gravar sem ele produz um registro que
+      // a leitura enxerga e a edição não alcança — foi o que aconteceu com o
+      // `bloco_agenda_min` de três sedes (a tela dava "Registro undefined não
+      // encontrado"). Aqui a escrita para antes, dizendo o porquê.
+      const semId = { ...sede("sem-id") } as Record<string, unknown>;
+      delete semId.id;
+      await expect(ds.criar("sedes", semId as never)).rejects.toThrow(/sem id utilizável/u);
+    });
+
     // ── gravarLote: tudo ou nada ───────────────────────────────────────
     it("lote grava todas as operações", async () => {
       sujeira.push(["sedes", `${P}lote-1`], ["sedes", `${P}lote-2`]);

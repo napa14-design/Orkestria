@@ -8,7 +8,7 @@
 import { type CondicaoConsulta, type DataSource, filtrarEmMemoria, type OperacaoLote } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
-import { semUndefined } from "./semUndefined";
+import { exigirId, semUndefined } from "./semUndefined";
 import { hashSenha } from "./senha";
 
 type Banco = { [K in NomeTabela]: MapaTabelas[K][] };
@@ -253,7 +253,7 @@ export class MemoryDataSource implements DataSource {
    */
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
     const lista = banco()[tabela] as Array<MapaTabelas[K] & { id: string }>;
-    const { id } = registro as { id: string };
+    const id = exigirId(tabela, registro);
     // Espelha o Firestore, que recusa `undefined` — o falso não pode ser mais
     // permissivo que o real, senão o erro só aparece em produção.
     registro = semUndefined(registro);

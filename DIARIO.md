@@ -7,6 +7,63 @@
 
 ---
 
+## 2026-08-20 — Três parâmetros ilegíveis para edição, e a porta fechada
+
+Último item aberto da segunda auditoria.
+
+### Errata da entrada anterior
+
+Eu escrevi que os três `bloco_agenda_min` tinham o campo `id` **valendo a string
+`"undefined"`**. Está errado, e a convenção deste arquivo é não editar entrada
+antiga — então fica registrado aqui: o campo estava **ausente**
+(`Object.hasOwn(dados, "id") === false`). Só descobri porque fui checar o tipo
+antes de gravar; a interpolação em template mostra `undefined` para os dois casos
+e eu tinha assumido o errado.
+
+O sintoma é o mesmo — a tela lê `registro.id`, recebe `undefined`, a URL vira
+`/api/parametros/undefined` e o erro é *"Registro undefined não encontrado"* —
+mas a causa é outra: o documento foi gravado **sem o campo**, não com ele errado.
+
+### O conserto
+
+Campo `id` = id do documento, nos três. Dado + auditoria no **mesmo `WriteBatch`**,
+usando o que foi construído hoje.
+
+Verificado pelo caminho que estava quebrado, não pelo campo: pegar o parâmetro
+como a **tela** pega (listar → usar o `.id`) e alcançar o documento como a **rota**
+faz (`obter` por esse id).
+
+```
+nenhum parâmetro sem `id` na listagem — 0
+todo id da listagem resolve o documento — 11/11
+ids únicos — 11 distintos de 11
+os valores não mudaram — ben=15 · dt=15 · eus=15 · geral=30
+nenhum campo id ≠ id do documento em toda a base — 0
+auditoria gravada — 3 registros
+```
+
+### A porta
+
+Limpar não impede repetir. `exigirId()` em `lib/semUndefined.ts` recusa a escrita
+sem `id` **nos dois bancos**, com mensagem que diz o que houve em vez do
+`doc(undefined)` críptico do Firestore:
+
+> *Registro de "parametros" sem id utilizável (recebido: undefined). O campo `id`
+> é o id do documento — gravar sem ele deixa o registro ilegível para edição.*
+
+Recusa também a string `"undefined"`, que era o meu palpite errado — se algum dia
+aparecer, para também.
+
+Um caso novo no contrato de DataSource cobre isso, então vale para memória e
+Firestore.
+
+`tsc` limpo, build limpo, **167 testes** (eram 166).
+
+### Arquivos
+
+`lib/semUndefined.ts`, `lib/firebaseClient.ts`, `lib/memoryStore.ts`,
+`testes/datasource-contrato.test.ts`
+
 ## 2026-08-20 — Escrita em lote virou operação atômica, com a auditoria junto
 
 O último item em aberto da auditoria, e o de maior consequência: **`Promise.all`

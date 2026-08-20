@@ -25,3 +25,23 @@ export function semUndefined<T extends object>(registro: T): T {
   }
   return limpo as T;
 }
+
+/**
+ * Exige que o registro traga `id` preenchido.
+ *
+ * O `DataSource` usa o campo `id` COMO o id do documento; sem ele o Firestore
+ * recebe `doc(undefined)` e estoura com mensagem que não diz o que houve. Pior:
+ * um `.set()` avulso (fora do DataSource) pode gravar o documento **sem** o
+ * campo, e aí a leitura funciona mas a edição pela tela quebra — foi o que
+ * aconteceu com o `bloco_agenda_min` de três sedes, corrigido em 20/08.
+ */
+export function exigirId(tabela: string, registro: unknown): string {
+  const id = (registro as { id?: unknown } | null)?.id;
+  if (typeof id !== "string" || id === "" || id === "undefined") {
+    throw new Error(
+      `Registro de "${tabela}" sem id utilizável (recebido: ${JSON.stringify(id)}). ` +
+        "O campo `id` é o id do documento — gravar sem ele deixa o registro ilegível para edição.",
+    );
+  }
+  return id;
+}
