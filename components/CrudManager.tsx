@@ -5,14 +5,14 @@
  * Cada tela de cadastro (funcionários, sedes, locais, tarefas) apenas
  * declara campos e colunas — o comportamento é todo daqui.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { DIAS_SEMANA, DIAS_SEMANA_CURTO, parseDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import Carregando from "./Carregando";
 import Modal from "./Modal";
-import { listarIntervalos } from "@/lib/intervalos";
+import { paresCrus, serializarPares } from "@/lib/intervalos";
 
 export interface OpcaoCampo {
   valor: string;
@@ -120,11 +120,29 @@ function EditorIntervalos({
   valor: string;
   aoMudar: (v: string) => void;
 }) {
-  const pares = listarIntervalos(valor);
-  const escrever = (lista: { inicio: string; fim: string }[]) =>
-    aoMudar(lista.filter((p) => p.inicio || p.fim).map((p) => `${p.inicio}-${p.fim}`).join(";"));
+  // Estado PRÓPRIO das linhas. A primeira versão derivava as linhas do texto
+  // normalizado a cada tecla — e o normalizador ordena e descarta par
+  // incompleto, então as linhas pulavam de lugar e sumiam no meio da digitação.
+  // Aqui a ordem é a que a pessoa escreveu; ordenar é problema de quem soma.
+  const [linhas, setLinhas] = useState<{ inicio: string; fim: string }[]>(() => paresCrus(valor));
+  const meuTexto = useRef(valor);
 
-  const linhas = pares.length > 0 ? pares : [];
+  // Reaproveita o estado quando o modal abre em OUTRO registro (o pai troca o
+  // valor por fora); ignora o eco do que este componente acabou de emitir.
+  useEffect(() => {
+    if (valor !== meuTexto.current) {
+      meuTexto.current = valor;
+      setLinhas(paresCrus(valor));
+    }
+  }, [valor]);
+
+  function escrever(proximas: { inicio: string; fim: string }[]) {
+    setLinhas(proximas);
+    const texto = serializarPares(proximas);
+    meuTexto.current = texto;
+    aoMudar(texto);
+  }
+
   return (
     <div style={{ display: "grid", gap: 6 }}>
       {linhas.map((p, i) => (
@@ -163,7 +181,9 @@ function EditorIntervalos({
       <button
         type="button"
         className="botao-secundario"
-        onClick={() => escrever([...linhas, { inicio: "12:00", fim: "13:00" }])}
+        // Linha nova nasce vazia: preencher é menos trabalho que apagar um
+        // palpite errado, e evita salvar um 12:00–13:00 que ninguém pediu.
+        onClick={() => escrever([...linhas, { inicio: "", fim: "" }])}
         style={{ justifySelf: "start", padding: "4px 10px", fontSize: 12 }}
       >
         + Adicionar intervalo

@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-08-24 — O editor reordenava as linhas debaixo do dedo de quem digita
+
+Reportado da tela, dois minutos depois de eu subir o editor: *"muito ruim por os
+horários. eu errei 1 e mudou todos? não posso fazer em qualquer ordem?"*.
+
+### A causa
+
+Eu derivei as linhas da tela de `listarIntervalos`, que é a função do
+**cálculo** — e ela faz duas coisas certas para somar e cruéis para digitar:
+**ordena por horário** e **descarta par incompleto**. Como o componente
+recalculava a lista a cada tecla:
+
+- trocar um horário **reordenava as linhas** no meio da edição — mexer em uma
+  parecia mexer em todas;
+- limpar um campo para redigitar virava `09:00-`, que não passa no filtro, e a
+  **linha inteira sumia da tela**.
+
+### O conserto
+
+`paresCrus` / `serializarPares` (novos, puros): o que está escrito, na ordem em
+que está, sem validar e sem ordenar. O editor passou a ter **estado próprio**,
+semeado do valor e ressemeado só quando o modal abre em outro registro — não a
+cada tecla. **Ordem importa no cálculo, nunca na digitação**: quem ordena é quem
+soma, e a validação de sobreposição ordena antes de comparar, então digitar fora
+de ordem continua sendo pego.
+
+Linha nova passou a nascer **vazia** em vez de `12:00–13:00`: preencher é menos
+trabalho que apagar um palpite errado, e evita salvar um intervalo que ninguém
+pediu.
+
+### Padrão, de novo
+
+**Sexta vez na sessão**, e a mais direta: reusei a função certa no lugar errado.
+`listarIntervalos` normaliza para calcular; a tela precisa do texto cru. Uma
+função boa aplicada na camada errada é tão defeito quanto uma função errada — e
+nenhum teste da função pegaria, porque ela estava certa.
+
+Um dos testes novos estava errado, não o código: comparei o objeto inteiro de
+`sincronizarTrio` entre duas ordens, e `intervalos` **preserva o que foi
+digitado** de propósito. Corrigido para comparar só os campos derivados.
+
+287 testes (eram 281). Mutando `paresCrus` de volta para ordenar e filtrar,
+3 caem.
+
+**Arquivos:** `lib/intervalos.ts`, `components/CrudManager.tsx`,
+`testes/intervalos.test.ts`.
+
+---
+
 ## 2026-08-24 — Apagar todos os intervalos precisa apagar de verdade
 
 Furo no conserto de meia hora atrás, achado antes de o dono esbarrar nele.

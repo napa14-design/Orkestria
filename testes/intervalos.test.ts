@@ -15,6 +15,8 @@ import { validarFuncionario } from "@/lib/validations";
 import {
   csvDoTrio,
   listarIntervalos,
+  paresCrus,
+  serializarPares,
   problemaNosIntervalos,
   resumoIntervalos,
   rotularIntervalos,
@@ -299,5 +301,57 @@ describe("remover todos os intervalos", () => {
     expect(csvResolvido(REG, { intervalos: "09:00-09:15;12:00-13:30;15:00-15:15" })).toBe(
       "09:00-09:15;12:00-13:30;15:00-15:15",
     );
+  });
+});
+
+/**
+ * Digitar não pode reordenar nem sumir com linha.
+ *
+ * Reportado da tela: *"muito ruim por os horários. eu errei 1 e mudou todos?
+ * não posso fazer em qualquer ordem?"*. O editor derivava as linhas de
+ * `listarIntervalos`, que ordena e descarta par incompleto — então trocar um
+ * horário reordenava tudo e limpar um campo fazia a linha desaparecer.
+ */
+describe("paresCrus / serializarPares — o que a tela digita", () => {
+  it("não ordena: a ordem digitada é preservada", () => {
+    expect(paresCrus("15:00-15:15;09:00-09:15").map((p) => p.inicio)).toEqual(["15:00", "09:00"]);
+  });
+
+  it("não descarta linha pela metade — dá para preencher aos poucos", () => {
+    expect(paresCrus("09:00-")).toEqual([{ inicio: "09:00", fim: "" }]);
+    expect(paresCrus("-09:15")).toEqual([{ inicio: "", fim: "09:15" }]);
+    expect(paresCrus("12:00-13:00;09:00-")).toHaveLength(2);
+  });
+
+  it("linha totalmente vazia não vira lixo no texto", () => {
+    expect(serializarPares([{ inicio: "", fim: "" }])).toBe("");
+    expect(serializarPares([{ inicio: "12:00", fim: "13:00" }, { inicio: "", fim: "" }])).toBe(
+      "12:00-13:00",
+    );
+  });
+
+  it("ida e volta preserva a ordem digitada", () => {
+    const texto = "15:00-15:15;09:00-09:15;11:30-13:00";
+    expect(serializarPares(paresCrus(texto))).toBe(texto);
+  });
+
+  it("a ordem NÃO muda o resultado do cálculo — é lá que se ordena", () => {
+    const foraDeOrdem = "15:00-15:15;09:00-09:15;11:30-13:00";
+    const emOrdem = "09:00-09:15;11:30-13:00;15:00-15:15";
+    expect(totalIntervaloMin(foraDeOrdem)).toBe(totalIntervaloMin(emOrdem));
+    expect(rotularIntervalos(foraDeOrdem)).toBe(rotularIntervalos(emOrdem));
+    // O trio DERIVADO não depende da ordem; o texto guardado, sim — ele preserva
+    // o que a pessoa digitou de propósito.
+    const derivado = (csv: string) => {
+      const { intervalos, ...resto } = sincronizarTrio({ intervalos: csv });
+      return resto;
+    };
+    expect(derivado(foraDeOrdem)).toEqual(derivado(emOrdem));
+    expect(sincronizarTrio({ intervalos: foraDeOrdem }).intervalos).toBe(foraDeOrdem);
+  });
+
+  it("sobreposição é pega mesmo digitada fora de ordem", () => {
+    const jornada = { entrada: "06:00", saida: "18:00" };
+    expect(problemaNosIntervalos("12:30-13:30;11:30-13:00", jornada)).toMatch(/se sobrep/u);
   });
 });

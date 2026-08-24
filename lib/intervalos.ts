@@ -29,6 +29,37 @@ export interface Intervalo {
 
 const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/u;
 
+/**
+ * Pares **crus**: o que está escrito, na ordem em que está, sem validar e sem
+ * ordenar. É o que o editor da tela precisa.
+ *
+ * `listarIntervalos` ordena e descarta o inválido — correto para calcular,
+ * desastroso para digitar: o editor derivava as linhas dele a cada tecla, então
+ * trocar um horário **reordenava as linhas** debaixo do dedo e limpar um campo
+ * para redigitar fazia a **linha sumir** (vira `09:00-`, que não passa). Quem
+ * reportou: *"eu errei 1 e mudou todos? não posso fazer em qualquer ordem?"*.
+ *
+ * Ordem importa no cálculo, nunca na digitação — quem ordena é quem soma.
+ */
+export function paresCrus(csv: string | undefined | null): Intervalo[] {
+  if (!csv || !csv.trim()) return [];
+  return csv
+    .split(";")
+    .map((par) => {
+      const [inicio, fim] = par.split("-");
+      return { inicio: (inicio ?? "").trim(), fim: (fim ?? "").trim() };
+    })
+    .filter((iv) => iv.inicio || iv.fim);
+}
+
+/** Serializa como está, sem ordenar: preserva o que a pessoa digitou. */
+export function serializarPares(pares: Intervalo[]): string {
+  return pares
+    .filter((p) => p.inicio || p.fim)
+    .map((p) => `${p.inicio}-${p.fim}`)
+    .join(";");
+}
+
 /** Pares válidos do CSV, em ordem de início. Ignora o que não parseia. */
 export function listarIntervalos(csv: string | undefined | null): Intervalo[] {
   if (!csv || !csv.trim()) return [];
