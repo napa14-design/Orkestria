@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { agruparRuns, type Run } from "@/lib/agenda";
+import { horarioDoEncaixe } from "@/lib/encaixe";
 import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 import CardRotina from "./CardRotina";
 import BalaoDetalhe from "./BalaoDetalhe";
@@ -79,7 +80,7 @@ export default function AgendaGrid({
   // Altura efetiva do bloco — todas as contas internas usam este valor.
   const ALTURA_BLOCO = alturaBloco;
   // Fantasma de drop: célula(s) exatas onde a tarefa cairá se for solta.
-  const [previa, setPrevia] = useState<{ funcionarioId: string; slot: number } | null>(null);
+  const [previa, setPrevia] = useState<{ funcionarioId: string; minuto: number } | null>(null);
 
   // Balãozinho de detalhes (clique no card): guarda o run e a âncora; o
   // BalaoDetalhe deriva o que exibe das entidades resolvidas.
@@ -163,10 +164,35 @@ export default function AgendaGrid({
     }
   }
 
-  function slotDoEvento(e: React.DragEvent, alvo: HTMLElement): number {
+  /**
+   * Minuto do dia onde o cursor soltou — CONTÍNUO, sem encaixar em slot. Quem
+   * decide o horário é `horarioDoEncaixe`, que imanta nas bordas reais das
+   * tarefas em vez de amarrar tudo ao passo da grade.
+   */
+  function minutoDoEvento(e: React.DragEvent, alvo: HTMLElement): number {
     const rect = alvo.getBoundingClientRect();
     const y = e.clientY - rect.top + alvo.scrollTop;
-    return Math.min(totalBlocos - 1, Math.max(0, Math.floor(y / ALTURA_BLOCO)));
+    const bruto = inicioGrade + (y / ALTURA_BLOCO) * blocoMin;
+    return Math.min(fimGrade, Math.max(inicioGrade, bruto));
+  }
+
+  /** Horário final do drop para esta pessoa, já imantado. */
+  function horarioDoDrop(e: React.DragEvent, alvo: HTMLElement, f: Funcionario): number {
+    const doDia = agruparRuns(rotinas.filter((r) => r.funcionario_id === f.id)).map((run) => ({
+      ini: hhmmParaMin(run.inicio),
+      fim: hhmmParaMin(run.fim),
+    }));
+    const pausas = intervalosDoFuncionario(f).map((iv) => ({
+      ini: hhmmParaMin(iv.inicio),
+      fim: hhmmParaMin(iv.fim),
+    }));
+    return horarioDoEncaixe({
+      minutoBruto: minutoDoEvento(e, alvo),
+      blocoMin,
+      ocupados: doDia,
+      pausas,
+      entrada: hhmmParaMin(f.entrada),
+    });
   }
 
   if (funcionarios.length === 0) {
@@ -331,11 +357,11 @@ export default function AgendaGrid({
                 style={{ position: "relative", height: totalBlocos * ALTURA_BLOCO }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  const slot = slotDoEvento(e, e.currentTarget);
+                  const minuto = horarioDoDrop(e, e.currentTarget, f);
                   setPrevia((p) =>
-                    p?.funcionarioId === f.id && p.slot === slot
+                    p?.funcionarioId === f.id && p.minuto === minuto
                       ? p
-                      : { funcionarioId: f.id, slot },
+                      : { funcionarioId: f.id, minuto },
                   );
                 }}
                 onDrop={(e) => {
@@ -344,8 +370,7 @@ export default function AgendaGrid({
                   aoTerminarArrasto?.();
                   const dados = lerArrasto(e);
                   if (!dados) return;
-                  const slot = slotDoEvento(e, e.currentTarget);
-                  const inicio = minParaHHMM(inicioGrade + slot * blocoMin);
+                  const inicio = minParaHHMM(horarioDoDrop(e, e.currentTarget, f));
                   if (dados.tipo === "nova" && dados.tarefa_id)
                     aoSoltarNova(dados.tarefa_id, f.id, inicio);
                   else if (dados.tipo === "mover" && dados.rotina_id)
@@ -449,7 +474,7 @@ export default function AgendaGrid({
                   <div
                     style={{
                       position: "absolute",
-                      top: previa.slot * ALTURA_BLOCO + 1,
+                      top: ((previa.minuto - inicioGrade) / blocoMin) * ALTURA_BLOCO + 1,
                       left: 3,
                       right: 3,
                       height: (blocosArrasto ?? 1) * ALTURA_BLOCO - 3,
@@ -465,7 +490,7 @@ export default function AgendaGrid({
                     }}
                   >
                     <span className="num" style={{ fontSize: 10, fontWeight: 700, color: "var(--acento)" }}>
-                      {minParaHHMM(inicioGrade + previa.slot * blocoMin)}
+                      {minParaHHMM(previa.minuto)}
                     </span>
                   </div>
                 )}

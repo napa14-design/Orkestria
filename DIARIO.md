@@ -7,6 +7,72 @@
 
 ---
 
+## 2026-08-20 — O arrasto virou ímã: o horário deixou de depender da grade
+
+Pergunta do dono do produto, melhor que a minha resposta: *"isso não deveria ser
+dinâmico? tipo quando eu coloco embaixo ele já se ajeita?"*
+
+### O que havia
+
+O horário do drop era **encaixe puro na grade**: `inicioGrade + slot ×
+bloco_agenda_min`. Isso amarra o que se pode planejar ao passo configurado da
+sede.
+
+Medido na CESIU, cujo passo é herdado do `geral` (30 min) porque a sede não tem
+parâmetro próprio:
+
+```
+minuto em que os 152 blocos começam:
+:00=13  :05=8   :10=18  :15=10  :20=18  :25=9
+:30=18  :35=11  :40=16  :45=10  :50=13  :55=8
+```
+
+A rota usa **todos os múltiplos de 5**. Com passo de 30, **só 31 dos 152 blocos
+(20%) caíam num ponto que a agenda oferece** — dava para arrastar uma tarefa para
+fora e não dava para arrastar de volta. Era isso que impedia soltar a tarefa
+logo depois da "Pegar garrafas de café", que termina às 07:15.
+
+### A regra nova
+
+`lib/encaixe.ts`: o horário é **imantado**. Soltar perto de uma borda encaixa
+nela; longe de tudo, cai na grade como antes.
+
+São bordas só os pontos onde uma tarefa **pode começar sem pisar em ninguém**:
+
+- o **fim** de um bloco já planejado — é o "coloquei embaixo da garrafa";
+- o **fim** de uma pausa — voltar do almoço já emendando;
+- a **entrada** da pessoa.
+
+O **início** de um bloco existente não é ímã, de propósito: encaixar ali começaria
+a tarefa exatamente quando outra começa, ou seja, sobreposição garantida.
+
+Tolerância de **6 minutos** (~15px na escala normal): perto o bastante para o
+gesto parecer proposital, longe o bastante para não capturar quem mirou no vazio.
+Numa rota fina as bordas ficam a cada 5 min, então nunca falta ímã por perto.
+
+### O efeito colateral bom
+
+O `bloco_agenda_min` deixa de ser o que limita o planejamento — passa a ser só o
+passo do vazio. A CESIU ainda ganharia com um parâmetro próprio de 5 min para
+posicionamento livre em área aberta, mas **não é mais o que trava a operação**.
+
+### Verificado, e o que NÃO foi
+
+12 casos na função pura, incluindo o que motivou tudo (soltar às 07:16 → 07:15),
+a fronteira exata da tolerância, e a regra de que início de bloco não imanta.
+`tsc` limpo, build limpo, **220 testes**.
+
+**Não exercitei o arrasto no navegador**: fazer isso exigiria digitar senha num
+formulário, coisa que não faço. A ligação está checada por tipo e por construção
+— a fórmula do topo da prévia é algebricamente a mesma de antes quando o minuto
+cai num slot —, mas **o tato do ímã só quem usa julga**. Se 6 minutos agarrar de
+menos ou de mais, é um número num arquivo.
+
+### Arquivos
+
+`lib/encaixe.ts` (novo), `testes/encaixe.test.ts` (novo),
+`components/agenda/AgendaGrid.tsx`
+
 ## 2026-08-20 — O buraco das 07:15 na CESIU: uma tarefa que meu conversor engoliu
 
 O dono do produto olhou a agenda e perguntou: *"tá certo esse buraco aqui?"*. Não
