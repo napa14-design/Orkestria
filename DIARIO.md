@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-24 — Os 40 consultórios saíram de "outros" (correção de dado, neutra no cálculo)
+
+Aplicada a classificação em lote proposta na entrada abaixo.
+
+- **40 locais** da CESIU passaram de `outros` para `consultorio`.
+- **1 ficou de fora de propósito**: "Corredor Consultórios" — o nome casa com o
+  padrão, mas consultório não é o substantivo principal ali. O script separa quem
+  começa com corredor/hall/banheiro/área/entrada e não toca.
+- **0 locais tiveram o fator efetivo alterado**, e isso foi **provado, não
+  afirmado**: o script compara o fator antes e depois de cada local e **para**
+  antes de gravar se algum mudar. Três dos 40 têm `fator_intensidade` próprio
+  (0,9), que vence o tipo de qualquer jeito.
+
+`locais` por tipo agora: outros 53 · **consultorio 40** · banheiro 12 ·
+area_comum 2 · copa 1 · sala 1 · area_externa 1.
+
+Sobram 53 em "outros", e a maior parte cabe em tipo que **já existe** (12 salas,
+5 banheiros, 4 recepções). Esses ficam parados de propósito: banheiro vale
+**1,5**, então classificar mudaria tempo calculado de verdade e precisa de
+conferência da operação antes. Os outros 22 são andares, "Geral" e "Volante" —
+que talvez nem sejam locais.
+
+Sem mudança de código. 40 registros em `historico` com o tipo anterior.
+
+---
+
 ## 2026-08-24 — Consultório entra na lista de tipos; criar tipo livre, não
 
 Pergunta do dono olhando o cadastro de Locais: *"não tem como cadastrar tipo de
