@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-08-24 — "Ele fica falando que vai sobrescrever": eu tinha consertado só a metade do servidor
+
+Reportado da tela: arrastar uma tarefa de 10 min para o vão das **06:30** do
+Gleydison (CESIU) abria o modal de autorização dizendo que ia sobrescrever —
+mesmo com os 10 minutos cabendo exatamente ali.
+
+**Causa:** em 20/08 eu corrigi `fim_planejado = início + tempo VISUAL` para o
+tempo previsto real — **só no servidor**. A validação imediata do cliente
+(`validarLocalmente`, em `app/(app)/rotinas/page.tsx`) continuou somando o
+visual. Na grade de 30 min da CESIU, uma tarefa de 10 virava 30, pisava na
+tarefa das 06:40 e caía em `SOBREPOSICAO` **antes de a API ser chamada**. A
+gravação certa do servidor nunca chegava a acontecer.
+
+Valia para os dois caminhos: soltar da paleta **e** mover um card existente
+(os dois passam pela mesma validação). O card já desenhava pela duração real,
+o que fazia o sintoma parecer coisa do arrasto, e não do cálculo.
+
+**Conserto:** a regra virou uma função com nome — `fimPlanejadoMin(inicioMin,
+previsto)` em `lib/calculations.ts` — usada pelo cliente **e** pelo servidor,
+nos quatro pontos (validação, card otimista do soltar, do mover e do
+redimensionar). Uma soma solta em dois arquivos foi exatamente o que deixou os
+dois lados divergirem; com nome e comentário, `+ visual` passa a ser um desvio
+visível.
+
+**Terceira vez nesta sessão que "consertei metade"** — antes foi o
+`semUndefined` (entrou no `criar` dos dois bancos e no `atualizar` de um só) e
+o "Entrada clinica" (corrigido no script de análise, não no conversor). O
+padrão é sempre o mesmo: a regra existe em dois lugares e eu conserto o lugar
+onde fui olhar.
+
+**Testes:** 240 (eram 236). Os novos exercitam a **composição** — quem calcula
+o fim junto com quem valida — e não cada peça isolada, porque isoladas as duas
+já passavam. Mutando `fimPlanejadoMin` para voltar a arredondar no bloco, 3
+testes caem.
+
+**Arquivos:** `lib/calculations.ts`, `app/(app)/rotinas/page.tsx`,
+`services/rotinasService.ts`, `testes/tarefa-curta.test.ts`.
+
+---
+
 ## 2026-08-24 — Dois dias da CESIU ficaram com a importação velha (correção de dado, sem mudança de código)
 
 Conferindo a agenda da CESIU contra o dado (a pergunta foi *"ta certo agora?"*),

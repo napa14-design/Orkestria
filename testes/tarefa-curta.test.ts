@@ -13,7 +13,7 @@
  * não do relógio.
  */
 import { describe, expect, it } from "vitest";
-import { PARAMETROS_PADRAO, tempoVisualMin } from "@/lib/calculations";
+import { PARAMETROS_PADRAO, fimPlanejadoMin, tempoVisualMin } from "@/lib/calculations";
 import { validarAlocacao } from "@/lib/validations";
 import type { Funcionario, RotinaPlanejada } from "@/types";
 
@@ -60,5 +60,47 @@ describe("tarefa mais curta que o bloco da agenda", () => {
     // Regressão do jeito antigo — 5 min gravados como se fossem 15.
     const inflada = jaPlanejada("06:45", "07:00");
     expect(sobrepoe(inflada, 6 * 60 + 50, 6 * 60 + 55)).toBe(true);
+  });
+});
+
+/**
+ * A METADE QUE FICOU PARA TRÁS.
+ *
+ * O conserto acima foi no servidor. A validação imediata do cliente continuou
+ * somando o tempo **visual** — então o arrasto era recusado com "vai
+ * sobrescrever" **antes de a API ser chamada**, e a gravação certa do servidor
+ * nunca chegava a acontecer. Reportado da tela, 24/08/2026: soltar uma tarefa de
+ * 10 min no vão das 06:30 do Gleydison, na CESIU (grade herdada de 30 min).
+ *
+ * Estes testes exercitam a COMPOSIÇÃO que quebrou — quem calcula o fim e quem
+ * valida —, não cada peça isolada, porque isoladas as duas já estavam certas.
+ */
+describe("cliente e servidor precisam responder igual", () => {
+  const GRADE_CESIU = 30;
+
+  it("o vão de 06:30 da CESIU aceita a tarefa de 10 min", () => {
+    // Gleydison entra 06:30 e a primeira tarefa é 06:40 (os 10 min de ENTRADA
+    // ficam vazios de propósito). Uma tarefa de 10 min cabe exatamente ali.
+    const inicio = 6 * 60 + 30;
+    expect(sobrepoe(jaPlanejada("06:40", "06:50"), inicio, fimPlanejadoMin(inicio, 10))).toBe(false);
+  });
+
+  it("com o tempo VISUAL no lugar do previsto, o mesmo arrasto é recusado", () => {
+    // A regressão exata: 10 min viram 30 na grade de 30, e aí pisa em 06:40.
+    const inicio = 6 * 60 + 30;
+    expect(sobrepoe(jaPlanejada("06:40", "06:50"), inicio, inicio + tempoVisualMin(10, GRADE_CESIU))).toBe(true);
+  });
+
+  it("fimPlanejadoMin nunca depende do tamanho do bloco", () => {
+    for (const grade of [5, 10, 15, 20, 30]) {
+      expect(fimPlanejadoMin(390, 10), `grade ${grade}`).toBe(400);
+    }
+    expect(fimPlanejadoMin(390, 5)).toBe(395);
+    expect(fimPlanejadoMin(390, 90)).toBe(480);
+  });
+
+  it("duração quebrada ou negativa não gera fim antes do início", () => {
+    expect(fimPlanejadoMin(390, -5)).toBe(390);
+    expect(fimPlanejadoMin(390, 10.4)).toBe(400);
   });
 });

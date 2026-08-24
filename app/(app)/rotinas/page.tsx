@@ -28,6 +28,7 @@ import {
   funcionarioNoDia,
   PARAMETROS_PADRAO,
   tempoPrevistoMin,
+  fimPlanejadoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
@@ -215,7 +216,6 @@ export default function PaginaRotinas() {
     if (!funcionario)
       return [{ nivel: "erro", codigo: "SEM_FUNCIONARIO", mensagem: "Funcionário não encontrado." }];
     const local = tarefa ? (locais ?? []).find((l) => l.id === tarefa.local_id) : undefined;
-    const visual = tempoVisualMin(tempoPrevisto, blocoMin);
     const iniMin = hhmmParaMin(inicio);
     return validarAlocacao({
       funcionario,
@@ -223,7 +223,7 @@ export default function PaginaRotinas() {
         (r) => r.funcionario_id === funcionarioId && r.id !== ignorarRotinaId,
       ),
       inicioMin: iniMin,
-      fimMin: iniMin + visual,
+      fimMin: fimPlanejadoMin(iniMin, tempoPrevisto),
       tarefa,
       local,
       parametros: params,
@@ -277,7 +277,7 @@ export default function PaginaRotinas() {
       tarefa_id: tarefaId,
       local_id: tarefa.local_id,
       inicio_planejado: inicio,
-      fim_planejado: minParaHHMM(iniMin + visual),
+      fim_planejado: minParaHHMM(fimPlanejadoMin(iniMin, previsto)),
       tempo_previsto_min: previsto,
       tempo_visual_min: visual,
       blocos_ocupados: blocosOcupados(previsto, blocoMin),
@@ -348,8 +348,7 @@ export default function PaginaRotinas() {
       }
       forcar = true;
     }
-    // Espelha o servidor: o fim é o real, não o do bloco (ver createRotina).
-    const fim = minParaHHMM(hhmmParaMin(inicio) + rotina.tempo_previsto_min);
+    const fim = minParaHHMM(fimPlanejadoMin(hhmmParaMin(inicio), rotina.tempo_previsto_min));
     const otimista = { ...rotina, funcionario_id: funcionarioId, inicio_planejado: inicio, fim_planejado: fim };
     setSelecionado(funcionarioId);
     try {
@@ -409,7 +408,9 @@ export default function PaginaRotinas() {
                     tempo_previsto_min: novoTempoMin,
                     tempo_visual_min: visual,
                     blocos_ocupados: blocosOcupados(novoTempoMin, blocoMin),
-                    fim_planejado: minParaHHMM(hhmmParaMin(r.inicio_planejado) + visual),
+                    fim_planejado: minParaHHMM(
+                      fimPlanejadoMin(hhmmParaMin(r.inicio_planejado), novoTempoMin),
+                    ),
                   }
                 : r,
             ),

@@ -6,6 +6,7 @@
  * e revalida conflitos antes de gravar.
  */
 import {
+  fimPlanejadoMin,
   blocosOcupados,
   funcionarioNoDia,
   jornadaDoDia,
@@ -263,7 +264,7 @@ export async function createRotina(
   // arrasto), mas quem decide sobreposição é o relógio: uma tarefa de 5 min NÃO
   // reserva os 15 do bloco. Sem isso, rotas com muita tarefa curta — a CESIU tem
   // 92 de 5 e 10 min — perdem quase tudo por SOBREPOSICAO ao gerar o dia.
-  const fimMin = inicioMin + previsto;
+  const fimMin = fimPlanejadoMin(inicioMin, previsto);
 
   const candidata: Partial<RotinaPlanejada> = {
     data: entrada.data,
@@ -392,7 +393,7 @@ export async function updateRotina(
 
   const inicioMin = hhmmParaMin(destinoInicio);
   // Mesmo motivo do createRotina: o fim gravado é o real.
-  const fimMin = inicioMin + novoPrevisto;
+  const fimMin = fimPlanejadoMin(inicioMin, novoPrevisto);
 
   let alertas: AlertaValidacao[] = [];
   const mudouPosicao =

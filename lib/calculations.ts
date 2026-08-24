@@ -313,6 +313,24 @@ export function tempoVisualMin(tempoPrevistoMin: number, blocoMin: number): numb
   return blocosOcupados(tempoPrevistoMin, blocoMin) * blocoMin;
 }
 
+/**
+ * Fim planejado de um bloco: início + tempo previsto **real**.
+ *
+ * Nunca `tempoVisualMin`. Se o fim vier do visual, uma tarefa de 10 min numa
+ * grade de 30 **reserva os 30** — e aí duas tarefas curtas no mesmo bloco viram
+ * "sobreposição". Foi o bug que o dono do produto pegou olhando a CESIU: *"o
+ * sistema tinha que aceitar mais de 1 tarefa por bloco"*.
+ *
+ * Existe como função, e não como soma solta, porque **cliente e servidor
+ * precisam responder igual**. Da primeira vez consertei só o servidor: a gravação
+ * ficou certa e a validação imediata do cliente continuou recusando o arrasto
+ * antes mesmo de chamar a API. `tempo_visual_min` e `blocos_ocupados` seguem
+ * existindo — só para desenhar.
+ */
+export function fimPlanejadoMin(inicioMin: number, tempoPrevistoMin: number): number {
+  return inicioMin + Math.max(0, Math.round(tempoPrevistoMin));
+}
+
 /** Soma dos tempos previstos reais das rotinas (não o tempo visual). */
 export function tempoPlanejadoMin(rotinas: RotinaPlanejada[]): number {
   return rotinas
