@@ -4,7 +4,7 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { fatorIntensidadeLocal, FATOR_POR_TIPO_LOCAL } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
-import type { Local, Sede, TipoLocal } from "@/types";
+import type { Local, Sede, TipoLocalCatalogo } from "@/types";
 
 /**
  * Escala nomeada da intensidade.
@@ -22,7 +22,12 @@ const ESCALA_INTENSIDADE = [
   { valor: "1.5", rotulo: "Pesado — suja muito (×1,5)" },
 ];
 
-const TIPOS_LOCAL = [
+/**
+ * Lista de reserva: os 12 tipos que eram fixos no código. Só aparece se o
+ * catálogo `tipos_local` ainda não carregou (ou não foi semeado) — senão o
+ * cadastro de local ficaria com o select vazio e ninguém saberia por quê.
+ */
+const TIPOS_RESERVA = [
   { valor: "sala", rotulo: "Sala" },
   { valor: "consultorio", rotulo: "Consultório" },
   { valor: "banheiro", rotulo: "Banheiro" },
@@ -37,9 +42,27 @@ const TIPOS_LOCAL = [
   { valor: "outros", rotulo: "Outros" },
 ];
 
+
 export default function PaginaLocais() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
+  const { data: tipos } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
+
+  // O catálogo manda; a lista de reserva só aparece enquanto ele não chega.
+  const opcoesTipo =
+    tipos && tipos.length > 0
+      ? tipos.filter((t) => t.ativo).map((t) => ({ valor: t.id, rotulo: t.nome }))
+      : TIPOS_RESERVA;
+  const rotuloTipo = (id: string) =>
+    tipos?.find((t) => t.id === id)?.nome ??
+    TIPOS_RESERVA.find((t) => t.valor === id)?.rotulo ??
+    id;
+  /** Fator que o TIPO dá, vindo do catálogo (cai na constante para os 12 antigos). */
+  const fatorDoTipo = new Map(
+    (tipos ?? [])
+      .filter((t) => Number(t.fator_intensidade) > 0)
+      .map((t) => [t.id, Number(t.fator_intensidade)]),
+  );
 
   return (
     <CrudManager<Local>
@@ -77,8 +100,8 @@ export default function PaginaLocais() {
           rotulo: "Tipo de local",
           tipo: "select",
           obrigatorio: true,
-          opcoes: TIPOS_LOCAL,
-          dica: "A categoria do ambiente (sala, banheiro, corredor, área externa…). Usado para filtrar e para análises por tipo de espaço nos relatórios.",
+          opcoes: opcoesTipo,
+          dica: "A categoria do ambiente (sala, consultório, banheiro, área externa…). Serve para filtrar, para análises por tipo de espaço e para sugerir a intensidade de limpeza quando o local não traz fator próprio. Não achou o tipo que precisa? Um administrador cria em Estrutura › Tipos de local.",
         },
         {
           key: "metragem",
@@ -116,7 +139,9 @@ export default function PaginaLocais() {
             const atual = String(form.fator_intensidade ?? "");
             if (!atual || atual === "0") {
               const tipo = String(form.tipo_local ?? "");
-              const herdado = FATOR_POR_TIPO_LOCAL[tipo as TipoLocal];
+              // O catálogo primeiro; a constante é a rede dos 12 tipos antigos.
+              const herdado =
+                fatorDoTipo.get(tipo) ?? (FATOR_POR_TIPO_LOCAL as Record<string, number>)[tipo];
               return herdado
                 ? `O tipo escolhido usa ×${String(herdado).replace(".", ",")}`
                 : "O tipo do local decide";
@@ -143,7 +168,7 @@ export default function PaginaLocais() {
         {
           key: "tipo_local",
           rotulo: "Tipo",
-          render: (l) => TIPOS_LOCAL.find((t) => t.valor === l.tipo_local)?.rotulo ?? l.tipo_local,
+          render: (l) => rotuloTipo(l.tipo_local),
         },
         {
           key: "metragem",
@@ -160,7 +185,7 @@ export default function PaginaLocais() {
           rotulo: "Intensidade",
           // Mostra o fator EFETIVO (o digitado ou, em branco, o padrão do tipo).
           render: (l) => {
-            const f = fatorIntensidadeLocal(l);
+            const f = fatorIntensidadeLocal(l, fatorDoTipo);
             const doTipo = !l.fator_intensidade || l.fator_intensidade <= 0;
             if (f === 1)
               return <span className="num" style={{ color: "var(--tinta-3)" }}>normal</span>;

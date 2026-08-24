@@ -29,6 +29,7 @@ export default function TaskPalette({
   locais,
   categorias = [],
   blocoMin,
+  fatorDoTipo,
   funcionarios = [],
   qualificacoes = [],
   requisitos = [],
@@ -41,6 +42,8 @@ export default function TaskPalette({
   locais: Local[];
   categorias?: Categoria[];
   blocoMin: number;
+  /** Fator de intensidade por tipo de local, do catálogo. */
+  fatorDoTipo?: ReadonlyMap<string, number>;
   /** Para sugerir quem chamar nas tarefas que exigem requisito (ata 17/07). */
   funcionarios?: Funcionario[];
   qualificacoes?: QualificacaoFuncionario[];
@@ -171,7 +174,7 @@ export default function TaskPalette({
         )}
         {visiveis.map((t) => {
           const local = localPorId.get(t.local_id);
-          const previsto = tempoPrevistoMin(t, local);
+          const previsto = tempoPrevistoMin(t, local, fatorDoTipo);
           const blocos = blocosOcupados(previsto, blocoMin);
           return (
             <div

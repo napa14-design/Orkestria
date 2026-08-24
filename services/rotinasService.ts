@@ -21,6 +21,7 @@ import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
+import { mapaFatorDoTipo } from "./tiposLocalService";
 import { getQualificacoesDoFuncionario } from "./qualificacoesService";
 import { getTempoPessoal } from "./temposPersonalizadosService";
 
@@ -256,7 +257,7 @@ export async function createRotina(
   const previsto =
     duracaoVariavel && typeof entrada.duracao_min === "number" && entrada.duracao_min > 0
       ? Math.round(entrada.duracao_min)
-      : tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined);
+      : tempoPessoal ?? tempoPrevistoMin(tarefa, local ?? undefined, await mapaFatorDoTipo());
   const visual = tempoVisualMin(previsto, parametros.bloco_agenda_min);
   const inicioMin = hhmmParaMin(entrada.inicio_planejado);
   // O fim é o REAL (início + previsto), não o do bloco arredondado. `visual` e

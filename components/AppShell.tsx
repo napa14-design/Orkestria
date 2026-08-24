@@ -53,6 +53,7 @@ const GRUPOS: Grupo[] = [
       { href: "/sedes", rotulo: "Sedes" },
       { href: "/locais", rotulo: "Locais" },
       { href: "/tarefas", rotulo: "Tarefas" },
+      { href: "/tipos-local", rotulo: "Tipos de local", apenasAdmin: true },
       { href: "/categorias", rotulo: "Categorias", apenasAdmin: true },
       { href: "/requisitos", rotulo: "Requisitos", apenasAdmin: true },
       { href: "/periodos-letivos", rotulo: "Calendário acadêmico", apenasAdmin: true },

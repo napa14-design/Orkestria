@@ -5,6 +5,7 @@
  * migração para o Firestore (nomes das coleções).
  */
 import type {
+  TipoLocalCatalogo,
   Ausencia,
   Categoria,
   ExecucaoRealizada,
@@ -30,6 +31,7 @@ export interface MapaTabelas {
   funcionarios: Funcionario;
   sedes: Sede;
   locais: Local;
+  tipos_local: TipoLocalCatalogo;
   categorias: Categoria;
   requisitos: Requisito;
   tarefas: Tarefa;
@@ -124,6 +126,14 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("fator_intensidade", "number"),
     col("ativo", "boolean"),
     col("observacoes"),
+    ...AUDITORIA,
+  ],
+  tipos_local: [
+    col("id"),
+    col("nome"),
+    col("fator_intensidade", "number"),
+    col("descricao"),
+    col("ativo", "boolean"),
     ...AUDITORIA,
   ],
   categorias: [

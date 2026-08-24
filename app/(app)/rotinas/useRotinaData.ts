@@ -12,6 +12,7 @@ import { jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import type {
+  TipoLocalCatalogo,
   Ausencia,
   Categoria,
   Funcionario,
@@ -47,6 +48,18 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   const { data: funcionarios } = useSWR<Funcionario[]>(sedeId ? `/api/funcionarios?sede=${sedeId}` : null, fetcher);
   const { data: tarefas } = useSWR<Tarefa[]>(sedeId ? `/api/tarefas?sede=${sedeId}` : null, fetcher);
   const { data: locais } = useSWR<Local[]>(sedeId ? `/api/locais?sede=${sedeId}` : null, fetcher);
+  // Catálogo de tipos de local: o cliente precisa dele para prever o mesmo
+  // tempo que o servidor vai gravar. Coleção pequena e global — uma busca só.
+  const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
+  const fatorDoTipo = useMemo(
+    () =>
+      new Map(
+        (tiposLocal ?? [])
+          .filter((t) => Number(t.fator_intensidade) > 0)
+          .map((t) => [t.id, Number(t.fator_intensidade)] as const),
+      ),
+    [tiposLocal],
+  );
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: periodosLetivos } = useSWR<PeriodoLetivo[]>(sedeId ? `/api/periodos-letivos?sede=${sedeId}` : null, fetcher);
   const { data: temposPessoais } = useSWR<TempoPersonalizado[]>(sedeId ? `/api/tempos-personalizados?sede=${sedeId}` : null, fetcher);
@@ -121,6 +134,7 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
     funcionarios,
     tarefas,
     locais,
+    fatorDoTipo,
     categorias,
     periodosLetivos,
     temposPessoais,

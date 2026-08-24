@@ -7,6 +7,77 @@
 
 ---
 
+## 2026-08-24 — Tipo de local virou catálogo, e quem cria informa o fator
+
+Pedido do dono do produto, feito três vezes: *"seria bom poder criar no próprio
+modal"* → *"eu ainda acho que deveria poder cadastrar e a pessoa coloca"* →
+*"agora as pessoas podem criar o tipo de local?"*. Eu tinha resistido duas
+vezes; a terceira é decisão dele, e estava certa.
+
+### Por que a minha resistência não se sustentava
+
+Aleguei que `tipo_local` é a chave de onde sai a intensidade de limpeza, e que
+tipo criado sem fator cairia em **1,0 em silêncio**. Verdade no desenho — e
+**vazio na prática**, porque medindo se descobre que as **427 tarefas da
+produção são `fixo`** e a intensidade só incide em `por_m2`/`por_unidade`. Eu
+argumentei antes de medir, duas vezes.
+
+E o desenho responde à objeção de qualquer forma: **quem cria informa o fator**,
+que é a mesma decisão que a ata de 17/07 tomou ("o tipo de uso puxa o fator"),
+agora na mão de quem conhece a sede.
+
+### O que entrou
+
+- **Tabela `tipos_local`** (id, nome, `fator_intensidade`, descricao, ativo):
+  catálogo global no padrão de `categorias` — só administrador escreve, qualquer
+  sessão lê, porque o cadastro de Locais precisa da lista.
+- **Tela `Estrutura › Tipos de local`**, com a intensidade em escala nomeada
+  (leve 0,8 · normal 1,0 · puxado 1,3 · denso 1,5) e a conta ao vivo embaixo:
+  *"uma tarefa de 20 min por m² neste tipo passa a 26 min (+30%)"*.
+- **Excluir tipo com locais vinculados é bloqueado** — deixaria a intensidade
+  deles sem origem. O caminho é inativar, que tira da lista e preserva quem usa.
+- **Fator fora de 0,1–5 é recusado**: 0 zeraria o tempo, 50 multiplicaria por
+  cinquenta — quase certamente engano de digitação.
+- Os **12 tipos antigos viraram registros com os ids de sempre**, então nenhum
+  dos 110 locais precisou de migração.
+
+### A parte que dá trabalho: o fator precisa chegar em quem calcula
+
+`fatorIntensidadeLocal(local, fatorDoTipo?)` resolve nesta ordem: fator digitado
+no local → fator do tipo no catálogo → `FATOR_POR_TIPO_LOCAL` (rede dos 12
+antigos) → 1,0. A rede importa: sem ela, um ponto de cálculo que esqueça de
+carregar o catálogo erraria até nos tipos conhecidos.
+
+O mapa foi passado pelos **7 pontos** que calculam tempo — `rotinasService` e
+`modelosService` no servidor (que gravam o número) e `rotinas`, `tarefas`,
+`TaskPalette`, `SugestoesAjuste` e `locais` no cliente. **Foi de propósito não
+deixar nenhum de fora**: cliente e servidor divergirem no mesmo número é
+exatamente o defeito que apareceu duas vezes hoje.
+
+### Produção
+
+12 tipos semeados em `tipos_local`, com os ids e fatores de sempre — conferido
+antes: **nenhum tipo usado por local ficaria sem entrada no catálogo**. Uso
+atual: consultorio 42 · outros 21 · banheiro 19 · sala 18 · recepcao 3 ·
+area_externa 3 · copa 2 · area_comum 2; corredor, escada, auditório e
+almoxarifado seguem em zero.
+
+301 testes (eram 290). Quatro mutações pegas, entre elas a que faz o catálogo ser
+ignorado — a objeção original virou teste.
+
+**Não verificado no navegador** (a tela pede sessão): a tela nova e o select
+alimentado pelo catálogo têm tipo, build e teste, mas ninguém os abriu.
+
+**Arquivos:** `types/TipoLocalCatalogo.ts`, `services/tiposLocalService.ts`,
+`app/api/tipos-local/`, `app/(app)/tipos-local/page.tsx`, `lib/schema.ts`,
+`lib/calculations.ts`, `lib/memoryStore.ts`, `app/(app)/locais/page.tsx`,
+`app/(app)/tarefas/page.tsx`, `app/(app)/dashboard/page.tsx`,
+`app/(app)/rotinas/{page,useRotinaData}.tsx`, `components/AppShell.tsx`,
+`components/agenda/TaskPalette.tsx`, `components/SugestoesAjuste.tsx`,
+`services/{rotinas,modelos}Service.ts`, `testes/tipos-local.test.ts`, `docs/02`.
+
+---
+
 ## 2026-08-24 — Mais 32 locais classificados, e a descoberta que muda a pergunta
 
 ### A segunda leva

@@ -17,6 +17,7 @@ import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
+  TipoLocalCatalogo,
   ExecucaoRealizada,
   Funcionario,
   Local,
@@ -58,6 +59,16 @@ export default function PaginaDashboard() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
+  const fatorDoTipo = useMemo(
+    () =>
+      new Map(
+        (tiposLocal ?? [])
+          .filter((t) => Number(t.fator_intensidade) > 0)
+          .map((t) => [t.id, Number(t.fator_intensidade)] as const),
+      ),
+    [tiposLocal],
+  );
   const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
   const { data: parametros } = useSWR<ParametrosResolvidos>(
     "/api/parametros?resolvidos=1",
@@ -381,6 +392,7 @@ export default function PaginaDashboard() {
           execucoes={execucoes ?? []}
           tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
           locais={locais ?? []}
+          fatorDoTipo={fatorDoTipo}
           parametros={params}
           aoAplicado={() => void mutateTarefas()}
         />

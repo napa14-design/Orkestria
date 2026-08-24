@@ -103,6 +103,7 @@ individual** gerado em Sistema › Usuários.
 | Visão geral para IA/gerência | `CONTEXTO-IA.md` |
 | Última mudança / estado atual | `DIARIO.md` (primeira entrada) |
 | Documentação funcional, modelo de dados, regras, arquitetura, backlog | `docs/01..07` |
+| Catálogo de tipos de ambiente | `app/(app)/tipos-local/`, `services/tiposLocalService.ts` |
 | Tela principal (agenda drag-and-drop) | `app/(app)/rotinas/page.tsx` + `components/agenda/` |
 | Fórmulas (jornada, blocos, ocupação, desvio) | `lib/calculations.ts` |
 | Validações (conflito, intervalo, sobrecarga…) | `lib/validations.ts` |

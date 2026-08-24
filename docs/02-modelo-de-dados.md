@@ -70,6 +70,23 @@ faculdade · administrativo · outros) · **grupo** (texto, ex.: "Sul") · ativo
 auditoria. `tipo_sede`/`grupo` são opcionais e servem para comparar/agrupar
 sedes.
 
+### tipos_local
+id · nome · **fator_intensidade** (0,8 leve · 1,0 normal · 1,5 densa) · descricao ·
+ativo · auditoria. **Catálogo global** (só administrador escreve; qualquer sessão
+lê, porque o cadastro de Locais precisa da lista).
+
+Era lista fixa no código até 24/08/2026 — virou cadastro porque as 18 sedes vão de
+educação infantil a clínica e nenhuma lista fechada cobre todas (faltava
+*consultório* para 41 locais, enquanto 5 dos 11 tipos oferecidos nunca tinham
+sido usados). Os 12 tipos antigos foram semeados **com os ids de sempre**, então
+nenhum local precisou de migração.
+
+**Quem cria informa o fator.** `tipo_local` é a chave de onde sai a intensidade
+de limpeza; tipo sem fator cairia em 1,0 sem avisar. A resolução está em
+`fatorIntensidadeLocal(local, fatorDoTipo?)`, nesta ordem: fator digitado no
+local → fator do tipo no catálogo → `FATOR_POR_TIPO_LOCAL` (rede dos 12 antigos)
+→ 1,0. Excluir tipo com locais vinculados é bloqueado; o caminho é inativar.
+
 ### locais
 | Campo | Tipo | Observação |
 |---|---|---|

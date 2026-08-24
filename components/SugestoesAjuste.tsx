@@ -44,6 +44,7 @@ export default function SugestoesAjuste({
   execucoes,
   tarefas,
   locais,
+  fatorDoTipo,
   parametros,
   aoAplicado,
 }: {
@@ -51,6 +52,9 @@ export default function SugestoesAjuste({
   execucoes: ExecucaoRealizada[];
   tarefas: Tarefa[];
   locais: Local[];
+  /** Fator por tipo de local, do catálogo. Sem ele, tipo criado pelo usuário
+   *  cairia em 1,0 e a sugestão de tempo base sairia torta. */
+  fatorDoTipo?: ReadonlyMap<string, number>;
   parametros: ParametrosResolvidos;
   aoAplicado: () => void;
 }) {
@@ -80,10 +84,10 @@ export default function SugestoesAjuste({
       if (!tarefa || !tarefa.ativo || !cobraDesvio(tarefa)) continue;
       const local = localPorId.get(tarefa.local_id);
       // mesmo multiplicador do tempo previsto (intensidade só em por_m2/unidade)
-      const fator = multiplicadorTempo(tarefa, local);
+      const fator = multiplicadorTempo(tarefa, local, fatorDoTipo);
 
       // compara com o previsto ATUAL: depois de aplicar, a sugestão some.
-      const previstoAtual = tempoPrevistoMin(tarefa, local);
+      const previstoAtual = tempoPrevistoMin(tarefa, local, fatorDoTipo);
       if (previstoAtual <= 0) continue;
 
       const med = mediana(reais);
@@ -113,7 +117,7 @@ export default function SugestoesAjuste({
       });
     }
     return resultado.sort((a, b) => Math.abs(b.desvio) - Math.abs(a.desvio));
-  }, [rotinas, execucoes, tarefas, locais, parametros]);
+  }, [rotinas, execucoes, tarefas, locais, parametros, fatorDoTipo]);
 
   if (sugestoes.length === 0) return null;
 

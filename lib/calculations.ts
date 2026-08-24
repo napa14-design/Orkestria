@@ -104,10 +104,27 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
  * Sem fator informado (ausente/≤0), cai no padrão do TIPO do local — antes caía
  * sempre em 1. Locais que já têm fator gravado não mudam de comportamento.
  */
-export function fatorIntensidadeLocal(local: Local | undefined): number {
+/**
+ * A intensidade efetiva do local, em ordem de prioridade:
+ *
+ *  1. o fator **digitado no próprio local** — a exceção sempre vence;
+ *  2. o fator do **tipo**, vindo do catálogo `tipos_local` (desde 24/08/2026 o
+ *     tipo é cadastrável, e quem cria informa o fator);
+ *  3. a tabela `FATOR_POR_TIPO_LOCAL`, rede de segurança para os 12 tipos que
+ *     eram fixos no código — assim quem calcula sem carregar o catálogo
+ *     continua acertando o caso conhecido em vez de cair em 1,0 calado;
+ *  4. 1,0.
+ */
+export function fatorIntensidadeLocal(
+  local: Local | undefined,
+  fatorDoTipo?: Map<string, number> | ReadonlyMap<string, number>,
+): number {
   const f = local?.fator_intensidade;
   if (typeof f === "number" && f > 0) return f;
-  return (local && FATOR_POR_TIPO_LOCAL[local.tipo_local]) || 1;
+  if (!local) return 1;
+  const doCatalogo = fatorDoTipo?.get(local.tipo_local);
+  if (typeof doCatalogo === "number" && doCatalogo > 0) return doCatalogo;
+  return (FATOR_POR_TIPO_LOCAL as Record<string, number>)[local.tipo_local] || 1;
 }
 
 /**
@@ -273,10 +290,14 @@ export function cargaSemanalMin(f: Funcionario): number {
  *    em todas as regras (a forma de limpar pesa mesmo num tempo fixo, ex.: vidros
  *    desincrustantes).
  */
-export function multiplicadorTempo(tarefa: Tarefa, local: Local | undefined): number {
+export function multiplicadorTempo(
+  tarefa: Tarefa,
+  local: Local | undefined,
+  fatorDoTipo?: ReadonlyMap<string, number>,
+): number {
   const escalaPelaArea =
     tarefa.regra_calculo === "por_m2" || tarefa.regra_calculo === "por_unidade";
-  const intensidade = escalaPelaArea ? fatorIntensidadeLocal(local) : 1;
+  const intensidade = escalaPelaArea ? fatorIntensidadeLocal(local, fatorDoTipo) : 1;
   return intensidade * fatorServico(tarefa);
 }
 
@@ -290,7 +311,11 @@ export function multiplicadorTempo(tarefa: Tarefa, local: Local | undefined): nu
  * só em por_m2/por_unidade, × natureza do serviço, sempre).
  * Fórmula da 1ª fase: m² × tipo de ambiente × tipo de serviço.
  */
-export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): number {
+export function tempoPrevistoMin(
+  tarefa: Tarefa,
+  local: Local | undefined,
+  fatorDoTipo?: ReadonlyMap<string, number>,
+): number {
   let base: number;
   switch (tarefa.regra_calculo) {
     case "por_m2":
@@ -304,7 +329,7 @@ export function tempoPrevistoMin(tarefa: Tarefa, local: Local | undefined): numb
     default:
       base = tarefa.tempo_base_min;
   }
-  return Math.round(base * multiplicadorTempo(tarefa, local));
+  return Math.round(base * multiplicadorTempo(tarefa, local, fatorDoTipo));
 }
 
 /** blocos = teto(tempo_previsto / bloco). 80min em blocos de 30 → 3 blocos. */

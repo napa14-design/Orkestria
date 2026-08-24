@@ -74,6 +74,7 @@ export default function PaginaRotinas() {
     funcionarios,
     tarefas,
     locais,
+    fatorDoTipo,
     categorias,
     periodosLetivos,
     temposPessoais,
@@ -244,7 +245,7 @@ export default function PaginaRotinas() {
     const pessoal = (temposPessoais ?? []).find(
       (tp) => tp.funcionario_id === funcionarioId && tp.tarefa_id === tarefaId,
     );
-    const base = pessoal ? pessoal.tempo_min : tempoPrevistoMin(tarefa, local);
+    const base = pessoal ? pessoal.tempo_min : tempoPrevistoMin(tarefa, local, fatorDoTipo);
 
     // Presença/plantão e regra manual têm duração variável por dia: pergunta
     // "quanto tempo hoje?" em vez de assumir o tempo base.
@@ -733,6 +734,7 @@ export default function PaginaRotinas() {
               locais={locais ?? []}
               categorias={categorias ?? []}
               blocoMin={blocoMin}
+              fatorDoTipo={fatorDoTipo}
               funcionarios={funcionarios ?? []}
               qualificacoes={qualificacoes ?? []}
               requisitos={requisitos ?? []}

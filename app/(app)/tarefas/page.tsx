@@ -1,11 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
-import type { Categoria, Local, Requisito, Sede, Tarefa } from "@/types";
+import type {
+  TipoLocalCatalogo, Categoria, Local, Requisito, Sede, Tarefa } from "@/types";
 
 const REGRAS = [
   { valor: "fixo", rotulo: "Tempo fixo" },
@@ -43,6 +45,17 @@ const RESTRICOES_GENERO = [
 export default function PaginaTarefas() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
+  // Mesmo mapa que o servidor monta: o número da tela tem de bater com o gravado.
+  const fatorDoTipo = useMemo(
+    () =>
+      new Map(
+        (tiposLocal ?? [])
+          .filter((t) => Number(t.fator_intensidade) > 0)
+          .map((t) => [t.id, Number(t.fator_intensidade)] as const),
+      ),
+    [tiposLocal],
+  );
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
   const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
 
@@ -297,7 +310,7 @@ export default function PaginaTarefas() {
           rotulo: "Tempo previsto",
           render: (t) => (
             <strong className="num">
-              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id)))}
+              {formatarDuracao(tempoPrevistoMin(t, localPorId(t.local_id), fatorDoTipo))}
             </strong>
           ),
         },
@@ -315,7 +328,7 @@ export default function PaginaTarefas() {
            */
           render: (t) => {
             const local = localPorId(t.local_id);
-            const minutos = tempoPrevistoMin(t, local);
+            const minutos = tempoPrevistoMin(t, local, fatorDoTipo);
             if (!local?.metragem || !minutos)
               return <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>—</span>;
             const porHora = local.metragem / (minutos / 60);

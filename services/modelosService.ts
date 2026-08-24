@@ -32,6 +32,7 @@ import type { ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
+import { mapaFatorDoTipo } from "./tiposLocalService";
 import {
   createRotina,
   getRotinasByData,
@@ -407,10 +408,13 @@ export async function gerarDiaDaRotaPadrao(
   const ds = await getDataSource();
   const agora = agoraISO();
 
+  // Uma leitura só para o dia inteiro, não uma por item.
+  const fatorDoTipo = await mapaFatorDoTipo();
+
   /** Tempo previsto do item: a duração do snapshot, ou o cálculo da tarefa. */
   const previstoDoItem = (it: ModeloRotinaItem) =>
     it.duracao_min ??
-    tempoPrevistoMin(ctx.tarefas.get(it.tarefa_id)!, locais.get(it.local_id) ?? undefined);
+    tempoPrevistoMin(ctx.tarefas.get(it.tarefa_id)!, locais.get(it.local_id) ?? undefined, fatorDoTipo);
 
   const medidas = (inicio: string, previsto: number) => ({
     inicio_planejado: inicio,

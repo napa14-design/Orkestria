@@ -76,6 +76,22 @@ function seed(): Banco {
       { id: "christus_l3", sede_id: "christus_dt", andar: "—", nome_local: "Coleta Residuos", tipo_local: "outros", metragem: 50, ativo: true, observacoes: "Setor Christus DT", ...aud },
       { id: "christus_l4", sede_id: "christus_dt", andar: "—", nome_local: "Pintura", tipo_local: "outros", metragem: 50, ativo: true, observacoes: "Setor Christus DT", ...aud },
     ],
+    // Os 12 tipos que eram lista fixa no código, agora catálogo. Os ids são os
+    // mesmos de antes, então nenhum local precisou ser migrado.
+    tipos_local: [
+      { id: "sala", nome: "Sala", fator_intensidade: 1, descricao: "Sala de aula, escritório, coordenação.", ativo: true, ...aud },
+      { id: "consultorio", nome: "Consultório", fator_intensidade: 1, descricao: "Ambiente clínico de atendimento.", ativo: true, ...aud },
+      { id: "banheiro", nome: "Banheiro", fator_intensidade: 1.5, descricao: "Suja mais que a média — limpeza densa.", ativo: true, ...aud },
+      { id: "corredor", nome: "Corredor", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "area_comum", nome: "Área comum", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "area_externa", nome: "Área externa", fator_intensidade: 0.8, descricao: "Aberta — limpeza mais leve por m².", ativo: true, ...aud },
+      { id: "copa", nome: "Copa", fator_intensidade: 1.5, descricao: "Suja mais que a média — limpeza densa.", ativo: true, ...aud },
+      { id: "escada", nome: "Escada", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "recepcao", nome: "Recepção", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "auditorio", nome: "Auditório", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "almoxarifado", nome: "Almoxarifado", fator_intensidade: 1, descricao: "", ativo: true, ...aud },
+      { id: "outros", nome: "Outros", fator_intensidade: 1, descricao: "Quando nenhum tipo cabe. Vale 1,0.", ativo: true, ...aud },
+    ],
     categorias: [
       { id: "c1", nome: "Limpeza concorrente", descricao: "Manutenção do dia a dia (rápida, recorrente).", cor: "#2f6f4f", fator_intensidade: 1, ativo: true, ...aud },
       { id: "c2", nome: "Higienização", descricao: "Sanitização de banheiros e áreas críticas.", cor: "#9C0D38", fator_intensidade: 1, ativo: true, ...aud },
