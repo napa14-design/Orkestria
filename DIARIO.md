@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-08-24 — Mais 32 locais classificados, e a descoberta que muda a pergunta
+
+### A segunda leva
+
+32 locais saíram de "outros" pelo nome: 17 sala, 7 banheiro, 3 recepção, 2 área
+externa, 2 consultório, 1 copa. Impacto medido tarefa a tarefa antes de gravar:
+**0 locais com tempo calculado alterado** — o motivo aparece embaixo.
+
+Dois achados de dado no caminho: **"Consulótio 09 (LEAC)"** (erro de digitação da
+planilha) entrou como consultório, e **"Verificar todos os banheiros"** é nome de
+**tarefa** que virou local no importador — classificado como banheiro por ora,
+mas o certo é não existir.
+
+Ficam 21 em "outros", e nenhum deles é ambiente: andares (1º a 10º), "Geral",
+"Volante", "Quadras", "Idiomas", "Coleta Residuos", "Pintura", "6 bebedouros".
+
+`locais` agora: consultorio 42 · outros 21 · banheiro 19 · sala 18 · recepcao 3 ·
+area_externa 3 · copa 2 · area_comum 2.
+
+### A descoberta
+
+Perguntando *"eles limpam objetos como bebedouros, não apenas locais"*, fui medir
+— e o número recontextualiza a discussão inteira de `tipo_local`:
+
+> **As 427 tarefas da produção são `regra_calculo: fixo`. Todas.**
+> Zero usam `por_m2`. Zero usam `por_unidade`.
+
+Como a intensidade do ambiente **só incide em `por_m2`/`por_unidade`** (refino de
+17/06, para não inflar tarefa que não depende de metragem), o `tipo_local` hoje
+**não afeta nenhum cálculo do sistema**. É rótulo puro.
+
+Isso derruba a minha própria objeção de duas entradas atrás — *"tipo criado na
+hora cairia em 1,0 em silêncio"* — porque **ninguém sente 1,0 hoje**. O risco que
+eu levantei é real no desenho e **vazio na prática**, e eu deveria ter medido
+antes de argumentar.
+
+E `por_unidade` — o mecanismo que o sistema **já tem** para "limpar N objetos",
+com quantidade × tempo base — nunca foi usado: **0 de 427**. "6 bebedouros" é o
+único objeto virado local, veio da coluna SETOR da planilha, tem m² = 0 e uma
+tarefa de tempo fixo.
+
+Sem mudança de código. 32 registros em `historico`.
+
+---
+
 ## 2026-08-24 — Os 40 consultórios saíram de "outros" (correção de dado, neutra no cálculo)
 
 Aplicada a classificação em lote proposta na entrada abaixo.
