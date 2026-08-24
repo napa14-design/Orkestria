@@ -7,6 +7,82 @@
 
 ---
 
+## 2026-08-24 — A mesma informação em dois campos, e o formulário editava o que perde
+
+Reportado da tela: *"pq ta dando 46h30?"* — Gleydison e Eveline apareciam com
+**46h30** de carga semanal, acima das 44h. A conta estava certa (10h de
+expediente − 1h30 de intervalo = 8h30/dia × 5 + 4h de sábado). O que estava
+errado veio depois: o coordenador abriu o cadastro, trocou o intervalo para
+**2h**, salvou — e **o número não se mexeu**.
+
+### A causa
+
+O intervalo mora em **dois lugares**: `intervalos` (CSV de pares, que suporta
+lanche + almoço + lanche) e o trio `intervalo_inicio` / `intervalo_fim` /
+`intervalo_min`. `minutosIntervalo` lê o **CSV quando ele existe** e só cai no
+trio quando está vazio — e o formulário de Funcionários editava **apenas o
+trio**. A edição não dava erro e não tinha efeito.
+
+Na DT era o outro lado da mesma moeda: a tela mostrava o par `11:30–13:00` (1h30)
+ao lado de um campo "120 min" — **dois controles da mesma tela discordando**,
+porque o par mostra o almoço e o total soma os três intervalos. Os lanches
+existiam no dado e eram **invisíveis no cadastro**, o que gerou a pergunta
+seguinte do dono: *"e os lanches, não deveria ser possível cadastrar também?"*.
+
+### O conserto
+
+`lib/intervalos.ts` (novo, puro): `intervalos` passa a ser a **única** coisa que
+se edita, e o trio antigo vira **derivado** dele (`sincronizarTrio`) — o par fica
+com o maior intervalo, o total com a soma. Registro velho que só tem o trio
+ganha o caminho de volta (`csvDoTrio`), senão abrir e salvar pelo formulário
+novo **apagaria o intervalo da pessoa**.
+
+O formulário trocou três campos por **um editor de lista**: linhas de início/fim
+com "+ Adicionar intervalo" e remoção — dá para cadastrar lanche, que era o
+pedido. Embaixo, a conta ao vivo (*"3 intervalos · 2h descontadas da jornada ·
+jornada líquida 8h"*), no mesmo padrão que resolveu a dúvida do "quantas
+unidades" na tela de Tarefas.
+
+Validação entrou em `validarFuncionario`, que cliente e servidor compartilham:
+formato, fim depois do início, sem sobreposição, dentro do expediente e sem
+consumir a jornada inteira. **Encostar não é sobrepor** — tem teste.
+
+### A carga semanal deixou de ser muda
+
+O sistema calculava **46h30** e escrevia em negrito, sem dizer nada. Passa de
+44h agora ganha um selo com o excedente e o motivo no título. Mesma regra da
+régua de ocupação de hoje cedo: número que serve para medir não pode ficar
+calado. A lista também ganhou coluna de **Intervalos**, porque o que sai da
+jornada estava invisível ali.
+
+### Errata da minha própria medição
+
+Eu disse **"31 dos 38 funcionários com os dois campos em desacordo"**. O número
+está certo mas a leitura não: em 29 deles o **`intervalo_min` já batia** com o
+CSV; o que divergia era o *par*, que por construção não consegue representar três
+intervalos. Ou seja: era o formulário incapaz de **mostrar** a verdade, não o
+dado errado. Precisam de escrita só **2** — Gleydison e Eveline, onde a edição do
+coordenador ficou no trio e nunca chegou ao CSV.
+
+**Nada foi gravado na produção.** Esses dois casos são pergunta de fato, não de
+sistema: ressincronizar pelo CSV **descartaria** a edição do coordenador e
+devolveria 46h30; honrar a edição assume que o intervalo real é de 2h. Com o
+conserto no ar, ele digita o correto na tela e a gravação sincroniza tudo.
+
+### O que **não** foi verificado
+
+O editor novo não foi exercitado no navegador — a tela exige sessão e a senha
+não passa por aqui. Tem tipo, build e 24 testes de unidade; **não tem prova de
+que a lista renderiza e salva na tela**. É o próximo a conferir.
+
+271 testes (eram 244). Quatro mutações pegas.
+
+**Arquivos:** `lib/intervalos.ts` (novo), `lib/validations.ts`,
+`services/funcionariosService.ts`, `components/CrudManager.tsx`,
+`app/(app)/funcionarios/page.tsx`, `testes/intervalos.test.ts` (novo).
+
+---
+
 ## 2026-08-24 — O passo do vazio agora olha os FINS, não só os inícios
 
 Reportado da tela, depois do conserto anterior: *"ele dá certo, mas é muito ruim

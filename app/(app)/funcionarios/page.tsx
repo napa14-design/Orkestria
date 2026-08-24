@@ -2,6 +2,13 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { hhmmParaMin } from "@/lib/dateUtils";
+import {
+  csvDoTrio,
+  resumoIntervalos,
+  rotularIntervalos,
+  totalIntervaloMin,
+} from "@/lib/intervalos";
 import { cargaSemanalMin, jornadaLiquidaMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
@@ -69,26 +76,18 @@ export default function PaginaFuncionarios() {
           dica: "Horário em que o expediente termina. Tarefas não podem ser alocadas depois disso.",
         },
         {
-          key: "intervalo_inicio",
-          rotulo: "Início do intervalo",
-          tipo: "hora",
-          padrao: "12:00",
-          dica: "Quando começa o almoço/descanso. Esse período fica bloqueado na agenda (hachurado) e não aceita tarefas.",
-        },
-        {
-          key: "intervalo_fim",
-          rotulo: "Fim do intervalo",
-          tipo: "hora",
-          padrao: "13:00",
-          dica: "Quando o almoço/descanso termina e o funcionário volta a poder receber tarefas.",
-        },
-        {
-          key: "intervalo_min",
-          rotulo: "Intervalo (min)",
-          tipo: "numero",
-          padrao: 60,
-          ajuda: "Descontado da jornada líquida",
-          dica: "Duração do intervalo em minutos. É descontado da jornada para chegar na JORNADA LÍQUIDA = (saída − entrada) − intervalo. Ex.: 07:00 às 16:00 com 60 min de almoço = 8 h líquidas, que é a base do cálculo de ocupação e ociosidade.",
+          key: "intervalos",
+          rotulo: "Intervalos do dia (almoço e lanches)",
+          tipo: "intervalos",
+          inteira: true,
+          padrao: "12:00-13:00",
+          // A conta ao vivo, em vez da regra: é o que mata a dúvida no campo.
+          ajuda: (form) =>
+            resumoIntervalos(
+              String(form.intervalos ?? ""),
+              Math.max(0, hhmmParaMin(String(form.saida ?? "")) - hhmmParaMin(String(form.entrada ?? ""))),
+            ),
+          dica: "Todos os intervalos do dia, no formato HH:mm-HH:mm, separados por ponto e vírgula. Um só: \"12:00-13:00\". Com lanches: \"09:00-09:15;11:30-13:00;15:00-15:15\". É esta lista que a agenda bloqueia (faixa hachurada) e que sai da JORNADA LÍQUIDA = (saída − entrada) − intervalos. Deixe vazio se não há intervalo.",
         },
         {
           key: "escala",
@@ -138,6 +137,21 @@ export default function PaginaFuncionarios() {
           ),
         },
         {
+          key: "intervalos",
+          rotulo: "Intervalos",
+          render: (f) => (
+            <span className="num" style={{ fontSize: 11, color: "var(--tinta-2)" }}>
+              {rotularIntervalos(csvDoTrio(f))}
+              {totalIntervaloMin(csvDoTrio(f)) > 0 && (
+                <span style={{ color: "var(--tinta-3)" }}>
+                  {" · "}
+                  {formatarDuracao(totalIntervaloMin(csvDoTrio(f)))}
+                </span>
+              )}
+            </span>
+          ),
+        },
+        {
           key: "escala",
           rotulo: "Escala",
           render: (f) =>
@@ -146,7 +160,26 @@ export default function PaginaFuncionarios() {
         {
           key: "id",
           rotulo: "Carga semanal",
-          render: (f) => <strong className="num">{formatarDuracao(cargaSemanalMin(f))}</strong>,
+          render: (f) => {
+            // 44h é o teto semanal da CLT. O sistema já sabia somar e mostrava
+            // 46h30 em negrito, sem dizer nada — número que serve para medir
+            // não pode ficar mudo (mesma regra da régua de ocupação).
+            const min = cargaSemanalMin(f);
+            const passa = min > 44 * 60;
+            return (
+              <span style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                <strong className="num">{formatarDuracao(min)}</strong>
+                {passa && (
+                  <span
+                    className="selo selo-amarelo"
+                    title={`${formatarDuracao(min - 44 * 60)} acima das 44h semanais. Confira a escala e os intervalos — ou registre como hora extra.`}
+                  >
+                    +{formatarDuracao(min - 44 * 60)}
+                  </span>
+                )}
+              </span>
+            );
+          },
         },
         {
           key: "ativo",

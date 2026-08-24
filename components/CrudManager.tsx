@@ -12,6 +12,7 @@ import { apiDelete, apiPost, apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { DIAS_SEMANA, DIAS_SEMANA_CURTO, parseDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import Carregando from "./Carregando";
 import Modal from "./Modal";
+import { listarIntervalos } from "@/lib/intervalos";
 
 export interface OpcaoCampo {
   valor: string;
@@ -30,6 +31,7 @@ export interface CampoForm {
     | "checkbox"
     | "textarea"
     | "dias_semana"
+    | "intervalos"
     | "multiselect";
   /**
    * Opções do select/multiselect. Como função, recalcula a cada digitação —
@@ -100,6 +102,74 @@ function rotuloDoItem(item: Registro): string {
     if (typeof valor === "string" && valor.trim()) return valor.trim();
   }
   return "este registro";
+}
+
+/**
+ * Editor da lista de intervalos do dia (lanche + almoço + lanche).
+ *
+ * Guarda no formulário o mesmo CSV `HH:mm-HH:mm;…` que o banco usa — o
+ * componente só troca a digitação do ponto e vírgula por linhas. Nasceu da
+ * pergunta do dono do produto olhando o cadastro: *"e os lanches, não deveria
+ * ser possível cadastrar também?"* — os lanches já existiam no dado (os 26 da
+ * DT têm três intervalos), e era a tela que mostrava um só.
+ */
+function EditorIntervalos({
+  valor,
+  aoMudar,
+}: {
+  valor: string;
+  aoMudar: (v: string) => void;
+}) {
+  const pares = listarIntervalos(valor);
+  const escrever = (lista: { inicio: string; fim: string }[]) =>
+    aoMudar(lista.filter((p) => p.inicio || p.fim).map((p) => `${p.inicio}-${p.fim}`).join(";"));
+
+  const linhas = pares.length > 0 ? pares : [];
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      {linhas.map((p, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="time"
+            value={p.inicio}
+            aria-label={`Início do intervalo ${i + 1}`}
+            onChange={(e) =>
+              escrever(linhas.map((x, j) => (j === i ? { ...x, inicio: e.target.value } : x)))
+            }
+            style={{ flex: 1 }}
+          />
+          <span style={{ color: "var(--tinta-3)" }}>–</span>
+          <input
+            type="time"
+            value={p.fim}
+            aria-label={`Fim do intervalo ${i + 1}`}
+            onChange={(e) =>
+              escrever(linhas.map((x, j) => (j === i ? { ...x, fim: e.target.value } : x)))
+            }
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            className="botao-secundario"
+            title="Remover este intervalo"
+            aria-label={`Remover o intervalo ${i + 1}`}
+            onClick={() => escrever(linhas.filter((_, j) => j !== i))}
+            style={{ padding: "4px 10px" }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="botao-secundario"
+        onClick={() => escrever([...linhas, { inicio: "12:00", fim: "13:00" }])}
+        style={{ justifySelf: "start", padding: "4px 10px", fontSize: 12 }}
+      >
+        + Adicionar intervalo
+      </button>
+    </div>
+  );
 }
 
 export default function CrudManager<T extends Registro>({
@@ -496,6 +566,11 @@ export default function CrudManager<T extends Registro>({
                     );
                   })}
                 </span>
+              ) : c.tipo === "intervalos" ? (
+                <EditorIntervalos
+                  valor={String(form[c.key] ?? "")}
+                  aoMudar={(v) => setForm((f) => ({ ...f, [c.key]: v }))}
+                />
               ) : (
                 <input
                   type={

@@ -21,6 +21,7 @@ import {
   tempoPlanejadoMin,
 } from "./calculations";
 import { hhmmParaMin, intervalosSobrepoem, minParaHHMM } from "./dateUtils";
+import { problemaNosIntervalos } from "./intervalos";
 
 /** Valida a alocação de um bloco [inicioMin, fimMin) na agenda do funcionário. */
 export function validarAlocacao(args: {
@@ -213,6 +214,11 @@ export function validarFuncionario(f: Partial<Funcionario>): AlertaValidacao[] {
       codigo: "SEM_JORNADA",
       mensagem: "Horários de entrada e saída são obrigatórios (HH:mm).",
     });
+  // O intervalo entra na jornada líquida, que é o denominador de toda ocupação
+  // do sistema. CSV malformado passava batido e sumia da conta em silêncio.
+  const problema = problemaNosIntervalos(f.intervalos, { entrada: f.entrada, saida: f.saida });
+  if (problema)
+    alertas.push({ nivel: "erro", codigo: "INTERVALOS_INVALIDOS", mensagem: problema });
   return alertas;
 }
 

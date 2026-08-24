@@ -1,4 +1,5 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { validarFuncionario, temErro } from "@/lib/validations";
 import type { Funcionario } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -19,7 +20,8 @@ export async function createFuncionario(
   dados: DadosFuncionario,
   autor: string,
 ): Promise<Funcionario> {
-  const alertas = validarFuncionario(dados);
+  const comIntervalos = { ...dados, intervalos: csvDoTrio(dados) };
+  const alertas = validarFuncionario(comIntervalos);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
   const ds = await getDataSource();
   const sede = await ds.obter("sedes", dados.sede_id);
@@ -30,7 +32,9 @@ export async function createFuncionario(
   const agora = agoraISO();
   return ds.criar("funcionarios", {
     id: novoId(),
-    ...dados,
+    // `intervalos` é a fonte; o trio antigo sai derivado dela, para os dois
+    // nunca mais discordarem (ver `lib/intervalos.ts`).
+    ...sincronizarTrio(comIntervalos),
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,
@@ -47,6 +51,9 @@ export async function updateFuncionario(
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
   const destino = { ...atual, ...mudancas };
+  // Cadastro antigo que só tem o trio: monta o CSV a partir dele, senão abrir
+  // e salvar pelo formulário novo apagaria o intervalo da pessoa.
+  destino.intervalos = csvDoTrio(destino);
   const alertas = validarFuncionario(destino);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
 
@@ -76,7 +83,7 @@ export async function updateFuncionario(
       ]);
   }
   return ds.atualizar("funcionarios", id, {
-    ...mudancas,
+    ...sincronizarTrio({ ...mudancas, intervalos: destino.intervalos }),
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });
