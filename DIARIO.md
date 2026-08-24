@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-08-24 — Deploy recusado: `tipo_local` continuou união fechada, e o meu grep escondeu
+
+O commit anterior **quebrou o build na Vercel**. Dois erros, e o segundo é pior.
+
+### O defeito
+
+`Local.tipo_local` era a união fechada `TipoLocal` (`"sala" | "banheiro" | …`).
+Fiz o tipo virar catálogo cadastrável e **esqueci o próprio campo**: um tipo
+criado pela operação não cabe numa união escrita por mim. Virou `string` (o id
+do catálogo); `TipoLocal` continua existindo como as chaves de
+`FATOR_POR_TIPO_LOCAL`, a rede dos 12 tipos antigos.
+
+Foi o teste novo que denunciou — ele usa `"laboratorio"` e `"quadra"`, que é
+justamente o caso que o catálogo existe para permitir. O teste estava certo; o
+tipo é que não tinha sido aberto.
+
+### O erro de processo, que é o que importa
+
+Eu conferi o build com:
+
+```
+npm run build 2>&1 | grep -E "Compiled|Error" | head -2
+```
+
+O Next **compila primeiro e roda o TypeScript depois**. O erro sai como
+`error TS2322` (minúsculo) e `Failed to type check` — **nenhum dos dois casa com
+`Error`** —, e o `head -2` cortava o resto. Ou seja: o build local falhou
+exatamente igual ao da Vercel, e eu li a linha `✓ Compiled successfully` que vem
+**antes** e declarei limpo.
+
+O detector era meu, e só achava o que eu tinha previsto. Passei a conferir por
+**código de saída**:
+
+```
+npm run build > /tmp/b.log 2>&1; echo $?
+```
+
+E é a **quarta ocorrência** dessa família na sessão — as outras três estão na
+entrada de 20/08 (`--reporter=basic` que não existia, o emulador de outro
+projeto, o `sed` que não casou por causa do escape do `&&`). Anotado na memória
+do projeto com a regra explícita: **conferir por código de saída, nunca por
+`grep` de palavra escolhida por mim**.
+
+301 testes, `tsc` limpo e build com saída 0 — os três conferidos sem filtro.
+
+**Arquivos:** `types/Local.ts`.
+
+---
+
 ## 2026-08-24 — Tipo de local virou catálogo, e quem cria informa o fator
 
 Pedido do dono do produto, feito três vezes: *"seria bom poder criar no próprio

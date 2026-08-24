@@ -1,4 +1,4 @@
-import type { Auditoria, TipoLocal } from "./comum";
+import type { Auditoria } from "./comum";
 
 export interface Local extends Auditoria {
   id: string;
@@ -6,7 +6,14 @@ export interface Local extends Auditoria {
   sede_id: string;
   andar: string;
   nome_local: string;
-  tipo_local: TipoLocal;
+  /**
+   * Id do tipo no catálogo `tipos_local`. Era a união fechada `TipoLocal` até
+   * 24/08/2026; virou **string** quando o tipo passou a ser cadastrável, senão
+   * um tipo criado pela operação não caberia no próprio campo. `TipoLocal`
+   * continua existindo como as chaves de `FATOR_POR_TIPO_LOCAL` — a rede de
+   * segurança dos 12 tipos que já vinham no código.
+   */
+  tipo_local: string;
   /** Metragem em m². 0 dispara alerta de "local sem metragem". */
   metragem: number;
   /**
