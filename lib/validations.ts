@@ -219,6 +219,38 @@ export function validarFuncionario(f: Partial<Funcionario>): AlertaValidacao[] {
   const problema = problemaNosIntervalos(f.intervalos, { entrada: f.entrada, saida: f.saida });
   if (problema)
     alertas.push({ nivel: "erro", codigo: "INTERVALOS_INVALIDOS", mensagem: problema });
+
+  // `jornadaDoDia` só aplica o horário de sábado quando os DOIS campos existem.
+  // Com um só preenchido ela cai no horário do dia útil **em silêncio** — o
+  // sábado passaria a valer 8h30 sem ninguém pedir. Recusar é melhor que adivinhar.
+  const temEntradaSab = Boolean(f.entrada_sabado?.trim());
+  const temSaidaSab = Boolean(f.saida_sabado?.trim());
+  if (temEntradaSab !== temSaidaSab)
+    alertas.push({
+      nivel: "erro",
+      codigo: "SABADO_INCOMPLETO",
+      mensagem:
+        "Preencha entrada E saída do sábado, ou deixe os dois vazios — com só um deles o sábado herda o horário do dia útil sem avisar.",
+    });
+  if (temEntradaSab && temSaidaSab) {
+    const ini = hhmmParaMin(f.entrada_sabado ?? "");
+    const fim = hhmmParaMin(f.saida_sabado ?? "");
+    if (!Number.isNaN(ini) && !Number.isNaN(fim) && fim <= ini)
+      alertas.push({
+        nivel: "erro",
+        codigo: "SABADO_INVERTIDO",
+        mensagem: "No sábado, a saída precisa ser depois da entrada.",
+      });
+    // O sistema não representa intervalo no sábado (`jornadaDoDia` zera). Até 4h
+    // isso é fiel; acima disso a jornada líquida do dia sai maior do que é.
+    if (!Number.isNaN(ini) && !Number.isNaN(fim) && fim - ini > 4 * 60)
+      alertas.push({
+        nivel: "alerta",
+        codigo: "SABADO_SEM_INTERVALO",
+        mensagem:
+          "Sábado com mais de 4h: o sistema não desconta intervalo neste dia, então a jornada líquida do sábado sai cheia.",
+      });
+  }
   return alertas;
 }
 

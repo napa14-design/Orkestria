@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-08-24 — O que a planilha da CESIU diz sobre intervalo, e o silêncio do sábado
+
+Duas perguntas do dono, das que se respondem medindo.
+
+### "Não tem na planilha os intervalos?"
+
+Tem, e são **um por pessoa**:
+
+| aba | linha | tempo |
+|---|---|---|
+| Glaydson | `INTERVALO 12:00 ÀS 13:30` | **1h30** |
+| Eveline | `INTERVALO 13:00 ÀS 14:30` | **1h30** |
+| Jeová | `INTERVALO 17:00 ÀS 18:00` | 1h00 |
+
+Nenhum lanche, e **nenhuma menção a sábado** — é uma "Rota Diária", de dia útil.
+Ou seja: o cadastro (1h30) está fiel à planilha, e as **2h** digitadas hoje são
+informação nova, que a planilha não contém. O sábado 07:00–11:00 também não vem
+dela: foi cadastrado hoje pela coordenação (a importação gravou `seg_sex`).
+
+### "E se tiver intervalo no sábado?"
+
+Hoje **não dá**: `jornadaDoDia` zera o intervalo no sábado com horário próprio
+(`intervalo_min: 0`, `intervalos: ""`), por decisão registrada no comentário.
+
+Medido antes de opinar: **3 pessoas trabalham sábado, todas 07:00–11:00 — 4h
+cravadas**, faixa em que a CLT não exige intervalo (de 4h a 6h são 15 min; acima
+de 6h, uma hora). A lacuna é real e está **vazia**. Construir `intervalos_sabado`
+agora seria acrescentar campo sem nenhum dado pedindo — exatamente o que a
+doutrina desta manhã manda não fazer. Fica à espera de uma sede com sábado maior.
+
+O que **entrou** foi o sistema parar de somar calado:
+
+- **Sábado pela metade agora é recusado.** `jornadaDoDia` só aplica o horário de
+  sábado quando os **dois** campos existem; com um só preenchido, ela caía no
+  horário do dia útil **em silêncio** — o sábado passaria a valer 8h30 sem
+  ninguém pedir. Hoje 0 cadastros estão nesse estado; o caminho é que existia.
+- **Saída antes da entrada no sábado** também é recusada.
+- **Sábado acima de 4h vira alerta** (não erro): *"o sistema não desconta
+  intervalo neste dia, então a jornada líquida do sábado sai cheia"*. É a
+  limitação falando por si, em vez de virar número errado.
+
+277 testes (eram 271). A mutação da trava do sábado incompleto derruba 1.
+
+**Arquivos:** `lib/validations.ts`, `testes/intervalos.test.ts`.
+
+---
+
 ## 2026-08-24 — A mesma informação em dois campos, e o formulário editava o que perde
 
 Reportado da tela: *"pq ta dando 46h30?"* — Gleydison e Eveline apareciam com

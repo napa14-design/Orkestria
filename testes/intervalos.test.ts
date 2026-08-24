@@ -10,7 +10,8 @@
  * campos em desacordo.
  */
 import { describe, expect, it } from "vitest";
-import { jornadaLiquidaMin, cargaSemanalMin } from "@/lib/calculations";
+import { jornadaDoDia, jornadaLiquidaMin, cargaSemanalMin } from "@/lib/calculations";
+import { validarFuncionario } from "@/lib/validations";
 import {
   csvDoTrio,
   listarIntervalos,
@@ -193,5 +194,69 @@ describe("resumo e rótulo", () => {
   it("o rótulo da lista mostra todos, não só o almoço", () => {
     expect(rotularIntervalos(COM_LANCHES)).toBe("09:00-09:15 · 11:30-13:00 · 15:00-15:15");
     expect(rotularIntervalos("")).toBe("—");
+  });
+});
+
+/**
+ * O sábado não tem intervalo — e isso é decisão, não esquecimento.
+ *
+ * `jornadaDoDia` zera o intervalo no sábado com horário próprio. Medido na
+ * produção em 24/08/2026: as únicas 3 pessoas que trabalham sábado fazem
+ * 07:00–11:00, **4h cravadas**, onde a CLT não exige intervalo. O que faltava era
+ * o sistema **dizer** isso quando o sábado passa de 4h, em vez de somar calado.
+ */
+describe("sábado", () => {
+  const base = {
+    nome: "Teste",
+    sede_id: "s1",
+    entrada: "06:30",
+    saida: "16:30",
+    intervalos: "12:00-13:30",
+    escala: "seg_sab",
+  } as unknown as Funcionario;
+
+  const codigos = (f: Partial<Funcionario>) => validarFuncionario(f).map((a) => a.codigo);
+
+  it("sábado de 4h não desconta intervalo — 07:00–11:00 vale 4h", () => {
+    const f = { ...base, entrada_sabado: "07:00", saida_sabado: "11:00" };
+    const sab = jornadaDoDia(f, "2026-08-22"); // sábado
+    expect(sab.entrada).toBe("07:00");
+    expect(sab.intervalos).toBe("");
+    expect(jornadaLiquidaMin(sab)).toBe(4 * 60);
+  });
+
+  it("na segunda o intervalo do dia útil continua valendo", () => {
+    const f = { ...base, entrada_sabado: "07:00", saida_sabado: "11:00" };
+    expect(jornadaLiquidaMin(jornadaDoDia(f, "2026-08-24"))).toBe(8 * 60 + 30);
+  });
+
+  it("metade do horário de sábado é recusada — antes caía no dia útil calado", () => {
+    expect(codigos({ ...base, entrada_sabado: "07:00" })).toContain("SABADO_INCOMPLETO");
+    expect(codigos({ ...base, saida_sabado: "11:00" })).toContain("SABADO_INCOMPLETO");
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "11:00" })).not.toContain(
+      "SABADO_INCOMPLETO",
+    );
+    expect(codigos(base)).not.toContain("SABADO_INCOMPLETO");
+  });
+
+  it("sábado invertido é recusado", () => {
+    expect(codigos({ ...base, entrada_sabado: "11:00", saida_sabado: "07:00" })).toContain(
+      "SABADO_INVERTIDO",
+    );
+  });
+
+  it("acima de 4h o sistema AVISA que não desconta intervalo no sábado", () => {
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "11:00" })).not.toContain(
+      "SABADO_SEM_INTERVALO",
+    );
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "13:00" })).toContain(
+      "SABADO_SEM_INTERVALO",
+    );
+  });
+
+  it("o aviso não bloqueia o cadastro — é alerta, não erro", () => {
+    const alertas = validarFuncionario({ ...base, entrada_sabado: "07:00", saida_sabado: "13:00" });
+    const sabado = alertas.find((a) => a.codigo === "SABADO_SEM_INTERVALO");
+    expect(sabado?.nivel).toBe("alerta");
   });
 });
