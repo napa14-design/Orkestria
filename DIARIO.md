@@ -7,6 +7,69 @@
 
 ---
 
+## 2026-08-20 — "Derivar antes de configurar" entrou na doutrina, e a varredura dos parâmetros
+
+O dono do produto viu o que eu não vi: consertar o encaixe da agenda por
+**parâmetro** teria "dificultado 20x". Virou regra e virou varredura.
+
+### Na doutrina
+
+Nova seção **"Derivar antes de configurar"** e uma **sexta pergunta no portão**:
+
+> *Isto pode ser derivado do dado que já existe?* — Se puder, derive. Um
+> parâmetro novo não é uma decisão adiada: é uma decisão **transferida** para
+> quem tem menos contexto que o sistema, e repetida em cada sede.
+
+O texto guarda o caso completo (o passo de 30 min da CESIU, os 80% de blocos
+irreproduzíveis) e por que a saída óbvia era ruim em três frentes — inclusive a
+que eu não tinha visto: **o número "certo" piorava outra coisa**. Com passo de 5,
+a grade fica com 190 linhas e encostar uma tarefa na outra vira mira de 12px.
+
+Também registra os três exemplos do mesmo movimento já no código
+(`CAPACIDADE_TAREFAS` derivada da geometria, `FATOR_POR_TIPO_LOCAL` como padrão
+com override, e o `bloco_agenda_min` depois do ímã) e a forma preferida quando a
+configuração precisa existir: **derivado por padrão, configurável por exceção**.
+
+### A varredura: 11 parâmetros, 8 chaves
+
+O achado que eu não esperava:
+
+**`bloco_agenda_min` é o ÚNICO parâmetro que alguém já mudou.** Três sedes têm
+override (15 min); as outras sete chaves nunca saíram do valor `geral`. São
+constantes fantasiadas de parâmetro — cada uma carregando o custo de existir na
+tela sem nunca ter servido para nada.
+
+| Chave | Valor | Overrides | Veredito |
+|---|---|---|---|
+| `bloco_agenda_min` | geral 30 · 3 sedes em 15 | **3** | Derivável dos dados (o MDC dos minutos de início da sede) |
+| `ocupacao_baixa/adequada/alta` | 60 / 85 / 100 | 0 | **Juízo de gestão**, não derivável — mas ver abaixo |
+| `desvio_justificativa_percentual` | 30 | 0 | Juízo. Manter |
+| `tolerancia_sobrecarga_min` | **0** | 0 | Vale zero desde sempre; candidato a aposentadoria |
+| `min_execucoes_ajuste` · `desvio_ajuste_percentual` | 3 · 15 | 0 | Estatística do ajuste automático — com **0 execuções** em produção, nunca rodou |
+| `folga_minima_percentual` · `deslocamento_min_por_tarefa` | — | — | **Nem existem no banco**: só como padrão no código |
+
+### O achado que vale decisão
+
+**Todas as 8 chaves estão com `editavel_por_supervisor = SIM`** — inclusive
+`ocupacao_alta`, que é o número que define o que **é** sobrecarga.
+
+Ou seja: hoje, a pessoa cuja operação está sendo medida pode mover a régua que a
+mede. Bastaria pôr `ocupacao_alta = 200` para os 121% da CESIU deixarem de ser
+sobrecarga. Nada no sistema acusaria — é um parâmetro legítimo mudando de valor.
+
+Isso não é hipótese ociosa: o propósito declarado da implantação da CESIU é
+**comprovar sobrecarga**. Uma régua que o medido pode ajustar não comprova nada.
+
+Por isso a doutrina ganhou também a pergunta final sobre configuração: **quem
+pode mudar?** Número que mede a operação não pode ser editável por quem é medido.
+
+**Não mexi em nenhum parâmetro** — é decisão de produto, e a lista está aqui para
+ser decidida de uma vez.
+
+### Arquivos
+
+`docs/00-doutrina.md`
+
 ## 2026-08-20 — O arrasto virou ímã: o horário deixou de depender da grade
 
 Pergunta do dono do produto, melhor que a minha resposta: *"isso não deveria ser

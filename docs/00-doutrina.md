@@ -69,6 +69,48 @@ Sem respostas concretas às cinco, a mudança não entra:
    — O dia mediano tem que ser feito pelo supervisor menos técnico, que ignora
    toda a esperteza (Ctrl+K, sugestões, favoritas). O esperto é bônus, nunca
    dependência.
+6. **Isto pode ser derivado do dado que já existe?** — Se puder, derive. Um
+   parâmetro novo não é uma decisão adiada: é uma decisão **transferida** para
+   quem tem menos contexto que o sistema, e repetida em cada sede.
+
+## Derivar antes de configurar
+
+Configuração parece barata porque adia a decisão. Ela não adia: **transfere** —
+para alguém que sabe menos do que o sistema, e uma vez por sede.
+
+O caso que gerou esta regra: o horário de soltar uma tarefa na agenda era o
+encaixe na grade, cujo passo é o parâmetro `bloco_agenda_min`. A CESIU herdou 30
+min, e a rota real dela tem blocos começando em **todos os múltiplos de 5** —
+resultado, **80% dos blocos estavam em horários que a própria agenda não deixava
+reproduzir**. Dava para arrastar uma tarefa para fora e não dava para trazer de
+volta.
+
+A saída óbvia era configurar 5 min naquela sede. Ela tem três defeitos:
+
+- alguém precisa **saber que o parâmetro existe** e qual o número certo;
+- toda sede nova nasce com o problema, porque o padrão continua 30;
+- e o número certo **piora outra coisa**: com passo de 5, a grade fica com 190
+  linhas e encostar uma tarefa na outra vira mira de 12px.
+
+A saída certa foi **derivar**: soltar perto do fim de um bloco encaixa ali,
+porque as bordas das tarefas **são o dado que já está na tela**. Nenhuma
+configuração, nenhuma sede especial, e funciona melhor onde a rota é mais fina.
+
+Três exemplos do mesmo movimento no código, para reconhecer o padrão:
+
+- **`CAPACIDADE_TAREFAS`** (ficha impressa) é calculada da geometria — um laço
+  acha o último `n` que não colide — em vez de um número escrito à mão que
+  envelhece no próximo ajuste de layout.
+- **`FATOR_POR_TIPO_LOCAL`** preenche o fator de intensidade pelo tipo do local;
+  o valor digitado vence quando existe. **Derivado por padrão, configurável por
+  exceção** — esta é a forma preferida quando a configuração precisa existir.
+- **`bloco_agenda_min`**, depois do ímã, deixou de governar o que se pode
+  planejar e virou só o passo do vazio. O parâmetro não sumiu; parou de ser um
+  obstáculo.
+
+Quando a configuração tiver mesmo de existir, uma última pergunta: **quem pode
+mudar?** Número que serve para *medir a operação* não pode ser editável por quem
+é medido — senão a medida vira opinião.
 
 ## A exceção também é uma decisão curta
 
