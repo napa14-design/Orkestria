@@ -68,7 +68,7 @@ unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 id · nome_sede · cidade · endereco · **tipo_sede** (educacao_infantil · escola ·
 faculdade · administrativo · outros) · **grupo** (texto, ex.: "Sul") · ativo ·
 auditoria. `tipo_sede`/`grupo` são opcionais e servem para comparar/agrupar
-sedes; a folga-alvo continua por sede (`folga_minima_percentual`).
+sedes.
 
 ### locais
 | Campo | Tipo | Observação |
@@ -292,9 +292,13 @@ precisa logar manualmente.
 | ocupacao_adequada | 85 | percentual | geral |
 | ocupacao_alta | 100 | percentual | geral |
 | desvio_justificativa_percentual | 30 | percentual | geral |
-| tolerancia_sobrecarga_min | 0 | numero | geral |
 | min_execucoes_ajuste | 3 | numero | geral |
 | desvio_ajuste_percentual | 15 | percentual | geral |
+
+Os três limites de ocupação (`ocupacao_baixa`/`adequada`/`alta`) só são
+alteráveis por **administrador**, independentemente da flag
+`editavel_por_supervisor`: são a régua que mede a operação do supervisor
+(`CHAVES_SO_ADMINISTRADOR` em `lib/permissions.ts`).
 
 ## Google Sheets (banco provisório)
 

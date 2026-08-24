@@ -1,5 +1,9 @@
 import { comSessao, ok } from "@/lib/api";
-import { limitarSedeConsulta, podeAlterarSede } from "@/lib/permissions";
+import {
+  CHAVES_SO_ADMINISTRADOR,
+  limitarSedeConsulta,
+  podeAlterarSede,
+} from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createParametro,
@@ -33,10 +37,14 @@ export async function POST(req: Request) {
     const dados = await req.json();
     if (
       sessao.perfil === "supervisor" &&
-      (!dados.editavel_por_supervisor || !podeAlterarSede(sessao, dados.sede_id))
+      (!dados.editavel_por_supervisor ||
+        !podeAlterarSede(sessao, dados.sede_id) ||
+        // Sem isto, travar o PUT seria teatro: bastava CRIAR um
+        // `ocupacao_alta` da própria sede, que sobrescreve o geral.
+        CHAVES_SO_ADMINISTRADOR.has(dados.chave))
     )
       throw new ErroPermissao(
-        "Supervisores só criam parâmetros editáveis no escopo das sedes que operam.",
+        "Supervisores só criam parâmetros editáveis no escopo das sedes que operam, e nunca os limites de ocupação.",
       );
     return ok(await createParametro(dados, sessao.email), 201);
   });

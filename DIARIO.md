@@ -7,6 +7,96 @@
 
 ---
 
+## 2026-08-24 — A régua saiu da mão de quem é medido, três chaves foram aposentadas e o passo do vazio virou dado
+
+As três decisões que a varredura de parâmetros da entrada anterior deixou em
+aberto. Nenhuma delas cria tela nova; duas apagam.
+
+### 1. Os limites de ocupação só de administrador
+
+`ocupacao_baixa` / `ocupacao_adequada` / `ocupacao_alta` estavam com
+`editavel_por_supervisor = true` na produção. São a régua que diz que a CESIU
+está em **121%**: bastava um supervisor subir `ocupacao_alta` para 200 e a
+sobrecarga sumia da tela sem nada mudar no chão — e depois ninguém conseguiria
+distinguir "a sede melhorou" de "alguém mexeu na régua", porque o histórico
+guardaria só a mudança do número.
+
+A trava é **de código** (`CHAVES_SO_ADMINISTRADOR` em `lib/permissions.ts`) e
+não a flag do banco, de propósito: a flag é dado, e dado se edita na própria
+tela de Parâmetros. A regra tem que morar onde a tela não alcança.
+
+**O buraco maior estava na criação, não na edição.** Travar só o `PUT` seria
+teatro: `POST /api/parametros` deixava o supervisor **criar** um
+`ocupacao_alta` no escopo da própria sede, que sobrescreve o "geral" em
+`resolverParametros`. As duas portas passaram a checar a mesma lista.
+
+A coluna "Supervisor edita?" da tela agora mostra **"Só admin"** nessas três
+chaves — antes mostraria "Sim" e o servidor recusaria, ou seja, a tela mentiria.
+
+Na produção: `p2`, `p3` e `p4` com `editavel_por_supervisor: false`, para que
+uma leitura direta da coleção diga a mesma coisa que o código.
+
+### 2. Três chaves aposentadas
+
+| chave | por quê |
+|---|---|
+| `tolerancia_sobrecarga_min` | valia **0** desde sempre e **nenhum cálculo a lia** — só existia no default e no seed |
+| `folga_minima_percentual` | nunca esteve no banco de produção; default 0 |
+| `deslocamento_min_por_tarefa` | idem; entrava na ocupação multiplicado por 0 |
+
+A folga levou junto o painel **"Calibração da folga por sede"** do dashboard, que
+existia só para sugerir um valor para ela. Medido antes de apagar:
+`servicos_eventuais` tem **0 documentos** — a cadeia inteira (imprevisto → painel
+→ parâmetro → marca de alvo na barra de ocupação) nunca produziu um número.
+
+`resumoFuncionario` perdeu o campo `deslocamento_min`. Se o deslocamento voltar,
+volta como **dado medido**, não como campo a preencher — está anotado assim em
+`docs/08`.
+
+`parametros` foi de **11 para 10 documentos** e de 8 para **7 chaves distintas**.
+O documento apagado está inteiro no `historico` (`h_aposenta_p6`), com motivo.
+
+### 3. O passo do vazio deixou de ser configurado
+
+O ímã (entrada anterior) resolveu encostar uma tarefa em outra. O **vazio grande**
+continuava preso ao `bloco_agenda_min`: na CESIU, que herdou 30 do "geral" porque
+ninguém configurou nada, só dava para começar tarefa em `:00` e `:30` — numa rota
+toda em múltiplos de 5.
+
+`passoDoVazio` (`lib/encaixe.ts`) deriva o passo do **próprio dia na tela**: o mais
+grosso entre 30/20/15/10/5 que ainda reproduz **todos** os inícios já planejados.
+Dá 5 na CESIU, 15 na DT/Benfica/Eusébio, 30 numa sede que só planeja na hora
+cheia. **Zero leitura extra** — os inícios já estavam em `rotinas`.
+
+Dois limites, porque dado solto manda demais:
+
+- a **escada** em vez do MDC cru — dois blocos em `06:47` e `07:01` dariam passo
+  de 7 minutos, que ninguém reconheceria como jeito de planejar limpeza;
+- o **teto no parâmetro** — derivar pode afinar o passo, nunca engrossá-lo, senão
+  um dia com duas tarefas na hora cheia deixaria a grade mais grossa do que a
+  sede pediu.
+
+O `bloco_agenda_min` continua desenhando a linha da grade e o tamanho do card. Ele
+sobrou como **teto**, não como decisão.
+
+### Testes
+
+236 passando (eram 220). As três mutações que importavam foram pegas: passo
+sempre igual ao configurado, escada que ignora se o passo reproduz os inícios, e
+`podeEditarParametro` sem a lista de chaves travadas. *(A primeira rodada da
+mutação da escada deu "passou" — era o `sed` que não casou por causa do escape
+do `&&`, não o teste. Refeito em Python: 4 testes caem.)*
+
+**Arquivos:** `lib/permissions.ts`, `lib/encaixe.ts`, `lib/calculations.ts`,
+`lib/memoryStore.ts`, `types/Parametro.ts`, `types/comum.ts`,
+`app/api/parametros/route.ts`, `app/api/parametros/[id]/route.ts`,
+`app/(app)/parametros/page.tsx`, `app/(app)/dashboard/page.tsx`,
+`components/agenda/AgendaGrid.tsx`, `components/agenda/OccupancySummary.tsx`,
+`components/CalibracaoFolga.tsx` (removido), `testes/permissoes.test.ts`,
+`testes/encaixe.test.ts`, `docs/00-doutrina.md`, `docs/02`, `docs/03`, `docs/08`.
+
+---
+
 ## 2026-08-20 — "Derivar antes de configurar" entrou na doutrina, e a varredura dos parâmetros
 
 O dono do produto viu o que eu não vi: consertar o encaixe da agenda por

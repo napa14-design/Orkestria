@@ -105,12 +105,23 @@ Três exemplos do mesmo movimento no código, para reconhecer o padrão:
   o valor digitado vence quando existe. **Derivado por padrão, configurável por
   exceção** — esta é a forma preferida quando a configuração precisa existir.
 - **`bloco_agenda_min`**, depois do ímã, deixou de governar o que se pode
-  planejar e virou só o passo do vazio. O parâmetro não sumiu; parou de ser um
-  obstáculo.
+  planejar e virou só o passo do vazio — e o passo do vazio passou a ser
+  **derivado do próprio dia** (`passoDoVazio`, em `lib/encaixe.ts`): o passo
+  mais grosso que ainda reproduz todos os inícios que a sede já usa. O
+  parâmetro sobrou como **teto** do desenho da grade. Ninguém configura o
+  ritmo de uma sede: ele já estava escrito na rota dela.
 
 Quando a configuração tiver mesmo de existir, uma última pergunta: **quem pode
 mudar?** Número que serve para *medir a operação* não pode ser editável por quem
 é medido — senão a medida vira opinião.
+
+> Caso aplicado (24/08/2026): os três limites de ocupação
+> (`ocupacao_baixa`/`adequada`/`alta`) estavam marcados como editáveis por
+> supervisor. São a régua que diz que a CESIU está em 121% — bastava subir
+> `ocupacao_alta` para 200 e a sobrecarga sumia da tela sem nada mudar no chão.
+> Viraram **só de administrador**, por regra de código
+> (`CHAVES_SO_ADMINISTRADOR`) e não por flag no banco: a flag é dado, e dado
+> se edita.
 
 ## A exceção também é uma decisão curta
 

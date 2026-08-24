@@ -90,15 +90,33 @@ export function podeAlterarSede(sessao: SessaoUsuario, sedeId: string): boolean 
   return false;
 }
 
+/**
+ * Chaves que o supervisor não altera, mesmo marcadas como editáveis.
+ *
+ * Estas três são a RÉGUA que mede a operação do próprio supervisor: os 121% da
+ * CESIU só são sobrecarga porque `ocupacao_alta` vale 100. Deixar quem é medido
+ * mexer no medidor apaga o diagnóstico sem apagar o problema — e ninguém
+ * conseguiria distinguir depois "a sede melhorou" de "alguém subiu a régua".
+ *
+ * É regra de código, e não a flag `editavel_por_supervisor` do banco, de
+ * propósito: a flag é dado, e dado se edita. A regra precisa morar num lugar
+ * que a própria tela de parâmetros não alcance.
+ */
+export const CHAVES_SO_ADMINISTRADOR = new Set([
+  "ocupacao_baixa",
+  "ocupacao_adequada",
+  "ocupacao_alta",
+]);
+
 export function podeEditarParametro(
   sessao: SessaoUsuario,
-  editavelPorSupervisor: boolean,
-  sedeIdParametro: string,
+  parametro: { chave: string; editavel_por_supervisor: boolean; sede_id: string },
 ): boolean {
   if (sessao.perfil === "administrador") return true;
   if (sessao.perfil !== "supervisor") return false;
-  if (!editavelPorSupervisor) return false;
-  return sedeIdParametro === "geral" || podeAlterarSede(sessao, sedeIdParametro);
+  if (CHAVES_SO_ADMINISTRADOR.has(parametro.chave)) return false;
+  if (!parametro.editavel_por_supervisor) return false;
+  return parametro.sede_id === "geral" || podeAlterarSede(sessao, parametro.sede_id);
 }
 
 export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {

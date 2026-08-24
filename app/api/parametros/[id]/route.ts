@@ -10,7 +10,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const atual = await getParametroPorId(id);
     if (!atual) throw new Error("Parâmetro não encontrado.");
-    if (!podeEditarParametro(sessao, atual.editavel_por_supervisor, atual.sede_id))
+    if (!podeEditarParametro(sessao, atual))
       throw new ErroPermissao("Este parâmetro não é editável pelo seu perfil.");
     const mudancas = await req.json();
     if (

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { agruparRuns, type Run } from "@/lib/agenda";
-import { horarioDoEncaixe } from "@/lib/encaixe";
+import { horarioDoEncaixe, passoDoVazio } from "@/lib/encaixe";
 import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 import CardRotina from "./CardRotina";
 import BalaoDetalhe from "./BalaoDetalhe";
@@ -150,6 +150,16 @@ export default function AgendaGrid({
     return [ini, fim];
   }, [funcionarios, rotinas]);
 
+  /**
+   * O passo do VAZIO é derivado do próprio dia, não do parâmetro (ver
+   * `passoDoVazio`). Nada de leitura extra: os inícios já estão em `rotinas`.
+   * O `blocoMin` continua mandando na linha desenhada e no tamanho do card.
+   */
+  const passoVazio = useMemo(
+    () => passoDoVazio(rotinas.map((r) => hhmmParaMin(r.inicio_planejado)), blocoMin),
+    [rotinas, blocoMin],
+  );
+
   const totalBlocos = Math.max(1, Math.ceil((fimGrade - inicioGrade) / blocoMin));
   const slots = useMemo(
     () => Array.from({ length: totalBlocos }, (_, i) => inicioGrade + i * blocoMin),
@@ -188,7 +198,7 @@ export default function AgendaGrid({
     }));
     return horarioDoEncaixe({
       minutoBruto: minutoDoEvento(e, alvo),
-      blocoMin,
+      blocoMin: passoVazio,
       ocupados: doDia,
       pausas,
       entrada: hhmmParaMin(f.entrada),

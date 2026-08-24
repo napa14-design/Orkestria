@@ -91,3 +91,42 @@ export function horarioDoEncaixe(args: {
   const passo = blocoMin > 0 ? blocoMin : 1;
   return Math.floor(minutoBruto / passo) * passo;
 }
+
+/**
+ * Passo do vazio: de quanto em quanto tempo uma tarefa nova pode começar
+ * quando a pessoa solta o bloco LONGE de qualquer borda.
+ *
+ * Antes isso era o `bloco_agenda_min` da sede — um parâmetro. Foi ele que
+ * criou o problema original: a CESIU herdou 30 min do "geral" porque ninguém
+ * configurou nada, e a rota dela é toda em múltiplos de 5. O ímã resolveu
+ * encostar numa tarefa existente; o vazio continuava travado em `:00` e `:30`.
+ *
+ * A doutrina diz: *se dá para derivar do dado que já existe, derive*. E dá — o
+ * ritmo de uma sede está escrito nos horários que ela já usa: o passo é o mais
+ * grosso da escada abaixo que ainda reproduz **todos** os inícios do dia. Dá 5
+ * na CESIU, 15 na DT/Benfica/Eusébio e 30 numa sede que só planeja na hora
+ * cheia. Ninguém precisa decidir nada.
+ *
+ * Derivar pode **afinar** o passo, nunca engrossá-lo: o teto continua sendo o
+ * `bloco_agenda_min` da sede, que é também o tamanho da linha desenhada na
+ * grade. Dia sem nenhum bloco: não há dado, então vale o configurado.
+ */
+/**
+ * Passos considerados, do mais grosso para o mais fino. O MDC cru daria números
+ * como 7 (dois blocos em `06:47` e `07:01`) — ninguém planeja limpeza de 7 em 7
+ * minutos. A escada limita o derivado ao que uma pessoa reconheceria.
+ */
+export const PASSOS_POSSIVEIS = [30, 20, 15, 10, 5];
+
+export function passoDoVazio(inicios: number[], passoConfigurado: number): number {
+  const teto = passoConfigurado > 0 ? passoConfigurado : PASSOS_POSSIVEIS[0];
+  const validos = inicios.filter((m) => Number.isFinite(m) && m > 0);
+  if (validos.length === 0) return teto;
+  // O passo certo é o mais GROSSO que ainda reproduz todos os inícios que a
+  // sede já usa: se ela nunca começou fora do :00/:30, não há por que oferecer
+  // :05. Se começou, a agenda passa a oferecer.
+  const cabe = PASSOS_POSSIVEIS.find(
+    (passo) => passo <= teto && validos.every((m) => m % passo === 0),
+  );
+  return cabe ?? Math.min(teto, PASSOS_POSSIVEIS[PASSOS_POSSIVEIS.length - 1]);
+}

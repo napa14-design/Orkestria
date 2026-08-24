@@ -136,11 +136,8 @@ export const PARAMETROS_PADRAO: ParametrosResolvidos = {
   ocupacao_adequada: 85,
   ocupacao_alta: 100,
   desvio_justificativa_percentual: 30,
-  tolerancia_sobrecarga_min: 0,
   min_execucoes_ajuste: 3,
   desvio_ajuste_percentual: 15,
-  folga_minima_percentual: 0,
-  deslocamento_min_por_tarefa: 0,
 };
 
 /** Mediana de uma lista de números (robusta a execuções atípicas). */
@@ -391,7 +388,6 @@ export interface ResumoFuncionario {
   jornada_liquida_min: number;
   tempo_planejado_min: number;
   /** Deslocamento estimado do dia (nº de tarefas × parâmetro da sede). */
-  deslocamento_min: number;
   ociosidade_prevista_min: number;
   ocupacao_percentual: number;
   classificacao: ClassificacaoOcupacao;
@@ -406,15 +402,11 @@ export function resumoFuncionario(
   const jornada = jornadaLiquidaMin(funcionario);
   const planejado = tempoPlanejadoMin(rotinasDoDia);
   const totalTarefas = rotinasDoDia.filter((r) => r.status !== "cancelada").length;
-  // deslocamento entre espaços é tempo real do dia (volume invisível antes)
-  const deslocamento = totalTarefas * (p.deslocamento_min_por_tarefa || 0);
-  const ocupado = planejado + deslocamento;
-  const ocupacao = ocupacaoPercentual(ocupado, jornada);
+  const ocupacao = ocupacaoPercentual(planejado, jornada);
   return {
     jornada_liquida_min: jornada,
     tempo_planejado_min: planejado,
-    deslocamento_min: deslocamento,
-    ociosidade_prevista_min: ociosidadePrevistaMin(jornada, ocupado),
+    ociosidade_prevista_min: ociosidadePrevistaMin(jornada, planejado),
     ocupacao_percentual: ocupacao,
     classificacao: classificarOcupacao(ocupacao, p),
     total_tarefas: totalTarefas,

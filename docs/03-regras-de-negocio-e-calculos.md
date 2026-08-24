@@ -56,8 +56,16 @@ produtividade_m2_hora      = total_m2 / horas (planejada e realizada)
 Tarefa de 80 min com bloco de 15 min → `teto(80/15) = 6 blocos` → ocupa 90 min
 na agenda. O sistema **guarda os dois valores**: `tempo_previsto_min = 80`
 (usado em produtividade/ocupação) e `tempo_visual_min = 90` (usado só no
-desenho da agenda). A grade/snap usa `bloco_agenda_min` (padrão **15 min** —
-granularidade fina, alinhada à rota real das sedes; era 30).
+desenho da agenda). O **desenho** da grade usa `bloco_agenda_min` (padrão
+**15 min** — granularidade fina, alinhada à rota real das sedes; era 30).
+
+O **encaixe do arrasto** não usa mais o parâmetro (`lib/encaixe.ts`): soltar
+perto do fim de uma tarefa, do fim de uma pausa ou da entrada da pessoa **imanta
+naquela borda** (tolerância de 6 min); longe de tudo, cai num passo **derivado
+do próprio dia** — o mais grosso entre 30/20/15/10/5 que ainda reproduz todos os
+inícios já planejados naquela agenda, limitado pelo `bloco_agenda_min` da sede.
+Uma sede que planeja de 5 em 5 recebe passo de 5 sem configurar nada; uma que só
+planeja na hora cheia continua em 30.
 
 ### Exemplo por m² (com os dois fatores)
 

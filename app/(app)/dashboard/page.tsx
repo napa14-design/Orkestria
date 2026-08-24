@@ -3,7 +3,6 @@
 /** Dashboard de indicadores: ocupação, ociosidade, tempo por local/sede. */
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import CalibracaoFolga from "@/components/CalibracaoFolga";
 import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import SugestoesAjuste from "@/components/SugestoesAjuste";
@@ -24,7 +23,6 @@ import type {
   ParametrosResolvidos,
   RotinaPlanejada,
   Sede,
-  ServicoEventual,
   Tarefa,
 } from "@/types";
 
@@ -71,10 +69,6 @@ export default function PaginaDashboard() {
   );
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
     `/api/execucoes?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
-    fetcher,
-  );
-  const { data: eventuais } = useSWR<ServicoEventual[]>(
-    `/api/servicos-eventuais?de=${de}&ate=${ate}`,
     fetcher,
   );
 
@@ -380,15 +374,6 @@ export default function PaginaDashboard() {
 
       {/* ferramentas interativas — não fazem parte do relatório impresso */}
       <div className="nao-imprimir">
-        {/* calibração da folga por sede a partir dos imprevistos */}
-        <CalibracaoFolga
-          servicosEventuais={eventuais ?? []}
-          funcionarios={funcionarios ?? []}
-          sedes={sedes ?? []}
-          de={de}
-          ate={ate}
-          sedeFiltro={sedeFiltro}
-        />
 
         {/* tempos padrão para revisar (previsto × realidade) */}
         <SugestoesAjuste

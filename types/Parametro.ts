@@ -21,16 +21,8 @@ export interface ParametrosResolvidos {
   ocupacao_adequada: number;
   ocupacao_alta: number;
   desvio_justificativa_percentual: number;
-  tolerancia_sobrecarga_min: number;
   /** Mínimo de execuções com tempo real para sugerir ajuste de tempo padrão. */
   min_execucoes_ajuste: number;
   /** Desvio mediano (%) a partir do qual o sistema sugere ajustar o tempo base. */
   desvio_ajuste_percentual: number;
-  /** % da jornada reservado como folga (buffer p/ imprevistos). Define a
-   *  ocupação-alvo da sede = 100 − folga. 0 = sem reserva. */
-  folga_minima_percentual: number;
-  /** Minutos de deslocamento/transição atribuídos por tarefa alocada no dia.
-   *  Entra na ocupação como tempo real, sem poluir o desvio das tarefas.
-   *  0 = não contabiliza (até a sede calibrar). */
-  deslocamento_min_por_tarefa: number;
 }

@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
+import { CHAVES_SO_ADMINISTRADOR } from "@/lib/permissions";
 import type { Parametro, Sede } from "@/types";
 
 const TIPOS = [
@@ -71,7 +72,7 @@ export default function PaginaParametros() {
           rotulo: "Editável por supervisor",
           tipo: "checkbox",
           padrao: true,
-          dica: "Se marcado, supervisores podem alterar este parâmetro. Desmarcado, só administradores. Útil para travar configurações sensíveis.",
+          dica: "Se marcado, supervisores podem alterar este parâmetro. Desmarcado, só administradores. Útil para travar configurações sensíveis. Os limites de ocupação (ocupacao_baixa/adequada/alta) são sempre só de administrador, marcados ou não: é a régua que mede a própria sede.",
         },
         {
           key: "ativo",
@@ -90,11 +91,19 @@ export default function PaginaParametros() {
         {
           key: "editavel_por_supervisor",
           rotulo: "Supervisor edita?",
-          render: (p) => (
-            <span className={`selo ${p.editavel_por_supervisor ? "selo-verde" : "selo-cinza"}`}>
-              {p.editavel_por_supervisor ? "Sim" : "Não"}
-            </span>
-          ),
+          render: (p) => {
+            // A trava da régua de ocupação é de código, não do campo: a coluna
+            // mostraria "Sim" e o servidor recusaria — a tela mentiria.
+            const soAdmin = CHAVES_SO_ADMINISTRADOR.has(p.chave);
+            return (
+              <span
+                className={`selo ${p.editavel_por_supervisor && !soAdmin ? "selo-verde" : "selo-cinza"}`}
+                title={soAdmin ? "Limite de ocupação: só administrador altera." : undefined}
+              >
+                {soAdmin ? "Só admin" : p.editavel_por_supervisor ? "Sim" : "Não"}
+              </span>
+            );
+          },
         },
         {
           key: "atualizado_por",

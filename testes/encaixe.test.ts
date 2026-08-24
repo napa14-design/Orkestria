@@ -8,7 +8,13 @@
  * deixava reproduzir**.
  */
 import { describe, expect, it } from "vitest";
-import { TOLERANCIA_IMA_MIN, bordasDeEncaixe, horarioDoEncaixe } from "@/lib/encaixe";
+import {
+  PASSOS_POSSIVEIS,
+  TOLERANCIA_IMA_MIN,
+  bordasDeEncaixe,
+  horarioDoEncaixe,
+  passoDoVazio,
+} from "@/lib/encaixe";
 
 const M = (h: string) => {
   const [a, b] = h.split(":").map(Number);
@@ -104,5 +110,63 @@ describe("bordasDeEncaixe", () => {
   it("não inclui INÍCIO de bloco", () => {
     const b = bordasDeEncaixe({ ocupados: [{ ini: M("09:00"), fim: M("09:30") }], pausas: [], entrada: M("06:00") });
     expect(b.map(hhmm)).toEqual(["06:00", "09:30"]);
+  });
+});
+
+/**
+ * O passo do vazio deixou de ser configurado e passou a ser derivado do dia.
+ * Os números abaixo são os das sedes reais medidas em 24/08/2026: a CESIU sem
+ * parâmetro próprio (herda 30 do "geral") e rota em múltiplos de 5; DT,
+ * Benfica e Eusébio com `bloco_agenda_min = 15`.
+ */
+describe("passoDoVazio", () => {
+  const inicios = (...horas: string[]) => horas.map(M);
+
+  it("CESIU: parâmetro herdado de 30, rota de 5 em 5 → passo 5", () => {
+    // Era exatamente este o caso que travava o vazio em :00 e :30.
+    expect(passoDoVazio(MANHA.map((b) => b.ini), 30)).toBe(5);
+  });
+
+  it("sede que só planeja de 15 em 15 → passo 15", () => {
+    expect(passoDoVazio(inicios("06:45", "07:00", "07:30", "08:15"), 30)).toBe(15);
+  });
+
+  it("sede que só planeja na hora e meia-hora → continua 30", () => {
+    expect(passoDoVazio(inicios("07:00", "07:30", "09:00"), 30)).toBe(30);
+  });
+
+  it("derivar afina, nunca engrossa: teto é o parâmetro da sede", () => {
+    // Tudo na hora cheia daria 60; o configurado de 15 segura em 15.
+    expect(passoDoVazio(inicios("07:00", "09:00", "11:00"), 15)).toBe(15);
+  });
+
+  it("horário esquisito não vira régua de minuto — cai no passo mais fino", () => {
+    // MDC cru de 06:47 e 07:01 é 7. A escada não oferece 7.
+    expect(passoDoVazio(inicios("06:47", "07:01"), 30)).toBe(5);
+  });
+
+  it("dia vazio: sem dado para derivar, vale o configurado", () => {
+    expect(passoDoVazio([], 30)).toBe(30);
+    expect(passoDoVazio([], 15)).toBe(15);
+  });
+
+  it("ignora horários inválidos em vez de deixar NaN contaminar o passo", () => {
+    expect(passoDoVazio([NaN, M("07:15"), M("07:45")], 30)).toBe(15);
+    expect(passoDoVazio([NaN], 30)).toBe(30);
+  });
+
+  it("parâmetro zerado ou negativo não derruba o passo", () => {
+    expect(passoDoVazio(inicios("07:00", "07:30"), 0)).toBe(30);
+    expect(PASSOS_POSSIVEIS.every((p) => p > 0)).toBe(true);
+  });
+
+  it("o passo devolvido está sempre na escada e nunca acima do teto", () => {
+    for (let teto of [5, 10, 15, 20, 30]) {
+      for (let m = 300; m < 1080; m += 13) {
+        const p = passoDoVazio([m, m + 40, m + 95], teto);
+        expect(PASSOS_POSSIVEIS.includes(p), `teto ${teto}, minuto ${m}`).toBe(true);
+        expect(p).toBeLessThanOrEqual(teto);
+      }
+    }
   });
 });

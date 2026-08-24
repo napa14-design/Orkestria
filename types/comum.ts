@@ -5,10 +5,8 @@ export type Perfil = "administrador" | "supervisor" | "visualizador";
 export type Turno = "manha" | "tarde" | "noite" | "integral";
 
 /**
- * Natureza da sede — usada para comparar ociosidade entre unidades parecidas e
- * sugerir uma folga-alvo por perfil (ex.: educação infantil tende a uma folga
- * maior). Não altera cálculo sozinho; a folga-alvo continua em
- * `folga_minima_percentual` por sede.
+ * Natureza da sede — usada para comparar ociosidade entre unidades parecidas.
+ * Não altera cálculo sozinho.
  */
 export type TipoSede =
   | "educacao_infantil"

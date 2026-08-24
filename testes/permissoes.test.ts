@@ -7,9 +7,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  CHAVES_SO_ADMINISTRADOR,
   limitarSedeConsulta,
   montarSedesDaSessao,
   podeAlterarSede,
+  podeEditarParametro,
   sedesPermitidas,
   type SessaoUsuario,
 } from "@/lib/permissions";
@@ -110,5 +112,61 @@ describe("podeAlterarSede", () => {
   it("cookie antigo altera só a sede principal", () => {
     expect(podeAlterarSede(base, "aldeota")).toBe(true);
     expect(podeAlterarSede(base, "messejana")).toBe(false);
+  });
+});
+
+/**
+ * A régua não pertence a quem é medido.
+ *
+ * Os 121% da CESIU só são sobrecarga porque `ocupacao_alta` vale 100. Se o
+ * supervisor pudesse subir para 200, o diagnóstico sumiria da tela sem que
+ * nada mudasse no chão — e ninguém conseguiria distinguir depois "a sede
+ * melhorou" de "alguém mexeu na régua".
+ */
+describe("podeEditarParametro", () => {
+  const marcado = (chave: string, sede_id = "geral") => ({
+    chave,
+    editavel_por_supervisor: true,
+    sede_id,
+  });
+
+  it("supervisor edita parâmetro comum marcado como editável", () => {
+    expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min"))).toBe(true);
+    expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min", "aldeota"))).toBe(true);
+  });
+
+  it("supervisor NÃO edita os limites de ocupação, mesmo marcados como editáveis", () => {
+    for (const chave of CHAVES_SO_ADMINISTRADOR) {
+      expect(podeEditarParametro(umaSede, marcado(chave)), chave).toBe(false);
+      expect(podeEditarParametro(umaSede, marcado(chave, "aldeota")), chave).toBe(false);
+    }
+  });
+
+  it("as três chaves travadas são exatamente os limites de ocupação", () => {
+    expect([...CHAVES_SO_ADMINISTRADOR].sort()).toEqual([
+      "ocupacao_adequada",
+      "ocupacao_alta",
+      "ocupacao_baixa",
+    ]);
+  });
+
+  it("administrador continua editando tudo", () => {
+    for (const chave of CHAVES_SO_ADMINISTRADOR) {
+      expect(podeEditarParametro(admin, marcado(chave))).toBe(true);
+    }
+  });
+
+  it("visualizador não edita nada", () => {
+    expect(podeEditarParametro(gerencia, marcado("bloco_agenda_min"))).toBe(false);
+  });
+
+  it("supervisor não edita parâmetro de sede que não opera", () => {
+    expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min", "messejana"))).toBe(false);
+  });
+
+  it("a flag desmarcada continua valendo para as chaves comuns", () => {
+    expect(
+      podeEditarParametro(umaSede, { ...marcado("bloco_agenda_min"), editavel_por_supervisor: false }),
+    ).toBe(false);
   });
 });

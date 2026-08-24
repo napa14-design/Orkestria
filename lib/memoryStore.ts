@@ -194,12 +194,9 @@ function seed(): Banco {
       { id: "p3", chave: "ocupacao_adequada", valor: "85", tipo: "percentual", descricao: "Limite para considerar ocupação adequada", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p4", chave: "ocupacao_alta", valor: "100", tipo: "percentual", descricao: "Limite para alta ocupação/sobrecarga", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p5", chave: "desvio_justificativa_percentual", valor: "30", tipo: "percentual", descricao: "Percentual de desvio que exige justificativa", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
-      { id: "p6", chave: "tolerancia_sobrecarga_min", valor: "0", tipo: "numero", descricao: "Tolerância em minutos antes de marcar sobrecarga", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p7", chave: "tempo_limpeza_m2_recepcao", valor: "1", tipo: "min_por_m2", descricao: "Tempo padrão por m² para limpeza de recepção", sede_id: "christus_dt", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p8", chave: "min_execucoes_ajuste", valor: "3", tipo: "numero", descricao: "Mínimo de execuções com tempo real para sugerir ajuste de tempo padrão", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
       { id: "p9", chave: "desvio_ajuste_percentual", valor: "15", tipo: "percentual", descricao: "Desvio mediano que dispara sugestão de ajuste do tempo base", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
-      { id: "p10", chave: "folga_minima_percentual", valor: "10", tipo: "percentual", descricao: "Folga reservada da jornada (buffer p/ imprevistos) — ocupação-alvo = 100 − este valor", sede_id: "geral", editavel_por_supervisor: true, ativo: true, ...aud },
-      { id: "p11", chave: "deslocamento_min_por_tarefa", valor: "5", tipo: "numero", descricao: "Minutos de deslocamento/transição por tarefa alocada (entra na ocupação)", sede_id: "christus_dt", editavel_por_supervisor: true, ativo: true, ...aud },
     ],
   };
 }

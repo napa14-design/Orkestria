@@ -31,9 +31,9 @@ O fator da categoria foi **neutralizado** (deixou de afetar o cálculo; a ação
 
 **Onda 5 (feito — parte de produto):** a Sede ganhou **`tipo_sede`** (educação
 infantil · escola · faculdade · administrativo · outros) e **`grupo`** (ex.:
-"Sul"), cadastráveis na tela de Sedes. A **folga-alvo já é por sede**
-(`folga_minima_percentual`), então a "ociosidade-alvo por tipo" se resolve
-configurando o parâmetro de cada sede. A **visão agregada** foi entregue no
+"Sul"), cadastráveis na tela de Sedes. A "ociosidade-alvo por tipo" ficava a cargo do
+parâmetro `folga_minima_percentual` por sede — **aposentado em 24/08/2026**
+por nunca ter saído do zero (ver DIARIO). A **visão agregada** foi entregue no
 painel **`/panorama`** (menu Painéis): soma ocupação e ociosidade de todas as
 sedes por **grupo** ou por **tipo**, com ocupação média (ponderada por
 funcionário), ociosidade total, sobrecarga, barras por sede e dica de remanejo
@@ -71,8 +71,9 @@ houver tarefa letiva devida, a agenda mostra um **aviso forte** pedindo o
 cadastro. Lógica pura em `statusPeriodoLetivo` (`lib/calculations.ts`).
 
 **Onda 2 (resolvida):** a precisão dos números **não depende do bloco visual**
-— `tempo_previsto_min` é exato e o **deslocamento** já é parâmetro por sede
-(`deslocamento_min_por_tarefa`, Fase D), entrando na ocupação como tempo real.
+— `tempo_previsto_min` é exato. O **deslocamento** chegou a ser parâmetro por sede
+(`deslocamento_min_por_tarefa`, Fase D), **aposentado em 24/08/2026** por nunca
+ter saído do zero em nenhuma sede.
 A **planilha real da Aldeota** mostrou que a rota é feita em blocos de **15 min**
 (o mais comum), 10 e até 5 min — confirmando a diretriz do Murilo de "combater o
 bloco de 30 min". **Decisão revista:** o `bloco_agenda_min` passou de 30 → **15**
@@ -154,7 +155,7 @@ também alimenta o buffer da Fase A (folga por sede).
 
 | Item | O que é | Depende de | Esforço |
 |---|---|---|---|
-| **Tempo de deslocamento** ✅ | parâmetro por sede `deslocamento_min_por_tarefa` (default 0) entra na ocupação como tempo real | decisão de modelagem | M–G |
+| **Tempo de deslocamento** ❌ | era o parâmetro por sede `deslocamento_min_por_tarefa`; aposentado em 24/08/2026 (ficou em 0 em todas as sedes). Volta como dado medido, não como campo a preencher | decisão de modelagem | M–G |
 | **Tempo padrão por funcionário × atividade** ✅ | tabela `tempos_personalizados`; override no planejamento (só planejar) | decisão planejar/avaliar | M |
 | **Criticidade / circuito essencial** ✅ | flag `critica` + seção "circuito essencial" no painel de pendências | decisão de modelagem | M |
 
