@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-08-24 — Dois dias da CESIU ficaram com a importação velha (correção de dado, sem mudança de código)
+
+Conferindo a agenda da CESIU contra o dado (a pergunta foi *"ta certo agora?"*),
+achei que **18/08 e 20/08 não tinham sido reimportados** depois da correção do
+conversor. Efeito prático: Gleydison aparecia com **115% na segunda e 121% na
+terça**, mesma rota, sem explicação — o que enfraquece exatamente a prova que a
+importação existe para dar.
+
+- **2 blocos criados** — "Limpeza area externa @ Entrada clinica" 07:15–07:45 do
+  Gleydison, nos dias 18 e 20 (a tarefa que o conversor engolia por casar com
+  `^ENTRADA`).
+- **6 blocos atualizados** — consultórios 21–26 do Jeová no dia 18, de 5 para
+  10 min, resto da tabela de medianas anterior à correção.
+- 16 operações num lote atômico, com `historico` no mesmo commit.
+
+Os cinco dias (18, 19, 20, 21, 24) agora são idênticos: Gleydison 44 tarefas /
+**121%**, Eveline 54 / **118%**, Jeová 54 / **109%**. Zero sobreposição e zero
+invasão de intervalo em todos.
+
+`execucoes_realizadas` da CESIU está vazia — nada disso era registro de operação
+real, só artefato da primeira importação.
+
+### Decisão: os 10 min de ENTRADA continuam vazios
+
+A planilha declara a linha `ENTRADA` **com duração** (Gleydison 06:30–06:40,
+Eveline 08:00–08:10; o Jeová tem 12:00–12:00 e o vão de 5 min dele é da
+planilha mesmo). Importar como tarefa `presenca` subiria Gleydison para 123% e
+Eveline para 120%. **O dono do produto decidiu deixar fora**: contar troca de
+uniforme como serviço daria a quem recebe o relatório um argumento para
+desqualificar o número inteiro. Fora do cálculo, os 10 min viram ociosidade
+prevista — leitura mais conservadora e mais difícil de contestar.
+
+**O vão de 10 min no começo do expediente da CESIU não é bug. Não "consertar".**
+
+### Errata da entrada anterior
+
+Eu havia dito que os vãos restantes eram "o que a planilha declara". **Não
+eram.** O do Gleydison às 11:55 vem de três linhas quebradas (L25 diz
+`11:55 → 11:35`, e L26/L27 voltam no tempo para horários já ocupados), e o do
+Jeová às 15:50 vem de L30 (`16:00 → 14:40`). São consequência das tarefas
+deslocadas para a fila — tratamento correto, mas não "declarado".
+
+**Sem mudança de código.** Escrita direta na produção via script de manutenção,
+com prévia campo a campo antes de aplicar (a prévia pegou um bug meu: eu
+comparava também a chave `__id`, que difere por construção, e o script anunciou
+**302** atualizações em vez de 6).
+
+---
+
 ## 2026-08-24 — A régua saiu da mão de quem é medido, três chaves foram aposentadas e o passo do vazio virou dado
 
 As três decisões que a varredura de parâmetros da entrada anterior deixou em
