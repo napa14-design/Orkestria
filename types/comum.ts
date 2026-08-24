@@ -20,6 +20,7 @@ export type Escala = "seg_sex" | "seg_sab" | "todos";
 
 export type TipoLocal =
   | "sala"
+  | "consultorio"
   | "banheiro"
   | "corredor"
   | "area_comum"

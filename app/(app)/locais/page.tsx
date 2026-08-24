@@ -24,6 +24,7 @@ const ESCALA_INTENSIDADE = [
 
 const TIPOS_LOCAL = [
   { valor: "sala", rotulo: "Sala" },
+  { valor: "consultorio", rotulo: "Consultório" },
   { valor: "banheiro", rotulo: "Banheiro" },
   { valor: "corredor", rotulo: "Corredor" },
   { valor: "area_comum", rotulo: "Área comum" },

@@ -82,6 +82,11 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
   copa: 1.5,
   area_externa: 0.8,
   sala: 1,
+  // Consultório entra em 1,0 de propósito: são **41 dos 110 locais** da produção
+  // (a CESIU inteira), todos hoje em "outros", que também vale 1,0. Assim
+  // classificar não muda nenhum tempo calculado — só passa a nomear o que é.
+  // Calibrar para cima é decisão da operação, com o fator por local ou aqui.
+  consultorio: 1,
   corredor: 1,
   area_comum: 1,
   escada: 1,

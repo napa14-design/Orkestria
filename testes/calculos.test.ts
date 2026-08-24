@@ -6,6 +6,7 @@
  * de certo, que é o pior tipo de defeito deste sistema.
  */
 import { describe, expect, it } from "vitest";
+import type { TipoLocal } from "@/types";
 import {
   blocosOcupados,
   FATOR_POR_TIPO_LOCAL,
@@ -150,5 +151,36 @@ describe("ocupação e ociosidade", () => {
     const { ocupacao_baixa, ocupacao_adequada, ocupacao_alta } = PARAMETROS_PADRAO;
     expect(ocupacao_baixa).toBeLessThan(ocupacao_adequada);
     expect(ocupacao_adequada).toBeLessThan(ocupacao_alta);
+  });
+});
+
+/**
+ * `tipo_local` não é rótulo: é chave da tabela de intensidade, e é por isso que
+ * criar tipo livremente na tela seria enganoso — o tipo novo cairia em 1,0 sem
+ * dizer. Medido em 24/08/2026: **93 dos 110 locais** estão em "outros", e 41
+ * deles são consultórios (a CESIU inteira).
+ */
+describe("FATOR_POR_TIPO_LOCAL cobre todo tipo oferecido", () => {
+  it("nenhum tipo fica sem fator — tipo sem fator vira 1,0 em silêncio", () => {
+    const tipos: TipoLocal[] = [
+      "sala", "consultorio", "banheiro", "corredor", "area_comum", "area_externa",
+      "copa", "escada", "recepcao", "auditorio", "almoxarifado", "outros",
+    ];
+    for (const t of tipos) {
+      expect(FATOR_POR_TIPO_LOCAL[t], `tipo ${t}`).toBeTypeOf("number");
+      expect(FATOR_POR_TIPO_LOCAL[t]).toBeGreaterThan(0);
+    }
+    // A tabela não pode ter chave a mais nem a menos que o tipo.
+    expect(Object.keys(FATOR_POR_TIPO_LOCAL).sort()).toEqual([...tipos].sort());
+  });
+
+  it("consultório entra em 1,0 — classificar os 41 não muda tempo nenhum", () => {
+    expect(FATOR_POR_TIPO_LOCAL.consultorio).toBe(FATOR_POR_TIPO_LOCAL.outros);
+  });
+
+  it("os densos e os leves da ata continuam onde estavam", () => {
+    expect(FATOR_POR_TIPO_LOCAL.banheiro).toBe(1.5);
+    expect(FATOR_POR_TIPO_LOCAL.copa).toBe(1.5);
+    expect(FATOR_POR_TIPO_LOCAL.area_externa).toBe(0.8);
   });
 });

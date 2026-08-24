@@ -7,6 +7,65 @@
 
 ---
 
+## 2026-08-24 — Consultório entra na lista de tipos; criar tipo livre, não
+
+Pergunta do dono olhando o cadastro de Locais: *"não tem como cadastrar tipo de
+local? seria bom poder criar no próprio modal"*.
+
+### O que a produção diz
+
+**93 dos 110 locais estão em "outros"** (85%). Agrupando pelo nome:
+
+| | |
+|---|---|
+| **41** | consultório |
+| 12 | sala / coordenação / ADM |
+| 5 | banheiro / WC |
+| 4 | recepção |
+| 3 | dispensação / farmácia |
+| 22 | sem padrão (andares, "Geral", "Volante") |
+
+E **5 dos 11 tipos oferecidos nunca foram usados**: corredor, escada, recepção,
+auditório, almoxarifado. Ou seja: **falta não é de opção**, é de classificação — o
+importador jogou tudo em "outros" e ninguém voltou. A exceção real é uma só:
+**consultório não existia**, porque a lista nasceu pensando em escola, e a CESIU
+é clínica.
+
+### O que entrou
+
+`consultorio`, com fator **1,0** — igual ao de "outros", onde os 41 estão hoje.
+Assim classificar **não muda nenhum tempo calculado**: a mudança nomeia o que é
+sem remexer em número, e calibrar para cima fica como decisão da operação.
+
+### O que **não** entrou, e por quê
+
+Criar tipo livremente no modal parece um select a mais e não é: `tipo_local` é
+**chave da tabela `FATOR_POR_TIPO_LOCAL`**, que dá a intensidade de limpeza
+quando o cadastro não traz fator próprio. Tipo criado na hora **não tem fator** e
+cairia em 1,0 **em silêncio** — um campo com cara de configurar o cálculo, que
+não configura. E a exceção já tem caminho: `fator_intensidade` por local, usado
+por 21 dos 110.
+
+Fazer direito significa transformar o tipo em **catálogo com fator** (como
+`categorias` já é para tarefas): tabela, tela, permissão e migração do enum. É
+trabalho real e esbarra numa decisão que a **ata de 17/07 já parqueou** — a
+formalização metodológica dos fatores de intensidade, item do Murilo. Fica
+proposto, não feito.
+
+### Proteção que faltava
+
+A tabela de fatores é `Record<TipoLocal, number>`, então **tipo sem fator já era
+erro de compilação** — e agora também tem teste, porque a tabela poderia ganhar
+chave a mais sem ninguém notar. Mutando (removendo `consultorio` da tabela), o
+`tsc` reclama e 2 testes caem.
+
+290 testes (eram 287).
+
+**Arquivos:** `types/comum.ts`, `lib/calculations.ts`,
+`app/(app)/locais/page.tsx`, `testes/calculos.test.ts`.
+
+---
+
 ## 2026-08-24 — O editor reordenava as linhas debaixo do dedo de quem digita
 
 Reportado da tela, dois minutos depois de eu subir o editor: *"muito ruim por os
