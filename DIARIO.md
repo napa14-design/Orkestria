@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-08-24 — Apagar todos os intervalos precisa apagar de verdade
+
+Furo no conserto de meia hora atrás, achado antes de o dono esbarrar nele.
+
+`csvDoTrio` existe para o cadastro antigo (que só tem o trio) não perder o
+intervalo ao ser salvo pelo formulário novo. Mas ele confundia **duas coisas
+diferentes**: *"o campo não veio"* e *"o campo veio vazio"*. Na segunda — a
+pessoa remove todas as linhas na tela e salva — o serviço caía no trio antigo e
+**ressuscitava o intervalo recém-apagado**, calado. Remover ficaria impossível.
+
+Agora `mudancas.intervalos !== undefined` separa os dois casos, e quando a lista
+fica vazia o trio zera junto — senão sobraria o par velho no registro e ele
+voltaria no salvamento seguinte pela mesma porta.
+
+É a quinta vez na sessão que o defeito está na **composição** e não na peça:
+`csvDoTrio` isolado responde certo nos dois casos; quem confundia era o serviço
+ao chamar. O teste novo exercita a resolução (registro + o que veio da tela),
+não a função sozinha.
+
+281 testes (eram 277).
+
+**Arquivos:** `services/funcionariosService.ts`, `testes/intervalos.test.ts`.
+
+---
+
 ## 2026-08-24 — O que a planilha da CESIU diz sobre intervalo, e o silêncio do sábado
 
 Duas perguntas do dono, das que se respondem medindo.

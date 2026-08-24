@@ -260,3 +260,44 @@ describe("sábado", () => {
     expect(sabado?.nivel).toBe("alerta");
   });
 });
+
+/**
+ * Apagar todos os intervalos precisa apagar de verdade.
+ *
+ * O `csvDoTrio` existe para o cadastro antigo (que só tem o trio) não perder o
+ * intervalo ao ser salvo pelo formulário novo. Mas ele confundia duas coisas:
+ * "o campo não veio" e "o campo veio vazio". Na segunda, o intervalo que a
+ * pessoa acabou de remover na tela voltava do trio antigo, calado.
+ */
+describe("remover todos os intervalos", () => {
+  /** O que o serviço faz, isolado: qual CSV vale, dado o registro e o que veio. */
+  const csvResolvido = (
+    atual: { intervalos?: string; intervalo_inicio?: string; intervalo_fim?: string },
+    mudancas: { intervalos?: string },
+  ) =>
+    mudancas.intervalos !== undefined
+      ? String(mudancas.intervalos).trim()
+      : csvDoTrio({ ...atual, ...mudancas });
+
+  const REG = { intervalos: "12:00-13:30", intervalo_inicio: "12:00", intervalo_fim: "13:30" };
+
+  it("lista vazia enviada pela tela apaga mesmo", () => {
+    expect(csvResolvido(REG, { intervalos: "" })).toBe("");
+  });
+
+  it("campo ausente (cadastro antigo, chamada sem ele) preserva o que existe", () => {
+    expect(csvResolvido(REG, {})).toBe("12:00-13:30");
+  });
+
+  it("registro só com o trio antigo, salvo sem o campo, não perde o intervalo", () => {
+    expect(csvResolvido({ intervalo_inicio: "12:00", intervalo_fim: "13:00" }, {})).toBe(
+      "12:00-13:00",
+    );
+  });
+
+  it("lista nova substitui a antiga", () => {
+    expect(csvResolvido(REG, { intervalos: "09:00-09:15;12:00-13:30;15:00-15:15" })).toBe(
+      "09:00-09:15;12:00-13:30;15:00-15:15",
+    );
+  });
+});

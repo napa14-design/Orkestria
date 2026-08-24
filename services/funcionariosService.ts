@@ -51,9 +51,14 @@ export async function updateFuncionario(
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
   const destino = { ...atual, ...mudancas };
-  // Cadastro antigo que só tem o trio: monta o CSV a partir dele, senão abrir
-  // e salvar pelo formulário novo apagaria o intervalo da pessoa.
-  destino.intervalos = csvDoTrio(destino);
+  // Duas situações diferentes que é fácil confundir:
+  //  - o formulário **mandou** `intervalos` (mesmo vazio) → vale o que ele mandou;
+  //    apagar todos os intervalos precisa apagar de verdade.
+  //  - o campo **não veio** (cadastro antigo, chamada de API sem ele) → monta o
+  //    CSV a partir do trio, senão salvar pelo formulário novo apagaria o
+  //    intervalo da pessoa em silêncio.
+  destino.intervalos =
+    mudancas.intervalos !== undefined ? String(mudancas.intervalos).trim() : csvDoTrio(destino);
   const alertas = validarFuncionario(destino);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
 
@@ -82,8 +87,13 @@ export async function updateFuncionario(
         },
       ]);
   }
+  // Sem intervalo nenhum o trio também tem de zerar — senão sobra o par velho
+  // no registro e `csvDoTrio` o traria de volta no próximo salvamento.
+  const trio = destino.intervalos
+    ? sincronizarTrio({ ...mudancas, intervalos: destino.intervalos })
+    : { ...mudancas, intervalos: "", intervalo_inicio: "", intervalo_fim: "", intervalo_min: 0 };
   return ds.atualizar("funcionarios", id, {
-    ...sincronizarTrio({ ...mudancas, intervalos: destino.intervalos }),
+    ...trio,
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });
