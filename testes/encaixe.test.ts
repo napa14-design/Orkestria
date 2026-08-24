@@ -120,29 +120,63 @@ describe("bordasDeEncaixe", () => {
  * Benfica e Eusébio com `bloco_agenda_min = 15`.
  */
 describe("passoDoVazio", () => {
-  const inicios = (...horas: string[]) => horas.map(M);
+  /** Blocos de 10 min a partir de cada horário — início e fim na mesma grade. */
+  const blocos = (...horas: string[]) => horas.map((h) => ({ ini: M(h), fim: M(h) + 10 }));
 
   it("CESIU: parâmetro herdado de 30, rota de 5 em 5 → passo 5", () => {
     // Era exatamente este o caso que travava o vazio em :00 e :30.
-    expect(passoDoVazio(MANHA.map((b) => b.ini), 30)).toBe(5);
+    expect(passoDoVazio(MANHA, 30)).toBe(5);
+  });
+
+  it("o FIM de uma tarefa conta — foi o buraco reportado da tela em 24/08", () => {
+    // Dia com duas tarefas curtas: 06:30–06:35 e 07:00–07:05. Só pelos inícios
+    // o passo daria 30, e encaixar algo logo após a primeira dependia de acertar
+    // os ~14px do ímã — errando, caía em cima da tarefa ou 30 min adiante.
+    const dia = [
+      { ini: M("06:30"), fim: M("06:35") },
+      { ini: M("07:00"), fim: M("07:05") },
+    ];
+    // A versão antiga olhava só os inícios (ambos múltiplos de 30) e devolvia 30.
+    expect(passoDoVazio(dia.map((b) => ({ ini: b.ini, fim: b.ini })), 30)).toBe(30);
+    expect(passoDoVazio(dia, 30)).toBe(5);
+  });
+
+  it("uma tarefa só já basta para afinar, se ela terminar fora da grade grossa", () => {
+    expect(passoDoVazio([{ ini: M("07:00"), fim: M("07:25") }], 30)).toBe(5);
+  });
+
+  it("sede que começa E termina na meia hora continua em 30", () => {
+    // O afinamento não é gratuito: quem trabalha em blocos de 30 fica em 30.
+    const dia = [
+      { ini: M("07:00"), fim: M("07:30") },
+      { ini: M("08:00"), fim: M("08:30") },
+    ];
+    expect(passoDoVazio(dia, 30)).toBe(30);
   });
 
   it("sede que só planeja de 15 em 15 → passo 15", () => {
-    expect(passoDoVazio(inicios("06:45", "07:00", "07:30", "08:15"), 30)).toBe(15);
+    expect(passoDoVazio(blocos("06:45", "07:00", "07:30", "08:15"), 30)).toBe(5);
+  });
+
+  it("sede de 15 em 15, com blocos que fecham na grade", () => {
+    const dia = ["06:45", "07:00", "07:30", "08:15"].map((h) => ({ ini: M(h), fim: M(h) + 15 }));
+    expect(passoDoVazio(dia, 30)).toBe(15);
   });
 
   it("sede que só planeja na hora e meia-hora → continua 30", () => {
-    expect(passoDoVazio(inicios("07:00", "07:30", "09:00"), 30)).toBe(30);
+    const dia = ["07:00", "07:30", "09:00"].map((h) => ({ ini: M(h), fim: M(h) + 30 }));
+    expect(passoDoVazio(dia, 30)).toBe(30);
   });
 
   it("derivar afina, nunca engrossa: teto é o parâmetro da sede", () => {
     // Tudo na hora cheia daria 60; o configurado de 15 segura em 15.
-    expect(passoDoVazio(inicios("07:00", "09:00", "11:00"), 15)).toBe(15);
+    const dia = ["07:00", "09:00", "11:00"].map((h) => ({ ini: M(h), fim: M(h) + 60 }));
+    expect(passoDoVazio(dia, 15)).toBe(15);
   });
 
   it("horário esquisito não vira régua de minuto — cai no passo mais fino", () => {
     // MDC cru de 06:47 e 07:01 é 7. A escada não oferece 7.
-    expect(passoDoVazio(inicios("06:47", "07:01"), 30)).toBe(5);
+    expect(passoDoVazio([{ ini: M("06:47"), fim: M("07:01") }], 30)).toBe(5);
   });
 
   it("dia vazio: sem dado para derivar, vale o configurado", () => {
@@ -151,19 +185,19 @@ describe("passoDoVazio", () => {
   });
 
   it("ignora horários inválidos em vez de deixar NaN contaminar o passo", () => {
-    expect(passoDoVazio([NaN, M("07:15"), M("07:45")], 30)).toBe(15);
-    expect(passoDoVazio([NaN], 30)).toBe(30);
+    expect(passoDoVazio([{ ini: NaN, fim: M("07:15") }, { ini: M("07:45"), fim: M("08:00") }], 30)).toBe(15);
+    expect(passoDoVazio([{ ini: NaN, fim: NaN }], 30)).toBe(30);
   });
 
   it("parâmetro zerado ou negativo não derruba o passo", () => {
-    expect(passoDoVazio(inicios("07:00", "07:30"), 0)).toBe(30);
+    expect(passoDoVazio([{ ini: M("07:00"), fim: M("07:30") }], 0)).toBe(30);
     expect(PASSOS_POSSIVEIS.every((p) => p > 0)).toBe(true);
   });
 
   it("o passo devolvido está sempre na escada e nunca acima do teto", () => {
     for (let teto of [5, 10, 15, 20, 30]) {
       for (let m = 300; m < 1080; m += 13) {
-        const p = passoDoVazio([m, m + 40, m + 95], teto);
+        const p = passoDoVazio([{ ini: m, fim: m + 40 }, { ini: m + 60, fim: m + 95 }], teto);
         expect(PASSOS_POSSIVEIS.includes(p), `teto ${teto}, minuto ${m}`).toBe(true);
         expect(p).toBeLessThanOrEqual(teto);
       }

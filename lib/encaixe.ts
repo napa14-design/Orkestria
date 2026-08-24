@@ -103,9 +103,20 @@ export function horarioDoEncaixe(args: {
  *
  * A doutrina diz: *se dá para derivar do dado que já existe, derive*. E dá — o
  * ritmo de uma sede está escrito nos horários que ela já usa: o passo é o mais
- * grosso da escada abaixo que ainda reproduz **todos** os inícios do dia. Dá 5
- * na CESIU, 15 na DT/Benfica/Eusébio e 30 numa sede que só planeja na hora
+ * grosso da escada abaixo que ainda reproduz **todos os instantes** do dia. Dá
+ * 5 na CESIU, 15 na DT/Benfica/Eusébio e 30 numa sede que só planeja na hora
  * cheia. Ninguém precisa decidir nada.
+ *
+ * **Inícios E FINS**, e o "e fins" custou caro. Derivando só dos inícios, um dia
+ * com duas tarefas em 06:30 e 07:00 (fins 06:35 e 07:05) derivava passo de 30 —
+ * e aí encaixar algo logo após a primeira só era possível acertando os ~14px do
+ * ímã: errando, caía em 06:30 (em cima da tarefa) ou em 07:00. Um precipício, e
+ * quem reportou descreveu exatamente assim: *"é muito ruim de conseguir, o
+ * ponteiro tem que ficar logo abaixo da tarefa 1"*.
+ *
+ * O fim de uma tarefa **é** um horário que o dia usa — e é justamente o horário
+ * de "começar logo depois", que é o gesto mais comum da tela. Deixar de fora
+ * quem se quer poder reproduzir era o erro.
  *
  * Derivar pode **afinar** o passo, nunca engrossá-lo: o teto continua sendo o
  * `bloco_agenda_min` da sede, que é também o tamanho da linha desenhada na
@@ -118,13 +129,21 @@ export function horarioDoEncaixe(args: {
  */
 export const PASSOS_POSSIVEIS = [30, 20, 15, 10, 5];
 
-export function passoDoVazio(inicios: number[], passoConfigurado: number): number {
+/**
+ * Recebe as **faixas**, e não uma lista de minutos, de propósito: assim não
+ * existe a chamada que passa só os inícios. Foi exatamente esse o defeito — a
+ * função estava certa e quem chamava é que entregava metade do dado, e nenhum
+ * teste unitário pegaria isso. Agora o compilador pega.
+ */
+export function passoDoVazio(blocos: Faixa[], passoConfigurado: number): number {
   const teto = passoConfigurado > 0 ? passoConfigurado : PASSOS_POSSIVEIS[0];
-  const validos = inicios.filter((m) => Number.isFinite(m) && m > 0);
+  const validos = blocos
+    .flatMap((b) => [b.ini, b.fim])
+    .filter((m) => Number.isFinite(m) && m > 0);
   if (validos.length === 0) return teto;
-  // O passo certo é o mais GROSSO que ainda reproduz todos os inícios que a
-  // sede já usa: se ela nunca começou fora do :00/:30, não há por que oferecer
-  // :05. Se começou, a agenda passa a oferecer.
+  // O passo certo é o mais GROSSO que ainda reproduz todos os instantes que a
+  // sede já usa: se ela nunca começou nem terminou fora do :00/:30, não há por
+  // que oferecer :05. Se saiu uma vez, a agenda passa a oferecer.
   const cabe = PASSOS_POSSIVEIS.find(
     (passo) => passo <= teto && validos.every((m) => m % passo === 0),
   );

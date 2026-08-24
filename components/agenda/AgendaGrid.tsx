@@ -152,11 +152,20 @@ export default function AgendaGrid({
 
   /**
    * O passo do VAZIO é derivado do próprio dia, não do parâmetro (ver
-   * `passoDoVazio`). Nada de leitura extra: os inícios já estão em `rotinas`.
-   * O `blocoMin` continua mandando na linha desenhada e no tamanho do card.
+   * `passoDoVazio`). Inícios **e fins**: o fim de uma tarefa é o horário de
+   * "começar logo depois dela", o gesto mais comum da tela. Nada de leitura
+   * extra — os dois já estão em `rotinas`. O `blocoMin` continua mandando na
+   * linha desenhada e no tamanho do card.
    */
   const passoVazio = useMemo(
-    () => passoDoVazio(rotinas.map((r) => hhmmParaMin(r.inicio_planejado)), blocoMin),
+    () =>
+      passoDoVazio(
+        rotinas.map((r) => ({
+          ini: hhmmParaMin(r.inicio_planejado),
+          fim: hhmmParaMin(r.fim_planejado),
+        })),
+        blocoMin,
+      ),
     [rotinas, blocoMin],
   );
 

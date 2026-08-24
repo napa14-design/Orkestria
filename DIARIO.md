@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-08-24 — O passo do vazio agora olha os FINS, não só os inícios
+
+Reportado da tela, depois do conserto anterior: *"ele dá certo, mas é muito ruim
+de conseguir, o ponteiro do mouse tem que ficar logo abaixo da tarefa 1"*.
+
+**Causa — defeito da deritação que eu escrevi hoje de manhã.** `passoDoVazio`
+derivava o passo apenas dos **inícios** do dia. No dia 25/08 do Gleydison havia
+duas tarefas, 06:30–06:35 e 07:00–07:05: os dois inícios são múltiplos de 30, e
+o passo derivado saiu **30 min**. Resultado: na escala de 2,4 px/min, o único
+alvo para "começar às 06:35" eram os ~14px da tolerância do ímã — errando, caía
+em 06:30 (em cima da tarefa, abrindo o modal de conflito) ou em 07:00. Um
+**precipício**, sem meio-termo.
+
+Os fins do mesmo dia são 06:35 e 07:05. Contando-os, o passo derivado vira
+**5 min**: errar a mira passa a dar 06:40, que é inofensivo e ajustável.
+
+O raciocínio que faltou: o fim de uma tarefa **é** um horário que o dia usa — e
+é exatamente o horário de "começar logo depois", o gesto mais comum da tela.
+Derivar de um conjunto que exclui justamente o que se quer poder reproduzir era
+o erro.
+
+### A brecha estrutural, e o que fiz com ela
+
+Mutei a fiação (`AgendaGrid` voltando a passar só os inícios): **os 25 testes de
+`encaixe` continuaram verdes**. A função estava certa; quem chamava entregava
+metade do dado — e teste unitário nenhum pegaria isso. É a **quarta** vez nesta
+sessão que o defeito mora na composição e não na peça.
+
+Então `passoDoVazio` passou a receber `Faixa[]` (`{ini, fim}`) em vez de
+`number[]`: **não existe mais a chamada que passa só os inícios** — vira erro de
+compilação. Isso não impede escrever um `fim` errado de propósito (mutar
+`fim: inicio_planejado` ainda passa nos testes e no `tsc`), mas troca um
+**esquecimento** por uma **mentira explícita**, que é muito mais difícil de
+cometer sem perceber.
+
+244 testes. `bordasDeEncaixe` já recebia `Faixa[]`; agora as duas funções do
+módulo falam a mesma língua.
+
+**Arquivos:** `lib/encaixe.ts`, `components/agenda/AgendaGrid.tsx`,
+`testes/encaixe.test.ts`.
+
+---
+
 ## 2026-08-24 — "Ele fica falando que vai sobrescrever": eu tinha consertado só a metade do servidor
 
 Reportado da tela: arrastar uma tarefa de 10 min para o vão das **06:30** do
