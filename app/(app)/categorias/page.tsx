@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo, podeEditarItemDoCatalogo } from "@/lib/permissions";
 import Carregando from "@/components/Carregando";
 import Modal from "@/components/Modal";
 import { apiPost, ErroApi } from "@/lib/clientApi";
@@ -21,6 +23,7 @@ const PRESETS = [
 ];
 
 export default function PaginaCategorias() {
+  const sessao = useSessao();
   const { mutate } = useSWRConfig();
   const [alvo, setAlvo] = useState<Categoria | null>(null);
   const [fator, setFator] = useState("1.1");
@@ -59,6 +62,12 @@ export default function PaginaCategorias() {
         titulo="Categorias de atividade"
         subtitulo="Catálogo global que agrupa tarefas afins. Usado nos filtros e na recalibração em cascata. (A intensidade de limpeza agora é cadastrada em cada Local, não na categoria.)"
         endpoint="/api/categorias"
+        permissao={{
+          criar: !sessao || podeCriarNoCatalogo(sessao),
+          // Item compartilhado pelas 18 sedes: administrador sempre;
+          // supervisor só o que ele mesmo criou.
+          alterar: (item) => !sessao || podeEditarItemDoCatalogo(sessao, item),
+        }}
         textoNovo="+ Nova categoria"
         campos={[
           {
@@ -121,7 +130,9 @@ export default function PaginaCategorias() {
             ),
           },
         ]}
-        acoesExtra={(c) => (
+        // Recalibrar multiplica o tempo de TODAS as tarefas da categoria, em
+        // todas as sedes: segue de administrador, e some para quem não é.
+        acoesExtra={sessao && sessao.perfil !== "administrador" ? undefined : (c) => (
           <button className="btn btn-mini btn-fantasma" onClick={() => abrir(c)}>
             Recalibrar
           </button>

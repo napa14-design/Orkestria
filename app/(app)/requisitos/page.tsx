@@ -6,6 +6,8 @@
  * qualificações dos funcionários (o que possuem).
  */
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo, podeEditarItemDoCatalogo } from "@/lib/permissions";
 import type { Requisito } from "@/types";
 
 const TIPOS = [
@@ -21,11 +23,18 @@ const SELO_TIPO: Record<string, string> = {
 };
 
 export default function PaginaRequisitos() {
+  const sessao = useSessao();
   return (
     <CrudManager<Requisito>
       titulo="Requisitos de execução"
       subtitulo="Catálogo de aptidões, treinamentos e EPIs. As tarefas exigem requisitos; os funcionários possuem aptidões/treinamentos (com validade). Aptidão e treinamento faltando bloqueiam a alocação."
       endpoint="/api/requisitos"
+      permissao={{
+        criar: !sessao || podeCriarNoCatalogo(sessao),
+        // Item compartilhado pelas 18 sedes: administrador sempre;
+        // supervisor só o que ele mesmo criou.
+        alterar: (item) => !sessao || podeEditarItemDoCatalogo(sessao, item),
+      }}
       textoNovo="+ Novo requisito"
       campos={[
         {

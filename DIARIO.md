@@ -7,6 +7,83 @@
 
 ---
 
+## 2026-08-24 — O supervisor passa a cadastrar no catálogo (e o botão que dava 403 na única usuária)
+
+Pergunta do dono: *"só adm pode cadastrar as coisas? supervisor deveria poder
+também não?"*. A medição respondeu melhor que qualquer argumento:
+
+> O sistema tem **2 usuários**: o administrador e a **supervisora Thaís**, que
+> opera 6 sedes, entre elas a CESIU. **É ela quem está no piloto.**
+
+Ou seja: os três catálogos globais eram só de administrador, e o atalho
+"+ novo" que entreguei uma hora antes — feito para poupar passos — **dava 403
+justamente para a única pessoa que usa o sistema**. Botão que promete e recusa
+é pior que botão ausente.
+
+### A regra nova segue o risco, não o cargo
+
+- **Criar** é aditivo: acrescenta uma opção e não mexe em nenhum registro
+  existente. Passou a valer para supervisor.
+- **Editar** item compartilhado alcança as **18 sedes** — subir o fator do
+  "banheiro" reprecifica a rede inteira. Segue de administrador, **exceto o que
+  o próprio supervisor criou** (`podeEditarItemDoCatalogo`), senão quem errasse
+  o nome não poderia corrigir.
+- **Excluir** já era bloqueado com item em uso.
+- **Recalibrar** categoria (multiplica o tempo de todas as tarefas dela, em
+  todas as sedes) e **criar usuário** seguem de administrador.
+
+Os itens semeados (12 tipos, 8 categorias, 17 requisitos) têm outro autor e
+continuam intocáveis para o supervisor — a regra cai sozinha em cima deles.
+
+### A tela parou de mentir
+
+`SessaoContexto` novo: até hoje só o `AppShell` conhecia o perfil, então o
+`CrudManager` mostrava "Editar"/"Excluir" para todo mundo e quem não podia
+levava **403 no clique**. Agora a linha de item compartilhado mostra
+**"compartilhado"** em vez dos botões, e o "+ novo" some para quem não pode
+criar. É a mesma regra que a coluna "Supervisor edita?" dos parâmetros ganhou de
+manhã — terceira vez hoje que o defeito é *a tela oferecer o que o servidor
+recusa*.
+
+### Verificado como supervisora, não só no teste
+
+Criei a usuária pelo fluxo real (cadastro → código → primeiro acesso) no modo
+memória e exercitei as seis portas:
+
+| | |
+|---|---|
+| criar tipo de local | **201** |
+| editar o que ela criou | **200** |
+| editar "banheiro" (semeado, 19 locais) | **403** |
+| excluir "banheiro" | **403** |
+| recalibrar categoria | **403** |
+| criar usuário | **403** |
+
+E na tela: "+ Novo tipo" visível, os 12 semeados como **"compartilhado"**, o dela
+com **Editar/Excluir**, e o menu mostrando Tipos de local · Categorias ·
+Requisitos — sem Usuários.
+
+### Uma mutação cega, e o buraco que ela apontou
+
+Tirar o `Boolean(item?.criado_por) &&` da regra **não derrubou teste nenhum** —
+porque nos meus casos o vazio nunca casava com um e-mail real. O guard existe
+para outra coisa: **sessão sem e-mail** com **item sem autor**, onde
+`undefined === undefined` daria `true` e abriria o catálogo inteiro. Escrevi o
+caso; agora a mutação cai.
+
+311 testes. `tsc`, testes e build conferidos por código de saída.
+
+**Sem escrita em produção** — a mudança é de código; a Thaís passa a poder
+cadastrar assim que o deploy subir.
+
+**Arquivos:** `lib/permissions.ts`, `components/SessaoContexto.tsx` (novo),
+`components/{AppShell,CrudManager}.tsx`, `app/api/{tipos-local,categorias,requisitos}/`,
+`services/{tiposLocal,categorias,requisitos}Service.ts`,
+`app/(app)/{tipos-local,categorias,requisitos,locais,tarefas,qualificacoes}/page.tsx`,
+`testes/permissoes.test.ts`.
+
+---
+
 ## 2026-08-24 — Criar catálogo sem sair do formulário (e a primeira vez que eu abri a tela)
 
 Ideia do dono do produto: *"a pessoa ta cadastrando um local, ela tem que sair do

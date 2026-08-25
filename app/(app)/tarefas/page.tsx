@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo } from "@/lib/permissions";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
@@ -43,6 +45,10 @@ const RESTRICOES_GENERO = [
 ];
 
 export default function PaginaTarefas() {
+  const sessao = useSessao();
+  // O atalho "+ novo" só existe para quem o servidor deixaria criar — senão
+  // seria um botão que promete e devolve 403.
+  const podeCriarCatalogo = !sessao || podeCriarNoCatalogo(sessao);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
   const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
@@ -117,7 +123,7 @@ export default function PaginaTarefas() {
             .filter((c) => c.ativo)
             .map((c) => ({ valor: c.id, rotulo: c.nome })),
           ajuda: "Catálogo gerenciado em Categorias (admin) · dá para criar aqui",
-          criarInline: {
+          criarInline: !podeCriarCatalogo ? undefined : {
             titulo: "Nova categoria",
             endpoint: "/api/categorias",
             campos: [

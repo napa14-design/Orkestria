@@ -123,7 +123,44 @@ export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {
   return sessao.perfil === "administrador";
 }
 
-/** Catálogo global (categorias) afeta todas as sedes → só administrador edita. */
+/**
+ * Catálogo global (tipos de local, categorias, requisitos): **criar é aditivo,
+ * editar é que afeta todo mundo.**
+ *
+ * Até 24/08/2026 os três eram só de administrador, e a medição mostrou o
+ * absurdo: o sistema tem **2 usuários**, e quem opera o piloto é uma
+ * **supervisora** — ou seja, a única pessoa que usa o sistema não podia
+ * cadastrar o tipo de ambiente da própria sede. O atalho "+ novo" que nasceu
+ * para poupar passos dava 403 justamente para ela.
+ *
+ * A separação segue o risco real, não o cargo:
+ *  - **criar** acrescenta uma opção e não mexe em nenhum registro existente;
+ *  - **editar** um item compartilhado muda o cálculo das **18 sedes** (subir o
+ *    fator do "banheiro" reprecifica a rede inteira);
+ *  - **excluir** já é bloqueado quando há alguém usando.
+ */
+export function podeCriarNoCatalogo(sessao: SessaoUsuario): boolean {
+  return sessao.perfil === "administrador" || sessao.perfil === "supervisor";
+}
+
+/**
+ * Editar/excluir item do catálogo: administrador sempre; supervisor **só o que
+ * ele mesmo criou**.
+ *
+ * Sem isso, quem criasse um tipo com o nome errado não poderia corrigir — e a
+ * regra segue segura, porque os itens que vieram semeados (os 12 tipos, as 8
+ * categorias, os 17 requisitos) têm outro autor e continuam intocáveis.
+ */
+export function podeEditarItemDoCatalogo(
+  sessao: SessaoUsuario,
+  item: { criado_por?: string } | null | undefined,
+): boolean {
+  if (sessao.perfil === "administrador") return true;
+  if (sessao.perfil !== "supervisor") return false;
+  return Boolean(item?.criado_por) && item?.criado_por === sessao.email;
+}
+
+/** Catálogo global — gestão ampla (a tela inteira) segue de administrador. */
 export function podeGerenciarCatalogo(sessao: SessaoUsuario): boolean {
   return sessao.perfil === "administrador";
 }

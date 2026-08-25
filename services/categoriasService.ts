@@ -101,3 +101,9 @@ export async function recalibrarCategoria(
   }
   return { atualizadas: tarefas.length };
 }
+
+/** Um item do catálogo, para a rota decidir permissão antes de deixar mexer. */
+export async function getCategoriaPorId(id: string): Promise<Categoria | null> {
+  const ds = await getDataSource();
+  return ds.obter("categorias", id);
+}

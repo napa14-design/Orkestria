@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeGerenciarCatalogo } from "@/lib/permissions";
+import { podeCriarNoCatalogo } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createTipoLocal, getTiposLocal } from "@/services/tiposLocalService";
 
@@ -10,8 +10,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    if (!podeGerenciarCatalogo(sessao))
-      throw new ErroPermissao("Apenas administradores gerenciam o catálogo de tipos de local.");
+    if (!podeCriarNoCatalogo(sessao))
+      throw new ErroPermissao("Somente quem opera o sistema cria itens de catálogo.");
     return ok(await createTipoLocal(await req.json(), sessao.email), 201);
   });
 }

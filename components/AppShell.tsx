@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ProvedorSessao } from "./SessaoContexto";
 import { useEffect, useRef, useState } from "react";
 import { SWRConfig } from "swr";
 import type { SessaoUsuario } from "@/lib/permissions";
@@ -53,9 +54,9 @@ const GRUPOS: Grupo[] = [
       { href: "/sedes", rotulo: "Sedes" },
       { href: "/locais", rotulo: "Locais" },
       { href: "/tarefas", rotulo: "Tarefas" },
-      { href: "/tipos-local", rotulo: "Tipos de local", apenasAdmin: true },
-      { href: "/categorias", rotulo: "Categorias", apenasAdmin: true },
-      { href: "/requisitos", rotulo: "Requisitos", apenasAdmin: true },
+      { href: "/tipos-local", rotulo: "Tipos de local" },
+      { href: "/categorias", rotulo: "Categorias" },
+      { href: "/requisitos", rotulo: "Requisitos" },
       { href: "/periodos-letivos", rotulo: "Calendário acadêmico", apenasAdmin: true },
       { href: "/feriados", rotulo: "Feriados e recessos", apenasAdmin: true },
     ],
@@ -118,6 +119,7 @@ export default function AppShell({
   }
 
   return (
+    <ProvedorSessao sessao={sessao}>
     <SWRConfig
       value={{
         // Mantém os dados anteriores enquanto revalida ou ao trocar de chave —
@@ -225,5 +227,6 @@ export default function AppShell({
       </main>
     </div>
     </SWRConfig>
+    </ProvedorSessao>
   );
 }

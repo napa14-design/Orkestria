@@ -100,3 +100,9 @@ export async function mapaFatorDoTipo(): Promise<ReadonlyMap<string, number>> {
       .map((t) => [t.id, Number(t.fator_intensidade)] as const),
   );
 }
+
+/** Um item do catálogo, para a rota decidir permissão antes de deixar mexer. */
+export async function getTipoLocalPorId(id: string): Promise<TipoLocalCatalogo | null> {
+  const ds = await getDataSource();
+  return ds.obter("tipos_local", id);
+}

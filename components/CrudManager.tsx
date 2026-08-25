@@ -81,6 +81,18 @@ export interface CriarInline {
   aoCriado?: (novo: Record<string, unknown>) => void;
 }
 
+/**
+ * Quem pode o quê nesta tela. Sem isto, o CrudManager mostrava "Editar" e
+ * "Excluir" para todo mundo e quem não podia levava **403 ao clicar** — botão
+ * que promete o que a regra nega é pior que botão ausente.
+ */
+export interface PermissaoCrud<T> {
+  /** Falso esconde "+ Novo". */
+  criar?: boolean;
+  /** Por item: falso esconde "Editar" e "Excluir" naquela linha. */
+  alterar?: (item: T) => boolean;
+}
+
 export interface ColunaTabela<T> {
   key: string;
   rotulo: string;
@@ -467,6 +479,7 @@ export default function CrudManager<T extends Registro>({
   colunas,
   textoNovo = "+ Novo",
   acoesExtra,
+  permissao,
   aoCriar,
   vazio,
 }: {
@@ -478,6 +491,7 @@ export default function CrudManager<T extends Registro>({
   textoNovo?: string;
   /** Controles adicionais por linha, à esquerda de Editar/Excluir. */
   acoesExtra?: (item: T) => React.ReactNode;
+  permissao?: PermissaoCrud<T>;
   /** Chamado com o registro recém-criado (não roda em edição). */
   aoCriar?: (criado: T) => void;
   /** Mensagem amigável quando ainda não há nada cadastrado. */
@@ -667,9 +681,12 @@ export default function CrudManager<T extends Registro>({
               width: 200,
             }}
           />
-          <button className="btn btn-primario" data-tour="crud-novo" onClick={abrirNovo}>
-            {textoNovo}
-          </button>
+
+          {permissao?.criar !== false && (
+            <button className="btn btn-primario" data-tour="crud-novo" onClick={abrirNovo}>
+              {textoNovo}
+            </button>
+          )}
         </div>
       </div>
 
@@ -723,16 +740,27 @@ export default function CrudManager<T extends Registro>({
                       {acoesExtra(item)}{" "}
                     </>
                   )}
-                  <button className="btn btn-mini btn-fantasma" onClick={() => abrirEdicao(item)}>
-                    Editar
-                  </button>{" "}
-                  <button
-                    className="btn btn-mini btn-fantasma"
-                    style={{ color: "var(--vermelho)" }}
-                    onClick={() => { setParaExcluir(item); setErroExcluir(""); }}
-                  >
-                    Excluir
-                  </button>
+                  {permissao?.alterar && !permissao.alterar(item) ? (
+                    <span
+                      style={{ fontSize: 11, color: "var(--tinta-3)" }}
+                      title="Item compartilhado por todas as sedes — só um administrador altera."
+                    >
+                      compartilhado
+                    </span>
+                  ) : (
+                    <>
+                      <button className="btn btn-mini btn-fantasma" onClick={() => abrirEdicao(item)}>
+                        Editar
+                      </button>{" "}
+                      <button
+                        className="btn btn-mini btn-fantasma"
+                        style={{ color: "var(--vermelho)" }}
+                        onClick={() => { setParaExcluir(item); setErroExcluir(""); }}
+                      >
+                        Excluir
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

@@ -7,6 +7,8 @@
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo } from "@/lib/permissions";
 import LoteQualificacoes from "@/components/LoteQualificacoes";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
@@ -14,6 +16,10 @@ import { NIVEIS_QUALIFICACAO, NIVEL_ORDEM } from "@/types";
 import type { Funcionario, QualificacaoFuncionario, Requisito, Sede } from "@/types";
 
 export default function PaginaQualificacoes() {
+  const sessao = useSessao();
+  // O atalho "+ novo" só existe para quem o servidor deixaria criar — senão
+  // seria um botão que promete e devolve 403.
+  const podeCriarCatalogo = !sessao || podeCriarNoCatalogo(sessao);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const { data: requisitos, mutate: mutateRequisitos } = useSWR<Requisito[]>(
@@ -62,7 +68,7 @@ export default function PaginaQualificacoes() {
             .filter((r) => r.ativo && r.tipo !== "epi")
             .map((r) => ({ valor: r.id, rotulo: `${r.nome} (${r.tipo})` })),
           dica: "A aptidão ou treinamento que esta pessoa tem. O catálogo fica em Requisitos — e dá para criar um aqui mesmo, pelo botão ao lado, sem perder o que você já preencheu.",
-          criarInline: {
+          criarInline: !podeCriarCatalogo ? undefined : {
             titulo: "Novo requisito",
             endpoint: "/api/requisitos",
             campos: [

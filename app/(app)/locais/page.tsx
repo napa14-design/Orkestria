@@ -2,6 +2,8 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo } from "@/lib/permissions";
 import { fatorIntensidadeLocal, FATOR_POR_TIPO_LOCAL } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import type { Local, Sede, TipoLocalCatalogo } from "@/types";
@@ -44,6 +46,10 @@ const TIPOS_RESERVA = [
 
 
 export default function PaginaLocais() {
+  const sessao = useSessao();
+  // O atalho "+ novo" só existe para quem o servidor deixaria criar — senão
+  // seria um botão que promete e devolve 403.
+  const podeCriarCatalogo = !sessao || podeCriarNoCatalogo(sessao);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: tipos, mutate: mutateTipos } = useSWR<TipoLocalCatalogo[]>(
     "/api/tipos-local",
@@ -104,7 +110,7 @@ export default function PaginaLocais() {
           tipo: "select",
           obrigatorio: true,
           opcoes: opcoesTipo,
-          criarInline: {
+          criarInline: !podeCriarCatalogo ? undefined : {
             titulo: "Novo tipo de local",
             endpoint: "/api/tipos-local",
             campos: [

@@ -73,3 +73,9 @@ export async function deleteRequisito(id: string): Promise<void> {
   }
   await ds.excluir("requisitos", id);
 }
+
+/** Um item do catálogo, para a rota decidir permissão antes de deixar mexer. */
+export async function getRequisitoPorId(id: string): Promise<Requisito | null> {
+  const ds = await getDataSource();
+  return ds.obter("requisitos", id);
+}

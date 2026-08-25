@@ -11,7 +11,10 @@ import {
   limitarSedeConsulta,
   montarSedesDaSessao,
   podeAlterarSede,
+  podeCriarNoCatalogo,
+  podeEditarItemDoCatalogo,
   podeEditarParametro,
+  podeGerenciarCatalogo,
   sedesPermitidas,
   type SessaoUsuario,
 } from "@/lib/permissions";
@@ -168,5 +171,74 @@ describe("podeEditarParametro", () => {
     expect(
       podeEditarParametro(umaSede, { ...marcado("bloco_agenda_min"), editavel_por_supervisor: false }),
     ).toBe(false);
+  });
+});
+
+/**
+ * Catálogo global: criar é aditivo, editar é que alcança as 18 sedes.
+ *
+ * Até 24/08/2026 os três catálogos (tipos de local, categorias, requisitos)
+ * eram só de administrador — e a medição da produção mostrou o absurdo: o
+ * sistema tem **2 usuários**, e quem opera o piloto é uma **supervisora**. O
+ * atalho "+ novo", feito para poupar passos, dava 403 justamente para ela.
+ */
+describe("catálogo global", () => {
+  const item = (autor?: string) => ({ criado_por: autor });
+
+  it("supervisor CRIA — é aditivo e não mexe em registro existente", () => {
+    expect(podeCriarNoCatalogo(umaSede)).toBe(true);
+    expect(podeCriarNoCatalogo(admin)).toBe(true);
+  });
+
+  it("visualizador não cria nada", () => {
+    expect(podeCriarNoCatalogo(gerencia)).toBe(false);
+  });
+
+  it("supervisor edita o que ELE criou", () => {
+    expect(podeEditarItemDoCatalogo(umaSede, item(umaSede.email))).toBe(true);
+  });
+
+  it("supervisor NÃO edita item de outro — muda o cálculo das 18 sedes", () => {
+    expect(podeEditarItemDoCatalogo(umaSede, item("outra.pessoa@x.com"))).toBe(false);
+  });
+
+  it("os itens semeados ficam intocáveis para o supervisor", () => {
+    // Os 12 tipos, 8 categorias e 17 requisitos vieram com outro autor.
+    expect(podeEditarItemDoCatalogo(umaSede, item("ia02@px.com.br"))).toBe(false);
+    expect(podeEditarItemDoCatalogo(umaSede, item("catalogo"))).toBe(false);
+    expect(podeEditarItemDoCatalogo(umaSede, item("import"))).toBe(false);
+  });
+
+  it("item sem autor não vira brecha", () => {
+    expect(podeEditarItemDoCatalogo(umaSede, item(undefined))).toBe(false);
+    expect(podeEditarItemDoCatalogo(umaSede, item(""))).toBe(false);
+    expect(podeEditarItemDoCatalogo(umaSede, null)).toBe(false);
+    expect(podeEditarItemDoCatalogo(umaSede, undefined)).toBe(false);
+  });
+
+  it("sessão sem e-mail não casa com item sem autor", () => {
+    // Sem o guard, `undefined === undefined` daria **true** e um cookie
+    // malformado abriria o catálogo inteiro. É o vazio casando com o vazio.
+    const semEmail = { ...umaSede, email: "" } as SessaoUsuario;
+    expect(podeEditarItemDoCatalogo(semEmail, item(""))).toBe(false);
+    expect(podeEditarItemDoCatalogo(semEmail, item(undefined))).toBe(false);
+    const indefinido = { ...umaSede, email: undefined as unknown as string };
+    expect(podeEditarItemDoCatalogo(indefinido, item(undefined))).toBe(false);
+  });
+
+  it("administrador edita qualquer um, inclusive sem autor", () => {
+    expect(podeEditarItemDoCatalogo(admin, item("qualquer@x.com"))).toBe(true);
+    expect(podeEditarItemDoCatalogo(admin, null)).toBe(true);
+  });
+
+  it("visualizador não edita nem o que tivesse criado", () => {
+    expect(podeEditarItemDoCatalogo(gerencia, item(gerencia.email))).toBe(false);
+  });
+
+  it("a gestão ampla do catálogo segue de administrador", () => {
+    // É o que governa a ação "Recalibrar", que multiplica o tempo de todas as
+    // tarefas de uma categoria em todas as sedes.
+    expect(podeGerenciarCatalogo(admin)).toBe(true);
+    expect(podeGerenciarCatalogo(umaSede)).toBe(false);
   });
 });

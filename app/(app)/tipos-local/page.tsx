@@ -1,6 +1,8 @@
 "use client";
 
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
+import { podeCriarNoCatalogo, podeEditarItemDoCatalogo } from "@/lib/permissions";
 import type { TipoLocalCatalogo } from "@/types";
 
 /**
@@ -17,11 +19,18 @@ const FAIXA = [
 ];
 
 export default function PaginaTiposLocal() {
+  const sessao = useSessao();
   return (
     <CrudManager<TipoLocalCatalogo>
       titulo="Tipos de local"
       subtitulo="A lista que aparece no cadastro de Locais. Crie os tipos que a sua operação usa — o fator diz o quanto o ambiente suja em relação ao normal."
       endpoint="/api/tipos-local"
+      permissao={{
+        criar: !sessao || podeCriarNoCatalogo(sessao),
+        // Item compartilhado pelas 18 sedes: administrador sempre;
+        // supervisor só o que ele mesmo criou.
+        alterar: (item) => !sessao || podeEditarItemDoCatalogo(sessao, item),
+      }}
       textoNovo="+ Novo tipo"
       campos={[
         {
