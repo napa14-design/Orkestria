@@ -55,6 +55,30 @@ export interface CampoForm {
   dica?: string;
   /** Exibe o campo só quando a condição (sobre o estado atual do form) for verdadeira. */
   mostrarSe?: (form: Record<string, unknown>) => boolean;
+  /**
+   * Atalho "criar na hora" para campo que aponta para outro cadastro.
+   *
+   * Nasceu de uma observação do dono do produto: *"a pessoa ta cadastrando um
+   * local, ela tem que sair do modal, ir para tipo de local, cadastrar para
+   * voltar lá"*. Só vale para **catálogo pequeno** (nome + um ou dois campos):
+   * criar uma sede ou um funcionário no meio de outro formulário seria pior que
+   * sair, porque são cadastros com decisões próprias.
+   */
+  criarInline?: CriarInline;
+}
+
+export interface CriarInline {
+  /** Título do mini-formulário ("Novo tipo de local"). */
+  titulo: string;
+  /** Endpoint POST do catálogo. */
+  endpoint: string;
+  /** Campos do catálogo — renderizados pelo MESMO componente do formulário
+   *  grande, para os dois não divergirem. */
+  campos: CampoForm[];
+  /** Como o registro recém-criado vira opção do select. */
+  paraOpcao: (novo: Record<string, unknown>) => OpcaoCampo;
+  /** Chamado depois de criar, para a tela revalidar a lista de verdade. */
+  aoCriado?: (novo: Record<string, unknown>) => void;
 }
 
 export interface ColunaTabela<T> {
@@ -70,7 +94,7 @@ function valorDe(item: Registro, key: string): unknown {
 }
 
 /** Opções e ajuda podem ser função do formulário — aqui elas viram valor. */
-function opcoesDe(campo: CampoForm, form: Record<string, unknown>): OpcaoCampo[] {
+function opcoesDoCampo(campo: CampoForm, form: Record<string, unknown>): OpcaoCampo[] {
   const o = campo.opcoes;
   return (typeof o === "function" ? o(form) : o) ?? [];
 }
@@ -192,6 +216,249 @@ function EditorIntervalos({
   );
 }
 
+/**
+ * Os campos do formulário, extraídos do CrudManager para serem usados também
+ * pelo mini-formulário de "criar na hora" — se cada um renderizasse o seu, os
+ * dois divergiriam com o tempo, que foi o defeito mais repetido da sessão.
+ */
+function CamposDoFormulario({
+  campos,
+  form,
+  setForm,
+  mostrarDica,
+  esconderDica,
+  aoCriarInline,
+  criadosAgora,
+}: {
+  campos: CampoForm[];
+  form: Record<string, unknown>;
+  setForm: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
+  mostrarDica: (el: HTMLElement, texto: string) => void;
+  esconderDica: () => void;
+  /** Abre o mini-cadastro do catálogo daquele campo. */
+  aoCriarInline?: (campo: CampoForm) => void;
+  /** Opções nascidas nesta sessão do formulário, ainda não revalidadas. */
+  criadosAgora?: Record<string, OpcaoCampo[]>;
+}) {
+  /**
+   * As opções do campo mais as que nasceram agora, pelo atalho de criar.
+   *
+   * O filtro não é zelo: a tela revalida a lista de verdade logo depois de
+   * criar, e sem ele a opção nova aparece **duas vezes** — uma vinda da ponte
+   * local, outra da lista já atualizada. Visto na tela, com o select indo de 13
+   * para 15 opções ao criar uma.
+   */
+  const opcoesDe = (c: CampoForm, f: Record<string, unknown>): OpcaoCampo[] => {
+    const base = opcoesDoCampo(c, f);
+    const ponte = (criadosAgora?.[c.key] ?? []).filter(
+      (nova) => !base.some((o) => o.valor === nova.valor),
+    );
+    return [...base, ...ponte];
+  };
+  return (
+    <>
+          {campos.map((c) =>
+            c.mostrarSe && !c.mostrarSe(form) ? null : (
+            <label
+              key={c.key}
+              className="campo"
+              // Todo campo de cadastro vira alvo possível do tutorial sem
+              // trabalho manual: o roteiro só precisa citar "campo-<chave>".
+              data-tour={`campo-${c.key}`}
+              style={{ gridColumn: c.inteira ? "1 / -1" : undefined }}
+            >
+              <span className="rotulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>
+                  {c.rotulo}
+                  {c.obrigatorio ? " *" : ""}
+                </span>
+                {c.dica && (
+                  <button
+                    type="button"
+                    aria-label={`Ajuda: ${c.rotulo}`}
+                    onMouseEnter={(e) => mostrarDica(e.currentTarget, c.dica!)}
+                    onMouseLeave={esconderDica}
+                    onFocus={(e) => mostrarDica(e.currentTarget, c.dica!)}
+                    onBlur={esconderDica}
+                    onClick={(e) => e.preventDefault()}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: "1.5px solid var(--acento)",
+                      background: "transparent",
+                      color: "var(--acento)",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "help",
+                      padding: 0,
+                    }}
+                  >
+                    ?
+                  </button>
+                )}
+              </span>
+              {c.tipo === "select" ? (
+                <span style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                <select
+                  style={{ flex: 1, minWidth: 0 }}
+                  value={String(form[c.key] ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
+                  required={c.obrigatorio}
+                >
+                  {/* O campo pode trazer a própria opção de valor vazio, com
+                      rótulo que explica o que "vazio" significa (ex.: "herdar
+                      do tipo do local"). Nesse caso o genérico sobraria — e
+                      duas opções com o mesmo valor deixariam a do campo
+                      inalcançável, porque o navegador seleciona a primeira. */}
+                  {!opcoesDe(c, form).some((o) => o.valor === "") && (
+                    <option value="">— selecionar —</option>
+                  )}
+                  {opcoesDe(c, form).map((o) => (
+                    <option key={o.valor} value={o.valor}>
+                      {o.rotulo}
+                    </option>
+                  ))}
+                </select>
+                {/* Atalho para não ter de sair do formulário, ir a outra tela,
+                    cadastrar e voltar — ideia do dono do produto. Só nos
+                    catálogos pequenos (nome + um ou dois campos). */}
+                {c.criarInline && aoCriarInline && (
+                  <button
+                    type="button"
+                    className="btn btn-mini"
+                    title={`Criar ${c.criarInline.titulo.toLowerCase()} sem sair daqui`}
+                    onClick={() => aoCriarInline(c)}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    + novo
+                  </button>
+                )}
+                </span>
+              ) : c.tipo === "checkbox" ? (
+                <span style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form[c.key])}
+                    onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.checked }))}
+                    style={{ width: 18, height: 18, accentColor: "var(--acento)" }}
+                  />
+                  <span style={{ fontSize: 13 }}>Sim</span>
+                </span>
+              ) : c.tipo === "textarea" ? (
+                <textarea
+                  value={String(form[c.key] ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
+                />
+              ) : c.tipo === "multiselect" ? (
+                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
+                  {opcoesDe(c, form).length === 0 && (
+                    <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Nenhuma opção disponível.</span>
+                  )}
+                  {opcoesDe(c, form).map((o) => {
+                    const sel = String(form[c.key] ?? "").split(",").filter(Boolean);
+                    const ativo = sel.includes(o.valor);
+                    return (
+                      <button
+                        key={o.valor}
+                        type="button"
+                        aria-pressed={ativo}
+                        onClick={() =>
+                          setForm((f) => {
+                            const atuais = String(f[c.key] ?? "").split(",").filter(Boolean);
+                            const proximos = ativo
+                              ? atuais.filter((v) => v !== o.valor)
+                              : [...atuais, o.valor];
+                            return { ...f, [c.key]: proximos.join(",") };
+                          })
+                        }
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 4,
+                          border: "1.5px solid var(--tinta)",
+                          background: ativo ? "var(--acento)" : "var(--cartao)",
+                          color: ativo ? "#fff" : "var(--tinta-2)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {o.rotulo}
+                      </button>
+                    );
+                  })}
+                </span>
+              ) : c.tipo === "dias_semana" ? (
+                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
+                  {DIAS_SEMANA_CURTO.map((letra, idx) => {
+                    const sel = parseDiasSemana(String(form[c.key] ?? ""));
+                    const ativo = sel.includes(idx);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        title={DIAS_SEMANA[idx]}
+                        aria-pressed={ativo}
+                        onClick={() =>
+                          setForm((f) => {
+                            const atuais = parseDiasSemana(String(f[c.key] ?? ""));
+                            const proximos = ativo
+                              ? atuais.filter((d) => d !== idx)
+                              : [...atuais, idx];
+                            return { ...f, [c.key]: serializarDiasSemana(proximos) };
+                          })
+                        }
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 4,
+                          border: "1.5px solid var(--tinta)",
+                          background: ativo ? "var(--acento)" : "var(--cartao)",
+                          color: ativo ? "var(--marfim, #fff)" : "var(--tinta-2)",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {letra}
+                      </button>
+                    );
+                  })}
+                </span>
+              ) : c.tipo === "intervalos" ? (
+                <EditorIntervalos
+                  valor={String(form[c.key] ?? "")}
+                  aoMudar={(v) => setForm((f) => ({ ...f, [c.key]: v }))}
+                />
+              ) : (
+                <input
+                  type={
+                    c.tipo === "numero"
+                      ? "number"
+                      : c.tipo === "hora"
+                        ? "time"
+                        : c.tipo === "data"
+                          ? "date"
+                          : "text"
+                  }
+                  step={c.passo}
+                  value={String(form[c.key] ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
+                  required={c.obrigatorio}
+                />
+              )}
+              {ajudaDe(c, form) && (
+                <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>{ajudaDe(c, form)}</span>
+              )}
+            </label>
+          ))}
+    </>
+  );
+}
+
 export default function CrudManager<T extends Registro>({
   titulo,
   subtitulo,
@@ -229,6 +496,53 @@ export default function CrudManager<T extends Registro>({
   // Balão de ajuda flutuante (hover/foco no "?"). Posição em coordenadas
   // de tela, renderizado em portal para nunca ser cortado pelo modal.
   const [tip, setTip] = useState<{ texto: string; x: number; y: number; acima: boolean } | null>(null);
+
+  /**
+   * Atalho "criar na hora": o campo que está com o mini-cadastro aberto, o
+   * formulário dele, e as opções que já nasceram nesta sessão.
+   *
+   * `criadosAgora` existe porque a lista do select vem de um SWR da tela, e
+   * revalidar leva um instante — sem isso, a pessoa cria o tipo e ele **não
+   * aparece**, que é pior do que o problema que o atalho resolve.
+   */
+  const [inline, setInline] = useState<CampoForm | null>(null);
+  const [formInline, setFormInline] = useState<Record<string, unknown>>({});
+  const [erroInline, setErroInline] = useState("");
+  const [salvandoInline, setSalvandoInline] = useState(false);
+  const [criadosAgora, setCriadosAgora] = useState<Record<string, OpcaoCampo[]>>({});
+
+  function abrirInline(campo: CampoForm) {
+    const ini: Record<string, unknown> = {};
+    for (const c of campo.criarInline?.campos ?? [])
+      ini[c.key] = c.padrao ?? (c.tipo === "checkbox" ? true : c.tipo === "numero" ? 0 : "");
+    setFormInline(ini);
+    setErroInline("");
+    setInline(campo);
+  }
+
+  async function salvarInline(e: React.FormEvent) {
+    e.preventDefault();
+    const conf = inline?.criarInline;
+    if (!conf) return;
+    setErroInline("");
+    setSalvandoInline(true);
+    try {
+      const corpo: Record<string, unknown> = { ...formInline };
+      for (const c of conf.campos)
+        if (c.tipo === "numero" || c.numerico) corpo[c.key] = Number(corpo[c.key] ?? 0);
+      const novo = (await apiPost(conf.endpoint, corpo)) as Record<string, unknown>;
+      const opcao = conf.paraOpcao(novo);
+      // Aparece na lista e já fica escolhido: a pessoa criou porque queria usar.
+      setCriadosAgora((m) => ({ ...m, [inline!.key]: [...(m[inline!.key] ?? []), opcao] }));
+      setForm((f) => ({ ...f, [inline!.key]: opcao.valor }));
+      conf.aoCriado?.(novo);
+      setInline(null);
+    } catch (err) {
+      setErroInline(err instanceof ErroApi ? err.message : "Não foi possível criar.");
+    } finally {
+      setSalvandoInline(false);
+    }
+  }
 
   function mostrarDica(el: HTMLElement, texto: string) {
     const r = el.getBoundingClientRect();
@@ -432,187 +746,15 @@ export default function CrudManager<T extends Registro>({
         aoFechar={() => setAberto(false)}
       >
         <form onSubmit={salvar} className="form-grade">
-          {campos.map((c) =>
-            c.mostrarSe && !c.mostrarSe(form) ? null : (
-            <label
-              key={c.key}
-              className="campo"
-              // Todo campo de cadastro vira alvo possível do tutorial sem
-              // trabalho manual: o roteiro só precisa citar "campo-<chave>".
-              data-tour={`campo-${c.key}`}
-              style={{ gridColumn: c.inteira ? "1 / -1" : undefined }}
-            >
-              <span className="rotulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span>
-                  {c.rotulo}
-                  {c.obrigatorio ? " *" : ""}
-                </span>
-                {c.dica && (
-                  <button
-                    type="button"
-                    aria-label={`Ajuda: ${c.rotulo}`}
-                    onMouseEnter={(e) => mostrarDica(e.currentTarget, c.dica!)}
-                    onMouseLeave={esconderDica}
-                    onFocus={(e) => mostrarDica(e.currentTarget, c.dica!)}
-                    onBlur={esconderDica}
-                    onClick={(e) => e.preventDefault()}
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      border: "1.5px solid var(--acento)",
-                      background: "transparent",
-                      color: "var(--acento)",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "help",
-                      padding: 0,
-                    }}
-                  >
-                    ?
-                  </button>
-                )}
-              </span>
-              {c.tipo === "select" ? (
-                <select
-                  value={String(form[c.key] ?? "")}
-                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
-                  required={c.obrigatorio}
-                >
-                  {/* O campo pode trazer a própria opção de valor vazio, com
-                      rótulo que explica o que "vazio" significa (ex.: "herdar
-                      do tipo do local"). Nesse caso o genérico sobraria — e
-                      duas opções com o mesmo valor deixariam a do campo
-                      inalcançável, porque o navegador seleciona a primeira. */}
-                  {!opcoesDe(c, form).some((o) => o.valor === "") && (
-                    <option value="">— selecionar —</option>
-                  )}
-                  {opcoesDe(c, form).map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.rotulo}
-                    </option>
-                  ))}
-                </select>
-              ) : c.tipo === "checkbox" ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form[c.key])}
-                    onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.checked }))}
-                    style={{ width: 18, height: 18, accentColor: "var(--acento)" }}
-                  />
-                  <span style={{ fontSize: 13 }}>Sim</span>
-                </span>
-              ) : c.tipo === "textarea" ? (
-                <textarea
-                  value={String(form[c.key] ?? "")}
-                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
-                />
-              ) : c.tipo === "multiselect" ? (
-                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
-                  {opcoesDe(c, form).length === 0 && (
-                    <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Nenhuma opção disponível.</span>
-                  )}
-                  {opcoesDe(c, form).map((o) => {
-                    const sel = String(form[c.key] ?? "").split(",").filter(Boolean);
-                    const ativo = sel.includes(o.valor);
-                    return (
-                      <button
-                        key={o.valor}
-                        type="button"
-                        aria-pressed={ativo}
-                        onClick={() =>
-                          setForm((f) => {
-                            const atuais = String(f[c.key] ?? "").split(",").filter(Boolean);
-                            const proximos = ativo
-                              ? atuais.filter((v) => v !== o.valor)
-                              : [...atuais, o.valor];
-                            return { ...f, [c.key]: proximos.join(",") };
-                          })
-                        }
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 4,
-                          border: "1.5px solid var(--tinta)",
-                          background: ativo ? "var(--acento)" : "var(--cartao)",
-                          color: ativo ? "#fff" : "var(--tinta-2)",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {o.rotulo}
-                      </button>
-                    );
-                  })}
-                </span>
-              ) : c.tipo === "dias_semana" ? (
-                <span style={{ display: "flex", gap: 6, paddingTop: 4, flexWrap: "wrap" }}>
-                  {DIAS_SEMANA_CURTO.map((letra, idx) => {
-                    const sel = parseDiasSemana(String(form[c.key] ?? ""));
-                    const ativo = sel.includes(idx);
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        title={DIAS_SEMANA[idx]}
-                        aria-pressed={ativo}
-                        onClick={() =>
-                          setForm((f) => {
-                            const atuais = parseDiasSemana(String(f[c.key] ?? ""));
-                            const proximos = ativo
-                              ? atuais.filter((d) => d !== idx)
-                              : [...atuais, idx];
-                            return { ...f, [c.key]: serializarDiasSemana(proximos) };
-                          })
-                        }
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 4,
-                          border: "1.5px solid var(--tinta)",
-                          background: ativo ? "var(--acento)" : "var(--cartao)",
-                          color: ativo ? "var(--marfim, #fff)" : "var(--tinta-2)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {letra}
-                      </button>
-                    );
-                  })}
-                </span>
-              ) : c.tipo === "intervalos" ? (
-                <EditorIntervalos
-                  valor={String(form[c.key] ?? "")}
-                  aoMudar={(v) => setForm((f) => ({ ...f, [c.key]: v }))}
-                />
-              ) : (
-                <input
-                  type={
-                    c.tipo === "numero"
-                      ? "number"
-                      : c.tipo === "hora"
-                        ? "time"
-                        : c.tipo === "data"
-                          ? "date"
-                          : "text"
-                  }
-                  step={c.passo}
-                  value={String(form[c.key] ?? "")}
-                  onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
-                  required={c.obrigatorio}
-                />
-              )}
-              {ajudaDe(c, form) && (
-                <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>{ajudaDe(c, form)}</span>
-              )}
-            </label>
-          ))}
+          <CamposDoFormulario
+            campos={campos}
+            form={form}
+            setForm={setForm}
+            mostrarDica={mostrarDica}
+            esconderDica={esconderDica}
+            aoCriarInline={abrirInline}
+            criadosAgora={criadosAgora}
+          />
 
           {erro && (
             <div className="alerta alerta-erro" style={{ gridColumn: "1 / -1" }}>
@@ -634,6 +776,38 @@ export default function CrudManager<T extends Registro>({
               </button>
             </div>
           )}
+        </form>
+      </Modal>
+
+      {/* Mini-cadastro do catálogo, por cima do formulário que o chamou. Vai em
+          portal próprio, então não vira <form> dentro de <form>. */}
+      <Modal
+        titulo={inline?.criarInline?.titulo ?? ""}
+        aberto={Boolean(inline)}
+        aoFechar={() => setInline(null)}
+        larguraMax={480}
+      >
+        <form onSubmit={salvarInline} className="form-grade">
+          <CamposDoFormulario
+            campos={inline?.criarInline?.campos ?? []}
+            form={formInline}
+            setForm={setFormInline}
+            mostrarDica={mostrarDica}
+            esconderDica={esconderDica}
+          />
+          {erroInline && (
+            <div className="alerta alerta-erro" style={{ gridColumn: "1 / -1" }}>
+              {erroInline}
+            </div>
+          )}
+          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" className="btn" onClick={() => setInline(null)}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primario" disabled={salvandoInline}>
+              {salvandoInline ? "Criando…" : "Criar e usar"}
+            </button>
+          </div>
         </form>
       </Modal>
 

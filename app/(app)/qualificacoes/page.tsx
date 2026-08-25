@@ -16,7 +16,10 @@ import type { Funcionario, QualificacaoFuncionario, Requisito, Sede } from "@/ty
 export default function PaginaQualificacoes() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  const { data: requisitos, mutate: mutateRequisitos } = useSWR<Requisito[]>(
+    "/api/requisitos",
+    fetcher,
+  );
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const nomeFunc = (id: string) => funcionarios?.find((f) => f.id === id)?.nome ?? id;
@@ -58,7 +61,35 @@ export default function PaginaQualificacoes() {
           opcoes: (requisitos ?? [])
             .filter((r) => r.ativo && r.tipo !== "epi")
             .map((r) => ({ valor: r.id, rotulo: `${r.nome} (${r.tipo})` })),
-          dica: "A aptidão ou treinamento que esta pessoa tem. Gerencie o catálogo em Requisitos.",
+          dica: "A aptidão ou treinamento que esta pessoa tem. O catálogo fica em Requisitos — e dá para criar um aqui mesmo, pelo botão ao lado, sem perder o que você já preencheu.",
+          criarInline: {
+            titulo: "Novo requisito",
+            endpoint: "/api/requisitos",
+            campos: [
+              { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true, inteira: true },
+              {
+                key: "tipo",
+                rotulo: "Tipo",
+                tipo: "select",
+                obrigatorio: true,
+                padrao: "treinamento",
+                inteira: true,
+                // EPI fica de fora: EPI é exigência da tarefa, não algo que a
+                // pessoa "possui" — e este campo é o que ela possui.
+                opcoes: [
+                  { valor: "treinamento", rotulo: "Treinamento" },
+                  { valor: "aptidao", rotulo: "Aptidão" },
+                ],
+              },
+              { key: "descricao", rotulo: "Descrição", tipo: "texto", inteira: true },
+              { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+            ],
+            paraOpcao: (novo) => ({
+              valor: String(novo.id),
+              rotulo: `${String(novo.nome)} (${String(novo.tipo)})`,
+            }),
+            aoCriado: () => void mutateRequisitos(),
+          },
         },
         {
           key: "validade",

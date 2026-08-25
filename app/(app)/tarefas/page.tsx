@@ -56,7 +56,10 @@ export default function PaginaTarefas() {
       ),
     [tiposLocal],
   );
-  const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
+  const { data: categorias, mutate: mutateCategorias } = useSWR<Categoria[]>(
+    "/api/categorias",
+    fetcher,
+  );
   const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
@@ -113,7 +116,25 @@ export default function PaginaTarefas() {
           opcoes: (categorias ?? [])
             .filter((c) => c.ativo)
             .map((c) => ({ valor: c.id, rotulo: c.nome })),
-          ajuda: "Catálogo gerenciado em Categorias (admin)",
+          ajuda: "Catálogo gerenciado em Categorias (admin) · dá para criar aqui",
+          criarInline: {
+            titulo: "Nova categoria",
+            endpoint: "/api/categorias",
+            campos: [
+              { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true, inteira: true },
+              { key: "descricao", rotulo: "Descrição", tipo: "texto", inteira: true },
+              {
+                key: "cor",
+                rotulo: "Cor",
+                tipo: "texto",
+                padrao: "#2f6f4f",
+                ajuda: "Hex, ex.: #2f6f4f — pinta a espinha do card na agenda",
+              },
+              { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
+            ],
+            paraOpcao: (novo) => ({ valor: String(novo.id), rotulo: String(novo.nome) }),
+            aoCriado: () => void mutateCategorias(),
+          },
           dica: "A categoria de atividade que agrupa esta tarefa (ex.: Higienização, Coleta). Usada nos filtros da paleta e na recalibração em cascata. O catálogo é gerenciado na tela Categorias.",
         },
         {

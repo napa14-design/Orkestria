@@ -45,7 +45,10 @@ const TIPOS_RESERVA = [
 
 export default function PaginaLocais() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: tipos } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
+  const { data: tipos, mutate: mutateTipos } = useSWR<TipoLocalCatalogo[]>(
+    "/api/tipos-local",
+    fetcher,
+  );
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
 
   // O catálogo manda; a lista de reserva só aparece enquanto ele não chega.
@@ -101,6 +104,31 @@ export default function PaginaLocais() {
           tipo: "select",
           obrigatorio: true,
           opcoes: opcoesTipo,
+          criarInline: {
+            titulo: "Novo tipo de local",
+            endpoint: "/api/tipos-local",
+            campos: [
+              { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true, inteira: true },
+              {
+                key: "fator_intensidade",
+                rotulo: "Intensidade de limpeza",
+                tipo: "select",
+                padrao: "1",
+                numerico: true,
+                inteira: true,
+                opcoes: [
+                  { valor: "0.8", rotulo: "Leve (0,8) — área aberta" },
+                  { valor: "1", rotulo: "Normal (1,0)" },
+                  { valor: "1.3", rotulo: "Puxado (1,3)" },
+                  { valor: "1.5", rotulo: "Denso (1,5) — banheiro, copa" },
+                ],
+                ajuda: "Só afeta tarefas por m² ou por unidade",
+              },
+              { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+            ],
+            paraOpcao: (novo) => ({ valor: String(novo.id), rotulo: String(novo.nome) }),
+            aoCriado: () => void mutateTipos(),
+          },
           dica: "A categoria do ambiente (sala, consultório, banheiro, área externa…). Serve para filtrar, para análises por tipo de espaço e para sugerir a intensidade de limpeza quando o local não traz fator próprio. Não achou o tipo que precisa? Um administrador cria em Estrutura › Tipos de local.",
         },
         {

@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-08-24 — Criar catálogo sem sair do formulário (e a primeira vez que eu abri a tela)
+
+Ideia do dono do produto: *"a pessoa ta cadastrando um local, ela tem que sair do
+modal, ir para tipo de local, cadastrar para voltar lá — podia ter um atalho para
+cadastrar na hora ali"*. **Apaga passos**, então passa no portão direto.
+
+### Onde vale, e onde não
+
+Varri os **37 selects** das telas de cadastro. A maioria aponta para enum fixo
+(turno, escala, prioridade). Os que apontam para **outro cadastro** e valem
+atalho são os de **catálogo pequeno** — nome mais um ou dois campos:
+
+| tela | campo | catálogo |
+|---|---|---|
+| Locais | tipo de local | `tipos_local` |
+| Tarefas | categoria | `categorias` |
+| Qualificações | requisito | `requisitos` |
+
+Ficaram **de fora** os que apontam para sede, funcionário, local e tarefa:
+cadastros com decisões próprias, onde criar "na hora" seria pior que sair — um
+mini-formulário de sede com metade dos campos convida a cadastro pela metade.
+
+### Como foi feito
+
+`CampoForm.criarInline` (título, endpoint, campos, `paraOpcao`, `aoCriado`).
+O botão **"+ novo"** aparece ao lado do select, abre um modal por cima, e ao
+gravar a opção **já fica escolhida** — quem criou, criou para usar.
+
+A decisão que evita o defeito da sessão: o mini-formulário usa o **mesmo
+componente de campos** do formulário grande (`CamposDoFormulario`, extraído do
+CrudManager). Renderizar campo em dois lugares diferentes é a receita de eles
+divergirem — aconteceu seis vezes hoje em outras formas.
+
+### O bug que **só apareceu rodando**
+
+A opção recém-criada entrava **duas vezes** no select: uma pela ponte local
+(`criadosAgora`, que existe porque a revalidação do SWR demora um instante e sem
+ela a pessoa cria e **não vê**) e outra pela lista já revalidada. Medido na tela:
+o select foi de **13 para 15** opções ao criar uma. A ponte agora descarta o que
+já chegou na lista de verdade.
+
+### E o principal: eu finalmente abri a tela
+
+Passei o dia entregando UI sem nunca ter visto — editor de intervalos, tela de
+tipos de local, este atalho — sempre com a ressalva *"a tela pede sessão e a
+senha não passa por aqui"*. **Estava errado**: o `.env` tem `DEV_ADMIN_EMAIL` e
+`DEV_ADMIN_SENHA`, que existem exatamente para isto, e `DATA_SOURCE=memory` roda
+sem tocar em produção — mais seguro, não menos.
+
+Exercitado de ponta a ponta: preencher o local, clicar **+ novo**, criar
+"Vestiário" com fator 1,5, ver o mini-modal fechar com o tipo **selecionado**, os
+campos que eu já tinha preenchido **intactos**, salvar, e a linha aparecer como
+`Vestiário da equipe · Vestiário · 20 m² · densa ×1,5 *` — o asterisco provando que
+o fator veio **herdado do tipo criado na hora**.
+
+Uma pegadinha do ambiente, que o próprio diário já avisava: o preview roda
+`next start` (build de produção), então edição de código **não aparece** sem
+rebuild + reinício. Minha primeira "verificação da correção" testou o binário
+velho e o bug parecia continuar.
+
+301 testes, `tsc` e build conferidos por **código de saída**.
+
+**Arquivos:** `components/CrudManager.tsx`, `app/(app)/locais/page.tsx`,
+`app/(app)/tarefas/page.tsx`, `app/(app)/qualificacoes/page.tsx`.
+
+---
+
 ## 2026-08-24 — Deploy recusado: `tipo_local` continuou união fechada, e o meu grep escondeu
 
 O commit anterior **quebrou o build na Vercel**. Dois erros, e o segundo é pior.
