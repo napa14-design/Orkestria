@@ -136,6 +136,28 @@ export function rotularDiasSemana(csv: string | undefined | null): string {
     .join(", ");
 }
 
+/**
+ * Primeiro dia **depois** de `data` que cai num dos dias marcados (0=dom…6=sáb).
+ * É o destino de "copiar este dia" quando ninguém escolheu período: com Seg–Sex
+ * marcados, a sexta copia para a segunda, e não para o sábado. Devolve "" se
+ * nenhum dia estiver marcado — quem chama precisa dizer isso na tela, não
+ * escolher um dia por conta própria.
+ */
+export function proximoDiaMarcado(data: string, diasMarcados: Set<number>): string {
+  // Meio-dia: às 00:00 o horário de verão de outros fusos empurra a data.
+  // Data inválida não precisa de trava própria: `getDay()` vira NaN, nenhum
+  // `has(NaN)` casa, e o laço termina devolvendo "" — a trava que eu havia
+  // escrito era código morto, e a mutação que a removeu não quebrou nada.
+  const cursor = new Date(`${data}T12:00:00`);
+  for (let i = 0; i < 7; i++) {
+    cursor.setDate(cursor.getDate() + 1);
+    if (diasMarcados.has(cursor.getDay())) {
+      return `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    }
+  }
+  return "";
+}
+
 /** Dois intervalos [aIni, aFim) e [bIni, bFim) em minutos se sobrepõem? */
 export function intervalosSobrepoem(
   aIni: number,

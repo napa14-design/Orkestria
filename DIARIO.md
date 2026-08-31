@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-08-31 — O período vira opcional (e o botão passa a dizer a data, não a contagem)
+
+Pergunta do dono, olhando a tela nova: *"e se não tiver período? deixa
+opcional"*. Estava certo — a origem mais comum é **este dia**, e sem período o
+botão principal ficava morto, sem dizer o que faltava.
+
+### A regra, dita em voz alta na tela
+
+- **Uma data só preenchida** vale por um dia (não exige mais o par de/até).
+- **Nenhuma data**: copiar o dia vai para o **próximo dia marcado nos chips** —
+  com Seg–Sex, a sexta copia para a **segunda**, não para o sábado; aplicar uma
+  rota entra no dia que está na tela (o comportamento de sempre).
+- **Nenhum dia da semana marcado**: botão desligado, com "Marque ao menos um dia
+  da semana".
+
+O botão passou a nomear o destino em vez de contar: `⧉ Copiar para 01/09/2026`
+quando é um dia, `⧉ Copiar para 5 dias` quando são vários. Ninguém clica sem
+saber onde as tarefas vão cair.
+
+`proximoDiaMarcado` foi morar em `lib/dateUtils.ts`, não no componente: é a regra
+que decide **em que data o dia inteiro aterrissa**, e regra assim tem teste. São
+7 casos, e três mutações provam que eles mordem (não incrementar antes de
+comparar, laço curto demais, e o próprio dia como destino). **A terceira mutação
+saiu cega** e ensinou algo: a trava de data inválida que eu havia escrito era
+código morto — `getDay()` de data inválida é `NaN`, nenhum `has(NaN)` casa, e o
+laço já devolvia `""`. A trava saiu; os testes que fixam o comportamento ficaram.
+
+### O bug que só a tela mostrou
+
+Com período informado que **não rende data nenhuma** (12–13/09 com Seg–Sex
+marcados), a tela dizia em vermelho "nenhuma data no período" **e o botão,
+habilitado, se oferecia para copiar para 02/09** — uma data que ninguém pediu. O
+destino padrão estava vazando para um caso que não era o dele. É a mesma família
+do mês: a regra vale para um ramo e eu esqueci a guarda do outro. `tsc`, build e
+325 testes passavam com o defeito em pé.
+
+**Arquivos:** `components/agenda/ModalPlanejamento.tsx`, `lib/dateUtils.ts`,
+`testes/datas.test.ts`.
+
+**Verificado na tela:** sexta 04/09 → botão "Copiar para 07/09/2026" (segunda);
+só "De" preenchido → um dia; sem chip marcado → desligado com o motivo; período
+sem data → desligado e o aviso concorda; clique real sem período → **44 tarefas
+em 01/09 e zero em 02/09**. `tsc` 0 · build 0 · 325 testes 0 · console limpo.
+
+---
+
 ## 2026-08-31 — O modal de planejamento vira duas telas, uma por vez
 
 Relato do dono, na mesma mensagem do desfazer: *"o modal de criar rotas padrões,

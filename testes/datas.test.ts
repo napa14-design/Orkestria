@@ -10,7 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { feriadoDoDia } from "@/lib/calculations";
-import { agoraHHMM, diaDaSemana, hojeISO } from "@/lib/dateUtils";
+import { agoraHHMM, diaDaSemana, hojeISO, proximoDiaMarcado } from "@/lib/dateUtils";
 
 describe("hojeISO no fuso da operação", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -138,5 +138,48 @@ describe("diaDaSemana", () => {
     expect(diaDaSemana("2026-08-15")).toBe(6); // sábado
     expect(diaDaSemana("2026-08-16")).toBe(0); // domingo
     expect(diaDaSemana("2026-08-17")).toBe(1); // segunda
+  });
+});
+
+/**
+ * Destino de "copiar este dia" quando o período fica vazio — o período virou
+ * opcional em 31/08/2026 (*"e se não tiver período? deixa opcional"*), e um
+ * destino calculado errado põe o dia inteiro na data errada, em silêncio.
+ */
+describe("proximoDiaMarcado", () => {
+  const SEG_SEX = new Set([1, 2, 3, 4, 5]);
+
+  it("pula o fim de semana: da sexta vai para a segunda", () => {
+    expect(diaDaSemana("2026-08-14")).toBe(5); // sexta
+    expect(proximoDiaMarcado("2026-08-14", SEG_SEX)).toBe("2026-08-17"); // segunda
+  });
+
+  it("no meio da semana é simplesmente o dia seguinte", () => {
+    expect(proximoDiaMarcado("2026-08-11", SEG_SEX)).toBe("2026-08-12");
+  });
+
+  it("nunca devolve a própria data — o destino é sempre DEPOIS", () => {
+    // Segunda com só segunda marcada: vai para a segunda seguinte, não para ela
+    // mesma. Copiar o dia em cima de si é 44 conflitos e zero cópias.
+    expect(proximoDiaMarcado("2026-08-17", new Set([1]))).toBe("2026-08-24");
+  });
+
+  it("atravessa a virada do mês e do ano", () => {
+    expect(proximoDiaMarcado("2026-08-31", SEG_SEX)).toBe("2026-09-01");
+    expect(proximoDiaMarcado("2026-12-31", SEG_SEX)).toBe("2027-01-01"); // sexta
+  });
+
+  it("respeita um conjunto qualquer de dias, inclusive só o fim de semana", () => {
+    expect(proximoDiaMarcado("2026-08-11", new Set([6, 0]))).toBe("2026-08-15"); // sábado
+    expect(proximoDiaMarcado("2026-08-15", new Set([6, 0]))).toBe("2026-08-16"); // domingo
+  });
+
+  it("sem dia marcado devolve vazio, em vez de escolher um por conta própria", () => {
+    expect(proximoDiaMarcado("2026-08-11", new Set())).toBe("");
+  });
+
+  it("data inválida não vira NaN na tela", () => {
+    expect(proximoDiaMarcado("", SEG_SEX)).toBe("");
+    expect(proximoDiaMarcado("31/08/2026", SEG_SEX)).toBe("");
   });
 });

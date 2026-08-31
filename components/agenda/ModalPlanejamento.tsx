@@ -26,7 +26,12 @@ import { useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { apiDelete, apiPost, ErroApi, fetcher } from "@/lib/clientApi";
-import { formatarDataBR, rotularDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
+import {
+  formatarDataBR,
+  proximoDiaMarcado,
+  rotularDiasSemana,
+  serializarDiasSemana,
+} from "@/lib/dateUtils";
 import type { ResumoModelo, ResultadoAplicacao } from "@/services/modelosService";
 
 const DIAS_SEMANA = [
@@ -42,6 +47,11 @@ const DIAS_SEMANA = [
 /** Valor da origem que significa "as tarefas que já estão na tela". */
 const ORIGEM_DIA = "__dia__";
 
+/** ISO do dia, no fuso local (meio-dia evita a virada por UTC). */
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Lista de datas YYYY-MM-DD entre de/até, filtrada pelos dias da semana. */
 function datasDoPeriodo(de: string, ate: string, diasAtivos: Set<number>): string[] {
   if (!de || !ate || de > ate) return [];
@@ -49,11 +59,7 @@ function datasDoPeriodo(de: string, ate: string, diasAtivos: Set<number>): strin
   const cursor = new Date(`${de}T12:00:00`);
   const fim = new Date(`${ate}T12:00:00`);
   while (cursor <= fim && datas.length < 62) {
-    if (diasAtivos.has(cursor.getDay())) {
-      datas.push(
-        `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`,
-      );
-    }
+    if (diasAtivos.has(cursor.getDay())) datas.push(iso(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return datas;
@@ -197,9 +203,24 @@ export default function ModalPlanejamento({
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
-  const datas = datasDoPeriodo(de, ate, dias);
   const rotas = (modelos ?? []).filter((m) => !m.evento);
   const eventos = (modelos ?? []).filter((m) => m.evento);
+
+  const copiandoODia = origem === ORIGEM_DIA;
+  /**
+   * O período é **opcional**. Preencher só uma das duas datas vale por um dia
+   * só; não preencher nenhuma tem um destino padrão, e o botão sempre diz qual
+   * é — copiar o dia vai para o próximo dia marcado, aplicar uma rota entra no
+   * dia que está na tela (o comportamento de sempre).
+   */
+  const periodoInformado = Boolean(de || ate);
+  const datas = periodoInformado ? datasDoPeriodo(de || ate, ate || de, dias) : [];
+  const destinoPadrao = copiandoODia ? proximoDiaMarcado(dataAtual, dias) : dataAtual;
+  // O destino padrão vale SÓ para quem não informou período. Quem informou um
+  // período que não rende data nenhuma fica sem destino de propósito: cair no
+  // padrão aqui mandaria o dia para uma data que a pessoa não pediu, e o botão
+  // diria isso em letra pequena enquanto o aviso vermelho dizia o contrário.
+  const alvos = periodoInformado ? datas : destinoPadrao ? [destinoPadrao] : [];
 
   function fechar() {
     setErro("");
@@ -227,24 +248,21 @@ export default function ModalPlanejamento({
    * Para quem usa é a mesma frase — "põe estas tarefas nestes dias".
    */
   function preencher() {
-    if (origem === ORIGEM_DIA) {
-      if (datas.length === 0) {
-        setErro("Escolha o período e ao menos um dia da semana.");
-        return;
-      }
+    if (alvos.length === 0) {
+      setErro("Marque ao menos um dia da semana, ou escolha um período.");
+      return;
+    }
+    if (copiandoODia) {
       executar(async () => {
         const r = await apiPost<{ copiadas: number; puladas: number }>("/api/rotinas/duplicar", {
           data_origem: dataAtual,
-          datas_destino: datas,
+          datas_destino: alvos,
           sede_id: sedeId,
         });
         return `${r.copiadas} tarefa(s) copiada(s)${r.puladas > 0 ? `, ${r.puladas} pulada(s) por conflito` : ""}.`;
       });
       return;
     }
-    // Sem período escolhido, a rota entra só no dia que está na tela — é o que o
-    // botão diz, e era o comportamento antigo.
-    const alvos = datas.length > 0 ? datas : [dataAtual];
     executar(async () => {
       const r = await apiPost<ResultadoAplicacao>("/api/modelos/aplicar", {
         nome: origem,
@@ -310,12 +328,15 @@ export default function ModalPlanejamento({
     });
   }
 
-  const copiandoODia = origem === ORIGEM_DIA;
-  const rotuloBotao = copiandoODia
-    ? `⧉ Copiar para ${datas.length || "…"} dia(s)`
-    : datas.length > 0
-      ? `Aplicar em ${datas.length} dia(s)`
-      : `Aplicar em ${formatarDataBR(dataAtual)}`;
+  // O botão nomeia o destino: uma data quando é uma só, a contagem quando são
+  // várias. Assim ninguém clica sem saber onde as tarefas vão cair.
+  const rotuloDestino =
+    alvos.length === 0
+      ? "…"
+      : alvos.length === 1
+        ? formatarDataBR(alvos[0])
+        : `${alvos.length} dias`;
+  const rotuloBotao = copiandoODia ? `⧉ Copiar para ${rotuloDestino}` : `Aplicar em ${rotuloDestino}`;
 
   return (
     <Modal
@@ -363,7 +384,9 @@ export default function ModalPlanejamento({
             <span className="rotulo">
               Para quais dias{" "}
               <span style={{ fontWeight: 400 }}>
-                ({datas.length} data{datas.length === 1 ? "" : "s"})
+                {periodoInformado
+                  ? `(${datas.length} data${datas.length === 1 ? "" : "s"})`
+                  : "(opcional)"}
               </span>
             </span>
             <SeletorPeriodo
@@ -376,11 +399,21 @@ export default function ModalPlanejamento({
                 setDias(ds);
               }}
             />
-            {!copiandoODia && datas.length === 0 && (
-              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
-                Sem período escolhido, a rota entra só em {formatarDataBR(dataAtual)}.
+            {/* Nunca ficar em silêncio: ou explica o destino padrão, ou diz por
+                que não há destino nenhum. */}
+            {periodoInformado && datas.length === 0 ? (
+              <p style={{ fontSize: 11, color: "var(--vermelho)", margin: 0 }}>
+                Nenhuma data no período: os dias da semana marcados não caem entre essas datas.
               </p>
-            )}
+            ) : !periodoInformado ? (
+              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
+                {alvos.length === 0
+                  ? "Marque ao menos um dia da semana."
+                  : copiandoODia
+                    ? `Sem período, copia para o próximo dia marcado: ${formatarDataBR(alvos[0])}.`
+                    : `Sem período, a rota entra só em ${formatarDataBR(alvos[0])}.`}
+              </p>
+            ) : null}
           </section>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
@@ -390,7 +423,7 @@ export default function ModalPlanejamento({
             <button
               className="btn btn-primario"
               onClick={preencher}
-              disabled={ocupado || (copiandoODia && datas.length === 0)}
+              disabled={ocupado || alvos.length === 0}
             >
               {rotuloBotao}
             </button>
