@@ -8,8 +8,28 @@
 import Modal from "@/components/Modal";
 import { formatarDuracao } from "@/lib/dateUtils";
 
+/**
+ * Texto do modal de confirmação. O padrão é a autorização de conflito, que foi
+ * o primeiro uso; quem confirma outra coisa (apagar o dia, por exemplo) passa o
+ * seu próprio — senão o botão de uma exclusão em massa diz "Autorizar mesmo
+ * assim", que foi o que apareceu na tela em 25/08.
+ */
+export interface TextoConfirmacao {
+  titulo: string;
+  intro: string;
+  nota?: string;
+  confirmar: string;
+}
+
+const CONFLITO: TextoConfirmacao = {
+  titulo: "Autorizar conflito manualmente?",
+  intro: "Esta alocação tem um conflito que você pode autorizar:",
+  nota: "Se autorizar, a rotina fica marcada como autorizada manualmente (e o histórico registra isso).",
+  confirmar: "Autorizar mesmo assim",
+};
+
 interface ModaisRotinaProps {
-  confirmacao: { mensagens: string[] } | null;
+  confirmacao: { mensagens: string[]; texto?: TextoConfirmacao } | null;
   aoResponderConfirmacao: (ok: boolean) => void;
   duracaoPrompt: { nome: string } | null;
   duracaoInput: string;
@@ -25,17 +45,16 @@ export default function ModaisRotina({
   aoMudarDuracaoInput,
   aoResponderDuracao,
 }: ModaisRotinaProps) {
+  const texto = confirmacao?.texto ?? CONFLITO;
   return (
     <>
       <Modal
-        titulo="Autorizar conflito manualmente?"
+        titulo={texto.titulo}
         aberto={!!confirmacao}
         aoFechar={() => aoResponderConfirmacao(false)}
         larguraMax={460}
       >
-        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 10 }}>
-          Esta alocação tem um conflito que você pode autorizar:
-        </p>
+        <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 10 }}>{texto.intro}</p>
         <div
           style={{
             background: "var(--papel-2)",
@@ -53,16 +72,15 @@ export default function ModaisRotina({
             </div>
           ))}
         </div>
-        <p style={{ fontSize: 12, color: "var(--tinta-3)", marginBottom: 16 }}>
-          Se autorizar, a rotina fica marcada como <strong>autorizada manualmente</strong> (e o
-          histórico registra isso).
-        </p>
+        {texto.nota && (
+          <p style={{ fontSize: 12, color: "var(--tinta-3)", marginBottom: 16 }}>{texto.nota}</p>
+        )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button type="button" className="btn" onClick={() => aoResponderConfirmacao(false)}>
             Cancelar
           </button>
           <button type="button" className="btn btn-primario" onClick={() => aoResponderConfirmacao(true)}>
-            Autorizar mesmo assim
+            {texto.confirmar}
           </button>
         </div>
       </Modal>

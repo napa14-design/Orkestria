@@ -558,3 +558,75 @@ export async function duplicarDia(
     ? { copiadas, puladas, comProblema: problemas.length, detalhes: resumirProblemas(problemas) }
     : { copiadas, puladas };
 }
+
+/** O que a limpeza do dia alcança. */
+export type EscopoLimpeza = "geradas" | "todas";
+
+export interface ResultadoLimpeza {
+  removidas: number;
+  /** Blocos que ficaram porque já têm realizado registrado. */
+  preservadas: number;
+  /** Blocos montados à mão, quando o escopo é só o gerado. */
+  manuais: number;
+  detalhes: string[];
+}
+
+/**
+ * Desfaz o dia — o caminho de volta que faltava.
+ *
+ * Reportado da tela em 25/08/2026: *"cliquei em gerar a rota padrão sem
+ * querer, podia ter a opção de limpar o dia"*. Gerar cria dezenas de blocos de
+ * uma vez e **não tinha volta**: só apagando um a um, com o × de cada card.
+ *
+ * Duas travas, porque apagar em lote é a operação mais perigosa da tela:
+ *
+ *  - **Bloco com realizado registrado nunca sai.** Apagar o planejado deixaria
+ *    a execução órfã, e o realizado é evidência — o que aconteceu aconteceu.
+ *  - **`escopo: "geradas"` remove só o que a máquina criou**, reconhecido pelo
+ *    id determinístico (`ri_…` da rota padrão, `m_…` de gerar/duplicar/aplicar/
+ *    importar). O que a pessoa arrastou à mão tem id aleatório e fica. É o que
+ *    torna "desfazer a geração" diferente de "limpar tudo".
+ */
+export async function limparDia(
+  sedeId: string,
+  data: string,
+  escopo: EscopoLimpeza,
+  autor: string,
+): Promise<ResultadoLimpeza> {
+  const ds = await getDataSource();
+  const doDia = await getRotinasByData(data, sedeId);
+  if (doDia.length === 0) return { removidas: 0, preservadas: 0, manuais: 0, detalhes: [] };
+
+  const execucoes = await ds.consultar("execucoes_realizadas", [
+    { campo: "data_execucao", op: "==", valor: data },
+  ]);
+  const comRealizado = new Set(execucoes.map((e) => e.rotina_id));
+
+  const gerado = (r: RotinaPlanejada) => r.id.startsWith("ri_") || r.id.startsWith("m_");
+
+  const alvo: RotinaPlanejada[] = [];
+  let preservadas = 0;
+  let manuais = 0;
+  for (const r of doDia) {
+    if (comRealizado.has(r.id)) {
+      preservadas++;
+      continue;
+    }
+    if (escopo === "geradas" && !gerado(r)) {
+      manuais++;
+      continue;
+    }
+    alvo.push(r);
+  }
+
+  const detalhes: string[] = [];
+  if (preservadas > 0)
+    detalhes.push(`${preservadas} bloco(s) mantido(s) por já terem realizado registrado.`);
+  if (manuais > 0) detalhes.push(`${manuais} bloco(s) montado(s) à mão foram preservados.`);
+
+  await ds.gravarLote(
+    alvo.map((r) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: r.id })),
+  );
+  void autor; // a autoria vai no histórico pelo decorator do DataSource
+  return { removidas: alvo.length, preservadas, manuais, detalhes };
+}

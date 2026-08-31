@@ -16,7 +16,7 @@ import AlertPanel from "@/components/agenda/AlertPanel";
 import BarraPassosDoDia from "@/components/agenda/BarraPassosDoDia";
 import CoberturaPanel from "@/components/agenda/CoberturaPanel";
 import FiltersBar from "@/components/agenda/FiltersBar";
-import ModaisRotina from "@/components/agenda/ModaisRotina";
+import ModaisRotina, { type TextoConfirmacao } from "@/components/agenda/ModaisRotina";
 import ModalPlanejamento from "@/components/agenda/ModalPlanejamento";
 import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
@@ -58,6 +58,7 @@ export default function PaginaRotinas() {
   // Modal de "autorizar conflito manualmente" (substitui o confirm() nativo).
   const [confirmacao, setConfirmacao] = useState<{
     mensagens: string[];
+    texto?: TextoConfirmacao;
     resolver: (ok: boolean) => void;
   } | null>(null);
   // Modal "quanto tempo hoje?" para tarefas de presença/plantão e regra manual,
@@ -184,6 +185,17 @@ export default function PaginaRotinas() {
     if (!autorizaveis) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       setConfirmacao({ mensagens: erros.map((e) => e.mensagem), resolver: resolve });
+    });
+  }
+
+  /**
+   * Confirmação genérica, no mesmo modal da autorização de conflito — nada de
+   * `window.confirm`, que o navegador deixa a pessoa silenciar e aí a ação
+   * simplesmente para de funcionar (lição de 05/08, na exclusão dos cadastros).
+   */
+  function pedirConfirmacao(mensagens: string[], texto?: TextoConfirmacao): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      setConfirmacao({ mensagens, texto, resolver: resolve });
     });
   }
 
@@ -550,6 +562,62 @@ export default function PaginaRotinas() {
     }
   }
 
+  /**
+   * Desfazer o dia — o caminho de volta que faltava para o "Gerar o dia".
+   *
+   * Reportado da tela: *"cliquei em gerar a rota padrão sem querer, podia ter a
+   * opção de limpar o dia"*. Gerar cria dezenas de blocos de uma vez, e desfazer
+   * significava apagar um a um no × de cada card.
+   *
+   * `escopo: "geradas"` remove só o que a máquina criou (id determinístico) —
+   * o que foi arrastado à mão fica. O servidor também preserva bloco que já
+   * tenha realizado registrado, sempre.
+   */
+  const [limpando, setLimpando] = useState(false);
+  async function limparDia(escopo: "geradas" | "todas") {
+    if (!sedeId) return;
+    const rotulo = escopo === "todas" ? "TODAS as tarefas do dia" : "as tarefas geradas automaticamente";
+    if (
+      !(await pedirConfirmacao(
+        [
+          `Remover ${rotulo} de ${formatarDataBR(data)}.`,
+          "Blocos com realizado registrado são mantidos.",
+          escopo === "geradas" ? "O que você montou à mão fica onde está." : "Isso inclui o que foi montado à mão.",
+        ],
+        {
+          titulo: "Desfazer a geração do dia?",
+          intro: "Os blocos abaixo saem da agenda deste dia:",
+          confirmar: "Remover os blocos",
+        },
+      ))
+    )
+      return;
+    setLimpando(true);
+    try {
+      const r = await apiPost<{
+        removidas: number;
+        preservadas: number;
+        manuais: number;
+        detalhes: string[];
+      }>("/api/rotinas/limpar", { sede: sedeId, data, escopo });
+      await mutateRotinas();
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "LIMPAR",
+          mensagem:
+            r.removidas === 0
+              ? `Nada foi removido.${r.detalhes.length ? " " + r.detalhes.join(" ") : ""}`
+              : `${r.removidas} bloco(s) removido(s).${r.detalhes.length ? " " + r.detalhes.join(" ") : ""}`,
+        },
+      ]);
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setLimpando(false);
+    }
+  }
+
   const [salvandoPadrao, setSalvandoPadrao] = useState(false);
   async function salvarRotaPadrao() {
     if (!sedeId) return;
@@ -623,6 +691,8 @@ export default function PaginaRotinas() {
           faltamRegistrar={faltamRegistrar}
           denso={denso}
           salvandoPadrao={salvandoPadrao}
+          limpando={limpando}
+          aoLimparDia={limparDia}
           aoSalvarRotaPadrao={salvarRotaPadrao}
           aoAlternarDenso={() => setDenso((v) => !v)}
         />

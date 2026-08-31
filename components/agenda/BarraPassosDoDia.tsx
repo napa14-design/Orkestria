@@ -18,6 +18,9 @@ interface BarraPassosDoDiaProps {
   denso: boolean;
   salvandoPadrao: boolean;
   aoSalvarRotaPadrao: () => void;
+  limpando?: boolean;
+  /** Desfaz o dia. "geradas" = só o que a máquina criou; "todas" = o dia inteiro. */
+  aoLimparDia?: (escopo: "geradas" | "todas") => void;
   aoAlternarDenso: () => void;
 }
 
@@ -30,6 +33,8 @@ export default function BarraPassosDoDia({
   faltamRegistrar,
   denso,
   salvandoPadrao,
+  limpando,
+  aoLimparDia,
   aoSalvarRotaPadrao,
   aoAlternarDenso,
 }: BarraPassosDoDiaProps) {
@@ -46,6 +51,19 @@ export default function BarraPassosDoDia({
           title="Ensina este dia como rota padrão; depois, dias vazios são gerados em um clique"
         >
           {salvandoPadrao ? "Salvando…" : "★ Ensinar esta rota"}
+        </button>
+      )}
+
+      {/* O caminho de volta do "Gerar o dia": só aparece quando há o que
+          desfazer, e some sozinho no dia vazio. */}
+      {temRotinas && aoLimparDia && (
+        <button
+          className="btn btn-mini btn-fantasma"
+          onClick={() => aoLimparDia("geradas")}
+          disabled={limpando}
+          title="Remove os blocos criados por Gerar/Repetir/Aplicar modelo. O que você montou à mão e o que já tem realizado ficam."
+        >
+          {limpando ? "Limpando…" : "↺ Desfazer a geração"}
         </button>
       )}
 

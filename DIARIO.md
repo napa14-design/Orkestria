@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-08-31 — Desfazer a geração do dia (e o modal que dizia a frase do dono anterior)
+
+Relato do dono: *"cliquei em gerar a rota padrão sem querer, podia ter a opção
+de limpar o dia"*. Gerar cria dezenas de blocos num clique; desfazer significava
+apagar um a um, no × de cada card. O caminho de ida existia e o de volta não.
+
+### O que entrou
+
+Botão **"↺ Desfazer a geração"** na barra do dia, visível só quando o dia tem
+blocos. Ele chama `limparDia`, que apaga em lote com **duas travas**:
+
+1. **Bloco com realizado registrado nunca sai** — o realizado é evidência do que
+   aconteceu, e nenhum escopo o remove, nem o `"todas"`.
+2. **O escopo `"geradas"` só toca no que a máquina criou** — reconhecido pelo id
+   determinístico (`ri_…` da rota padrão, `m_…` de gerar/duplicar/importar). O
+   que a pessoa arrastou à mão tem id aleatório e fica onde está.
+
+A mensagem devolve os três números (removidos, preservados por realizado,
+preservados por serem manuais) para não dizer "pronto" escondendo o que ficou.
+
+### O defeito que só apareceu rodando a tela
+
+Reusei o modal de confirmação da autorização de conflito e **herdei o texto
+dele**: numa exclusão em massa a tela perguntava *"Autorizar conflito
+manualmente?"*, falava em "esta alocação" e o botão dizia **"Autorizar mesmo
+assim"**. Passou em `tsc`, no build e nos 318 testes — nenhum deles lê texto de
+tela. Só apareceu com a tela aberta, no `DATA_SOURCE=memory`.
+
+O modal agora recebe `TextoConfirmacao` (título, intro, nota, rótulo do botão),
+com o texto do conflito como padrão. É a mesma família de erro do mês: **a peça
+reusada carrega a frase do primeiro dono**.
+
+### Testes
+
+`testes/limpar-dia.test.ts` — 7 casos, todos sobre as travas e o relatório, não
+sobre a remoção em si. Validados por mutação: apagar bloco com realizado, deixar
+o escopo `"geradas"` levar o manual e não reconhecer o id `ri_` — as três
+quebram testes.
+
+**Arquivos:** `services/rotinasService.ts` (`limparDia`),
+`app/api/rotinas/limpar/route.ts`, `app/(app)/rotinas/page.tsx`,
+`components/agenda/BarraPassosDoDia.tsx`, `components/agenda/ModaisRotina.tsx`,
+`testes/limpar-dia.test.ts`.
+
+**Verificado:** `tsc` 0 · build 0 · 318 testes 0 · na tela, 44 blocos gerados em
+16/09 → "Remover os blocos" → 0, com a mensagem "44 bloco(s) removido(s)".
+
+---
+
 ## 2026-08-24 — O supervisor passa a cadastrar no catálogo (e o botão que dava 403 na única usuária)
 
 Pergunta do dono: *"só adm pode cadastrar as coisas? supervisor deveria poder
