@@ -276,7 +276,7 @@ export const TRILHA: EtapaTutorial[] = [
         alvo: "duplicar-modelos",
         titulo: "E os dias fora do comum?",
         texto:
-          "Formatura, feira, prova. Monte o dia do evento uma vez, abra aqui e salve marcando que é um modelo de evento. No próximo, você aplica na véspera e o dia já amanhece programado.",
+          "Formatura, feira, prova. Monte o dia do evento uma vez, abra aqui, vá em \"Rotas salvas\" e salve marcando que é um modelo de evento. No próximo, você aplica na véspera e o dia já amanhece programado.",
         avancarEm: "leitura",
       },
     ],

@@ -113,15 +113,15 @@ export default function FiltersBar({
       </label>
 
       {/* Vale nos dois modos: quem monta um evento monta no DIA e precisa salvar
-          o modelo ali mesmo — exigir trocar para a semana escondia o caminho.
-          O rótulo cita "modelos" porque é o que a pessoa procura. */}
+          a rota ali mesmo — exigir trocar para a semana escondia o caminho.
+          O rótulo é o verbo, não o mecanismo: a pessoa quer encher os dias. */}
       <button
         className="btn"
         data-tour="duplicar-modelos"
         onClick={aoPlanejarPeriodo}
-        title="Duplicar este dia, salvar como rota padrão ou modelo de evento, e aplicar em datas futuras"
+        title="Copiar este dia (ou uma rota salva) para um período; e a biblioteca de rotas salvas"
       >
-        ⧉ Duplicar e modelos
+        ⧉ Preencher dias
       </button>
     </div>
   );

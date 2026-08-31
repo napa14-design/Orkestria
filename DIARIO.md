@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-08-31 — O modal de planejamento vira duas telas, uma por vez
+
+Relato do dono, na mesma mensagem do desfazer: *"o modal de criar rotas padrões,
+eu acho muito confuso"*. Era uma caixa só, chamada **"Duplicar dia e modelos de
+rotina"** — o "e" do título já era a confissão. Cinco defeitos concretos:
+
+1. O **"1 · Período de destino"** governava o *duplicar* e o *aplicar*, mas não
+   tinha efeito nenhum sobre o *salvar* (que sempre salva o dia atual). A
+   numeração 1→2→3 prometia uma sequência que não existia.
+2. **Salvar** (dia → modelo) e **aplicar** (modelo → dia) são operações inversas
+   e dividiam a mesma seção.
+3. As caixinhas "rota padrão" e "modelo de evento" são opções do *salvar*, mas
+   apareciam logo acima do *aplicar* — lendo de cima para baixo, pareciam dele.
+4. O **✕ de excluir** ficava pendurado no seletor do *aplicar*: ação destrutiva
+   presa a um controle de propósito oposto.
+5. **"Rota padrão"** — o conceito que a pessoa usa todo dia — era uma caixinha
+   três níveis fundo, dentro de uma seção chamada "Modelos".
+
+### A percepção que permitiu encolher
+
+**Duplicar o dia e aplicar um modelo são a MESMA operação com origens
+diferentes**: pôr tarefas em um período. Eram dois botões e dois blocos; viraram
+um. Com isso a divisão por intenção fica natural:
+
+- **Preencher dias** — de onde (este dia | uma rota salva) → para quais dias →
+  um botão. O rótulo diz o que vai acontecer: `⧉ Copiar para 5 dia(s)`, ou
+  `Aplicar em 31/08/2026` quando não há período (o comportamento antigo, agora
+  dito em voz alta).
+- **Rotas salvas** — a biblioteca: salvar este dia com nome, marcar padrão (e em
+  que dias vale) ou evento, e apagar **na linha da própria rota**. Sem período,
+  porque período não se aplica a guardar.
+
+Uma tela por vez, com link entre elas: a barra continua com **um** botão, agora
+`⧉ Preencher dias` (era `⧉ Duplicar e modelos`). Placar: 3 passos numerados e 4
+botões numa caixa → 2 telas com 1 verbo cada. Pela doutrina, **encolhe**.
+
+O alvo do tutorial é `data-tour="duplicar-modelos"` e continua funcionando — o
+comentário do `trilha.ts` que manda mirar em marcador, nunca em texto de botão,
+ganhou a terceira prova em um mês.
+
+**Arquivos:** `components/agenda/ModalPlanejamento.tsx` (reescrito),
+`components/agenda/FiltersBar.tsx`, `lib/tutorial/trilha.ts`.
+
+**Verificado na tela** (`DATA_SOURCE=memory`), não só no verde: origem "deste
+dia" + 21–25/09 → **220 tarefas copiadas** (44 × 5), sábado 26 intacto (o filtro
+de dia da semana valeu); origem = rota sem período → botão diz "Aplicar em
+31/08/2026"; salvar com "rota padrão" → linha na lista mostra "★ rota padrão ·
+todo dia · 06:05–17:00" e a origem mostra "★"; ✕ na linha pede confirmação e
+apaga a rota certa. `tsc` 0 · build 0 · 318 testes 0 · console sem erro.
+
+---
+
 ## 2026-08-31 — Desfazer a geração do dia (e o modal que dizia a frase do dono anterior)
 
 Relato do dono: *"cliquei em gerar a rota padrão sem querer, podia ter a opção
