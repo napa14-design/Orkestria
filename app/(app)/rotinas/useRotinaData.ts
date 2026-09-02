@@ -86,7 +86,7 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   // Visão semanal: rotinas e ausências da semana inteira (seg–dom).
   const segunda = segundaDaSemana(data);
   const datasSemana = useMemo(() => Array.from({ length: 7 }, (_, i) => somarDias(segunda, i)), [segunda]);
-  const { data: rotinasSemana } = useSWR<RotinaPlanejada[]>(
+  const { data: rotinasSemana, mutate: mutateSemana } = useSWR<RotinaPlanejada[]>(
     modo === "semana" && sedeId ? `/api/rotinas?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
     fetcher,
   );
@@ -150,6 +150,7 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
     temRotaPadrao,
     datasSemana,
     rotinasSemana,
+    mutateSemana,
     ausenciasSemana,
     ausentesMap,
     fonteRepetir,

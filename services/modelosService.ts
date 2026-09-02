@@ -14,6 +14,7 @@ import {
 import { agoraISO, getDataSource, type OperacaoLote } from "@/lib/datasource";
 import {
   diaDaSemana,
+  formatarDataBR,
   hhmmParaMin,
   minParaHHMM,
   parseDiasSemana,
@@ -486,6 +487,63 @@ export async function gerarDiaDaRotaPadrao(
   if (problemas.length) {
     res.comProblema = problemas.length;
     res.detalhes.push(...resumirProblemas(problemas));
+  }
+  return res;
+}
+
+export interface ResultadoPeriodo {
+  /** Dias em que algo foi criado. */
+  diasGerados: number;
+  geradas: number;
+  atualizadas: number;
+  puladas: number;
+  /** A sede não tem rota padrão — nada a gerar em dia nenhum. */
+  semRota?: boolean;
+  /** "12/10 Nossa Senhora" — dias que a sede não opera, listados por data. */
+  fechados: string[];
+  detalhes: string[];
+}
+
+/**
+ * Gera VÁRIOS dias da rota padrão — cada data resolvida por si.
+ *
+ * É só um laço sobre `gerarDiaDaRotaPadrao`, e é de propósito: quem decide qual
+ * camada vale numa data é `projetarDiaDaRota`, olhando o dia da semana dela. Por
+ * isso gerar a semana com uma rota por dia **funciona sozinho** — segunda monta
+ * a de segunda, sábado a de sábado — enquanto "aplicar um modelo no período"
+ * jogaria a MESMA rota em todos os dias.
+ *
+ * Sequencial, não paralelo: a geração de cada dia lê os blocos já existentes
+ * para não duplicar, e dois dias em paralelo na mesma data se atropelariam. São
+ * 7 dias no pior caso — não vale a complexidade.
+ */
+export async function gerarPeriodoDaRotaPadrao(
+  sedeId: string,
+  datas: string[],
+  supervisorId: string,
+): Promise<ResultadoPeriodo> {
+  const res: ResultadoPeriodo = {
+    diasGerados: 0,
+    geradas: 0,
+    atualizadas: 0,
+    puladas: 0,
+    fechados: [],
+    detalhes: [],
+  };
+  for (const data of datas) {
+    const dia = await gerarDiaDaRotaPadrao(sedeId, data, supervisorId);
+    // Sem rota padrão a resposta é a mesma para todo dia: diz uma vez e para.
+    if (dia.semRota) return { ...res, semRota: true };
+    if (dia.fechado) {
+      res.fechados.push(`${formatarDataBR(data).slice(0, 5)} ${dia.fechado}`);
+      continue;
+    }
+    res.geradas += dia.geradas;
+    res.atualizadas += dia.atualizadas ?? 0;
+    res.puladas += dia.puladas;
+    if (dia.geradas > 0) res.diasGerados++;
+    // O detalhe sem a data seria inútil num relatório de 7 dias.
+    res.detalhes.push(...dia.detalhes.map((d) => `${formatarDataBR(data).slice(0, 5)}: ${d}`));
   }
   return res;
 }

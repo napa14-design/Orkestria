@@ -89,6 +89,7 @@ export default function PaginaRotinas() {
     temRotaPadrao,
     datasSemana,
     rotinasSemana,
+    mutateSemana,
     ausenciasSemana,
     ausentesMap,
     fonteRepetir,
@@ -563,6 +564,70 @@ export default function PaginaRotinas() {
   }
 
   /**
+   * Gera a semana inteira da visão semanal — cada dia com a rota que vale nele.
+   *
+   * Vale para quem gravou **uma rota por dia da semana**: quem decide qual
+   * camada entra numa data é a projeção, olhando o dia da semana dela. Por isso
+   * isto é um laço sobre a mesma geração de um dia, e NÃO "aplicar um modelo no
+   * período" — que jogaria a mesma rota em todos os dias.
+   *
+   * Pede confirmação porque são até 7 dias de uma vez e o desfazer é por dia.
+   */
+  const [gerandoSemana, setGerandoSemana] = useState(false);
+  async function gerarSemana() {
+    if (!sedeId || datasSemana.length === 0) return;
+    const primeiro = formatarDataBR(datasSemana[0]);
+    const ultimo = formatarDataBR(datasSemana[datasSemana.length - 1]);
+    if (
+      !(await pedirConfirmacao(
+        [
+          `Montar os ${datasSemana.length} dias de ${primeiro} a ${ultimo}.`,
+          "Cada dia recebe a rota que vale nele — segunda a de segunda, sábado a de sábado.",
+          "Dia que já tem tarefa não é duplicado, e feriado da sede é pulado.",
+        ],
+        {
+          titulo: "Gerar a semana inteira?",
+          intro: "O sistema vai montar, de uma vez:",
+          nota: "Para desfazer, abra o dia e use \"↺ Desfazer a geração\" — o desfazer é por dia.",
+          confirmar: "Gerar a semana",
+        },
+      ))
+    )
+      return;
+    setGerandoSemana(true);
+    try {
+      const r = await apiPost<{
+        diasGerados: number;
+        geradas: number;
+        atualizadas: number;
+        puladas: number;
+        semRota?: boolean;
+        fechados: string[];
+        detalhes: string[];
+      }>("/api/rotinas/gerar", { sede: sedeId, datas: datasSemana });
+      // A grade da semana lê de outro SWR: sem revalidar as duas, a pessoa
+      // gera 200 blocos e a tela continua vazia.
+      await Promise.all([mutateSemana(), mutateRotinas()]);
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "GERAR_SEMANA",
+          mensagem: r.semRota
+            ? "Esta sede ainda não tem rota padrão. Monte um dia e ensine a rota primeiro."
+            : `${r.geradas} tarefa(s) geradas em ${r.diasGerados} dia(s)` +
+              `${r.atualizadas ? ` · ${r.atualizadas} alinhada(s) à rota` : ""}` +
+              `${r.puladas ? ` · ${r.puladas} puladas (já existiam, ausência ou conflito)` : ""}` +
+              `${r.fechados.length ? ` · sede fechada em ${r.fechados.join(", ")}` : ""}.`,
+        },
+      ]);
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setGerandoSemana(false);
+    }
+  }
+
+  /**
    * Desfazer o dia — o caminho de volta que faltava para o "Gerar o dia".
    *
    * Reportado da tela: *"cliquei em gerar a rota padrão sem querer, podia ter a
@@ -697,7 +762,23 @@ export default function PaginaRotinas() {
           aoAlternarDenso={() => setDenso((v) => !v)}
         />
       ) : modo === "semana" ? (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          {/* O "gerar" da semana mora AQUI, e não na barra do dia: é a tela em
+              que a semana inteira está à vista, e é onde dá para conferir o
+              resultado sem trocar de data sete vezes. */}
+          {temRotaPadrao && (
+            <button className="btn btn-primario" onClick={gerarSemana} disabled={gerandoSemana}>
+              {gerandoSemana ? "Gerando…" : "⚡ Gerar a semana da rota padrão"}
+            </button>
+          )}
           <AjudaAgenda aoComecarTutorial={() => setModo("dia")} />
         </div>
       ) : null}

@@ -7,6 +7,64 @@
 
 ---
 
+## 2026-09-02 — Gerar a SEMANA inteira, cada dia com a rota que vale nele
+
+Pergunta do dono: *"se eu gravar uma rota para cada dia da semana, tem como
+gerar a semana de uma vez igual o dia?"*. Medindo, a resposta era metade sim:
+
+- **A parte difícil já existia.** `projetarDiaDaRota` calcula o dia da semana
+  **da data** e filtra as camadas por `dias_semana` — inclusive a regra de
+  "substitui o dia". Então gravar uma rota por dia da semana já funcionava, e o
+  "Gerar o dia" escolhia a certa sozinho.
+- **O que faltava era o "de uma vez".** `POST /api/rotinas/gerar` só aceitava
+  uma data.
+
+E havia uma armadilha à espreita: o "⧉ Preencher dias" *parece* resolver, mas
+aplica **uma rota escolhida** em todas as datas — mandaria a rota de segunda
+para a terça inteira.
+
+### Onde ficou
+
+Na **visão semanal**, escolha do dono: *"tem a visão semanal, coloca lá o botão
+de gerar semana"*. É a tela em que a semana está à vista e onde dá para conferir
+o resultado sem trocar de data sete vezes — melhor que as duas opções que eu
+tinha proposto (mais uma origem no modal, ou mais um botão na barra do dia).
+
+`⚡ Gerar a semana da rota padrão` aparece só quando a sede tem rota padrão, pede
+confirmação (são até 7 dias e o desfazer é por dia) e devolve um relatório
+somado, com a data em cada detalhe.
+
+`gerarPeriodoDaRotaPadrao` é um laço sobre a geração de um dia — sequencial de
+propósito, porque cada dia lê os blocos existentes para não duplicar. "Sem rota
+padrão" responde **uma vez**, em vez de repetir a mesma frase sete vezes.
+
+A rota da API passou a aceitar `datas: []` além de `data` — mesma operação, mesma
+permissão, um endpoint só.
+
+### Um defeito que eu ia deixar passar
+
+`mutateRotinas` revalida só o **dia**; a grade semanal lê de outro SWR. Sem
+revalidar os dois, a pessoa geraria 176 blocos e a tela continuaria vazia.
+`mutateSemana` foi exposto e as duas revalidam juntas.
+
+### Testes
+
+`testes/gerar-semana.test.ts` — 6 casos, e o que eles protegem é a diferença que
+motivou tudo: **gerar o período não é aplicar um modelo no período**. Duas
+mutações provam que mordem (ignorar o dia da semana; parar de somar os dias).
+
+**Verificado na tela:** com uma rota padrão de todo dia, o botão gerou
+**seg–sex com 44 blocos cada**, deixou **sábado e domingo vazios** (a escala
+seg–sex faz a geração pular folga), não duplicou o dia que já tinha 44, e a
+grade semanal atualizou sozinha. Segunda passada: **0 geradas**, total parado em
+220. `tsc` 0 · build 0 · 340 testes 0.
+
+**Arquivos:** `services/modelosService.ts`, `app/api/rotinas/gerar/route.ts`,
+`app/(app)/rotinas/page.tsx`, `app/(app)/rotinas/useRotinaData.ts`,
+`testes/gerar-semana.test.ts`.
+
+---
+
 ## 2026-09-02 — Marcas do tutorial zeradas em produção (2 usuários)
 
 Pergunta: *"consegue resetar para quem já tinha pulado?"*. Medi antes de
