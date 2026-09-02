@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PassoTutorial } from "@/lib/tutorial/trilha";
+import { EVENTO_SALVOU, type PassoTutorial } from "@/lib/tutorial/trilha";
 
 const MARGEM = 8;
 const BALAO_L = 340;
@@ -126,6 +126,17 @@ export default function Holofote({
     return () => document.removeEventListener("click", ouvir, true);
   }, [passo.avancarEm, passo.alvo, avancar]);
 
+  // Passo de resultado: espera a operação DAR CERTO. Clicar em Salvar num
+  // formulário vazio não grava nada — e antes disso avançava do mesmo jeito,
+  // dando a etapa por concluída sem um único cadastro.
+  useEffect(() => {
+    if (passo.avancarEm !== "sucesso") return;
+    const nome = passo.evento ?? EVENTO_SALVOU;
+    const ouvir = () => avancar();
+    window.addEventListener(nome, ouvir);
+    return () => window.removeEventListener(nome, ouvir);
+  }, [passo.avancarEm, passo.evento, avancar]);
+
   if (!montado) return null;
 
   const vw = window.innerWidth;
@@ -198,6 +209,8 @@ export default function Holofote({
           )
         ) : passo.avancarEm === "clique" ? (
           <div className="holofote-espera">↑ Clique no item destacado para continuar</div>
+        ) : passo.avancarEm === "sucesso" ? (
+          <div className="holofote-espera">↑ Continua quando o cadastro for salvo</div>
         ) : null}
 
         {(passo.avancarEm ?? "leitura") === "leitura" && !perdido && (

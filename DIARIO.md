@@ -7,6 +7,57 @@
 
 ---
 
+## 2026-09-02 — O tutorial dava etapa por concluída sem nada ter sido salvo
+
+Relato: *"tutorial bugado, ele pede para salvar, mas daí dá erro, pq não tem
+nada preenchido e não segue para o próximo passo"*. Reproduzido na tela, e era
+pior do que o relato.
+
+### Os três defeitos
+
+**1. A trilha nunca pedia para preencher.** Na etapa "Cadastrar os locais", o
+passo 3 só *explicava* o que é metragem e oferecia "Entendi →"; o passo 4 dizia
+"Clique em Salvar". Seguindo à risca, a pessoa clicava em Salvar com o
+formulário vazio e o navegador respondia **"Selecione um item da lista."**
+
+**2. O tutorial avançava no CLIQUE, não no RESULTADO.** O `Holofote` escutava o
+clique no alvo e avançava 260 ms depois, desse certo ou não. Sendo o passo
+final, a etapa era **gravada como concluída**. Medido: `etapasConcluidas:
+["locais"]` com `totalDeLocais: 4` — os mesmos 4 do seed, nenhum criado. A
+trilha exibia "Cadastrar os locais ✓", que era mentira. Valia para **quatro
+etapas**: locais, tarefas, equipe e qualificações.
+
+**3. E ainda voltava ao passo 1.** Quem abria pela trilha (`?tutorial=locais`)
+terminava a etapa e o link, ainda na URL, reabria a mesma etapa do zero. É a
+outra metade do "não segue para o próximo passo".
+
+### A correção
+
+- Novo `avancarEm: "sucesso"`: o passo espera o evento `orkestria:crud-salvou`,
+  disparado pelo `CrudManager` **depois do `await`** da gravação — o que importa
+  é ter gravado, não ter clicado. O balão passa a dizer "↑ Continua quando o
+  cadastro for salvo".
+- Os quatro passos viraram "Preencha e salve" e **pedem os campos com asterisco**
+  antes de mandar clicar.
+- `rotaEncerrada` passou a valer também para o pedido explícito da trilha.
+
+### Testes
+
+`testes/trilha.test.ts` — 5 invariantes, a primeira sendo "todo passo que aponta
+para `crud-salvar` avança em `sucesso`". Duas mutações provam que mordem: voltar
+um passo para `"clique"` e tirar o "preencha" do texto quebram um teste cada.
+
+**Arquivos:** `lib/tutorial/trilha.ts`, `components/tutorial/Holofote.tsx`,
+`components/tutorial/Tutorial.tsx`, `components/CrudManager.tsx`,
+`testes/trilha.test.ts`.
+
+**Verificado na tela** (`DATA_SOURCE=memory`): salvar vazio → continua no passo
+4, formulário aberto, `etapasConcluidas: []`; preencher e salvar → local criado
+(4 → 5), etapa concluída **com verdade**, e segue para a etapa seguinte em vez
+de voltar ao passo 1. `tsc` 0 · build 0 · 330 testes 0 · console limpo.
+
+---
+
 ## 2026-08-31 — O período vira opcional (e o botão passa a dizer a data, não a contagem)
 
 Pergunta do dono, olhando a tela nova: *"e se não tiver período? deixa

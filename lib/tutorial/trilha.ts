@@ -20,7 +20,24 @@ export type AvancarEm =
   /** Só explica; a pessoa clica em "Entendi". */
   | "leitura"
   /** Só avança quando ela clicar no alvo de verdade. É o que ensina. */
-  | "clique";
+  | "clique"
+  /**
+   * Só avança quando a ação **der certo** — não quando ela for tentada.
+   *
+   * Existe por um defeito de 31/08/2026: os passos "clique em Salvar"
+   * avançavam no clique. Com o formulário vazio (e a trilha nunca pediu para
+   * preencher), o navegador barrava o envio, nada era gravado — e o tutorial
+   * seguia assim mesmo e **marcava a etapa como concluída**. A pessoa ficava
+   * com um balão de erro na tela, zero locais cadastrados e "Cadastrar os
+   * locais ✓" na trilha.
+   *
+   * O passo escuta o evento em `evento` (ver `EVENTO_SALVOU`), disparado por
+   * quem de fato concluiu a operação.
+   */
+  | "sucesso";
+
+/** Disparado no `window` quando um cadastro é gravado de verdade. */
+export const EVENTO_SALVOU = "orkestria:crud-salvou";
 
 export interface PassoTutorial {
   /** Marcador `data-tour` do elemento destacado. Vazio = balão centralizado. */
@@ -28,6 +45,8 @@ export interface PassoTutorial {
   titulo: string;
   texto: string;
   avancarEm?: AvancarEm;
+  /** Só para `avancarEm: "sucesso"`: o evento que confirma a conclusão. */
+  evento?: string;
 }
 
 export interface EtapaTutorial {
@@ -85,10 +104,10 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-salvar",
-        titulo: "Salve e veja aparecer",
+        titulo: "Preencha e salve",
         texto:
-          "Clique em Salvar. O local entra na lista e já fica disponível para receber tarefas — que é o próximo passo da trilha.",
-        avancarEm: "clique",
+          "Antes de salvar, preencha os campos marcados com * — aqui são o nome, a sede e o tipo de local. Depois clique em Salvar: o local entra na lista e já fica disponível para receber tarefas, que é o próximo passo da trilha.",
+        avancarEm: "sucesso",
       },
     ],
   },
@@ -132,10 +151,10 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-salvar",
-        titulo: "Salve",
+        titulo: "Preencha e salve",
         texto:
-          "Repita para as tarefas principais da sede. Não precisa ser tudo hoje: comece pelo que a equipe faz todo dia, e vá completando conforme aparecer.",
-        avancarEm: "clique",
+          "Preencha os campos marcados com * e clique em Salvar. Depois repita para as tarefas principais da sede — não precisa ser tudo hoje: comece pelo que a equipe faz todo dia, e vá completando conforme aparecer.",
+        avancarEm: "sucesso",
       },
     ],
   },
@@ -166,10 +185,10 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-salvar",
-        titulo: "Salve",
+        titulo: "Preencha e salve",
         texto:
-          "Cadastre a equipe toda antes de montar o primeiro dia. Sem gente cadastrada, a agenda não tem colunas para receber tarefa.",
-        avancarEm: "clique",
+          "Preencha os campos marcados com * e clique em Salvar. Cadastre a equipe toda antes de montar o primeiro dia: sem gente cadastrada, a agenda não tem colunas para receber tarefa.",
+        avancarEm: "sucesso",
       },
     ],
   },
@@ -194,10 +213,10 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-salvar",
-        titulo: "Salve",
+        titulo: "Preencha e salve",
         texto:
-          "Esta parte só é necessária se as suas tarefas exigirem treinamento. Se nenhuma exigir, pode seguir para montar o dia.",
-        avancarEm: "clique",
+          "Escolha a pessoa e o requisito e clique em Salvar. Esta parte só é necessária se as suas tarefas exigirem treinamento — se nenhuma exigir, saia do tutorial e siga para montar o dia.",
+        avancarEm: "sucesso",
       },
     ],
   },

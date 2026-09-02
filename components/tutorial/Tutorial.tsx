@@ -55,7 +55,12 @@ export default function Tutorial() {
     }
     const explicita = etapa.id === pedida;
     const guiado = podeAutoIniciar(lerEstado(data.estado), data.concluidas.length);
-    const permitido = explicita || (guiado && rotaEncerrada.current !== rota);
+    // `rotaEncerrada` vale TAMBÉM para o pedido explícito da trilha. Antes o
+    // `explicita` passava por cima: terminado o último passo, o link
+    // `?tutorial=locais` continuava na URL, a etapa era reaberta na hora e a
+    // pessoa voltava ao PASSO 1 da etapa que acabara de concluir — parecia que
+    // o tutorial não seguia adiante. Sair da tela e voltar reabre normalmente.
+    const permitido = (explicita || guiado) && rotaEncerrada.current !== rota;
     if (!permitido) {
       setEtapaAtiva(null);
       return;
