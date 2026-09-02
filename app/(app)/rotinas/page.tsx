@@ -628,6 +628,64 @@ export default function PaginaRotinas() {
   }
 
   /**
+   * Desfaz a semana inteira — o caminho de volta do "gerar a semana".
+   *
+   * Mesmas travas do desfazer de um dia, porque é o mesmo serviço por baixo:
+   * bloco com realizado registrado nunca sai, e o escopo "geradas" não toca no
+   * que foi montado à mão. A confirmação nomeia o período, e o relatório diz o
+   * que ficou — desfazer 7 dias sem dizer o que sobrou seria pior que não ter.
+   */
+  const [limpandoSemana, setLimpandoSemana] = useState(false);
+  async function limparSemana() {
+    if (!sedeId || datasSemana.length === 0) return;
+    const primeiro = formatarDataBR(datasSemana[0]);
+    const ultimo = formatarDataBR(datasSemana[datasSemana.length - 1]);
+    if (
+      !(await pedirConfirmacao(
+        [
+          `Remover as tarefas geradas automaticamente de ${primeiro} a ${ultimo}.`,
+          "Blocos com realizado registrado são mantidos.",
+          "O que você montou à mão fica onde está.",
+        ],
+        {
+          titulo: "Desfazer a semana inteira?",
+          intro: "Os blocos abaixo saem dos 7 dias:",
+          confirmar: "Remover os blocos",
+        },
+      ))
+    )
+      return;
+    setLimpandoSemana(true);
+    try {
+      const r = await apiPost<{
+        diasLimpos: number;
+        removidas: number;
+        preservadas: number;
+        manuais: number;
+        detalhes: string[];
+      }>("/api/rotinas/limpar", { sede: sedeId, datas: datasSemana, escopo: "geradas" });
+      await Promise.all([mutateSemana(), mutateRotinas()]);
+      setAlertas([
+        {
+          nivel: "alerta",
+          codigo: "LIMPAR_SEMANA",
+          mensagem:
+            r.removidas === 0
+              ? `Nada foi removido.${r.detalhes.length ? " " + r.detalhes.join(" ") : ""}`
+              : `${r.removidas} bloco(s) removido(s) em ${r.diasLimpos} dia(s).${
+                  r.detalhes.length ? " " + r.detalhes.join(" ") : ""
+                }`,
+        },
+      ]);
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setLimpandoSemana(false);
+    }
+  }
+
+
+  /**
    * Desfazer o dia — o caminho de volta que faltava para o "Gerar o dia".
    *
    * Reportado da tela: *"cliquei em gerar a rota padrão sem querer, podia ter a
@@ -777,6 +835,18 @@ export default function PaginaRotinas() {
           {temRotaPadrao && (
             <button className="btn btn-primario" onClick={gerarSemana} disabled={gerandoSemana}>
               {gerandoSemana ? "Gerando…" : "⚡ Gerar a semana da rota padrão"}
+            </button>
+          )}
+          {/* O caminho de volta, do lado da ida. Só aparece quando a semana tem
+              algo — no vazio não há o que desfazer. */}
+          {(rotinasSemana?.length ?? 0) > 0 && (
+            <button
+              className="btn btn-fantasma"
+              onClick={limparSemana}
+              disabled={limpandoSemana}
+              title="Remove os blocos criados por Gerar/Repetir/Aplicar modelo na semana. O que você montou à mão e o que já tem realizado ficam."
+            >
+              {limpandoSemana ? "Limpando…" : "↺ Desfazer a semana"}
             </button>
           )}
           <AjudaAgenda aoComecarTutorial={() => setModo("dia")} />

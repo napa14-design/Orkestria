@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-09-02 — Desfazer a semana, ao lado do gerar
+
+Eu tinha entregado o "gerar a semana" avisando que o desfazer continuava por
+dia — semana errada custava cinco idas ao dia. Pedido: *"faz o desfazer da
+semana também"*. É a mesma forma do outro lado: `limparPeriodo` é um laço sobre
+`limparDia`, e a rota `/api/rotinas/limpar` passou a aceitar `datas: []`.
+
+As travas ficam onde estavam, no serviço de um dia: **bloco com realizado
+registrado nunca sai**, e o escopo `"geradas"` não toca no que foi montado à
+mão. Repeti-las no laço seria a chance de divergirem.
+
+O `↺ Desfazer a semana` aparece na visão semanal ao lado do gerar, e **só quando
+a semana tem algo** — no vazio não há o que desfazer.
+
+**Verificado na tela, e o resultado prova as travas:** gerada a semana (176
+blocos em 4 dias), o desfazer removeu os 176 e **manteve os 44 de 02/09**, com a
+mensagem *"02/09: 44 bloco(s) montado(s) à mão foram preservados"* — são os
+blocos do seed, criados fora da geração, que o escopo "geradas" não alcança. A
+grade voltou a "vazio" em todos os dias menos esse.
+
+### Testes
+
+Quatro casos novos em `testes/limpar-dia.test.ts`, sobre o que só aparece no
+plural: a soma por dia, a contagem de **dias mexidos** (dia vazio não conta) e a
+**data em cada linha** do relatório. Duas mutações provam que mordem.
+
+**Arquivos:** `services/rotinasService.ts`, `app/api/rotinas/limpar/route.ts`,
+`app/(app)/rotinas/page.tsx`, `testes/limpar-dia.test.ts`.
+`tsc` 0 · build 0 · 344 testes 0 · console limpo.
+
+---
+
 ## 2026-09-02 — Gerar a SEMANA inteira, cada dia com a rota que vale nele
 
 Pergunta do dono: *"se eu gravar uma rota para cada dia da semana, tem como

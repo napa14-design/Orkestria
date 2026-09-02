@@ -14,7 +14,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
+import { formatarDataBR, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
@@ -630,3 +630,48 @@ export async function limparDia(
   void autor; // a autoria vai no histórico pelo decorator do DataSource
   return { removidas: alvo.length, preservadas, manuais, detalhes };
 }
+
+export interface ResultadoLimpezaPeriodo {
+  /** Dias em que algo foi removido. */
+  diasLimpos: number;
+  removidas: number;
+  preservadas: number;
+  manuais: number;
+  detalhes: string[];
+}
+
+/**
+ * Desfaz VÁRIOS dias — o caminho de volta do "gerar a semana".
+ *
+ * Laço sobre `limparDia`, pelo mesmo motivo do gerar: as travas (nunca apagar
+ * bloco com realizado registrado; no escopo "geradas", não tocar no que foi
+ * montado à mão) valem por dia e ficam num lugar só. Sequencial porque cada dia
+ * lê o próprio dia antes de decidir.
+ *
+ * O relatório carrega a data em cada detalhe: numa semana, "3 blocos mantidos"
+ * sem dizer onde não ajuda ninguém a conferir.
+ */
+export async function limparPeriodo(
+  sedeId: string,
+  datas: string[],
+  escopo: EscopoLimpeza,
+  autor: string,
+): Promise<ResultadoLimpezaPeriodo> {
+  const res: ResultadoLimpezaPeriodo = {
+    diasLimpos: 0,
+    removidas: 0,
+    preservadas: 0,
+    manuais: 0,
+    detalhes: [],
+  };
+  for (const data of datas) {
+    const dia = await limparDia(sedeId, data, escopo, autor);
+    res.removidas += dia.removidas;
+    res.preservadas += dia.preservadas;
+    res.manuais += dia.manuais;
+    if (dia.removidas > 0) res.diasLimpos++;
+    res.detalhes.push(...dia.detalhes.map((d) => `${formatarDataBR(data).slice(0, 5)}: ${d}`));
+  }
+  return res;
+}
+
