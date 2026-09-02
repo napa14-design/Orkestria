@@ -6,8 +6,13 @@
  * É o que dá a sensação de caminho inteiro sem despejar 30 passos de uma vez —
  * e o que permite ela sair no meio e voltar amanhã sabendo onde parou.
  *
- * **Some sozinha quando tudo está concluído.** Aprendizado tem fim; deixar o
- * quadro para sempre seria acrescentar mobília permanente à tela mais visitada.
+ * **Fica na tela mesmo depois de concluída** (decisão do dono em 02/09/2026:
+ * *"deixa a trilha lá mesmo depois de concluir"*). Ela sumiria quando as 12
+ * etapas terminassem, pela regra de não deixar mobília permanente na tela mais
+ * visitada — mas as etapas viraram clicáveis para revisão no mesmo dia, e
+ * esconder o quadro justamente quando ele vira índice de consulta tirava a
+ * única lista completa que existe. Concluída, ela troca de papel: deixa de ser
+ * "o que falta" e passa a ser "onde rever".
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,7 +31,7 @@ export default function TrilhaProgresso() {
 
   const concluidas = new Set(data.concluidas);
   const feitas = TRILHA.filter((e) => concluidas.has(e.id)).length;
-  if (feitas === TRILHA.length) return null;
+  const tudoFeito = feitas === TRILHA.length;
 
   const proxima = TRILHA.find((e) => !concluidas.has(e.id));
   // Quem adiou ou pulou não recebe holofote sozinho — então a trilha precisa
@@ -43,7 +48,7 @@ export default function TrilhaProgresso() {
     <section className="trilha" aria-label="Sua trilha de aprendizado">
       <header>
         <span className="rotulo">
-          Sua trilha · {feitas} de {TRILHA.length}
+          Sua trilha · {tudoFeito ? "concluída" : `${feitas} de ${TRILHA.length}`}
         </span>
         <div className="trilha-barra" aria-hidden="true">
           <i style={{ width: `${(feitas / TRILHA.length) * 100}%` }} />
@@ -87,7 +92,15 @@ export default function TrilhaProgresso() {
         })}
       </ol>
 
-      {guiado ? (
+      {tudoFeito ? (
+        // Concluída, o rodapé não pode continuar prometendo passo a passo nem
+        // oferecendo "retomar" — não há próxima etapa, e o botão não faria nada.
+        <p className="trilha-nota">
+          Você percorreu a trilha inteira. Clique em qualquer etapa para rever — o
+          <strong> ❔ Ajuda</strong> de cada tela abre os mesmos passeios, de onde a
+          dúvida aparecer.
+        </p>
+      ) : guiado ? (
         <p className="trilha-nota">
           Faça no seu ritmo — o sistema abre o passo a passo quando você entrar em
           cada tela. Nada aqui impede você de usar o resto do sistema.

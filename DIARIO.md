@@ -29,12 +29,23 @@ e com o estado **`pulado`** os 12 links continuam lá e abrem — o pedido expl�
 passa por cima do passo a passo desligado. `tsc` 0 · build 0 · 334 testes 0 ·
 console limpo.
 
-**Fica como está, de propósito:** a trilha continua **sumindo** da Central quando
-as 12 estão concluídas. A porta de revisão a partir dali passa a ser o **❔ Ajuda
-de cada tela** — que é onde a dúvida nasce. Aprendizado tem fim; o quadro não
-vira mobília permanente na tela mais visitada.
-
 **Arquivos:** `components/tutorial/TrilhaProgresso.tsx`.
+
+### Adendo do mesmo dia: a trilha fica depois de concluída
+
+Eu tinha mantido o sumiço ao concluir as 12, pela regra de não deixar mobília
+permanente na tela mais visitada, e ofereci a troca. Resposta: *"deixa a trilha
+lá mesmo depois de concluir"*. Está certo, e a minha regra é que estava velha:
+as etapas viraram clicáveis para revisão **hoje**, e esconder o quadro
+justamente quando ele deixa de ser "o que falta" e vira **índice de consulta**
+tirava a única lista completa que existe.
+
+Concluída, ela troca de papel: cabeçalho vira "Sua trilha · concluída", cada
+etapa mostra "Rever ·", e o rodapé para de prometer passo a passo — o botão
+"Começar o passo a passo" some, porque sem próxima etapa ele não faria nada.
+
+**Verificado com as 12 concluídas:** trilha visível, 12 itens, 12 links, sem
+botão morto, e rever "Gerar o dia em 1 clique" abre no passo 1.
 
 ---
 
