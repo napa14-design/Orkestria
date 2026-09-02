@@ -290,11 +290,32 @@ export const TRILHA: EtapaTutorial[] = [
         avancarEm: "leitura",
       },
       {
+        // Leitura, não clique: este botão SALVA a rota padrão da sede, e o
+        // passeio não altera a operação de ninguém. Quem quer ensinar clica
+        // quando decidir, com o dia certo na tela.
         alvo: "ensinar-rota",
-        titulo: "Ensinar esta rota",
+        titulo: "É este o botão",
         texto:
-          "Clique aqui. O sistema guarda a montagem deste dia como a rota padrão da sede. Nos próximos dias, um botão monta tudo — já pulando quem faltou e quem está de folga. Se a segunda (ou o sábado) tiver serviço próprio, monte esse dia e salve como outra rota marcando só os dias dela: as rotas se somam.",
-        avancarEm: "clique",
+          "\"★ Ensinar esta rota\" guarda a montagem deste dia como a rota padrão da sede. Ele fica aqui na barra de ações e só aparece enquanto a sede ainda não tem uma rota padrão — depois de ensinada, ele some.",
+        avancarEm: "leitura",
+      },
+      {
+        titulo: "Antes de clicar, confira o dia",
+        texto:
+          "O sistema guarda o que estiver na tela: cada pessoa, cada tarefa, cada horário. Então ensine num dia NORMAL da sede — não num dia de faltas, nem num dia pela metade. É esse retrato que vai virar todos os próximos dias.",
+        avancarEm: "leitura",
+      },
+      {
+        titulo: "Sábado e segunda podem ter rota própria",
+        texto:
+          "Se a segunda tem um serviço que os outros dias não têm, monte essa segunda e salve como OUTRA rota, marcando só o dia dela. As rotas se somam: a de todo dia entra sempre, e a da segunda entra por cima na segunda.",
+        avancarEm: "leitura",
+      },
+      {
+        titulo: "E quando a rotina mudar?",
+        texto:
+          "Monte o dia novo do jeito certo e ensine de novo — a rota da sede passa a ser essa. Não existe \"editar a rota\": o que vale é sempre o último dia ensinado.",
+        avancarEm: "leitura",
       },
       {
         alvo: "duplicar-modelos",

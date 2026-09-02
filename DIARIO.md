@@ -7,6 +7,56 @@
 
 ---
 
+## 2026-09-02 — Botão de Ajuda na agenda escolhe o tutorial; "Ensinar a rota" também só aponta
+
+Dois pedidos: *"é olha onde fica, e deixa BEM didático"* para o passo que ainda
+salvava a rota padrão, e *"coloca um botão de Ajuda nessa tela de Rotina do Dia
+que abre qual tutorial a pessoa quer"*.
+
+### "Ensinar a rota" agora só aponta — e ensina mais
+
+Era o último passo do passeio com efeito real: clicava no botão que **salva a
+rota padrão da sede**. Virou leitura, e a etapa passou de 3 para 6 passos, com o
+que o clique único não dizia:
+
+- **É este o botão** — onde fica e que ele some depois de a rota ser ensinada;
+- **Antes de clicar, confira o dia** — o sistema guarda o que está na tela, então
+  ensine num dia normal, não num dia de faltas nem pela metade;
+- **Sábado e segunda podem ter rota própria** — rotas se somam;
+- **E quando a rotina mudar?** — não existe "editar a rota": vale o último dia
+  ensinado.
+
+### A Ajuda da agenda
+
+O botão "❔ Como usar" já existia com a legenda da tela; virou **"❔ Ajuda"** e
+ganhou no topo *"Quer que eu te mostre?"* — os cinco passeios da tela, cada um
+com o nome, o ganho, o número de passos e, quando há, **o pré-requisito dito
+antes de abrir** (para ninguém começar um tutorial que trava no primeiro passo).
+A lista sai de `etapasDaRota("/rotinas")`: etapa nova na trilha aparece aqui
+sozinha. **Não é botão novo** — a tela não pode ganhar um controle a cada dúvida.
+
+Pedido do modo Semana leva junto para o modo Dia: todos os alvos (paleta,
+ocupação, barra de ações) são da visão de dia, e sem isso o passeio abriria
+apontando para o vazio.
+
+### O defeito que a Ajuda revelou
+
+Terminado um passeio, escolher outro na lista **não abria nada**. Era a minha
+correção de mais cedo: `rotaEncerrada` guardava só a rota, e a escolha na Ajuda é
+navegação de cliente — a rota não muda, então continuava "encerrada". Agora
+guarda `{rota, id}`: recusa só a MESMA etapa que acabou de encerrar, que era o
+laço original. Verificado na tela: terminar "Montar o dia" e pedir "Imprimir as
+fichas" abre; terminar "fichas" não a reabre sozinha.
+
+**Arquivos:** `lib/tutorial/trilha.ts`, `components/agenda/AjudaAgenda.tsx`,
+`components/tutorial/Tutorial.tsx`, `app/(app)/rotinas/page.tsx`.
+
+**Verificado:** etapa "Ensinar a rota" percorrida — 6 passos, nenhum perdido, o
+botão apenas iluminado, **0 modelos criados**. `tsc` 0 · build 0 · 334 testes 0 ·
+console limpo.
+
+---
+
 ## 2026-09-02 — Tutorial percorrido inteiro: 12 etapas, 40 passos, 2 defeitos
 
 Pedido: *"agora testa o tutorial inteiro do começo ao fim"*. Percorri as 12

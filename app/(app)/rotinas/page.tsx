@@ -698,7 +698,7 @@ export default function PaginaRotinas() {
         />
       ) : modo === "semana" ? (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          <AjudaAgenda />
+          <AjudaAgenda aoComecarTutorial={() => setModo("dia")} />
         </div>
       ) : null}
 

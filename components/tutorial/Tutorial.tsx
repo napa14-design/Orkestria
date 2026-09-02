@@ -31,8 +31,13 @@ export default function Tutorial() {
   const { data, mutate } = useSWR<Progresso>("/api/tutorial", fetcher);
   const [etapaAtiva, setEtapaAtiva] = useState<string | null>(null);
   const [passo, setPasso] = useState(0);
-  /** Rota em que já encerramos uma etapa — não abrir outra sem navegar. */
-  const rotaEncerrada = useRef<string | null>(null);
+  /**
+   * A ÚLTIMA etapa encerrada e onde. Guarda o id, não só a rota: bloquear a rota
+   * inteira fazia a Ajuda da agenda parar de funcionar — terminado um passeio,
+   * escolher outro da lista não abria nada, porque a rota continuava "encerrada"
+   * (a escolha é navegação do cliente, a rota não muda).
+   */
+  const encerrada = useRef<{ rota: string; id: string } | null>(null);
   /** Etapas de que ela saiu nesta sessão: não insistir ao voltar na tela. */
   const recusadas = useRef<Set<string>>(new Set());
 
@@ -55,12 +60,15 @@ export default function Tutorial() {
     }
     const explicita = etapa.id === pedida;
     const guiado = podeAutoIniciar(lerEstado(data.estado), data.concluidas.length);
-    // `rotaEncerrada` vale TAMBÉM para o pedido explícito da trilha. Antes o
-    // `explicita` passava por cima: terminado o último passo, o link
-    // `?tutorial=locais` continuava na URL, a etapa era reaberta na hora e a
-    // pessoa voltava ao PASSO 1 da etapa que acabara de concluir — parecia que
-    // o tutorial não seguia adiante. Sair da tela e voltar reabre normalmente.
-    const permitido = (explicita || guiado) && rotaEncerrada.current !== rota;
+    // Pedido explícito só é recusado quando é a MESMA etapa que acabou de
+    // encerrar nesta tela — senão o link `?tutorial=x`, que continua na URL,
+    // reabriria no passo 1 aquilo que a pessoa acabou de concluir. Pedir OUTRA
+    // etapa da mesma tela é legítimo, e é o que a Ajuda faz.
+    const mesmaQueEncerrou =
+      encerrada.current?.rota === rota && encerrada.current?.id === etapa.id;
+    const permitido = explicita
+      ? !mesmaQueEncerrou
+      : guiado && encerrada.current?.rota !== rota;
     if (!permitido) {
       setEtapaAtiva(null);
       return;
@@ -69,15 +77,15 @@ export default function Tutorial() {
     setPasso(0);
   }, [rota, etapa, data, pedida]);
 
-  // Navegou: a tela nova pode ensinar de novo.
+  // Navegou para outra tela: a nova pode ensinar sozinha de novo.
   useEffect(() => {
-    if (rotaEncerrada.current !== rota) rotaEncerrada.current = null;
+    if (encerrada.current && encerrada.current.rota !== rota) encerrada.current = null;
   }, [rota]);
 
   const encerrar = useCallback(
     async (concluida: boolean) => {
       const id = etapaAtiva;
-      rotaEncerrada.current = rota;
+      if (id) encerrada.current = { rota, id };
       setEtapaAtiva(null);
       setPasso(0);
       if (!id) return;
