@@ -13,6 +13,7 @@ import { DIAS_SEMANA, DIAS_SEMANA_CURTO, parseDiasSemana, serializarDiasSemana }
 import Carregando from "./Carregando";
 import Modal from "./Modal";
 import { paresCrus, serializarPares } from "@/lib/intervalos";
+import BotaoAjuda from "./tutorial/BotaoAjuda";
 
 export interface OpcaoCampo {
   valor: string;
@@ -668,7 +669,10 @@ export default function CrudManager<T extends Registro>({
             <p style={{ color: "var(--tinta-2)", marginTop: 2 }}>{subtitulo}</p>
           )}
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* Uma linha aqui dá o botão de ajuda a TODA tela de cadastro — e ele
+              some sozinho onde a trilha não tem etapa, então não vira enfeite. */}
+          <BotaoAjuda />
           <input
             placeholder="Buscar…"
             value={busca}

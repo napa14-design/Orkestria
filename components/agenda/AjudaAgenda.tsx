@@ -1,23 +1,13 @@
 "use client";
 
 /**
- * Botão de ajuda da agenda: **escolher um tutorial** desta tela, e a legenda
- * (cores, arrastar, painéis) logo abaixo.
+ * Legenda da agenda (cores, arrastar, painéis), servida dentro do botão de
+ * ajuda genérico — que já traz os tutoriais desta tela.
  *
- * A lista de tutoriais nasceu de um pedido de 02/09/2026: *"coloca um botão de
- * Ajuda nessa tela de Rotina do Dia que abre qual tutorial a pessoa quer"*.
- * Antes, a única porta para o tutorial era a trilha da Central — quem estava na
- * agenda com dúvida ali não tinha como pedir a aula daquela tela.
- *
- * **Não é botão novo**: entrou dentro do "Como usar" que já existia, porque a
- * tela não pode ganhar mais um controle a cada dúvida. As etapas vêm de
- * `etapasDaRota("/rotinas")` — acrescentar uma etapa na trilha a faz aparecer
- * aqui sozinha.
+ * A escolha de tutorial e o botão em si moram em `BotaoAjuda`, porque o mesmo
+ * botão passou a valer em todas as telas; aqui fica só o que é da agenda.
  */
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Modal from "@/components/Modal";
-import { etapasDaRota } from "@/lib/tutorial/trilha";
+import BotaoAjuda from "@/components/tutorial/BotaoAjuda";
 
 function Swatch({ cor }: { cor: string }) {
   return (
@@ -32,80 +22,9 @@ function Item({ children }: { children: React.ReactNode }) {
 }
 
 export default function AjudaAgenda({ aoComecarTutorial }: { aoComecarTutorial?: () => void }) {
-  const [aberto, setAberto] = useState(false);
-  const router = useRouter();
-  const etapas = etapasDaRota("/rotinas");
-
-  /** Abre o tutorial pedido: quem lê o `?tutorial=` é o componente Tutorial. */
-  function comecar(id: string) {
-    setAberto(false);
-    // Todos os passeios desta rota são da visão de DIA — os alvos (paleta,
-    // ocupação, barra de ações) não existem na visão de semana. Quem pede ajuda
-    // dali é levado junto, senão o tutorial abriria apontando para o vazio.
-    aoComecarTutorial?.();
-    router.push(`/rotinas?tutorial=${id}`);
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        className="btn btn-mini btn-fantasma"
-        onClick={() => setAberto(true)}
-        title="Tutoriais desta tela e legenda da agenda"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-      >
-        ❔ Ajuda
-      </button>
-
-      <Modal titulo="Ajuda da agenda" aberto={aberto} aoFechar={() => setAberto(false)} larguraMax={560}>
-        <section style={{ marginBottom: 18 }}>
-          <span className="rotulo">Quer que eu te mostre?</span>
-          <p style={{ fontSize: 12, color: "var(--tinta-3)", margin: "4px 0 10px" }}>
-            Cada um destes é um passeio curto pela tela: ele aponta onde ficam as coisas e
-            explica o que fazem. Nada é preenchido nem alterado.
-          </p>
-          <div style={{ display: "grid", gap: 6 }}>
-            {etapas.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => comecar(e.id)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  background: "var(--cartao)",
-                  border: "var(--borda)",
-                  borderRadius: "var(--raio)",
-                  padding: "9px 12px",
-                  cursor: "pointer",
-                }}
-              >
-                <span style={{ fontSize: 13, color: "var(--tinta)" }}>
-                  {e.nome} <span style={{ color: "var(--tinta-3)" }}>· {e.passos.length} passos</span>
-                </span>
-                <span style={{ display: "block", fontSize: 11, color: "var(--tinta-2)", marginTop: 2 }}>
-                  {e.ganho}
-                </span>
-                {/* Dizer o pré-requisito ANTES de abrir evita a pessoa começar um
-                    tutorial que vai parar no primeiro passo por falta de dado. */}
-                {e.precisa && (
-                  <span style={{ display: "block", fontSize: 11, color: "var(--tinta-3)", marginTop: 2 }}>
-                    Precisa de {e.precisa}.
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div style={{ borderTop: "1px solid var(--linha)", paddingTop: 14 }}>
-          <span className="rotulo" style={{ display: "block", marginBottom: 8 }}>
-            Legenda da tela
-          </span>
-        </div>
-        <div style={{ fontSize: 13, color: "var(--tinta-2)" }}>
+    <BotaoAjuda titulo="Ajuda da agenda" aoComecarTutorial={aoComecarTutorial}>
+      <div style={{ fontSize: 13, color: "var(--tinta-2)" }}>
           <p style={{ marginBottom: 12 }}>
             <strong>Montar:</strong> arraste uma tarefa da <strong>paleta</strong> (à esquerda) para a
             coluna de um funcionário e solte no horário. O card aparece na hora e já salva.
@@ -155,12 +74,6 @@ export default function AjudaAgenda({ aoComecarTutorial }: { aoComecarTutorial?:
             </Item>
           </ul>
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-          <button type="button" className="btn btn-primario" onClick={() => setAberto(false)}>
-            Entendi
-          </button>
-        </div>
-      </Modal>
-    </>
+    </BotaoAjuda>
   );
 }

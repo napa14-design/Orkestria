@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-09-02 — O botão de Ajuda em todas as telas que têm tutorial
+
+Pedido: *"põe o botão de ajuda nas outras telas também"*. O que estava preso à
+agenda virou `components/tutorial/BotaoAjuda.tsx`: descobre a tela sozinho pelo
+`usePathname` e pergunta à trilha quais etapas moram nela.
+
+**Uma linha no `CrudManager` deu o botão a todas as telas de cadastro de uma
+vez** — as 15 telas passam pelo mesmo componente. E ele **some sozinho onde não
+há o que ensinar**: sem etapa na trilha e sem legenda própria, não renderiza
+nada. Botão que abre lista vazia é pior que botão ausente, e a doutrina não deixa
+a operação crescer sem contrapartida.
+
+O `AjudaAgenda` encolheu para o que é só dele — a legenda de cores, arrastar e
+painéis — servida como `children` do botão genérico.
+
+**Onde ficou:** Locais, Tarefas, Equipe, Qualificações, Ausências, Eventuais e a
+agenda. **Onde não ficou, de propósito:** Sedes, Categorias, Requisitos e as
+demais telas sem etapa; e a **Central**, que já mostra a trilha inteira — dois
+caminhos para a mesma coisa na mesma tela seria porta repetida.
+
+**Verificado na tela**, rota a rota: botão presente em /tarefas, /funcionarios,
+/qualificacoes, /ausencias, /eventuais; **ausente** em /sedes, /categorias e
+/requisitos. Em /locais, o cartão "Onde ficam os locais · 4 passos" abre o
+tutorial no passo 1. Na agenda continua **um** botão, com os 5 tutoriais e a
+legenda embaixo. `tsc` 0 · build 0 · 334 testes 0 · console limpo.
+
+---
+
 ## 2026-09-02 — Botão de Ajuda na agenda escolhe o tutorial; "Ensinar a rota" também só aponta
 
 Dois pedidos: *"é olha onde fica, e deixa BEM didático"* para o passo que ainda
