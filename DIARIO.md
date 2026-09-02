@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-09-02 — Tutorial percorrido inteiro: 12 etapas, 40 passos, 2 defeitos
+
+Pedido: *"agora testa o tutorial inteiro do começo ao fim"*. Percorri as 12
+etapas com um piloto que lê o balão, decide a ação e registra o que viu —
+descobrindo o alvo de cada passo de clique ao **casar o estilo inline do anel**
+com o retângulo de cada `[data-tour]` (a geometria medida no painel oculto não
+serve; o inline é o que o componente calcula).
+
+**Resultado:** as 12 etapas correram até o fim, e os contadores no fim são
+idênticos aos do início — 4 locais, 33 tarefas, 4 funcionários, 0 qualificações,
+0 ausências, 0 eventuais, 0 modelos. **O passeio não cria nada.** Console limpo.
+
+### Os dois defeitos que apareceram
+
+**1. Dois passos da mesma etapa pediam estados opostos.** Em "Gerar o dia em 1
+clique", o passo 3 aponta o `gerar-dia`, que só existe no dia **vazio**; o passo
+4 apontava o `desfazer-geracao`, que só existe no dia **cheio**. Não havia
+estado em que os dois coubessem: o passo 4 caía sempre em "este passo ainda não
+dá para fazer". Como o passeio não gera nada, o botão legitimamente não está na
+tela — então ele passou a ser **contado, não apontado** (passo sem alvo, balão
+centralizado).
+
+**2. O `precisa` da etapa "Ensinar a rota" dava o motivo errado.** Dizia só "um
+dia com tarefas montadas na agenda", mas o botão também some quando a sede **já
+tem** rota padrão. Quem já ensinou via a mensagem falando de um pré-requisito
+que ela tinha. Agora diz as duas condições.
+
+De passagem, o comentário no topo do `trilha.ts` ainda dizia *"a pessoa termina
+a trilha com a sede montada de verdade, não com um passeio assistido"* — o
+oposto do que o tutorial virou hoje. Reescrito.
+
+### O que a primeira volta NÃO provou
+
+O piloto rápido (250ms por passo) clicava "Entendi" **antes** dos 2s que o
+holofote leva para desistir de um alvo — então um passo de leitura com alvo
+ausente passaria batido. Refiz com 2,3s e, para os demais, conferi a presença de
+cada alvo direto na tela em que ele deve estar, abrindo o modal quando era o
+caso. **Os 17 alvos existem no estado que a sua etapa exige.**
+
+**Arquivos:** `lib/tutorial/trilha.ts`.
+
+**Verificado:** `tsc` 0 · build 0 · 334 testes 0 · console sem erro.
+
+---
+
 ## 2026-09-02 — "Olha onde fica": o passeio também não gera o dia
 
 Eu tinha deixado uma exceção no passeio: o passo do **"⚡ Gerar o dia"** ainda

@@ -11,9 +11,15 @@
  * "Planejar período" virou "Duplicar e modelos" numa única semana — e um
  * tutorial que procura por texto quebra em silêncio, apontando para o vazio.
  *
- * **Tom:** "faça comigo", não "veja isto". A pessoa termina a trilha com a sede
- * montada de verdade, não com um passeio assistido. Por isso o texto fala da
- * planilha que ela já domina, e não das telas do sistema.
+ * **Tom:** o texto fala da planilha que a pessoa já domina, e não das telas do
+ * sistema.
+ *
+ * **Formato: passeio guiado.** Decisão do dono em 02/09/2026 — *"não precisa
+ * preencher nada, é mostrar aonde clicar para ir para cada tela, abre o modal,
+ * explica o modal, e fecha o modal"*. Antes a trilha mandava cadastrar de
+ * verdade, e quem estava só conhecendo o sistema travava num campo obrigatório
+ * sem ter a lista da sede na mão. Nenhum passo pede dado, e nenhum altera a
+ * operação: o que a pessoa leva é saber onde as coisas ficam.
  */
 
 /**
@@ -272,7 +278,10 @@ export const TRILHA: EtapaTutorial[] = [
     nome: "Ensinar a rota da sede",
     ganho: "A partir daqui, montar o dia vira um clique.",
     rota: "/rotinas",
-    precisa: "um dia com tarefas montadas na agenda",
+    // Duas condições, não uma: o botão "★ Ensinar esta rota" some quando a sede
+    // JÁ tem rota padrão. Dizer só "um dia com tarefas montadas" dava o motivo
+    // errado a quem já ensinou — ela tem o dia, e mesmo assim o passo não abria.
+    precisa: "um dia com tarefas montadas na agenda e a sede ainda sem rota padrão",
     passos: [
       {
         titulo: "Este é o passo que encolhe o seu trabalho",
@@ -335,10 +344,15 @@ export const TRILHA: EtapaTutorial[] = [
         avancarEm: "leitura",
       },
       {
-        alvo: "desfazer-geracao",
+        // SEM alvo de propósito. O "↺ Desfazer a geração" só existe no dia
+        // CHEIO, e o passo anterior precisa do dia VAZIO para mostrar o "Gerar":
+        // apontar para ele aqui era pedir os dois estados ao mesmo tempo, e o
+        // passo caía sempre em "este passo ainda não dá para fazer". Como o
+        // passeio não gera nada, o botão legitimamente não está na tela — então
+        // ele é contado, não apontado.
         titulo: "Gerou sem querer? Desfaz",
         texto:
-          "Este botão remove os blocos que a máquina criou. O que você arrastou à mão fica, e nada que já tenha realizado registrado é apagado — então dá para clicar sem medo.",
+          "Depois de gerar, aparece na barra de ações um \"↺ Desfazer a geração\". Ele remove os blocos que a máquina criou; o que você arrastou à mão fica, e nada que já tenha realizado registrado é apagado — então dá para gerar sem medo.",
         avancarEm: "leitura",
       },
       {
