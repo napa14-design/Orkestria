@@ -59,30 +59,29 @@ export default function TrilhaProgresso() {
               <span className="trilha-marca" aria-hidden="true">
                 {feita ? "✓" : atual ? "→" : ""}
               </span>
-              {atual && guiado ? (
-                <Link href={`${etapa.rota}?tutorial=${etapa.id}`}>
-                  <strong>{etapa.nome}</strong>
-                  {/* O pré-requisito importa MAIS na etapa atual do que nas
-                      futuras: é nela que a pessoa vai tentar e não conseguir. */}
-                  <small>
-                    {etapa.ganho}
-                    {etapa.precisa && ` · Precisa de ${etapa.precisa}`}
-                  </small>
-                </Link>
-              ) : (
-                <span>
-                  <strong>{etapa.nome}</strong>
-                  {feita ? (
-                    <small>{etapa.ganho}</small>
-                  ) : (
-                    // Diz o pré-requisito nas etapas que dependem de dado: sem
-                    // isso a ordem da trilha parece arbitrária, e quem tenta
-                    // pular direto para "ensinar a rota" não entende por que
-                    // não dá.
-                    etapa.precisa && <small>Precisa de {etapa.precisa}</small>
-                  )}
-                </span>
-              )}
+              {/* TODA etapa é clicável — concluída, atual ou futura.
+                  Antes só a atual era link, e só com o passo a passo ligado: quem
+                  já tinha feito uma aula não conseguia revê-la, e quem queria
+                  pular para a que interessava também não. A trilha virava um
+                  quadro de leitura. Pergunta do dono em 02/09/2026: *"e se eu já
+                  fiz um tutorial, agora é liberado eu escolher qual eu quero
+                  rever?"*.
+
+                  Clicar numa etapa cujo `precisa` ainda não existe não quebra: o
+                  holofote diz o motivo e oferece seguir. Por isso o pré-requisito
+                  aparece aqui também — para a escolha ser informada antes do
+                  clique, e não uma surpresa depois. */}
+              <Link
+                href={`${etapa.rota}?tutorial=${etapa.id}`}
+                title={feita ? `Rever: ${etapa.nome}` : `Começar: ${etapa.nome}`}
+              >
+                <strong>{etapa.nome}</strong>
+                <small>
+                  {feita && "Rever · "}
+                  {etapa.ganho}
+                  {etapa.precisa && ` · Precisa de ${etapa.precisa}`}
+                </small>
+              </Link>
             </li>
           );
         })}

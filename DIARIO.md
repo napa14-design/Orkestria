@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-09-02 — A trilha da Central vira escolha: rever ou pular para qualquer etapa
+
+Pergunta do dono: *"e se eu já fiz um tutorial, agora é liberado eu escolher na
+tela inicial qual eu quero rever, ou iniciar a partir dele? antes não deixava eu
+clicar"*. Não deixava mesmo, e era em dois eixos:
+
+- só a etapa **atual** era `<Link>`; concluídas e futuras eram `<span>` morto;
+- e mesmo a atual só virava link com o passo a passo **ligado** — quem tinha
+  pulado o convite via a trilha inteira sem um clique possível.
+
+Agora **as 12 são clicáveis**, em qualquer estado. As concluídas ganham
+"Rever · " na legenda; o pré-requisito aparece em todas, para a escolha ser
+informada antes do clique em vez de virar surpresa depois. Clicar numa etapa cujo
+pré-requisito ainda não existe continua sem quebrar: o holofote diz o motivo e
+oferece seguir.
+
+**Verificado na tela**, com 3 etapas concluídas: as 12 têm link; rever "Onde
+ficam os locais" abre no passo 1; pular para "Imprimir as fichas" (futura) abre;
+e com o estado **`pulado`** os 12 links continuam lá e abrem — o pedido explícito
+passa por cima do passo a passo desligado. `tsc` 0 · build 0 · 334 testes 0 ·
+console limpo.
+
+**Fica como está, de propósito:** a trilha continua **sumindo** da Central quando
+as 12 estão concluídas. A porta de revisão a partir dali passa a ser o **❔ Ajuda
+de cada tela** — que é onde a dúvida nasce. Aprendizado tem fim; o quadro não
+vira mobília permanente na tela mais visitada.
+
+**Arquivos:** `components/tutorial/TrilhaProgresso.tsx`.
+
+---
+
 ## 2026-09-02 — O botão de Ajuda em todas as telas que têm tutorial
 
 Pedido: *"põe o botão de ajuda nas outras telas também"*. O que estava preso à
