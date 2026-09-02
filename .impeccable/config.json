@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "components/CrudManager.tsx"
+        ],
+        "createdAt": "2026-09-02T12:58:45.400Z",
+        "reason": "Claude: e o tooltip de ajuda (max 270px), nao um card. A borda esquerda usa var(--acento), o vinho amaranto que o design system Partitura define como acento em app/globals.css; o mesmo motivo aparece em ModaisRotina.tsx. Linha pre-existente, nao tocada nesta sessao. NAO confirmado pelo usuario."
+      }
+    ]
+  }
+}

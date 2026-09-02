@@ -17,3 +17,8 @@ jogo-monstrinhos/
 firestore-debug.log
 firebase-debug.log
 ui-debug.log
+
+# Detector de design (skill impeccable): o config.json é compartilhado e vai
+# para o repositório; o cache guarda id de sessão e caminhos absolutos da
+# máquina de quem rodou, então fica de fora.
+.impeccable/hook.cache.json
