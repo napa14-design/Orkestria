@@ -39,6 +39,13 @@ export type AvancarEm =
 /** Disparado no `window` quando um cadastro é gravado de verdade. */
 export const EVENTO_SALVOU = "orkestria:crud-salvou";
 
+/**
+ * Disparado quando o dia foi montado a partir da rota padrão — e **só** então.
+ * Clicar em "Gerar o dia" numa sede sem rota padrão, ou numa data em que a sede
+ * não opera, é clique sem geração: o tutorial não pode dar por ensinado.
+ */
+export const EVENTO_DIA_GERADO = "orkestria:dia-gerado";
+
 export interface PassoTutorial {
   /** Marcador `data-tour` do elemento destacado. Vazio = balão centralizado. */
   alvo?: string;
@@ -296,6 +303,67 @@ export const TRILHA: EtapaTutorial[] = [
         titulo: "E os dias fora do comum?",
         texto:
           "Formatura, feira, prova. Monte o dia do evento uma vez, abra aqui, vá em \"Rotas salvas\" e salve marcando que é um modelo de evento. No próximo, você aplica na véspera e o dia já amanhece programado.",
+        avancarEm: "leitura",
+      },
+    ],
+  },
+  /**
+   * A etapa que faltava — e a falta custou caro: em 02/09/2026 um supervisor
+   * reclamou ao diretor que **não existia** montar o dia em um clique. Existia
+   * desde sempre, no botão "⚡ Gerar o dia da rota padrão"; o que não existia
+   * era alguém mostrar. A trilha ensinava a SALVAR a rota e nunca mostrava o
+   * botão que a USA — o `ganho` da etapa anterior já prometia "montar o dia
+   * vira um clique" e o clique não aparecia em passo nenhum.
+   *
+   * O nome na trilha é parte do conserto: quem só passa os olhos na lista da
+   * Central já lê que o recurso existe.
+   */
+  {
+    id: "gerar-o-dia",
+    nome: "Gerar o dia em 1 clique",
+    ganho: "O dia inteiro montado num clique, já pulando quem faltou.",
+    rota: "/rotinas",
+    precisa: "uma rota padrão salva e um dia ainda vazio",
+    passos: [
+      {
+        titulo: "É aqui que o cadastro se paga",
+        texto:
+          "Você ensinou a rota da sede. A partir de agora não precisa montar dia nenhum na mão: o sistema monta, e você só ajusta o que fugiu do normal. O que era uma manhã de planilha vira um clique e alguns minutos de revisão.",
+        avancarEm: "leitura",
+      },
+      {
+        alvo: "campo-data",
+        titulo: "Primeiro, escolha o dia que quer montar",
+        texto:
+          "Troque a data aqui para um dia que ainda está vazio — amanhã, por exemplo. O botão de gerar só aparece em dia vazio, para não passar por cima de um dia que você já montou.",
+        avancarEm: "leitura",
+      },
+      {
+        alvo: "gerar-dia",
+        titulo: "Agora o clique",
+        texto:
+          "Clique em \"⚡ Gerar o dia da rota padrão\". O sistema monta a agenda inteira da sede: cada pessoa, cada tarefa, no horário da rota. Ele já pula quem está de férias, de folga ou com falta lançada, e avisa embaixo o que ficou de fora e por quê.",
+        avancarEm: "sucesso",
+        evento: EVENTO_DIA_GERADO,
+      },
+      {
+        alvo: "desfazer-geracao",
+        titulo: "Gerou sem querer? Desfaz",
+        texto:
+          "Este botão remove os blocos que a máquina criou. O que você arrastou à mão fica, e nada que já tenha realizado registrado é apagado — então dá para clicar sem medo.",
+        avancarEm: "leitura",
+      },
+      {
+        alvo: "duplicar-modelos",
+        titulo: "E a semana inteira de uma vez",
+        texto:
+          "Em \"Preencher dias\" você joga este dia (ou uma rota salva) para um período inteiro: escolhe de quando até quando, marca os dias da semana e o botão diz exatamente para onde vai. Sem período, ele copia para o próximo dia marcado.",
+        avancarEm: "leitura",
+      },
+      {
+        titulo: "O ciclo, em uma frase",
+        texto:
+          "Monta um dia normal uma vez → ensina a rota → todos os outros dias saem em um clique. Se a rotina mudar, monte o dia novo do jeito certo e ensine de novo: a rota da sede passa a ser essa.",
         avancarEm: "leitura",
       },
     ],

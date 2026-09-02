@@ -11,7 +11,7 @@
  * o buraco do meio simplesmente não tem nada por cima — o clique chega ao botão
  * real, como se o tutorial não existisse.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EVENTO_SALVOU, type PassoTutorial } from "@/lib/tutorial/trilha";
 
@@ -55,11 +55,20 @@ export default function Holofote({
   aoSair: () => void;
 }) {
   const [caixa, setCaixa] = useState<Caixa | null>(null);
+  /** Altura real do balão, medida depois de pintar — ver o cálculo da posição. */
+  const balaoRef = useRef<HTMLDivElement>(null);
+  const [alturaBalao, setAlturaBalao] = useState(210);
   /** Alvo declarado que não existe na tela — falha visível, nunca silenciosa. */
   const [perdido, setPerdido] = useState(false);
   const [montado, setMontado] = useState(false);
 
   useEffect(() => setMontado(true), []);
+
+  // Mede o balão a cada passo: o texto muda de tamanho e a posição depende dele.
+  useEffect(() => {
+    const h = balaoRef.current?.offsetHeight;
+    if (h && Math.abs(h - alturaBalao) > 2) setAlturaBalao(h);
+  }, [passo.titulo, passo.texto, caixa, perdido, alturaBalao]);
 
   // Acompanha o alvo: ele muda de lugar com rolagem, resize e abertura de modal.
   useEffect(() => {
@@ -144,14 +153,20 @@ export default function Holofote({
   const foco = perdido ? null : caixa;
 
   // Balão: abaixo do alvo quando cabe, senão acima; centralizado sem alvo.
-  let balaoTop = vh / 2 - 90;
+  //
+  // A altura é **medida**, não estimada. Era um `210` fixo, e bastou um passo de
+  // texto mais longo (o de "Gerar o dia em 1 clique", 270px) para o balão passar
+  // 16px do rodapé — o botão de continuar ficava fora da tela. Com a medida, o
+  // texto pode crescer sem quebrar a posição.
+  let balaoTop = vh / 2 - alturaBalao / 2;
   let balaoLeft = vw / 2 - BALAO_L / 2;
   if (foco) {
     const abaixo = foco.y + foco.h + 14;
-    const cabeAbaixo = abaixo + 210 < vh;
-    balaoTop = cabeAbaixo ? abaixo : Math.max(14, foco.y - 210);
+    balaoTop = abaixo + alturaBalao < vh ? abaixo : foco.y - alturaBalao - 14;
     balaoLeft = Math.min(Math.max(foco.x + foco.w / 2 - BALAO_L / 2, 14), vw - BALAO_L - 14);
   }
+  // Trava final: nunca sair da tela, nem por cima nem por baixo.
+  balaoTop = Math.min(Math.max(14, balaoTop), Math.max(14, vh - alturaBalao - 14));
 
   const faixas: Caixa[] = foco
     ? [
@@ -179,7 +194,11 @@ export default function Holofote({
         />
       )}
 
-      <div className="holofote-balao" style={{ top: balaoTop, left: balaoLeft, width: BALAO_L }}>
+      <div
+        ref={balaoRef}
+        className="holofote-balao"
+        style={{ top: balaoTop, left: balaoLeft, width: BALAO_L, maxHeight: vh - 28, overflowY: "auto" }}
+      >
         <div className="holofote-topo">
           <span className="rotulo">
             Passo {indice + 1} de {total}

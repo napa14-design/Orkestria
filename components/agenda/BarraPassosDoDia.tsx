@@ -59,6 +59,7 @@ export default function BarraPassosDoDia({
       {temRotinas && aoLimparDia && (
         <button
           className="btn btn-mini btn-fantasma"
+          data-tour="desfazer-geracao"
           onClick={() => aoLimparDia("geradas")}
           disabled={limpando}
           title="Remove os blocos criados por Gerar/Repetir/Aplicar modelo. O que você montou à mão e o que já tem realizado ficam."

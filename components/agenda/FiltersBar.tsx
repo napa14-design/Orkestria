@@ -72,7 +72,7 @@ export default function FiltersBar({
         </div>
       </div>
 
-      <label className="campo">
+      <label className="campo" data-tour="campo-data">
         <span className="rotulo">Data</span>
         <input type="date" value={data} onChange={(e) => aoMudarData(e.target.value)} />
       </label>

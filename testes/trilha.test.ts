@@ -12,7 +12,7 @@
  * manda gravar só pode avançar quando a gravação acontecer.**
  */
 import { describe, expect, it } from "vitest";
-import { TRILHA, type PassoTutorial } from "@/lib/tutorial/trilha";
+import { EVENTO_DIA_GERADO, TRILHA, type PassoTutorial } from "@/lib/tutorial/trilha";
 
 const todosOsPassos: Array<{ etapa: string; indice: number; passo: PassoTutorial }> = TRILHA.flatMap(
   (e) => e.passos.map((passo, indice) => ({ etapa: e.id, indice, passo })),
@@ -56,6 +56,37 @@ describe("trilha do tutorial", () => {
       expect(ultimo, `etapa "${etapa.id}" está sem passos`).toBeTruthy();
       expect(["leitura", "clique", "sucesso", undefined]).toContain(ultimo.avancarEm);
     }
+  });
+
+  /**
+   * Em 02/09/2026 um supervisor reclamou ao diretor que **não dava para gerar o
+   * dia em um clique**. Dava, desde sempre — o botão `gerar-dia` existia e a
+   * trilha nunca apontava para ele. Ensinava a SALVAR a rota e não mostrava o
+   * botão que a USA. Estes dois testes existem para essa falta não voltar.
+   */
+  describe("o caminho de um clique é ensinado", () => {
+    const passoGerar = todosOsPassos.find(({ passo }) => passo.alvo === "gerar-dia");
+
+    it("existe um passo que aponta para o botão de gerar o dia", () => {
+      expect(
+        passoGerar,
+        'nenhum passo da trilha aponta para "gerar-dia" — o recurso principal fica invisível',
+      ).toBeTruthy();
+    });
+
+    it("e ele só avança quando o dia foi gerado de verdade", () => {
+      // Clicar em "Gerar" numa sede sem rota padrão, ou num dia em que a sede
+      // não opera, é clique sem geração — o tutorial não pode dar por ensinado.
+      expect(passoGerar?.passo.avancarEm).toBe("sucesso");
+      expect(passoGerar?.passo.evento).toBe(EVENTO_DIA_GERADO);
+    });
+
+    it("a etapa que ensina a gerar diz o que precisa existir antes", () => {
+      const etapa = TRILHA.find((e) => e.passos.some((p) => p.alvo === "gerar-dia"));
+      // Sem `precisa`, o holofote acusaria "tutorial desatualizado" numa sede
+      // que ainda não tem rota padrão — assustando quem só não chegou lá.
+      expect(etapa?.precisa, `etapa "${etapa?.id}" precisa dizer o pré-requisito`).toBeTruthy();
+    });
   });
 
   it("toda etapa tem id único, nome, ganho e rota", () => {

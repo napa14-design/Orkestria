@@ -7,6 +7,61 @@
 
 ---
 
+## 2026-09-02 — A trilha passa a ensinar o "gerar o dia em 1 clique"
+
+Relato do dono: *"o usuário me meteu pro diretor que não tinha como gerar rotinas
+em 1 click"*. Tinha — o botão **⚡ Gerar o dia da rota padrão** existe, com
+`data-tour="gerar-dia"` no código desde sempre. O que não existia era alguém
+mostrar: **nenhum passo da trilha apontava para ele.**
+
+A etapa "Ensinar a rota da sede" prometia no seu próprio `ganho` que *"a partir
+daqui, montar o dia vira um clique"* — e ensinava só a **salvar** a rota. O
+clique que usa a rota nunca aparecia. Quem terminava a trilha inteira não via o
+recurso principal do produto.
+
+### A etapa nova: "Gerar o dia em 1 clique"
+
+Seis passos, na ordem em que a pessoa age:
+
+1. **É aqui que o cadastro se paga** — o porquê, antes do como.
+2. **Escolha o dia** (alvo: o campo de data) — explica que o botão só aparece em
+   dia vazio, para não passar por cima de um dia já montado.
+3. **O clique** (alvo: `gerar-dia`) — o que o sistema faz: monta a agenda
+   inteira, pula férias/folga/falta e diz o que ficou de fora.
+4. **Gerou sem querer? Desfaz** (alvo novo `desfazer-geracao`).
+5. **A semana inteira** (alvo: `duplicar-modelos`) — agora "Preencher dias".
+6. **O ciclo, em uma frase** — monta uma vez → ensina → um clique nos demais.
+
+O nome na trilha é metade do conserto: quem só passa os olhos na lista da Central
+já lê que o recurso existe.
+
+O passo 3 usa `avancarEm: "sucesso"` com o evento `orkestria:dia-gerado`,
+disparado **só no ramo em que o dia foi montado** — clicar em Gerar numa sede sem
+rota padrão, ou num dia em que a sede não opera, é clique sem geração, e o
+tutorial não pode dar por ensinado. Mesma lição da correção de hoje mais cedo.
+
+### De passagem
+
+A altura do balão do holofote era um `210` fixo. O texto mais longo desta etapa
+(270px) o empurrava para fora da tela. Agora é **medida** com um `ref`, com trava
+para nunca sair do viewport — o texto pode crescer sem quebrar a posição.
+
+**Arquivos:** `lib/tutorial/trilha.ts`, `components/tutorial/Holofote.tsx`,
+`components/agenda/FiltersBar.tsx` (alvo `campo-data`),
+`components/agenda/BarraPassosDoDia.tsx` (alvo `desfazer-geracao`),
+`app/(app)/rotinas/page.tsx` (evento), `testes/trilha.test.ts`.
+
+**Verificado na tela** (viewport real de 1280×800 — com o painel oculto a
+geometria mede zero e não vale nada): os 6 passos correm do início ao fim,
+o clique gerou **44 blocos** em 23/09 e só então o tutorial passou ao passo 4;
+a etapa fecha como `["gerar-o-dia"]`. `tsc` 0 · build 0 · 333 testes 0.
+
+Três invariantes novas em `testes/trilha.test.ts` guardam a falta: existe passo
+apontando para `gerar-dia`, ele avança em `sucesso` com o evento certo, e a
+etapa declara o `precisa`. Duas mutações provam que mordem.
+
+---
+
 ## 2026-09-02 — O tutorial dava etapa por concluída sem nada ter sido salvo
 
 Relato: *"tutorial bugado, ele pede para salvar, mas daí dá erro, pq não tem
