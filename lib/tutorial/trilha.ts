@@ -85,8 +85,8 @@ export const TRILHA: EtapaTutorial[] = [
   // ─────────────────────────── fundação ───────────────────────────
   {
     id: "locais",
-    nome: "Cadastrar os locais",
-    ganho: "O sistema passa a saber onde a sua equipe trabalha.",
+    nome: "Onde ficam os locais",
+    ganho: "Você sabe onde e como cadastrar os lugares da sua sede.",
     rota: "/locais",
     passos: [
       {
@@ -97,38 +97,38 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-novo",
-        titulo: "Cadastre o primeiro",
+        titulo: "É por aqui que se cadastra",
         texto:
-          "Clique em Novo local. Comece pelo mais óbvio da sua sede — a recepção, a portaria — só para ver como é. Você cadastra o resto depois, com calma.",
+          "Clique em Novo local para abrir o formulário. Vamos só olhar por dentro — você não precisa preencher nada agora.",
         avancarEm: "clique",
       },
       {
         alvo: "campo-metragem",
         titulo: "A metragem é o número que importa",
         texto:
-          "É ela que dimensiona as tarefas cobradas por metro quadrado. Não precisa ser exata: uma estimativa razoável já faz o cálculo funcionar, e dá para corrigir quando você tiver o número certo.",
+          "É ela que dimensiona as tarefas cobradas por metro quadrado. Não precisa ser exata: uma estimativa razoável já faz o cálculo funcionar, e dá para corrigir quando você tiver o número certo. Os campos com * são os obrigatórios.",
         avancarEm: "leitura",
       },
       {
-        alvo: "crud-salvar",
-        titulo: "Preencha e salve",
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
         texto:
-          "Antes de salvar, preencha os campos marcados com * — aqui são o nome, a sede e o tipo de local. Depois clique em Salvar: o local entra na lista e já fica disponível para receber tarefas, que é o próximo passo da trilha.",
-        avancarEm: "sucesso",
+          "Clique em Cancelar. Você já sabe onde fica e o que o formulário pede — cadastre de verdade depois, com a lista da sua sede na mão.",
+        avancarEm: "clique",
       },
     ],
   },
   {
     id: "tarefas",
-    nome: "Cadastrar as tarefas",
-    ganho: "Cada serviço passa a ter tempo e frequência calculados.",
+    nome: "Onde ficam as tarefas",
+    ganho: "Você entende como o sistema calcula o tempo de cada serviço.",
     rota: "/tarefas",
     passos: [
       {
         alvo: "crud-novo",
         titulo: "Agora o que se faz em cada lugar",
         texto:
-          "Tarefa é o serviço: varrer a frente, limpar o banheiro masculino, recolher o café. Toda tarefa mora num local — foi por isso que os locais vieram primeiro. Clique em Nova tarefa e escolha uma que você faz todo dia e sabe de cabeça quanto tempo leva: é a mais fácil de conferir depois.",
+          "Tarefa é o serviço: varrer a frente, limpar o banheiro masculino, recolher o café. Toda tarefa mora num local — foi por isso que os locais vieram primeiro. Clique em Nova tarefa para abrir o formulário; é só para olhar, não precisa preencher.",
         avancarEm: "clique",
       },
       {
@@ -157,18 +157,18 @@ export const TRILHA: EtapaTutorial[] = [
         avancarEm: "leitura",
       },
       {
-        alvo: "crud-salvar",
-        titulo: "Preencha e salve",
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
         texto:
-          "Preencha os campos marcados com * e clique em Salvar. Depois repita para as tarefas principais da sede — não precisa ser tudo hoje: comece pelo que a equipe faz todo dia, e vá completando conforme aparecer.",
-        avancarEm: "sucesso",
+          "Clique em Cancelar. Quando for cadastrar de verdade, comece pelo que a equipe faz todo dia e vá completando conforme aparecer — não precisa ser tudo de uma vez.",
+        avancarEm: "clique",
       },
     ],
   },
   {
     id: "equipe",
-    nome: "Cadastrar a equipe",
-    ganho: "O sistema passa a saber quanto tempo cada pessoa realmente tem.",
+    nome: "Onde fica a equipe",
+    ganho: "Você vê onde a jornada e os intervalos de cada pessoa são definidos.",
     rota: "/funcionarios",
     passos: [
       {
@@ -179,30 +179,35 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-novo",
-        titulo: "Cadastre uma pessoa",
-        texto: "Clique em Novo funcionário e comece por alguém da sua equipe fixa.",
+        titulo: "É por aqui que se cadastra",
+        texto:
+          "Clique em Novo funcionário para abrir o formulário. Só de olhar — não precisa preencher nada agora.",
         avancarEm: "clique",
       },
       {
-        alvo: "campo-intervalo_min",
+        // Era `campo-intervalo_min`, de quando o intervalo era um número de
+        // minutos. Virou o editor de faixas (`intervalos`) e o roteiro ficou
+        // apontando para um campo que não existe mais: o passo caía em "Pular
+        // este passo" e a lição sobre intervalos simplesmente não era dada.
+        alvo: "campo-intervalos",
         titulo: "Os intervalos são o que ninguém lembra de descontar",
         texto:
           "Almoço, lanche, descanso. O sistema tira tudo isso da jornada antes de calcular a ocupação — é assim que ele evita programar alguém para trabalhar durante o almoço, que era o erro clássico da planilha.",
         avancarEm: "leitura",
       },
       {
-        alvo: "crud-salvar",
-        titulo: "Preencha e salve",
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
         texto:
-          "Preencha os campos marcados com * e clique em Salvar. Cadastre a equipe toda antes de montar o primeiro dia: sem gente cadastrada, a agenda não tem colunas para receber tarefa.",
-        avancarEm: "sucesso",
+          "Clique em Cancelar. Quando for cadastrar de verdade, faça a equipe toda antes de montar o primeiro dia: sem gente cadastrada, a agenda não tem colunas para receber tarefa.",
+        avancarEm: "clique",
       },
     ],
   },
   {
     id: "qualificacoes",
-    nome: "Definir quem pode fazer o quê",
-    ganho: "O sistema bloqueia alocar quem não tem a habilitação em dia.",
+    nome: "Onde ficam as habilitações",
+    ganho: "Você sabe onde registrar treinamento e validade — e por que isso trava alocação.",
     rota: "/qualificacoes",
     passos: [
       {
@@ -213,17 +218,17 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-novo",
-        titulo: "Registre uma habilitação",
+        titulo: "É por aqui que se registra",
         texto:
-          "Clique em Nova qualificação, escolha a pessoa e o treinamento que ela tem, com a validade. Vencido conta como não ter.",
+          "Clique em Nova qualificação para abrir o formulário. Dentro dele você escolhe a pessoa, o treinamento e a validade — vencido conta como não ter.",
         avancarEm: "clique",
       },
       {
-        alvo: "crud-salvar",
-        titulo: "Preencha e salve",
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
         texto:
-          "Escolha a pessoa e o requisito e clique em Salvar. Esta parte só é necessária se as suas tarefas exigirem treinamento — se nenhuma exigir, saia do tutorial e siga para montar o dia.",
-        avancarEm: "sucesso",
+          "Clique em Cancelar. Esta parte só é necessária se as suas tarefas exigirem treinamento — se nenhuma exigir, você pode nem usar esta tela.",
+        avancarEm: "clique",
       },
     ],
   },
@@ -416,8 +421,8 @@ export const TRILHA: EtapaTutorial[] = [
   // ─────────────────────────── exceções ───────────────────────────
   {
     id: "ausencias",
-    nome: "Registrar uma falta",
-    ganho: "A agenda se reorganiza e a Central sugere quem cobre.",
+    nome: "Onde se registra uma falta",
+    ganho: "Você sabe onde avisar o sistema de quem não veio.",
     rota: "/ausencias",
     passos: [
       {
@@ -428,17 +433,24 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-novo",
-        titulo: "Registre a ausência",
+        titulo: "É por aqui que se registra",
         texto:
-          "Assim que você salvar, a agenda daquela pessoa fica bloqueada e as tarefas dela aparecem como descobertas. Aí é só voltar à Central: quando existe alguém livre e habilitado, ela já sugere pronto.",
+          "Clique para abrir o formulário. Assim que uma ausência é salva, a agenda daquela pessoa fica bloqueada e as tarefas dela aparecem como descobertas — aí a Central já sugere quem está livre e habilitado para cobrir.",
+        avancarEm: "clique",
+      },
+      {
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
+        texto:
+          "Clique em Cancelar. No dia em que faltar alguém de verdade, você já sabe o caminho — e leva menos de um minuto.",
         avancarEm: "clique",
       },
     ],
   },
   {
     id: "eventuais",
-    nome: "Registrar trabalho fora da rotina",
-    ganho: "O imprevisto deixa de parecer folga nos números.",
+    nome: "Onde entra o trabalho fora da rotina",
+    ganho: "Você sabe onde lançar o imprevisto para ele não virar ociosidade.",
     rota: "/eventuais",
     passos: [
       {
@@ -449,9 +461,16 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "crud-novo",
-        titulo: "Vale o esforço de registrar",
+        titulo: "É por aqui que se lança",
         texto:
-          "É isto que mostra, com número, quanto do tempo da sua equipe é consumido por coisa que ninguém planejou. Sem esse registro, o imprevisto aparece nos relatórios como ociosidade — e o problema vira culpa da equipe.",
+          "Clique para abrir o formulário. Vale o esforço: é este registro que mostra, com número, quanto do tempo da sua equipe é consumido por coisa que ninguém planejou. Sem ele, o imprevisto aparece nos relatórios como ociosidade — e o problema vira culpa da equipe.",
+        avancarEm: "clique",
+      },
+      {
+        alvo: "crud-cancelar",
+        titulo: "Pode fechar",
+        texto:
+          "Clique em Cancelar. O lançamento leva menos de um minuto e é feito depois que o serviço acontece, com o tempo real que levou.",
         avancarEm: "clique",
       },
     ],

@@ -11,31 +11,56 @@
  * Nenhum destes testes olha aparência. Todos olham a regra: **um passo que
  * manda gravar só pode avançar quando a gravação acontecer.**
  */
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EVENTO_DIA_GERADO, TRILHA, type PassoTutorial } from "@/lib/tutorial/trilha";
+
+/** Todos os .ts/.tsx de `app/` e `components/` — onde os alvos são declarados. */
+function arquivosDeCodigo(raizes = ["app", "components"]): string[] {
+  const achados: string[] = [];
+  const andar = (dir: string) => {
+    for (const nome of readdirSync(dir)) {
+      const caminho = join(dir, nome);
+      if (statSync(caminho).isDirectory()) andar(caminho);
+      else if (/\.tsx?$/u.test(nome)) achados.push(caminho);
+    }
+  };
+  for (const r of raizes) andar(r);
+  return achados;
+}
 
 const todosOsPassos: Array<{ etapa: string; indice: number; passo: PassoTutorial }> = TRILHA.flatMap(
   (e) => e.passos.map((passo, indice) => ({ etapa: e.id, indice, passo })),
 );
 
 describe("trilha do tutorial", () => {
-  it("todo passo que aponta para o botão de salvar espera o RESULTADO, não o clique", () => {
+  /**
+   * Decisão do dono do produto, 02/09/2026: *"não precisa preencher nada, é
+   * mostrar aonde clicar para ir para cada tela, abre o modal, explica o modal,
+   * e fecha o modal"*. O tutorial é passeio guiado, não cadastro assistido —
+   * exigir dado real trava quem está conhecendo o sistema e ainda não tem a
+   * lista da sede na mão.
+   */
+  it("o passeio nunca manda salvar", () => {
     const salvares = todosOsPassos.filter(({ passo }) => passo.alvo === "crud-salvar");
-    expect(salvares.length).toBeGreaterThan(0); // senão o teste não protege nada
-    for (const { etapa, passo } of salvares) {
-      expect(
-        passo.avancarEm,
-        `etapa "${etapa}": o passo "${passo.titulo}" manda salvar e avançaria sem ter salvado`,
-      ).toBe("sucesso");
-    }
+    expect(
+      salvares.map((s) => `${s.etapa}: ${s.passo.titulo}`),
+      "o tutorial voltou a pedir cadastro real no meio do passeio",
+    ).toEqual([]);
   });
 
-  it("o passo que manda salvar também diz para preencher — senão leva ao erro", () => {
-    for (const { etapa, passo } of todosOsPassos.filter((p) => p.passo.alvo === "crud-salvar")) {
-      expect(
-        /preench|escolha|selecione/iu.test(passo.texto),
-        `etapa "${etapa}": "${passo.titulo}" manda clicar em Salvar sem pedir para preencher nada`,
-      ).toBe(true);
+  it("todo modal que o passeio abre, ele fecha", () => {
+    // Sem isto a pessoa fica com o formulário aberto e o tutorial encerrado,
+    // sem saber se devia salvar. Abrir e não fechar é meio caminho.
+    for (const etapa of TRILHA) {
+      const abre = etapa.passos.some((p) => p.alvo === "crud-novo");
+      if (!abre) continue;
+      const fecha = etapa.passos.some((p) => p.alvo === "crud-cancelar");
+      expect(fecha, `etapa "${etapa.id}" abre o formulário e nunca manda fechar`).toBe(true);
+      const iAbre = etapa.passos.findIndex((p) => p.alvo === "crud-novo");
+      const iFecha = etapa.passos.findIndex((p) => p.alvo === "crud-cancelar");
+      expect(iFecha, `etapa "${etapa.id}" manda fechar antes de abrir`).toBeGreaterThan(iAbre);
     }
   });
 
@@ -87,6 +112,35 @@ describe("trilha do tutorial", () => {
       // que ainda não tem rota padrão — assustando quem só não chegou lá.
       expect(etapa?.precisa, `etapa "${etapa?.id}" precisa dizer o pré-requisito`).toBeTruthy();
     });
+  });
+
+  /**
+   * O roteiro aponta para marcadores `data-tour` espalhados pelas telas, e nada
+   * liga um ao outro em tempo de compilação. `campo-intervalo_min` ficou no
+   * roteiro depois que o campo virou o editor de faixas (`intervalos`): o passo
+   * sobre intervalos caía em "Pular este passo" e a lição não era dada. Ninguém
+   * percebeu porque o tutorial continuava "funcionando".
+   */
+  it("todo alvo da trilha existe em alguma tela", () => {
+    const fontes = arquivosDeCodigo();
+    const texto = fontes.map((f) => readFileSync(f, "utf8")).join("\n");
+    const literais = new Set([...texto.matchAll(/data-tour="([^"]+)"/gu)].map((m) => m[1]));
+    // Todo campo de formulário vira alvo `campo-<chave>` automaticamente.
+    const dinamico = texto.includes("data-tour={`campo-${c.key}`}");
+    const chaves = new Set([...texto.matchAll(/key:\s*"([A-Za-z0-9_]+)"/gu)].map((m) => m[1]));
+
+    const orfaos = todosOsPassos
+      .filter(({ passo }) => {
+        if (!passo.alvo) return false;
+        if (literais.has(passo.alvo)) return false;
+        if (passo.alvo.startsWith("campo-") && dinamico) {
+          return !chaves.has(passo.alvo.slice("campo-".length));
+        }
+        return true;
+      })
+      .map(({ etapa, passo }) => `${etapa}: ${passo.alvo}`);
+
+    expect(orfaos, "alvos que o roteiro cita e nenhuma tela declara").toEqual([]);
   });
 
   it("toda etapa tem id único, nome, ganho e rota", () => {

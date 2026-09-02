@@ -7,6 +7,57 @@
 
 ---
 
+## 2026-09-02 — O tutorial vira passeio guiado: abre o modal, explica, fecha
+
+Decisão do dono, vendo o formulário de funcionários travado no "Preencha este
+campo": *"não precisa preencher nada, é mostrar aonde clicar para ir para cada
+tela, abre o modal, explica o modal, e fecha o modal"*.
+
+Faz sentido: exigir cadastro real trava justamente quem está **conhecendo** o
+sistema e ainda não tem a lista da sede na mão. Cadastro assistido virou
+passeio guiado.
+
+### O que mudou
+
+Os seis passos que apontavam para `crud-salvar` foram substituídos por um passo
+"Pode fechar" apontando para o **Cancelar** (alvo novo `crud-cancelar`). Nenhum
+passo do passeio pede dado. Os textos de abertura agora dizem "é só para olhar,
+não precisa preencher".
+
+Os `ganho` das etapas foram reescritos junto, porque prometiam o que o passeio
+não entrega mais: "Cadastrar os locais — o sistema passa a saber onde a sua
+equipe trabalha" virou "Onde ficam os locais — você sabe onde e como cadastrar
+os lugares da sua sede". Deixar a promessa antiga seria a mesma mentira que
+consertamos hoje de manhã, só que na outra ponta.
+
+O passo do **"⚡ Gerar o dia"** continua exigindo a ação de verdade: é um clique,
+sem digitar nada, é a demonstração do recurso, e o passo seguinte ensina a
+desfazer.
+
+### Dois defeitos que a invariante achou sozinha
+
+O teste "todo modal que o passeio abre, ele fecha" reprovou duas etapas que eu
+não tinha olhado: **ausências** e **eventuais** abriam o formulário e nunca
+mandavam fechar — a pessoa ficava com o modal aberto e o tutorial encerrado.
+
+E o teste "todo alvo da trilha existe em alguma tela" achou um alvo **órfão**:
+`campo-intervalo_min`, de quando o intervalo era um número de minutos. O campo
+virou o editor de faixas (`intervalos`) e ninguém atualizou o roteiro: o passo
+sobre intervalos caía em "Pular este passo" e **a lição simplesmente não era
+dada** — em silêncio, porque o tutorial "continuava funcionando". Dos 17 alvos,
+era o único quebrado.
+
+**Arquivos:** `lib/tutorial/trilha.ts`, `components/CrudManager.tsx` (alvo
+`crud-cancelar`), `testes/trilha.test.ts`.
+
+**Verificado na tela** (`DATA_SOURCE=memory`): equipe e locais percorridas do
+início ao fim — abre, explica, fecha — com **zero registros criados** (4
+funcionários e 4 locais, os do seed) e as duas etapas concluídas. Console limpo.
+`tsc` 0 · build 0 · 333 testes 0 · a mutação que repõe o alvo órfão quebra o
+teste e nomeia o culpado.
+
+---
+
 ## 2026-09-02 — A trilha passa a ensinar o "gerar o dia em 1 clique"
 
 Relato do dono: *"o usuário me meteu pro diretor que não tinha como gerar rotinas

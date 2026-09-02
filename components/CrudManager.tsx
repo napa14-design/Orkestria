@@ -801,7 +801,12 @@ export default function CrudManager<T extends Registro>({
             </div>
           ) : (
             <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button type="button" className="btn" onClick={() => setAberto(false)}>
+              <button
+                type="button"
+                className="btn"
+                data-tour="crud-cancelar"
+                onClick={() => setAberto(false)}
+              >
                 Cancelar
               </button>
               <button type="submit" className="btn btn-primario" data-tour="crud-salvar">
