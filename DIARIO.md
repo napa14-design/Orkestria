@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-09-02 — Marcas do tutorial zeradas em produção (2 usuários)
+
+Pergunta: *"consegue resetar para quem já tinha pulado?"*. Medi antes de
+responder, e o pressuposto não batia: **ninguém tinha pulado**. Os dois usuários
+de produção estavam com `tutorial_estado=ativo`. E, se alguém tivesse pulado, já
+conseguiria voltar sozinho — o botão "Começar o passo a passo →" da trilha faz
+esse reset desde antes.
+
+O que existia de verdade era outra coisa: **Thaís com 8 etapas marcadas como
+feitas e Guilherme com 3 — todas do formato antigo**, quando a trilha mandava
+cadastrar de verdade. "Ensinar a rota" que ela concluiu tinha 3 passos; hoje tem
+6. As marcas diziam que ela viu coisas que não existem mais.
+
+Autorizado nomeando os dois, zerei `tutorial_concluido` e deixei
+`tutorial_estado=ativo`. Prévia antes, aplicação depois, conferência lendo o
+banco: os dois voltaram a `concluidas=""`. **Nenhum dado operacional foi tocado**
+— só esses dois campos, nesses dois documentos.
+
+⚠️ A escrita foi direta pelo `firebase-admin`, então **não passou pelo decorator
+de auditoria e não aparece na tela de Histórico**. É manutenção, fora dos
+caminhos da aplicação; fica registrado aqui para não virar mistério depois.
+
+### Sobre "tudo certo?" — o que ficou fora do verificado
+
+Tudo o que testei hoje rodou com `DATA_SOURCE=memory` e perfil
+**administrador**. Confirmei **lendo** o `AppShell` e as permissões que nenhuma
+das seis telas do tutorial é restrita a admin nem esconde o "+ Novo" do
+supervisor (só categorias, requisitos e tipos-local usam `permissao`, e nenhuma
+delas tem etapa) — mas não rodei o passeio logado como supervisor.
+
+---
+
 ## 2026-09-02 — A trilha da Central vira escolha: rever ou pular para qualquer etapa
 
 Pergunta do dono: *"e se eu já fiz um tutorial, agora é liberado eu escolher na
