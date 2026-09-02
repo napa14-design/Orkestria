@@ -16,35 +16,21 @@
  * planilha que ela já domina, e não das telas do sistema.
  */
 
+/**
+ * Só existem dois modos, e é de propósito.
+ *
+ * Houve um terceiro, `"sucesso"`, que esperava a operação dar certo — criado em
+ * 02/09/2026 para o tutorial parar de marcar etapa como concluída quando o
+ * Salvar era barrado num formulário vazio. No mesmo dia o tutorial virou
+ * **passeio guiado** ("abre o modal, explica, fecha") e nenhum passo pede mais
+ * ação com resultado: o modo ficou sem uso e saiu junto. Se um dia um passo
+ * voltar a exigir uma operação de verdade, ele volta — mas aí com um usuário.
+ */
 export type AvancarEm =
   /** Só explica; a pessoa clica em "Entendi". */
   | "leitura"
-  /** Só avança quando ela clicar no alvo de verdade. É o que ensina. */
-  | "clique"
-  /**
-   * Só avança quando a ação **der certo** — não quando ela for tentada.
-   *
-   * Existe por um defeito de 31/08/2026: os passos "clique em Salvar"
-   * avançavam no clique. Com o formulário vazio (e a trilha nunca pediu para
-   * preencher), o navegador barrava o envio, nada era gravado — e o tutorial
-   * seguia assim mesmo e **marcava a etapa como concluída**. A pessoa ficava
-   * com um balão de erro na tela, zero locais cadastrados e "Cadastrar os
-   * locais ✓" na trilha.
-   *
-   * O passo escuta o evento em `evento` (ver `EVENTO_SALVOU`), disparado por
-   * quem de fato concluiu a operação.
-   */
-  | "sucesso";
-
-/** Disparado no `window` quando um cadastro é gravado de verdade. */
-export const EVENTO_SALVOU = "orkestria:crud-salvou";
-
-/**
- * Disparado quando o dia foi montado a partir da rota padrão — e **só** então.
- * Clicar em "Gerar o dia" numa sede sem rota padrão, ou numa data em que a sede
- * não opera, é clique sem geração: o tutorial não pode dar por ensinado.
- */
-export const EVENTO_DIA_GERADO = "orkestria:dia-gerado";
+  /** Só avança quando ela clicar no alvo de verdade — abrir e fechar o modal. */
+  | "clique";
 
 export interface PassoTutorial {
   /** Marcador `data-tour` do elemento destacado. Vazio = balão centralizado. */
@@ -52,8 +38,6 @@ export interface PassoTutorial {
   titulo: string;
   texto: string;
   avancarEm?: AvancarEm;
-  /** Só para `avancarEm: "sucesso"`: o evento que confirma a conclusão. */
-  evento?: string;
 }
 
 export interface EtapaTutorial {
@@ -345,11 +329,10 @@ export const TRILHA: EtapaTutorial[] = [
       },
       {
         alvo: "gerar-dia",
-        titulo: "Agora o clique",
+        titulo: "É este o botão de um clique",
         texto:
-          "Clique em \"⚡ Gerar o dia da rota padrão\". O sistema monta a agenda inteira da sede: cada pessoa, cada tarefa, no horário da rota. Ele já pula quem está de férias, de folga ou com falta lançada, e avisa embaixo o que ficou de fora e por quê.",
-        avancarEm: "sucesso",
-        evento: EVENTO_DIA_GERADO,
+          "\"⚡ Gerar o dia da rota padrão\". Um clique aqui monta a agenda inteira da sede: cada pessoa, cada tarefa, no horário da rota — já pulando quem está de férias, de folga ou com falta lançada, e avisando embaixo o que ficou de fora e por quê. Ele só aparece em dia vazio.",
+        avancarEm: "leitura",
       },
       {
         alvo: "desfazer-geracao",

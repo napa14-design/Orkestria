@@ -13,7 +13,6 @@ import { DIAS_SEMANA, DIAS_SEMANA_CURTO, parseDiasSemana, serializarDiasSemana }
 import Carregando from "./Carregando";
 import Modal from "./Modal";
 import { paresCrus, serializarPares } from "@/lib/intervalos";
-import { EVENTO_SALVOU } from "@/lib/tutorial/trilha";
 
 export interface OpcaoCampo {
   valor: string;
@@ -621,10 +620,6 @@ export default function CrudManager<T extends Registro>({
       }
       await mutate();
       setAberto(false);
-      // Avisa quem estiver esperando o RESULTADO — hoje, o tutorial. Fica aqui,
-      // depois do `await`, e não no onClick do botão: o que interessa é ter
-      // gravado, não ter clicado.
-      window.dispatchEvent(new CustomEvent(EVENTO_SALVOU, { detail: { endpoint } }));
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Erro ao salvar.");
     } finally {

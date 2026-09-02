@@ -33,7 +33,6 @@ import {
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
-import { EVENTO_DIA_GERADO } from "@/lib/tutorial/trilha";
 import { temErro, validarAlocacao } from "@/lib/validations";
 import { useRotinaData } from "./useRotinaData";
 import type { AlertaValidacao, RotinaPlanejada, Tarefa } from "@/types";
@@ -555,10 +554,6 @@ export default function PaginaRotinas() {
             }. Revise as exceções abaixo.`,
           },
         ]);
-        // Só aqui: o tutorial avança quando o dia foi MONTADO, e não quando a
-        // sede não tem rota padrão ou não opera na data — nesses dois casos o
-        // clique aconteceu e nada foi gerado.
-        window.dispatchEvent(new CustomEvent(EVENTO_DIA_GERADO));
       }
     } catch (err) {
       mostrarErro(err);

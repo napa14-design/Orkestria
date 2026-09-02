@@ -14,7 +14,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { EVENTO_DIA_GERADO, TRILHA, type PassoTutorial } from "@/lib/tutorial/trilha";
+import { TRILHA, type PassoTutorial } from "@/lib/tutorial/trilha";
 
 /** Todos os .ts/.tsx de `app/` e `components/` — onde os alvos são declarados. */
 function arquivosDeCodigo(raizes = ["app", "components"]): string[] {
@@ -64,10 +64,10 @@ describe("trilha do tutorial", () => {
     }
   });
 
-  it("passo de clique e de sucesso precisam de alvo — sem alvo não há o que esperar", () => {
+  it("passo de clique precisa de alvo — sem alvo não há o que clicar", () => {
     for (const { etapa, passo } of todosOsPassos) {
-      if (passo.avancarEm === "clique" || passo.avancarEm === "sucesso") {
-        expect(passo.alvo, `etapa "${etapa}": "${passo.titulo}" espera ação e não tem alvo`).toBeTruthy();
+      if (passo.avancarEm === "clique") {
+        expect(passo.alvo, `etapa "${etapa}": "${passo.titulo}" espera clique e não tem alvo`).toBeTruthy();
       }
     }
   });
@@ -79,7 +79,7 @@ describe("trilha do tutorial", () => {
     for (const etapa of TRILHA) {
       const ultimo = etapa.passos[etapa.passos.length - 1];
       expect(ultimo, `etapa "${etapa.id}" está sem passos`).toBeTruthy();
-      expect(["leitura", "clique", "sucesso", undefined]).toContain(ultimo.avancarEm);
+      expect(["leitura", "clique", undefined]).toContain(ultimo.avancarEm);
     }
   });
 
@@ -87,7 +87,7 @@ describe("trilha do tutorial", () => {
    * Em 02/09/2026 um supervisor reclamou ao diretor que **não dava para gerar o
    * dia em um clique**. Dava, desde sempre — o botão `gerar-dia` existia e a
    * trilha nunca apontava para ele. Ensinava a SALVAR a rota e não mostrava o
-   * botão que a USA. Estes dois testes existem para essa falta não voltar.
+   * botão que a USA. Estes testes existem para essa falta não voltar.
    */
   describe("o caminho de um clique é ensinado", () => {
     const passoGerar = todosOsPassos.find(({ passo }) => passo.alvo === "gerar-dia");
@@ -99,11 +99,11 @@ describe("trilha do tutorial", () => {
       ).toBeTruthy();
     });
 
-    it("e ele só avança quando o dia foi gerado de verdade", () => {
-      // Clicar em "Gerar" numa sede sem rota padrão, ou num dia em que a sede
-      // não opera, é clique sem geração — o tutorial não pode dar por ensinado.
-      expect(passoGerar?.passo.avancarEm).toBe("sucesso");
-      expect(passoGerar?.passo.evento).toBe(EVENTO_DIA_GERADO);
+    it("e ele só mostra o botão, sem gerar o dia da pessoa", () => {
+      // Decisão do dono, 02/09/2026: "olha onde fica". O passeio aponta o botão
+      // e explica o que ele faz; quem clica é a pessoa, quando quiser — o
+      // tutorial não pode criar 44 blocos numa data real só por estar rodando.
+      expect(passoGerar?.passo.avancarEm).toBe("leitura");
     });
 
     it("a etapa que ensina a gerar diz o que precisa existir antes", () => {

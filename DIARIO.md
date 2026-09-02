@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-09-02 — "Olha onde fica": o passeio também não gera o dia
+
+Eu tinha deixado uma exceção no passeio: o passo do **"⚡ Gerar o dia"** ainda
+exigia o clique de verdade. Perguntei e a resposta foi curta — *"olha onde
+fica"*. Está certo: o tutorial não pode criar 44 blocos numa data real só por
+estar rodando. O passo virou `leitura` — aponta o botão, explica o que ele faz,
+"Entendi →".
+
+### O que isso apagou
+
+Com esse último passo convertido, **nenhum passo da trilha espera resultado de
+operação** — e a máquina de `avancarEm: "sucesso"`, criada hoje de manhã, ficou
+sem um único usuário. Saiu inteira no mesmo dia em que entrou:
+
+- o modo `"sucesso"` e o campo `evento` do tipo `PassoTutorial`;
+- as constantes `EVENTO_SALVOU` e `EVENTO_DIA_GERADO`;
+- o `dispatchEvent` no `CrudManager` e o do `gerarDia` em `rotinas/page.tsx`;
+- o ouvinte e o rodapé "↑ Continua quando o cadastro for salvo" no `Holofote`.
+
+Ficou o comentário no `AvancarEm` dizendo que existiram e por que saíram — o
+defeito que os motivou (tutorial marcando etapa como concluída sem nada salvo)
+hoje é impossível por outro caminho: o passeio não manda salvar, e há teste para
+isso.
+
+**Arquivos:** `lib/tutorial/trilha.ts`, `components/tutorial/Holofote.tsx`,
+`components/CrudManager.tsx`, `app/(app)/rotinas/page.tsx`,
+`testes/trilha.test.ts`.
+
+**Verificado na tela:** o passo 3 mostra "É este o botão de um clique" com
+"Entendi →" e o dia 30/09 continua com **0 blocos** depois da etapa inteira.
+`tsc` 0 · build 0 · 334 testes 0.
+
+---
+
 ## 2026-09-02 — O tutorial vira passeio guiado: abre o modal, explica, fecha
 
 Decisão do dono, vendo o formulário de funcionários travado no "Preencha este
