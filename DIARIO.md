@@ -29,13 +29,27 @@ banco: os dois voltaram a `concluidas=""`. **Nenhum dado operacional foi tocado*
 de auditoria e não aparece na tela de Histórico**. É manutenção, fora dos
 caminhos da aplicação; fica registrado aqui para não virar mistério depois.
 
-### Sobre "tudo certo?" — o que ficou fora do verificado
+### O tutorial percorrido como SUPERVISOR
 
-Tudo o que testei hoje rodou com `DATA_SOURCE=memory` e perfil
-**administrador**. Confirmei **lendo** o `AppShell` e as permissões que nenhuma
-das seis telas do tutorial é restrita a admin nem esconde o "+ Novo" do
-supervisor (só categorias, requisitos e tipos-local usam `permissao`, e nenhuma
-delas tem etapa) — mas não rodei o passeio logado como supervisor.
+Eu tinha registrado como não verificado: tudo rodara como administrador. Pedido
+o teste, criei uma supervisora no banco de memória pelo caminho real do produto
+— cadastro, código de primeiro acesso, senha — e percorri **as 12 etapas com a
+sessão dela**.
+
+**Resultado: 12 de 12 concluídas, nenhum passo caiu em "Pular este passo".** O
+❔ Ajuda apareceu nas seis telas de cadastro, o "+ Novo" existe em todas elas, e
+os sete alvos da agenda (paleta, ocupação, preencher dias, fichas, confirmar,
+data, ensinar rota) estão todos lá para o perfil supervisor.
+
+**Nada foi criado nem alterado:** 4 locais, 33 tarefas, 4 funcionários, 0
+qualificações, 0 ausências, 0 eventuais — iguais ao início; **0 modelos** salvos
+pela etapa "Ensinar a rota"; **0 blocos** gerados pela etapa "Gerar o dia".
+
+Ao fim, a trilha dela mostra "Sua trilha · concluída", 12 itens clicáveis para
+rever e sem o botão morto de "Começar o passo a passo".
+
+Único erro no console em toda a varredura: **404 em `/favicon.ico`** — o projeto
+não tem favicon. É cosmético e anterior a tudo isto; não foi tocado.
 
 ---
 
