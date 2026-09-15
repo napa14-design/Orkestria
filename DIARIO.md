@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-09-15 — Pré Sul criado do zero (equipe do Murilo)
+
+Planilha "Rota de Trabalho Asg - Pré Sul", aba do Murilo — **Murilo é o
+supervisor**, não funcionário; a aba traz a equipe dele. **Sem mudança de
+código**: entrada de registro, porque a escrita foi direta no Firestore e não
+passa pela auditoria.
+
+A sede `christus_psul` estava **zerada**. Foram criados: 4 funcionários
+(Luziana 06:30–13:15 · Thaila 07:00–17:00 · Emanuel 09:00–19:00 · Cibelly
+06:30–16:30, todos `seg_sex`), 54 locais, 56 tarefas e 73 itens de `Rota padrão`.
+
+Formato diferente da CESIU: a coluna "SETOR" traz **verbo + lugar** ("MOPEAR O WC
+FEMININO DO IDIOMAS"). O nome da tarefa é a frase inteira (é o que aparece no
+card e o que o supervisor reconhece) e o local é a frase sem o verbo. Em três
+frases não deu para separar e o local ficou com a frase toda — estão marcadas
+nas observações.
+
+Dois defeitos da planilha corrigidos na leitura:
+- **`INVERVALO`** (L60 do Emanuel, 12:00–13:30) — almoço escrito errado. Sem
+  tratar, virava tarefa e ele ficava sem almoço;
+- os 24 "recados" misturados às tarefas ("se for seu dia…", "participa dos
+  simulados aos sábados") viraram **observação do funcionário**, não rotina.
+
+**Conferido lendo de volta:** 0 órfãos, 0 fora do turno, 0 em intervalo, 0
+sobreposições. Ocupação: **100% nos quatro** — a rota preenche a jornada
+líquida inteira, sem folga.
+
+⚠ Aberto para o RH: **Luziana faz 6h45 com uma pausa de 15 min**, sem intervalo
+de 1h. Está assim na planilha; foi importado como está, com aviso ao dono.
+
+Falta a outra aba ("LOCAÇÕES COLABORADORES", 5 pessoas com rota + Tiago e Tiago
+Nascimento sem nenhuma), que tem layout diferente.
+
+---
+
 ## 2026-09-15 — Rota padrão da CESIU trocada em produção
 
 Planilha nova ("Rota de Trabalho ASG- CESIU Rota Diaria utopia"), 3 abas. **Não
