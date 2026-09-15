@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-09-15 — A paleta parava de comer a agenda tarde demais
+
+Teste de usabilidade com uma pessoa que não conhece o sistema: das 7 missões,
+falhou **uma** — arrastar uma tarefa da lista para a agenda. Onze tentativas,
+vinte minutos. Ela achou sozinha o "gerar o dia em 1 clique" (aquele que um
+usuário jurou ao diretor que não existia) e travou no gesto mais básico da tela.
+
+Causa: `.linha-rotina` empilhava a partir de **1000px**. Empilhada, a lista de
+33 tarefas ocupa a tela toda e a agenda vai para o rodapé — não dá para arrastar
+de uma ponta à outra quando as duas nunca aparecem juntas. Ela descobriu na
+marra o truque de digitar na busca para a lista encolher.
+
+A linha virou **grade de 3 colunas** (`260px | minmax(0,1fr) | 280px`) e desmonta
+em duas etapas, na ordem certa: em **1180px** sai o **resumo** (é leitura, serve
+igual embaixo) e paleta+agenda continuam lado a lado; só em **760px** a paleta
+sobe, e lá ela fica presa no topo e curta (`42vh`) para a grade seguir visível
+durante o arrasto.
+
+**Medido na tela:** a 980px — largura que antes empilhava — paleta em `x=20` e
+agenda em `x=294`, mesma linha. A 700px, com a página rolada, paleta e agenda
+visíveis ao mesmo tempo (336px e 640px de altura visível).
+
+De quebra, `testes/rotina-invariantes.test.ts` amanheceu vermelho por conta
+própria: a data estava fixa em `"2026-09-15"` e o calendário a alcançou — o seed
+monta a agenda de hoje, então os quatro testes bateram no `christus_r2` das
+07:00. Passou a ser `hojeISO() + 7`.
+
+**Arquivos:** `app/globals.css`, `testes/rotina-invariantes.test.ts`.
+
+---
+
 ## 2026-09-02 — Desfazer a semana, ao lado do gerar
 
 Eu tinha entregado o "gerar a semana" avisando que o desfazer continuava por

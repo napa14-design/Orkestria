@@ -482,13 +482,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 
 /* ── responsividade ───────────────────────────────────────────────
-   Alvo principal: notebooks ~1366×768. Abaixo de 1000px a tela de
-   rotina empilha os painéis; abaixo de 720px tabelas viram cards. */
+   Alvo principal: notebooks ~1366×768. A tela de rotina desmonta em duas
+   etapas (1180px tira o resumo da linha, 760px empilha o resto); abaixo de
+   720px tabelas viram cards. */
 
+/* Grade de 3 colunas em vez de linha flex: a coluna do meio (a agenda) é
+   minmax(0, 1fr) e as laterais têm largura fixa, então a agenda encolhe sem
+   nunca ser empurrada para fora da linha. */
 .linha-rotina {
-  display: flex;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
   gap: 14px;
-  align-items: flex-start;
+  align-items: start;
 }
 
 .paleta-tarefas {
@@ -523,16 +528,34 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 .so-mobile { display: none; }
 
-@media (max-width: 1000px) {
-  .agenda-acoes-utilidades { margin-left: 0; }
-  .linha-rotina { flex-direction: column; }
-  .paleta-tarefas,
+/* Primeiro a sair da linha é o resumo, nunca a paleta: montar o dia é
+   arrastar de uma ponta à outra, e o arrasto exige as duas pontas visíveis.
+   O resumo é leitura — embaixo ele serve igual. */
+@media (max-width: 1180px) {
+  .linha-rotina { grid-template-columns: 260px minmax(0, 1fr); }
   .resumo-lateral {
-    width: 100%;
+    grid-column: 1 / -1;
+    width: auto;
     position: static;
     max-height: none;
+    overflow-y: visible;
   }
-  .paleta-tarefas > div:last-child { max-height: 300px; }
+}
+
+@media (max-width: 1000px) {
+  .agenda-acoes-utilidades { margin-left: 0; }
+}
+
+/* Só aqui a paleta sobe para cima da agenda. Ela fica presa no topo e curta
+   de propósito: empilhada e inteira (33 tarefas), ela come a tela e a grade
+   vai parar no rodapé — foi assim que um teste de usabilidade travou 20 min
+   sem conseguir arrastar nada. */
+@media (max-width: 760px) {
+  .linha-rotina { grid-template-columns: minmax(0, 1fr); }
+  .paleta-tarefas {
+    width: auto;
+    max-height: 42vh;
+  }
 }
 
 @media (max-width: 720px) {

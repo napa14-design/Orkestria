@@ -14,11 +14,20 @@
  *    testes travam a invariante para o código de hoje.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { hhmmParaMin } from "@/lib/dateUtils";
+import { hhmmParaMin, hojeISO, somarDias } from "@/lib/dateUtils";
 import { createRotina, updateRotina } from "@/services/rotinasService";
 import { reiniciarBanco } from "@/lib/memoryStore";
 
-const DATA = "2026-09-15";
+/**
+ * O seed monta a agenda de HOJE — e só dela. Este arquivo precisa de um dia
+ * vazio, então a data tem de ser relativa a hoje: escrita fixa ("2026-09-15"),
+ * ela funciona por meses e um dia o calendário a alcança. Foi o que aconteceu
+ * em 15/09/2026: os quatro testes caíram com "Sobreposição com tarefa já
+ * planejada às 07:00", que é o bloco `christus_r2` do seed.
+ * +7 dias mantém o mesmo dia da semana de hoje, então a escala do funcionário
+ * continua valendo.
+ */
+const DATA = somarDias(hojeISO(), 7);
 const FUNC = "christus_f1"; // do seed: 06:00–16:00
 const TAREFA = "christus_t7"; // 15 min no seed
 
