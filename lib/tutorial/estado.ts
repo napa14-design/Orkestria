@@ -67,3 +67,24 @@ export function podeAutoIniciar(estado: EstadoTutorial, etapasConcluidas: number
   // Quem já concluiu alguma etapa está no meio da trilha: segue guiado.
   return estado.tipo === "nunca" && etapasConcluidas > 0;
 }
+
+/**
+ * Abrir o holofote sozinho AGORA, nesta tela?
+ *
+ * `podeAutoIniciar` responde "esta pessoa aceita ser ensinada". Falta a outra
+ * metade: **cada tela se apresenta uma vez só**. A Rotina do Dia hospeda cinco
+ * etapas; abrir a próxima a cada visita transforma a tela em que a supervisora
+ * mais entra na tela que mais a interrompe — foi a queixa que originou esta
+ * função ("saio e volto e ele fica spammando").
+ *
+ * "Uma vez só" se lê nos dados que já existem: se alguma etapa desta tela está
+ * concluída, a tela já deu a sua aula. As outras continuam a um clique em
+ * ❔ Ajuda e na trilha da Central — lá é escolha, aqui era emboscada.
+ */
+export function deveAbrirSozinho(
+  estado: EstadoTutorial,
+  etapasConcluidas: number,
+  concluidasNestaTela: number,
+): boolean {
+  return podeAutoIniciar(estado, etapasConcluidas) && concluidasNestaTela === 0;
+}

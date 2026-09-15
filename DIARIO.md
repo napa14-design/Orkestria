@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-09-15 — O tutorial parou de emboscar
+
+Queixa do dono: *"parece que se eu saio e volto para a tela, ele sempre reseta e
+fica spammando"*. Reproduzido na tela, eram **dois** defeitos:
+
+1. **Sair do tutorial não virava dado.** A recusa vivia num `useRef`; um F5 e a
+   mesma etapa voltava em `PASSO 1 DE 3`, com `concluidas: []`. Para sempre —
+   quem nunca terminava uma etapa levava o mesmo holofote todo dia.
+2. **Cada volta à tela abria a etapa seguinte.** Com `montar-dia` concluída,
+   recarregar `/rotinas` abria `ensinar-rota` sozinho. A Rotina do Dia hospeda
+   **cinco** etapas: cinco emboscadas na tela onde a supervisora passa o dia.
+
+O comentário no topo do componente já dizia "uma etapa por visita" — a regra foi
+escrita para quem visita a tela uma vez, não para quem entra e sai dela vinte
+vezes.
+
+Agora: `deveAbrirSozinho` acrescenta "**cada tela se apresenta uma vez só**",
+lido dos dados que já existem (alguma etapa desta rota concluída ⇒ a tela já deu
+a sua aula) — sem coluna nova. E "Sair do tutorial" passa a gravar
+`acao: "pular"`, que é o que o botão sempre prometeu.
+
+O caminho de volta continua inteiro: ❔ Ajuda e a trilha da Central abrem
+qualquer etapa por pedido explícito, **inclusive para quem pulou** — verificado
+com estado `pulado` abrindo `gerar-o-dia` em `PASSO 1 DE 6`.
+
+**Medido na tela:** sair + F5 → sem holofote (antes: passo 1 de novo);
+`montar-dia` concluída + `/rotinas` → sem holofote (antes: `PASSO 1 DE 6`);
+`/locais`, tela nunca ensinada → `PASSO 1 DE 4`, como deve. Dois mutantes
+mortos em `deveAbrirSozinho` (ignorar a tela; trocar o `&&` por `||`).
+
+**Arquivos:** `lib/tutorial/estado.ts`, `components/tutorial/Tutorial.tsx`,
+`testes/tutorial-abre-sozinho.test.ts`.
+
+---
+
 ## 2026-09-15 — A paleta parava de comer a agenda tarde demais
 
 Teste de usabilidade com uma pessoa que não conhece o sistema: das 7 missões,

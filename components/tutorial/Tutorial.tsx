@@ -19,7 +19,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { apiPost, fetcher } from "@/lib/clientApi";
-import { lerEstado, podeAutoIniciar } from "@/lib/tutorial/estado";
+import { deveAbrirSozinho, lerEstado } from "@/lib/tutorial/estado";
 import { etapasDaRota } from "@/lib/tutorial/trilha";
 import Holofote from "./Holofote";
 
@@ -45,10 +45,12 @@ export default function Tutorial() {
   const pedida = params?.get("tutorial") ?? "";
   const daRota = etapasDaRota(rota);
   const concluidas = data?.concluidas;
-  // A agenda hospeda quatro etapas; a pendente mais antiga é a próxima aula.
+  // A agenda hospeda cinco etapas; a pendente mais antiga é a próxima aula.
   const etapa =
     daRota.find((e) => e.id === pedida) ??
     daRota.find((e) => !concluidas?.includes(e.id) && !recusadas.current.has(e.id));
+  /** Quantas aulas desta tela já foram dadas — número, para entrar nas deps. */
+  const jaEnsinadas = daRota.filter((e) => concluidas?.includes(e.id)).length;
 
   // Um efeito só decide tudo. Dois (um para abrir, outro para limpar na troca
   // de rota) se atropelavam: o de abrir roda primeiro e o de limpar apagava,
@@ -59,7 +61,7 @@ export default function Tutorial() {
       return;
     }
     const explicita = etapa.id === pedida;
-    const guiado = podeAutoIniciar(lerEstado(data.estado), data.concluidas.length);
+    const guiado = deveAbrirSozinho(lerEstado(data.estado), data.concluidas.length, jaEnsinadas);
     // Pedido explícito só é recusado quando é a MESMA etapa que acabou de
     // encerrar nesta tela — senão o link `?tutorial=x`, que continua na URL,
     // reabriria no passo 1 aquilo que a pessoa acabou de concluir. Pedir OUTRA
@@ -75,7 +77,7 @@ export default function Tutorial() {
     }
     setEtapaAtiva(etapa.id);
     setPasso(0);
-  }, [rota, etapa, data, pedida]);
+  }, [rota, etapa, data, pedida, jaEnsinadas]);
 
   // Navegou para outra tela: a nova pode ensinar sozinha de novo.
   useEffect(() => {
@@ -91,10 +93,16 @@ export default function Tutorial() {
       if (!id) return;
       if (concluida) {
         await apiPost("/api/tutorial", { etapa: id });
-        await mutate();
       } else {
+        // "Sair do tutorial" passa a fazer o que o botão diz. Guardado só em
+        // memória, ele não sobrevivia a um F5: a mesma etapa voltava no passo 1,
+        // para sempre, porque sair nunca virou dado nenhum. Quem saiu volta
+        // quando quiser — por ❔ Ajuda ou pela trilha da Central, que continuam
+        // abrindo qualquer etapa mesmo para quem pulou.
         recusadas.current.add(id);
+        await apiPost("/api/tutorial", { acao: "pular" });
       }
+      await mutate();
     },
     [etapaAtiva, mutate, rota],
   );
