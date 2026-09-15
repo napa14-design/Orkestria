@@ -457,6 +457,40 @@ export default function PaginaRotinas() {
     }
   }
 
+  /**
+   * Muda hora e duração de um bloco numa tacada — o "Editar" do balãozinho.
+   *
+   * Uma chamada só, e não `redimensionar` seguido de `mover`: em duas, a
+   * segunda valida contra o estado da primeira ainda não confirmado, e a pessoa
+   * levaria duas caixas de conflito para uma edição só. `updateRotina` já
+   * aceita os dois campos juntos e valida o resultado final.
+   */
+  async function editarBloco(rotinaId: string, inicio: string, tempoMin: number) {
+    const aplicar = (forcar: boolean) =>
+      mutateRotinas(async (cur) => {
+        const res = await apiPut<RespostaRotina>(`/api/rotinas/${rotinaId}`, {
+          inicio_planejado: inicio,
+          tempo_previsto_min: tempoMin,
+          forcar,
+        });
+        setAlertas(res.alertas ?? []);
+        return (cur ?? []).map((r) => (r.id === rotinaId ? res.rotina : r));
+      }, { revalidate: true });
+    try {
+      await aplicar(false);
+    } catch (err) {
+      if (err instanceof ErroApi && (await pedirAutorizacao(err.alertas))) {
+        try {
+          await aplicar(true);
+        } catch (err2) {
+          mostrarErro(err2);
+        }
+        return;
+      }
+      mostrarErro(err);
+    }
+  }
+
   async function remover(rotinaId: string) {
     try {
       await mutateRotinas(
@@ -979,6 +1013,7 @@ export default function PaginaRotinas() {
               aoMover={mover}
               aoRemover={remover}
               aoRedimensionar={redimensionar}
+              aoEditarBloco={editarBloco}
               blocosArrasto={blocosArrasto}
               aoIniciarArrasto={setBlocosArrasto}
               aoTerminarArrasto={() => setBlocosArrasto(null)}

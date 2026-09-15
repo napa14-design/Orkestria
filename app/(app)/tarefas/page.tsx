@@ -105,6 +105,7 @@ export default function PaginaTarefas() {
       titulo="Tarefas"
       subtitulo="Serviços atribuíveis. A sede é herdada automaticamente do local selecionado."
       endpoint="/api/tarefas"
+      porSede
       textoNovo="+ Nova tarefa"
       vazio="Cadastre os serviços que a equipe executa. Cada tarefa pertence a um local (a sede vem dele)."
       campos={[

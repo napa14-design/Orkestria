@@ -14,6 +14,8 @@ import Carregando from "./Carregando";
 import Modal from "./Modal";
 import { paresCrus, serializarPares } from "@/lib/intervalos";
 import BotaoAjuda from "./tutorial/BotaoAjuda";
+import { useSessao } from "./SessaoContexto";
+import type { Sede } from "@/types";
 
 export interface OpcaoCampo {
   valor: string;
@@ -483,6 +485,7 @@ export default function CrudManager<T extends Registro>({
   permissao,
   aoCriar,
   vazio,
+  porSede,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -497,8 +500,24 @@ export default function CrudManager<T extends Registro>({
   aoCriar?: (criado: T) => void;
   /** Mensagem amigável quando ainda não há nada cadastrado. */
   vazio?: string;
+  /**
+   * A listagem é por sede — mostra o seletor para quem opera mais de uma.
+   *
+   * Sem isto a tela pedia `/api/funcionarios` **sem sede**, e o servidor, que
+   * nunca agrega, caía na sede PRINCIPAL. Quem opera várias só via a primeira;
+   * e quem tinha a principal vazia (o caso do supervisor da Parquelândia 3)
+   * abria a tela em branco achando que o cadastro tinha sumido.
+   */
+  porSede?: boolean;
 }) {
-  const { data, mutate, isLoading } = useSWR<T[]>(endpoint, fetcher);
+  const sessao = useSessao();
+  const { data: sedes } = useSWR<Sede[]>(porSede ? "/api/sedes" : null, fetcher);
+  /** "" = sem filtro. Para supervisor o servidor lê isso como "a principal". */
+  const [sedeAtual, setSedeAtual] = useState("");
+  const chave = porSede && sedeAtual
+    ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}sede=${encodeURIComponent(sedeAtual)}`
+    : endpoint;
+  const { data, mutate, isLoading } = useSWR<T[]>(chave, fetcher);
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
   const [editando, setEditando] = useState<T | null>(null);
@@ -673,6 +692,26 @@ export default function CrudManager<T extends Registro>({
           {/* Uma linha aqui dá o botão de ajuda a TODA tela de cadastro — e ele
               some sozinho onde a trilha não tem etapa, então não vira enfeite. */}
           <BotaoAjuda />
+          {/* Só aparece para quem tem mais de uma sede — em quem opera uma só,
+              seria um controle com uma opção. O valor exibido quando ninguém
+              escolheu nada é a sede principal da sessão, que é exatamente a que
+              o servidor devolve nesse caso; para administrador ("geral") o
+              padrão continua sendo todas. */}
+          {porSede && (sedes?.length ?? 0) > 1 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span className="rotulo">Sede</span>
+              <select
+                value={sedeAtual || (sessao && sessao.sede_id !== "geral" ? sessao.sede_id : "")}
+                onChange={(e) => setSedeAtual(e.target.value)}
+                style={{ padding: "7px 10px", border: "1.5px solid var(--tinta)", borderRadius: 4, background: "var(--cartao)", maxWidth: 220 }}
+              >
+                {sessao?.sede_id === "geral" && <option value="">Todas as sedes</option>}
+                {(sedes ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.nome_sede}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <input
             placeholder="Buscar…"
             value={busca}

@@ -50,6 +50,7 @@ export default function AgendaGrid({
   aoMover,
   aoRemover,
   aoRedimensionar,
+  aoEditarBloco,
   blocosArrasto,
   aoIniciarArrasto,
   aoTerminarArrasto,
@@ -70,6 +71,8 @@ export default function AgendaGrid({
   aoRemover: (rotinaId: string) => void;
   /** Redimensionamento pela alça inferior do card (novo tempo em minutos). */
   aoRedimensionar?: (rotinaId: string, novoTempoMin: number) => void;
+  /** Hora + duração de uma vez, pelo balãozinho (sem arrastar). */
+  aoEditarBloco?: (rotinaId: string, inicio: string, tempoMin: number) => void;
   /** Blocos do item sendo arrastado (paleta ou card) — dimensiona o fantasma. */
   blocosArrasto?: number | null;
   aoIniciarArrasto?: (blocos: number) => void;
@@ -576,6 +579,11 @@ export default function AgendaGrid({
             setDetalhe(null);
           }}
           aoFechar={() => setDetalhe(null)}
+          aoEditar={
+            aoEditarBloco
+              ? (run, inicio, minutos) => aoEditarBloco(run.membros[0].id, inicio, minutos)
+              : undefined
+          }
         />
       )}
     </div>

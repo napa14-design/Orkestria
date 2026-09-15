@@ -78,6 +78,7 @@ export default function PaginaLocais() {
       titulo="Locais"
       subtitulo="Cada local pertence obrigatoriamente a uma sede — a mesma 'Recepção' em sedes diferentes são registros distintos."
       endpoint="/api/locais"
+      porSede
       textoNovo="+ Novo local"
       vazio="Cadastre os ambientes de cada sede (salas, banheiros, corredores…) — é onde as tarefas acontecem."
       campos={[

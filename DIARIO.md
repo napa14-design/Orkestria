@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-09-15 — Seletor de sede nos cadastros, e "Editar" no balãozinho
+
+Dois pedidos do dono, um deles um bug que estava cegando quase todo mundo.
+
+### As telas de cadastro mostravam só a sede principal
+
+`CrudManager` pedia `/api/funcionarios` **sem `?sede=`**. O servidor nunca
+agrega (é regra de arquitetura: uma sede por vez, um `where` só), então caía em
+`sessao.sede_id`. Quem opera várias sedes via apenas a primeira — e quem tinha a
+principal vazia abria a tela em branco.
+
+Medido em produção: **6 dos 7 supervisores são multi-sede**. A Larissa opera 12
+sedes e via 1. O Geovane tem a Parquelândia 3 (vazia) como principal e operava
+PQL1 e PQL2 — para ele as listas abriam **sem nada**, que foi o relato.
+
+O servidor já aceitava `?sede=` nas três rotas e `/api/sedes` já devolvia o
+escopo inteiro (o comentário de lá até dizia que era "para o seletor de quem
+opera mais de uma"). Faltava o seletor. Agora `CrudManager` tem `porSede`,
+ligado em funcionários, locais e tarefas. Some sozinho para quem tem uma sede
+só; administrador continua abrindo em "Todas as sedes".
+
+### "Editar" no lugar de "Fechar"
+
+O balãozinho do card ganhou **×** no canto e trocou "Fechar" por **Editar**, que
+muda **hora e duração ali mesmo** — o caminho sem arrastar que faltava (foi no
+arrasto que o teste de usabilidade travou 20 min).
+
+Uma chamada só ao servidor, não `redimensionar` seguido de `mover`: em duas, a
+segunda valida contra o estado da primeira ainda não confirmado e a pessoa leva
+**duas** caixas de conflito para uma edição. `updateRotina` já aceitava os dois
+campos juntos.
+
+Card que junta blocos iguais e seguidos não abre a edição (mexer só no primeiro
+desmancharia a junção em silêncio) — o botão fica apagado com a explicação.
+
+**Medido na tela:** seletor filtrando (Aldeota vazia → estado vazio; Dionísio →
+os 4); edição de 07:00–07:20/20min para 07:30/45min → 422, caixa "Autorizar
+conflito manualmente?" com a sobreposição certa, autorizado → card em
+**07:30–08:15, 45min**. `tsc` 0, build 0, 350 testes.
+
+**Arquivos:** `components/CrudManager.tsx`, `components/agenda/BalaoDetalhe.tsx`,
+`components/agenda/AgendaGrid.tsx`, `app/(app)/rotinas/page.tsx`, e as três telas
+de cadastro.
+
+---
+
 ## 2026-09-15 — Pré Sul criado do zero (equipe do Murilo)
 
 Planilha "Rota de Trabalho Asg - Pré Sul", aba do Murilo — **Murilo é o
