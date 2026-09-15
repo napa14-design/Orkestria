@@ -7,6 +7,68 @@
 
 ---
 
+## 2026-09-15 — Infantil DT importado na DT 1 (37 pessoas)
+
+Planilha `.ods` do Colégio Christus Infantil DT.01, 37 abas. **Sem mudança de
+código** — entrada de registro, porque a escrita foi direta no Firestore.
+
+Não há odfpy, pandas nem LibreOffice nesta máquina, então o leitor de `.ods`
+foi escrito na mão (é um ZIP com `content.xml`). Duas armadilhas do formato:
+`table:number-columns-repeated` (célula vazia repetida 200× é UMA tag — sem
+expandir, tudo desloca) e hora que não está no texto e sim em
+`office:time-value="PT07H00M00S"`.
+
+**Antes:** Dionísio Torres com 26 pessoas e 277 itens.
+**Depois:** "Dionísio Torres 1" com **63 pessoas, 210 locais, 387 tarefas e 672
+itens**. Criada a "Dionísio Torres 2" vazia, para a próxima planilha.
+
+### O defeito que quase entrou
+
+Em **18 das 37 abas o nome da aba e o do cabeçalho são pessoas diferentes** —
+sete abas dizem "BRENDA DE SOUSA". A matrícula não desempata: `001` aparece 13
+vezes. Decisão do dono: importar tudo assim mesmo. **Usei o nome da ABA** e
+guardei o do cabeçalho na observação de cada um dos 18, com um ⚠ pedindo para
+conferir de quem é a rota.
+
+Isso contradiz a resposta anterior de que as 11 abas com rota idêntica seriam
+reais ("cada uma numa sala"): as seis iguais têm também o mesmo cabeçalho e a
+mesma matrícula, o que é cópia não terminada. Ficou registrado e o dono seguiu.
+
+### Três erros meus no caminho, que valem a nota
+
+1. **Nomes** — o regex pegou `1 º HORÁRIO` em vez de `002: NEURICE BORGES`, e a
+   planilha saiu com 37 pessoas chamadas "º HORÁRIO".
+2. **Aba deslocada** — a da Francisca começa na coluna B; sem medir o
+   deslocamento, ela era lida como vazia.
+3. **Heredoc comeu a barra** — `\b` no regex virou o caractere backspace
+   (`\x08`), e TODAS as 108 pausas viraram tarefa. O plano tinha 497 itens em
+   vez de 395 e ninguém teria intervalo. É a terceira vez que esta armadilha
+   morde; script com regex vai pela ferramenta de escrita, não por heredoc.
+
+### Defeitos da planilha tratados
+
+- **1 intervalo descartado**: "Intervalo almoço 01:10–14:40" da Antonia Bernadete
+  (13h30 de almoço). Provavelmente 13:10, mas adivinhar não é meu papel — ela
+  ficou **sem almoço**, para a coordenação corrigir;
+- **6 linhas voltaram a ser tarefa**: "Limpeza de sala no momento do intervalo"
+  estava classificada como pausa;
+- 1 linha descartada (JEYSIANE, 15:00–15:00);
+- **20 abas com rota fora do turno declarado** — onde cabeçalho e linhas
+  discordam, mandam as linhas, e a jornada foi gravada pela rota real.
+
+**Conferido lendo de volta:** os 395 itens importados geram sem um bloqueio
+sequer. Os 15 problemas que a varredura da sede acusa (3 fora do turno, 3 em
+intervalo, 9 sobreposições) são todos de gente que **já estava lá antes**:
+Luziane, Fernanda/Zenir, Jean, Aliciane, Virginia.
+
+⚠ **Nomes repetidos na DT 1**: Renata ×2, Aline ×2, Fernanda/Zenir ×2 e
+"A Definir" ×2. A agenda mostra duas colunas com o mesmo rótulo.
+⚠ **63 colunas num dia só** — era o risco avisado ao propor sede separada.
+
+Cópia do estado anterior em `Downloads/backup-dt-2026-09-15T20-03-13-205Z.json`.
+
+---
+
 ## 2026-09-15 — A rota é do posto, não da pessoa
 
 *"Jorge assumiu o lugar do Assis em 15/09: a partir do dia 15 aparece Jorge no
