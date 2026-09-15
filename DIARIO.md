@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-09-15 — A rota é do posto, não da pessoa
+
+*"Jorge assumiu o lugar do Assis em 15/09: a partir do dia 15 aparece Jorge no
+lugar do Assis, e antes do dia 15 é o Assis."*
+
+O caminho barato seria **renomear** o cadastro — um registro só, zero código. Ele
+está descartado por um motivo que vale escrever: o bloco guarda o **id** do
+funcionário e a tela lê o nome desse id na hora de desenhar. Renomear reescreve
+o passado, e o dia 12/09, já realizado e confirmado, passaria a dizer que quem
+trabalhou foi o Jorge. "Antes do dia 15 é o Assis" **só** sai com dois cadastros
+e uma data de corte.
+
+`substituirNoPosto(novo, antigo, aPartirDe)` faz três coisas: copia os itens da
+rota padrão do antigo para o novo (e apaga os do antigo — deixar nos dois geraria
+o dia em dobro), passa para o novo os blocos **a partir da data que ainda estão
+só planejados**, e inativa o antigo com a observação de quem o substituiu.
+
+**O que nunca se move: bloco com realizado registrado.** Mesmo caindo depois da
+data — alguém pode ter trabalhado na manhã do próprio dia da troca, e isso é
+histórico dele.
+
+Na tela: dois campos no cadastro de funcionário, "Assume o posto de" e "A partir
+de", que só aparecem **ao criar** e **quando há alguém naquela sede** para
+substituir (`__novo` no formulário + `mostrarSe`). Editar alguém que já está na
+casa não mostra nada disso.
+
+Portão da doutrina, incluindo onde ele não encaixa: elimina recriar 20–50 itens
+de rota na mão; é operação; **não reduz os cinco minutos** — é raro e caro, não
+diário, e fingir o contrário seria trapaça; some quando a sede não tem outro
+funcionário; o caminho básico segue completo sem preencher nada; e não dá para
+derivar — só uma pessoa sabe quem substituiu quem.
+
+**Medido na tela:** cadastrado "Jorge" assumindo o posto da Aurilene em 15/09 →
+os 19 blocos dela no dia passaram para ele, a Aurilene ficou inativa com
+*"Substituído por Jorge em 2026-09-15"*, e a coluna da agenda agora diz **Jorge**.
+7 testes novos, 3 mutantes mortos (transferir sem olhar a data; mover o que já
+foi realizado; não apagar a rota do antigo). 357 testes no total.
+
+**Arquivos:** `services/funcionariosService.ts`, `app/api/funcionarios/route.ts`,
+`app/(app)/funcionarios/page.tsx`, `components/CrudManager.tsx`,
+`testes/substituir-no-posto.test.ts`.
+
+---
+
 ## 2026-09-15 — Seletor de sede nos cadastros, e "Editar" no balãozinho
 
 Dois pedidos do dono, um deles um bug que estava cegando quase todo mundo.

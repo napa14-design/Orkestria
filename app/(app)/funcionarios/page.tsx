@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
-import { hhmmParaMin } from "@/lib/dateUtils";
+import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import {
   csvDoTrio,
   resumoIntervalos,
@@ -29,8 +29,17 @@ const ESCALAS = [
 
 export default function PaginaFuncionarios() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
+  // Lista sem filtro de sede: as candidatas a ser substituídas são escolhidas
+  // pela sede do FORMULÁRIO, que pode não ser a que está aberta na tabela.
+  const { data: equipe } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
   const nomeSede = (id: string) =>
     sedes?.find((s) => s.id === id)?.nome_sede ?? id;
+
+  /** Quem já está na sede escolhida e pode ter o posto assumido. */
+  const candidatos = (form: Record<string, unknown>) =>
+    (equipe ?? [])
+      .filter((f) => f.sede_id === form.sede_id && f.ativo !== false)
+      .map((f) => ({ valor: f.id, rotulo: `${f.nome} (${f.entrada}–${f.saida})` }));
 
   return (
     <CrudManager<Funcionario>
@@ -113,6 +122,29 @@ export default function PaginaFuncionarios() {
         { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
+        {
+          key: "substitui",
+          rotulo: "Assume o posto de",
+          tipo: "select",
+          inteira: true,
+          opcoes: candidatos,
+          // Só ao cadastrar, e só quando existe alguém na sede para substituir.
+          mostrarSe: (f) => f.__novo === true && candidatos(f).length > 0,
+          ajuda: "Opcional. A rota padrão de quem sai passa para quem entra.",
+          dica:
+            "A rota é do posto, não da pessoa. Ao salvar, a rota padrão de quem sai é copiada " +
+            "para quem entra, os dias ainda não realizados a partir da data abaixo trocam de " +
+            "dono, e quem saiu fica inativo. Os dias anteriores continuam com o nome de quem " +
+            "trabalhou neles — o histórico não é reescrito.",
+        },
+        {
+          key: "substitui_desde",
+          rotulo: "A partir de",
+          tipo: "data",
+          padrao: hojeISO(),
+          mostrarSe: (f) => Boolean(f.substitui),
+          ajuda: "Do dia anterior para trás, a agenda continua com quem saiu.",
+        },
       ]}
       colunas={[
         { key: "nome", rotulo: "Nome" },

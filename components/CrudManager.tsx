@@ -600,7 +600,11 @@ export default function CrudManager<T extends Registro>({
   }, [data, busca]);
 
   function abrirNovo() {
-    const inicial: Record<string, unknown> = {};
+    // `__novo` marca o formulário de criação para o `mostrarSe` dos campos —
+    // "substitui quem saiu" só faz sentido ao cadastrar, nunca ao editar
+    // alguém que já está na casa. Chaves com `__` são internas e não vão para
+    // o servidor (ver `salvar`).
+    const inicial: Record<string, unknown> = { __novo: true };
     for (const c of campos) {
       inicial[c.key] =
         c.padrao ?? (c.tipo === "checkbox" ? true : c.tipo === "numero" ? 0 : "");
@@ -626,7 +630,10 @@ export default function CrudManager<T extends Registro>({
     e.preventDefault();
     setErro("");
     setSalvando(true);
-    const corpo: Record<string, unknown> = { ...form };
+    // Chaves `__` são estado do formulário, não dado do registro.
+    const corpo: Record<string, unknown> = Object.fromEntries(
+      Object.entries(form).filter(([k]) => !k.startsWith("__")),
+    );
     for (const c of campos) {
       if (c.tipo === "numero" || c.numerico) corpo[c.key] = Number(corpo[c.key] ?? 0);
     }

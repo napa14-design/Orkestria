@@ -125,3 +125,116 @@ export async function deleteFuncionario(id: string): Promise<void> {
   }
   await ds.excluir("funcionarios", id);
 }
+
+export interface ResultadoSubstituicao {
+  itensDeRota: number;
+  blocosTransferidos: number;
+  blocosPreservados: number;
+  inativou: boolean;
+}
+
+/**
+ * Jorge assume o posto do Assis a partir de 15/09: **a rota é do posto, não da
+ * pessoa**.
+ *
+ * Por que dois cadastros e não renomear um: o bloco guarda o *id* do
+ * funcionário e a tela lê o nome desse id na hora de desenhar. Renomear o
+ * registro reescreveria o passado — o dia 12/09, já realizado e confirmado,
+ * passaria a dizer que quem fez foi o Jorge. Dois registros e uma data de corte
+ * é o único jeito de "antes do dia 15 é o Assis" continuar verdade.
+ *
+ * Três movimentos, nesta ordem:
+ *  1. copia os itens da rota padrão do antigo para o novo (o posto continua);
+ *  2. passa para o novo os blocos **a partir da data** que ainda estão só
+ *     planejados;
+ *  3. inativa o antigo.
+ *
+ * O que nunca se move: bloco com realizado registrado. Ele é histórico do
+ * antigo, mesmo caindo depois da data de corte — alguém pode ter trabalhado no
+ * próprio dia da troca.
+ */
+export async function substituirNoPosto(
+  novoId: string,
+  antigoId: string,
+  aPartirDe: string,
+  autor: string,
+): Promise<ResultadoSubstituicao> {
+  if (novoId === antigoId)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SUBSTITUI_A_SI",
+        mensagem: "Um funcionário não substitui a si mesmo.",
+      },
+    ]);
+  const ds = await getDataSource();
+  const [novo, antigo] = await Promise.all([
+    ds.obter("funcionarios", novoId),
+    ds.obter("funcionarios", antigoId),
+  ]);
+  if (!novo || !antigo)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "FUNCIONARIO_INEXISTENTE",
+        mensagem: "Funcionário substituído não encontrado.",
+      },
+    ]);
+  if (novo.sede_id !== antigo.sede_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SEDE_DIVERGENTE",
+        mensagem: "A substituição vale dentro da mesma sede — a rota é do posto daquela unidade.",
+      },
+    ]);
+
+  const agora = agoraISO();
+  const [itens, blocos] = await Promise.all([
+    ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: antigoId }]),
+    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: antigoId }]),
+  ]);
+
+  // 1. a rota do posto passa a ser do novo. O id do item carrega a pessoa, por
+  // isso é recalculado — senão o novo item colidiria com o do antigo.
+  const copiados = itens.map((item) => ({
+    ...item,
+    id: item.id.replace(antigoId, novoId),
+    funcionario_id: novoId,
+    criado_por: autor,
+    criado_em: agora,
+  }));
+  await emLotesFunc(copiados, (item) => ds.criar("modelos_rotina", item));
+  await emLotesFunc(itens, (item) => ds.excluir("modelos_rotina", item.id));
+
+  // 2. só o que ainda é plano, e só daqui para a frente.
+  const aTransferir = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");
+  const preservados = blocos.filter((b) => b.data >= aPartirDe && b.status !== "planejada").length;
+  await emLotesFunc(aTransferir, (b) =>
+    ds.atualizar("rotinas_planejadas", b.id, { funcionario_id: novoId, atualizado_em: agora }),
+  );
+
+  // 3. quem saiu, saiu: some da agenda e das listas, o histórico fica inteiro.
+  await ds.atualizar("funcionarios", antigoId, {
+    ativo: false,
+    atualizado_por: autor,
+    atualizado_em: agora,
+    observacoes: [antigo.observacoes, `Substituído por ${novo.nome} em ${aPartirDe}.`]
+      .filter(Boolean)
+      .join(" · "),
+  });
+
+  return {
+    itensDeRota: copiados.length,
+    blocosTransferidos: aTransferir.length,
+    blocosPreservados: preservados,
+    inativou: true,
+  };
+}
+
+/** Mesmo laço em lotes usado nos outros serviços — evita rajada no Firestore. */
+async function emLotesFunc<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25): Promise<void> {
+  for (let i = 0; i < itens.length; i += lote) {
+    await Promise.all(itens.slice(i, i + lote).map(fn));
+  }
+}
