@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-09-15 — Passar da saída também pergunta
+
+*"Faz o mesmo para quando passa da saída."* Nasceu o código `PASSA_DA_SAIDA`,
+autorizável como os outros três.
+
+**Isto reverte uma decisão anterior**, que estava escrita só num comentário:
+*"a tarefa não pode INICIAR fora do expediente, mas PODE terminar depois da
+saída — a decisão da ata é 'pode terminar, não iniciar fora'"*. Passava calado, e
+o card só ganhava as listras. Agora para e pergunta: hora extra é decisão de quem
+assina, não silêncio do software.
+
+**Medi antes de mexer**, porque erro novo faz a geração PULAR o item: dos **1.555
+itens de rota em produção, zero** terminam depois da saída — nenhuma sede
+perde bloco na geração. Existem 196 blocos já gravados assim; validação só roda
+em criação/edição, então eles ficam onde estão e só perguntam se alguém os
+mover.
+
+A regra é `else if` do `FORA_DO_EXPEDIENTE` de propósito: quem começa depois da
+saída satisfaz as duas condições, e duas mensagens para o mesmo bloco é ruído na
+caixa de autorização.
+
+**Um teste meu nasceu cego.** O caso "uma mensagem, não duas" usava início às
+05:00 — que termina 05:23, antes das 16:00 —, então as duas condições nunca eram
+verdadeiras juntas e trocar `else if` por `if` não o derrubava. Só apareceu no
+teste de mutação. Corrigido para 16:30, e agora o mutante morre.
+
+Outro achado: **nenhum teste cobria a regra antiga**. Ela vivia no comentário e
+mais nada — mudá-la não quebrou nada porque não havia o que quebrar.
+
+**Medido na tela:** bloco em 15:50 com 40 min abre *"Tarefa termina 16:30,
+depois da saída de Aurilene (16:00)"*; autorizado, fica com as listras. O bloco
+que termina **em 16:00 em ponto** não é marcado. 5 testes novos (14 no arquivo),
+3 mutantes mortos, 371 no total.
+
+**Arquivos:** `lib/validations.ts`, `testes/autorizar-conflito.test.ts`.
+
+---
+
 ## 2026-09-15 — Fora do expediente passou a perguntar em vez de barrar
 
 *"O sistema mostra erro quando quer colocar uma tarefa fora do horário, eu acho

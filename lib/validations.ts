@@ -62,14 +62,26 @@ export function validarAlocacao(args: {
     return alertas;
   }
 
-  // Regra de horário: a tarefa não pode INICIAR fora do expediente, mas PODE
-  // terminar depois da saída (uma tarefa começada perto do fim do turno se
-  // estende — a decisão da ata é "pode terminar, não iniciar fora").
+  // Regra de horário, em duas metades — as duas autorizáveis pelo supervisor.
+  //
+  // Até 15/09/2026 valia "pode terminar, não iniciar fora": terminar depois da
+  // saída passava calado, com o card só ganhando as listras de "passa da saída".
+  // O dono trocou essa decisão — passar da saída é hora extra, e hora extra é
+  // decisão de quem assina, não silêncio do software. Agora as duas param e
+  // perguntam.
   if (inicioMin < entrada || inicioMin >= saida) {
     alertas.push({
       nivel: "erro",
       codigo: "FORA_DO_EXPEDIENTE",
       mensagem: `Tarefa inicia fora do expediente de ${f.nome} (${f.entrada}–${f.saida}).`,
+    });
+  } else if (fimMin > saida) {
+    // `else if` de propósito: quem começa fora já foi avisado pela regra acima,
+    // e duas mensagens para o mesmo bloco é ruído na caixa de autorização.
+    alertas.push({
+      nivel: "erro",
+      codigo: "PASSA_DA_SAIDA",
+      mensagem: `Tarefa termina ${minParaHHMM(fimMin)}, depois da saída de ${f.nome} (${f.saida}).`,
     });
   }
 
@@ -335,6 +347,9 @@ export const CODIGOS_AUTORIZAVEIS: ReadonlySet<string> = new Set([
   // se a pessoa quiser autorizar"*. Cobrir um turno vago e emendar hora extra
   // são decisões do supervisor, não do software.
   "FORA_DO_EXPEDIENTE",
+  // E, no mesmo dia, *"faz o mesmo para quando passa da saída"* — que antes
+  // passava calado, com o card só ganhando as listras.
+  "PASSA_DA_SAIDA",
 ]);
 
 /** Todos os erros da lista são autorizáveis? (Nenhum erro = nada a autorizar.) */

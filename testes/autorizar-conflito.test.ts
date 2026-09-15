@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CODIGOS_AUTORIZAVEIS, podeAutorizar } from "@/lib/validations";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { reiniciarBanco } from "@/lib/memoryStore";
+import { getDataSource } from "@/lib/datasource";
 import { createRotina } from "@/services/rotinasService";
 
 const erro = (codigo: string) => ({ nivel: "erro" as const, codigo, mensagem: codigo });
@@ -38,6 +39,10 @@ describe("o que dá para autorizar", () => {
   it("conflito e intervalo continuam autorizáveis", () => {
     expect(podeAutorizar([erro("SOBREPOSICAO")])).toBe(true);
     expect(podeAutorizar([erro("INTERVALO")])).toBe(true);
+  });
+
+  it("passar da saída também pergunta", () => {
+    expect(podeAutorizar([erro("PASSA_DA_SAIDA")])).toBe(true);
   });
 
   it("o que autorizar não resolve continua bloqueando", () => {
@@ -95,6 +100,77 @@ describe("gravar fora do expediente", () => {
     await expect(
       createRotina({ ...antesDaEntrada, data: domingo, forcar: true } as never, "t@t.com"),
     ).rejects.toThrow();
+  });
+});
+
+describe("terminar depois da saída", () => {
+  beforeEach(() => reiniciarBanco());
+
+  // Aurilene sai 16:00. A duração da tarefa é medida, não suposta — ver abaixo.
+  const base = {
+    data: DIA,
+    funcionario_id: "christus_f1",
+    tarefa_id: "christus_t7",
+    local_id: "christus_l1",
+    supervisor_id: "u1",
+  };
+
+  /**
+   * A duração NÃO é a do cadastro: o servidor recalcula com metragem e fatores
+   * de ambiente/serviço. Chutar "15 min" aqui fez a primeira versão destes
+   * testes falhar — a tarefa dura 23. A fronteira é derivada do valor real.
+   */
+  async function duracaoReal(): Promise<number> {
+    const r = await createRotina({ ...base, inicio_planejado: "07:00" } as never, "t@t.com");
+    const ds = await getDataSource();
+    await ds.excluir("rotinas_planejadas", r.rotina.id);
+    return r.rotina.tempo_previsto_min;
+  }
+
+  const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const SAIDA = 16 * 60;
+
+  it("terminar EM CIMA da saída não é passar dela", async () => {
+    // Trocar o `>` por `>=` na regra faria toda última tarefa do dia virar
+    // hora extra — é esta linha que segura isso.
+    const dur = await duracaoReal();
+    await expect(
+      createRotina({ ...base, inicio_planejado: hhmm(SAIDA - dur) } as never, "t@t.com"),
+    ).resolves.toBeTruthy();
+  });
+
+  it("passar cinco minutos já pergunta", async () => {
+    const dur = await duracaoReal();
+    await expect(
+      createRotina({ ...base, inicio_planejado: hhmm(SAIDA - dur + 5) } as never, "t@t.com"),
+    ).rejects.toThrow();
+  });
+
+  it("autorizando, grava e fica marcado com a hora real do fim", async () => {
+    const dur = await duracaoReal();
+    const r = await createRotina(
+      { ...base, inicio_planejado: hhmm(SAIDA - dur + 5), forcar: true } as never,
+      "t@t.com",
+    );
+    const a = r.alertas.find((x) => x.codigo === "PASSA_DA_SAIDA");
+    expect(a?.nivel).toBe("alerta");
+    expect(a?.mensagem).toContain("autorizado manualmente");
+    expect(a?.mensagem).toContain(hhmm(SAIDA + 5));
+  });
+
+  it("quem começa fora recebe UMA mensagem, não duas", async () => {
+    // Precisa começar DEPOIS da saída: aí as duas condições são verdadeiras ao
+    // mesmo tempo (começa fora E termina depois), e a caixa mostra só a que
+    // importa. A primeira versão usava 05:00 — que termina 05:23, antes das
+    // 16:00 —, então o caso nunca acontecia e o teste passava cego: trocar o
+    // `else if` por `if` não o derrubava.
+    const r = await createRotina(
+      { ...base, inicio_planejado: "16:30", forcar: true } as never,
+      "t@t.com",
+    );
+    const codigos = r.alertas.map((x) => x.codigo);
+    expect(codigos).toContain("FORA_DO_EXPEDIENTE");
+    expect(codigos).not.toContain("PASSA_DA_SAIDA");
   });
 });
 
