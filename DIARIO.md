@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-09-15 — Rota padrão da CESIU trocada em produção
+
+Planilha nova ("Rota de Trabalho ASG- CESIU Rota Diaria utopia"), 3 abas. **Não
+houve mudança de código**: esta entrada existe porque a gravação foi direta no
+Firestore e **não passa pelo decorator de auditoria** — sem ela, não há registro
+nenhum de que isto aconteceu.
+
+**Antes:** 304 itens em 2 camadas (`Rota padrão` 152 + `Padrão - Terça` 152).
+**Depois:** 117 itens numa camada só — Gleydison 33 · Eveline 42 · Jeová 42.
+Também: +3 locais, +7 tarefas; intervalos de Gleydison e Eveline reduzidos ao
+almoço, por decisão do dono ("a planilha manda").
+
+Decisões que foram do dono, não minhas:
+- **almoço da Eveline preservado** — a escada dela é contínua das 08:00 às 18:00,
+  sem um buraco; "a planilha manda" ao pé da letra apagaria o intervalo dela.
+  Ficaram de fora as 6 tarefas que caíam no 13:00–14:30;
+- as 3 linhas do Gleydison com horário voltando no tempo (Consultório 12 em
+  11:55–11:35) ficaram de fora, para a supervisão corrigir;
+- as 19 linhas sem horário **não couberam** (a escada dos três acaba exatamente
+  no fim do turno), mas os locais/tarefas foram cadastrados.
+
+**Conferido lendo de volta:** 0 órfãos, 0 fora do turno, 0 em intervalo, 0
+sobreposições — os 117 geram limpos. Ocupação resultante: 97% / 100% / 98%,
+ou seja, a rota nova não deixa folga nenhuma.
+
+Cópia do estado anterior em `Downloads/backup-cesiu-2026-09-15T17-17-09-132Z.json`
+(é o único caminho de volta da camada `Padrão - Terça`).
+
+---
+
 ## 2026-09-15 — O tutorial parou de emboscar
 
 Queixa do dono: *"parece que se eu saio e volto para a tela, ele sempre reseta e
