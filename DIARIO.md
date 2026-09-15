@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-09-15 — Fora do expediente passou a perguntar em vez de barrar
+
+*"O sistema mostra erro quando quer colocar uma tarefa fora do horário, eu acho
+que tem que aparecer um modal avisando, e se a pessoa quiser autorizar."*
+
+`FORA_DO_EXPEDIENTE` entrou na lista dos erros autorizáveis, junto com
+`INTERVALO` e `SOBREPOSICAO`. Cobrir turno vago e emendar hora extra são
+decisões do supervisor, não do software — e a autorização continua ficando
+registrada ("autorizado manualmente" na mensagem e no histórico).
+
+Continuam bloqueando de vez os erros que **autorizar não resolve**: restrição de
+gênero, requisito faltando ou vencido, tarefa sem tempo previsto, funcionário
+sem jornada e janela de horário. Autorizar não dá treinamento a ninguém.
+
+### O risco não era o código novo, era onde ele mora
+
+A lista estava em **dois lugares**: `CODIGOS_AUTORIZAVEIS` no `rotinasService` e
+uma cópia escrita à mão no `page.tsx` (`a.codigo === "INTERVALO" || ...`). Mexer
+num só produz o pior defeito possível: **uma tela que pergunta "autoriza?" e um
+servidor que recusa assim mesmo** — ou o inverso, erro seco sem caixa nenhuma.
+
+Agora a lista mora em `lib/validations.ts`, que é onde a doutrina do projeto já
+mandava (função pura usada no cliente E no servidor), com `podeAutorizar()`.
+E existe um teste que **varre `app/`, `components/` e `services/` procurando
+qualquer comparação literal com esses códigos** — se alguém reescrever a lista
+numa tela, a suíte cai.
+
+**Medido na tela:** editar um bloco da Aurilene (06:00–16:00) para 05:00 abre
+*"Autorizar conflito manualmente? — ⚠ Tarefa inicia fora do expediente de
+Aurilene (06:00–16:00)"*; autorizando, o card vai para **05:00–05:20** e a tarja
+fica *"(autorizado manualmente)"*. 9 testes novos, 2 mutantes mortos (tirar o
+código da lista; reintroduzir a cópia na tela). 366 testes.
+
+**Arquivos:** `lib/validations.ts`, `services/rotinasService.ts`,
+`app/(app)/rotinas/page.tsx`, `testes/autorizar-conflito.test.ts`.
+
+---
+
 ## 2026-09-15 — Infantil DT importado na DT 1 (37 pessoas)
 
 Planilha `.ods` do Colégio Christus Infantil DT.01, 37 abas. **Sem mudança de

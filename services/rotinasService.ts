@@ -15,7 +15,7 @@ import {
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { formatarDataBR, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
-import { temErro, validarAlocacao, validarRotina } from "@/lib/validations";
+import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
 import { ausenteEm } from "./ausenciasService";
@@ -138,8 +138,6 @@ export interface NovaRotina {
    */
   duracao_min?: number;
 }
-
-const CODIGOS_AUTORIZAVEIS = new Set(["INTERVALO", "SOBREPOSICAO"]);
 
 /** Com `forcar`, conflitos autorizáveis viram alertas em vez de bloqueio. */
 function aplicarAutorizacaoManual(

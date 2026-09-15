@@ -33,7 +33,7 @@ import {
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
-import { temErro, validarAlocacao } from "@/lib/validations";
+import { podeAutorizar, temErro, validarAlocacao } from "@/lib/validations";
 import { useRotinaData } from "./useRotinaData";
 import type { AlertaValidacao, RotinaPlanejada, Tarefa } from "@/types";
 
@@ -180,10 +180,10 @@ export default function PaginaRotinas() {
    */
   function pedirAutorizacao(validacao: AlertaValidacao[]): Promise<boolean> {
     const erros = validacao.filter((a) => a.nivel === "erro");
-    const autorizaveis =
-      erros.length > 0 &&
-      erros.every((a) => a.codigo === "INTERVALO" || a.codigo === "SOBREPOSICAO");
-    if (!autorizaveis) return Promise.resolve(false);
+    // A lista está em `lib/validations`, não aqui: quando era escrita à mão nos
+    // dois lados, acrescentar um código na tela dava uma caixa que pergunta e um
+    // servidor que recusa.
+    if (!podeAutorizar(validacao)) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       setConfirmacao({ mensagens: erros.map((e) => e.mensagem), resolver: resolve });
     });

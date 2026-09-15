@@ -313,6 +313,36 @@ export function validarRotina(r: Partial<RotinaPlanejada>): AlertaValidacao[] {
   return alertas;
 }
 
+/**
+ * Erros que o supervisor pode autorizar na mão — os outros bloqueiam de vez.
+ *
+ * Esta lista mora **aqui**, e não no serviço, porque quem decide se abre a
+ * caixa "Autorizar mesmo assim" é a tela, e quem aceita o `forcar` é o
+ * servidor. Enquanto foram duas listas (uma no `rotinasService`, outra escrita
+ * à mão no `page.tsx`), acrescentar um código num lado dava uma tela que
+ * pergunta e um servidor que recusa — ou pior, o contrário.
+ *
+ * O critério para entrar: é um conflito de **agenda**, que o supervisor
+ * consegue julgar olhando o dia. Fica de fora o que ele não pode resolver
+ * autorizando — falta de qualificação, restrição de gênero, tarefa sem tempo:
+ * autorizar não faz a pessoa ganhar o treinamento nem a tarefa ganhar duração.
+ */
+export const CODIGOS_AUTORIZAVEIS: ReadonlySet<string> = new Set([
+  "INTERVALO",
+  "SOBREPOSICAO",
+  // Pedido do dono em 15/09/2026: *"o sistema mostra erro quando quer colocar
+  // uma tarefa fora do horário, acho que tem que aparecer um modal avisando, e
+  // se a pessoa quiser autorizar"*. Cobrir um turno vago e emendar hora extra
+  // são decisões do supervisor, não do software.
+  "FORA_DO_EXPEDIENTE",
+]);
+
+/** Todos os erros da lista são autorizáveis? (Nenhum erro = nada a autorizar.) */
+export function podeAutorizar(alertas: AlertaValidacao[]): boolean {
+  const erros = alertas.filter((a) => a.nivel === "erro");
+  return erros.length > 0 && erros.every((a) => CODIGOS_AUTORIZAVEIS.has(a.codigo));
+}
+
 export function temErro(alertas: AlertaValidacao[]): boolean {
   return alertas.some((a) => a.nivel === "erro");
 }
