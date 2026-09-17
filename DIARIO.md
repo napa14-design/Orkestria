@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-09-17 — CESIU atualizada pela planilha "utopia(2)"
+
+Relato do dono: *"o Gleydson entra 7 e sai 17h, no sistema tá 6h30 16h30"*.
+
+**Não era erro de digitação no cadastro.** O sistema estava fiel à planilha
+anterior, cujo cabeçalho dizia `ENTRADA 6:30 / SAIDA 16:30`. A planilha nova
+corrige o horário **e reescreve a rota dele**: das 45 tarefas novas, só **2**
+coincidem com as 36 antigas.
+
+Por isso trocar só o campo seria pior que não mexer: a rota gravada começava
+06:40, e com a jornada em 07:00 os itens de 06:40, 06:50 e 06:55 passariam a
+cair fora do expediente — que desde 15/09 **bloqueia**. A geração pularia os
+três todo dia, em silêncio.
+
+| | Antes | Agora |
+|---|---|---|
+| Gleydison | 33 itens, 06:30–16:30 | **45 itens, 07:00–17:00** |
+| Eveline | 42 itens | **38 itens** |
+| Jeová | 42 itens | 42 — **idêntico**, nada mudou |
+
+Total: 117 → **125 itens**, +2 locais, +25 tarefas, 32 itens antigos apagados
+(85 reaproveitaram o id, então os vínculos de proveniência sobrevivem).
+
+A planilha (2) consertou sozinha os dois defeitos que obrigaram a cortar linhas
+na (1): o `Consultório 12` com fim antes do início e as seis tarefas da Eveline
+dentro do almoço. **Nenhuma linha precisou ser descartada desta vez.**
+
+⚠ **Sobrou uma sobreposição de 5 min** no Gleydison: a linha 12 termina 09:10 e
+a 13 começa 09:05. Importada como está, de propósito — corrigir seria inventar
+horário. A geração vai pular um dos dois blocos e dizer qual.
+
+**Os 117 blocos de hoje foram apagados** (todos ainda "planejada", nenhum à mão,
+nenhum com realizado). **A geração NÃO foi refeita por script**: não há `tsx`
+no projeto para rodar o serviço de fora, e reimplementar a materialização aqui
+seria a regra em dois lugares. O dia se gera num clique na tela, pelo serviço de
+verdade — que é também o único lugar onde aquela sobreposição é pega e mostrada.
+
+**Conferido lendo de volta:** 0 órfãos, 0 fora do turno, 0 em intervalo. Ocupação
+99% / 98% / 98%. Backup em `Downloads/backup-cesiu2-2026-09-17T13-30-14-708Z.json`.
+
+---
+
 ## 2026-09-15 — Passar da saída também pergunta
 
 *"Faz o mesmo para quando passa da saída."* Nasceu o código `PASSA_DA_SAIDA`,
