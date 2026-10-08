@@ -10,8 +10,9 @@ import {
   classificarOcupacao,
   cobraDesvio,
   desvioPercentual,
-  jornadaLiquidaMin,
+  ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
+  resumoDeOcupacao,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
@@ -95,32 +96,12 @@ export default function PaginaDashboard() {
     const tempoPlanejadoTotal = validas.reduce((s, r) => s + r.tempo_previsto_min, 0);
 
     // Ocupação média por funcionário nos dias em que houve planejamento.
-    const porFuncionario = funcs.map((f) => {
-      const minhas = validas.filter((r) => r.funcionario_id === f.id);
-      const dias = new Set(minhas.map((r) => r.data)).size;
-      const jornada = jornadaLiquidaMin(f);
-      const planejado = minhas.reduce((s, r) => s + r.tempo_previsto_min, 0);
-      const ocupacao = dias > 0 && jornada > 0 ? (planejado / (jornada * dias)) * 100 : 0;
-      return { funcionario: f, dias, planejado, jornada, ocupacao };
-    });
-
-    const comPlanejamento = porFuncionario.filter((p) => p.dias > 0);
-    const ocupacaoMedia =
-      comPlanejamento.length > 0
-        ? comPlanejamento.reduce((s, p) => s + p.ocupacao, 0) / comPlanejamento.length
-        : 0;
-
-    const sobrecarregados = comPlanejamento.filter(
-      (p) => classificarOcupacao(p.ocupacao, params) === "sobrecarga",
-    ).length;
-    const subutilizados = comPlanejamento.filter(
-      (p) => classificarOcupacao(p.ocupacao, params) === "subutilizado",
-    ).length;
-
-    const ociosidadeTotal = comPlanejamento.reduce(
-      (s, p) => s + Math.max(0, p.jornada * p.dias - p.planejado),
-      0,
-    );
+    const porFuncionario = ocupacaoPorPessoa(funcs, validas);
+    const resumo = resumoDeOcupacao(porFuncionario, params);
+    const ocupacaoMedia = resumo.ocupacaoMedia ?? 0;
+    const sobrecarregados = resumo.emSobrecarga;
+    const subutilizados = resumo.subutilizados;
+    const ociosidadeTotal = resumo.ociosidadeMin;
 
     // Tempo por local e por sede.
     const tempoPorLocal = new Map<string, number>();

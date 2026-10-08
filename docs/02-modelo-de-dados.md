@@ -57,6 +57,7 @@ unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | entrada, saida | HH:mm | |
 | intervalo_min | número | minutos descontados da jornada |
 | intervalo_inicio, intervalo_fim | HH:mm | bloqueado na agenda |
+| matricula | string | opcional — matrícula do RH, chave do Chromos (o nome tem homônimos) |
 | ativo | boolean | |
 | observacoes | string | |
 | criado_por, criado_em, atualizado_por, atualizado_em | auditoria | |

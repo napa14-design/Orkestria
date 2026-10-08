@@ -27,6 +27,11 @@ export interface Funcionario extends Auditoria {
   entrada_sabado?: string;
   saida_sabado?: string;
   cargo: string;
+  /**
+   * Matrícula do RH — a chave com que outros sistemas (o Chromos) acham a pessoa.
+   * O nome não serve: há homônimos ativos. Vazio = ainda não informada.
+   */
+  matricula?: string;
   ativo: boolean;
   observacoes: string;
 }

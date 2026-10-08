@@ -394,6 +394,63 @@ export function classificarOcupacao(
   return "subutilizado";
 }
 
+/** Ocupação de uma pessoa num período, nos dias em que ela teve planejamento. */
+export interface OcupacaoDaPessoa<F> {
+  funcionario: F;
+  /** Dias distintos com bloco não cancelado. */
+  dias: number;
+  planejado: number;
+  jornada: number;
+  /** planejado ÷ (jornada × dias), em %. 0 sem dia planejado ou sem jornada. */
+  ocupacao: number;
+}
+
+/**
+ * A régua de ocupação do período — **uma só** para o Dashboard, o Panorama e o
+ * resumo executivo do Chromos. Ela vivia copiada nas duas telas; com um terceiro
+ * consumidor, cópia vira número diferente para a mesma pergunta.
+ *
+ * O dia sem planejamento não entra no denominador: medir 30 dias de jornada contra
+ * 5 dias montados diria "17% ocupado" sobre quem está em 100%.
+ */
+export function ocupacaoPorPessoa<F extends Parameters<typeof jornadaLiquidaMin>[0] & { id: string }>(
+  funcionarios: F[],
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "tempo_previsto_min">[],
+): OcupacaoDaPessoa<F>[] {
+  const porPessoa = new Map<string, { dias: Set<string>; planejado: number }>();
+  for (const r of rotinas) {
+    if (r.status === "cancelada") continue;
+    const acc = porPessoa.get(r.funcionario_id) ?? { dias: new Set<string>(), planejado: 0 };
+    acc.dias.add(r.data);
+    acc.planejado += r.tempo_previsto_min;
+    porPessoa.set(r.funcionario_id, acc);
+  }
+  return funcionarios.map((funcionario) => {
+    const acc = porPessoa.get(funcionario.id);
+    const dias = acc?.dias.size ?? 0;
+    const planejado = acc?.planejado ?? 0;
+    const jornada = jornadaLiquidaMin(funcionario);
+    const ocupacao = dias > 0 && jornada > 0 ? (planejado / (jornada * dias)) * 100 : 0;
+    return { funcionario, dias, planejado, jornada, ocupacao };
+  });
+}
+
+/**
+ * Os agregados das pessoas COM planejamento. A ocupação média é a média das
+ * ocupações individuais (não horas ÷ horas) — é o número que as telas sempre
+ * mostraram. `null` quando ninguém teve planejamento: média de nada não é 0%.
+ */
+export function resumoDeOcupacao<F>(pessoas: OcupacaoDaPessoa<F>[], p: ParametrosResolvidos) {
+  const com = pessoas.filter((x) => x.dias > 0);
+  return {
+    pessoasPlanejadas: com.length,
+    ocupacaoMedia: com.length ? com.reduce((s, x) => s + x.ocupacao, 0) / com.length : null,
+    ociosidadeMin: com.reduce((s, x) => s + Math.max(0, x.jornada * x.dias - x.planejado), 0),
+    emSobrecarga: com.filter((x) => classificarOcupacao(x.ocupacao, p) === "sobrecarga").length,
+    subutilizados: com.filter((x) => classificarOcupacao(x.ocupacao, p) === "subutilizado").length,
+  };
+}
+
 export const ROTULO_CLASSIFICACAO: Record<ClassificacaoOcupacao, string> = {
   subutilizado: "Subutilizado",
   adequado: "Adequado",

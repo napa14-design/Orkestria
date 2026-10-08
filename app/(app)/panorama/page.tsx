@@ -10,7 +10,12 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
-import { classificarOcupacao, jornadaLiquidaMin, PARAMETROS_PADRAO } from "@/lib/calculations";
+import {
+  classificarOcupacao,
+  ocupacaoPorPessoa,
+  PARAMETROS_PADRAO,
+  resumoDeOcupacao,
+} from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type { Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede } from "@/types";
@@ -67,24 +72,14 @@ export default function PaginaPanorama() {
       .filter((s) => s.ativo)
       .map((s) => {
         const fs = funcs.filter((f) => f.sede_id === s.id);
-        const perF = fs.map((f) => {
-          const minhas = rs.filter((r) => r.funcionario_id === f.id);
-          const dias = new Set(minhas.map((r) => r.data)).size;
-          const jornada = jornadaLiquidaMin(f);
-          const planejado = minhas.reduce((a, r) => a + r.tempo_previsto_min, 0);
-          const ocup = dias > 0 && jornada > 0 ? (planejado / (jornada * dias)) * 100 : 0;
-          const ocios = dias > 0 ? Math.max(0, jornada * dias - planejado) : 0;
-          return { dias, ocup, ocios };
-        });
-        const comPlan = perF.filter((p) => p.dias > 0);
-        const ocupMedia = comPlan.length ? comPlan.reduce((a, p) => a + p.ocup, 0) / comPlan.length : 0;
+        const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, rs), params);
         return {
           sede: s,
           funcs: fs.length,
-          comPlan: comPlan.length,
-          ocupMedia,
-          ociosidade: comPlan.reduce((a, p) => a + p.ocios, 0),
-          sobrecarga: comPlan.filter((p) => classificarOcupacao(p.ocup, params) === "sobrecarga").length,
+          comPlan: resumo.pessoasPlanejadas,
+          ocupMedia: resumo.ocupacaoMedia ?? 0,
+          ociosidade: resumo.ociosidadeMin,
+          sobrecarga: resumo.emSobrecarga,
         };
       });
   }, [sedes, funcionarios, rotinas, params]);

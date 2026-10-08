@@ -120,6 +120,12 @@ export default function PaginaFuncionarios() {
           dica: "Horário de saída SÓ no sábado. Ex.: entrada 07:00 e saída 11:00 = 4 h no sábado. No sábado não é descontado intervalo.",
         },
         { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
+        {
+          key: "matricula",
+          rotulo: "Matrícula",
+          tipo: "texto",
+          dica: "Matrícula do RH. Opcional — é por ela que outros sistemas da Infraestrutura encontram a pessoa, porque nome pode repetir.",
+        },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
         {
