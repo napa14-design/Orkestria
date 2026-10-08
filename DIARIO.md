@@ -7,6 +7,297 @@
 
 ---
 
+## 2026-10-07 — DT 1 e DT 2 conferidas contra as planilhas; 8 buracos preenchidos na DT 2
+
+Pergunta do dono: as rotas padrão estão iguais às planilhas? Confronto item a
+item (início, duração e tarefa). **Sem mudança de código** — escrita direta no
+Firestore, por isso esta entrada.
+
+**DT 1 × Infantil (.ods): igual.** 395 de 396; a que falta é a da Jeysiane
+15:00–15:00 (zero minuto), descartada de propósito em 15/09. O leitor de `.ods`
+de 15/09 tinha sumido do scratchpad e foi reescrito; reproduz a importação
+(390 + 6 devolvidas à rota − 1 descartada = 395).
+
+**DT 2 × "DT2.xlsx": 260 de 284 antes do conserto.** 18 das 26 pessoas idênticas.
+O resto:
+
+1. **8 tarefas de "apoio/suporte durante o intervalo dos alunos" faltavam** — a
+   importação de junho as descartou pela palavra "intervalo" na descrição, o mesmo
+   defeito do Infantil. Na agenda viravam **tempo ocioso** (o print do dono mostrava
+   os buracos na Aliciane e na Aline). **Preenchidos** por decisão do dono:
+   Aliciane 08:45 e 15:00, Luzirene 09:00 e 15:00, Verônica 08:50, Renata 08:45,
+   Tailane 08:45, Aline 09:00 — 6 tarefas novas (uma por local, categoria c8) e 8
+   itens. O script recusava gravar se algum buraco não estivesse vazio (item da rota,
+   intervalo ou fora do expediente). DT 2: 192 → 198 tarefas, 277 → 285 itens.
+   Os intervalos dessas pessoas estavam certos — a hachura clara na agenda era só
+   tempo vago.
+2. **16 durações em que a planilha se contradiz** (13 da Luziane, 3 do Jean): a
+   coluna TEMPO não bate com início/fim, e a importação seguiu o TEMPO. Decisão do
+   dono: **vale o horário, igual no Benfica**. Aplicado nos 16 itens e no
+   `tempo_base_min` das 12 tarefas de uso único (o "Apoio Cantina" da Luziane, 2×
+   com durações diferentes, mudou só nos itens). A rota pelo TEMPO deixava a
+   Luziane com 4 sobreposições e o "Recolher garrafas" das 11:20 invadindo o
+   almoço — pelo horário a escada fecha sem nenhuma. O script simulou o dia antes
+   de gravar e barrava só conflito NOVO: as sobreposições do Jean às 07:05 e 15:35
+   são da própria planilha (duas linhas no mesmo horário) e seguem do mesmo
+   tamanho. Backup em `Downloads/backup-duracoes-dt2-2026-10-07T17-49-13-435Z.json`.
+   **Depois disso: DT 2 × planilha = 284 de 284.**
+3. **1 item só na rota**: Fernanda/Zenir (07:00–17:00) às 06:05, 55 min, "Limpeza
+   das salas de aula do 2º andar" — antes da entrada dela e sem linha na planilha.
+   **Removido** por decisão do dono (a tarefa fica no cadastro). A rota da DT 2
+   ficou com 284 itens, exatamente os da planilha. ⚠ O bloco de 07/10 gerado
+   desse item continua na agenda (planejada) — gerar o dia não apaga.
+   Backup em `Downloads/backup-item-0605-dt2-2026-10-07T17-52-37-068Z.json`.
+
+Restam duas sobreposições antigas, ambas da importação de junho e espelho da
+planilha: Aliciane às 14:15 (garrafas × WC do camarim) e Aline às 07:05 (WCs da
+quadra × garrafas). Os dias já gerados recebem os 8 itens no próximo "Gerar o dia".
+Backup em `Downloads/backup-buracos-dt2-2026-10-07T17-46-13-560Z.json`.
+
+---
+
+## 2026-10-07 — As 26 pessoas da Dionísio Torres original foram para a DT 2
+
+Pergunta do dono: a "Rota de Trabalho DT2.xlsx" e a do Infantil (.ods) foram
+importadas? **Sem mudança de código** — entrada de registro, porque a escrita
+foi direta no Firestore e não passa pela auditoria.
+
+- **Infantil (.ods): sim**, desde 15/09, na DT 1 (37 pessoas, 395 itens).
+- **"DT2.xlsx": o conteúdo já estava no sistema, mas na sede errada.** As 26 abas
+  são as 26 pessoas importadas em **24/06** — a "Dionísio Torres" de antes do
+  Infantil. Pelo nome do CABEÇALHO, as 26 batem uma a uma. A DT 2 estava vazia
+  desde que foi criada em 15/09 "para a próxima planilha".
+
+Decisão do dono: *"são da DT2, pode mover"*. A tela recusa trocar de sede quem
+tem vínculo (`FUNCIONARIO_SEDE_COM_VINCULOS` — "migração assistida"), então foi
+por script, com inventário antes:
+
+| | Foi para a DT 2 | Ficou na DT 1 | Compartilhado |
+|---|---|---|---|
+| Pessoas | 26 | 37 | — |
+| Tarefas | 192 | 195 | **0** |
+| Locais | 21 | 189 | **0** |
+| Itens de rota | 277 | 395 | — |
+| Blocos de agenda | 1.670 (24/06 → hoje) | 395 | — |
+
+A separação era limpa: nenhuma tarefa ou local usado pelos dois grupos, e 0
+realizados, ausências, qualificações, tempos pessoais ou eventuais das 26. Os
+blocos antigos (junho a agosto) foram junto — o bloco tem de estar na sede da
+tarefa e do local dele, senão a regra de hierarquia quebra.
+
+Para nada mudar de comportamento:
+- `bloco_agenda_min=15`, que a DT 1 tinha por sede, foi **copiado para a DT 2**;
+- a **Larissa** (única supervisora com a DT 1 no escopo) ganhou a DT 2 em
+  `sedes_extra`. **Ela precisa sair e entrar de novo** — o escopo vai na sessão.
+
+**Conferido lendo de volta:** nas duas sedes, 0 item de rota, 0 bloco e 0 tarefa
+apontando para fora da própria sede. Blocos de hoje: 277 na DT 2, 395 na DT 1.
+Backup em `Downloads/backup-mover-dt2-2026-10-07T17-01-20-351Z.json`.
+
+Os homônimos de 15/09 se dividiram: Renata e Aline agora têm uma em cada sede;
+Fernanda/Zenir ×2 e A Definir ×2 continuam juntos, na DT 2.
+
+**Ficou em aberto, sem resposta ainda** (nada foi mexido nisso):
+- **6 abas com nome diferente do cabeçalho**: Alessandra/Veronica A., Suyane/
+  Virginia, Mariza/Tailane, Erica/Aliciane, "Portaria… VIT"/Jean, "Zenir e
+  Fernanda"/Fernanda/Zenir. O sistema segue com o nome do cabeçalho. Se for troca
+  de pessoa, o caminho é "assume o posto de";
+- **rotas com 1–2 tarefas a mais na planilha** (Naiane, Benedita, Verônica,
+  Luzirene, Renata, Aline) — falta comparar item a item.
+
+---
+
+## 2026-10-06 — Resumo executivo para o Chromos, e a régua de ocupação vira uma só
+
+O Chromos (hub da Infraestrutura) pediu duas leituras do Orkestria com um token
+só (`ORKESTRIA_TOKEN`), no estilo do resumo executivo do Serv3: as tarefas de uma
+pessoa por **matrícula** e os números da operação por sede. Saiu a segunda; a
+primeira está travada por falta de dado.
+
+### `GET /api/chromos/resumo?de=AAAA-MM&ate=AAAA-MM`
+
+`Authorization: Bearer <ORKESTRIA_TOKEN>`. Sem a variável: **503** (fechado,
+nunca aberto). Token errado ou ausente: **401**. `de > ate`, formato inválido ou
+só uma ponta: **400**. Sem `de`/`ate`: mês corrente em Fortaleza. Cache de 5 min.
+O `middleware.ts` passou a deixar `/api/chromos/` entrar sem cookie — o portão é o
+token, conferido na rota (hash + `timingSafeEqual`).
+
+Ajustes ao que o Chromos propôs, porque é o que existe de fato:
+- `ocupacaoMediaPct` é a **média das ocupações individuais** (o que as telas
+  sempre mostraram), não horas ÷ horas;
+- `diasFechados` virou **`diasConferidos`** — aqui "dia fechado" é sede que não abre
+  (feriado). Conferido = dia da sede em que todo bloco tem realizado;
+- entraram `execucoesParciais`, `execucoesOutras` (remanejada/cancelada) e
+  **`execucoesSemRegistro`**: as seis contas somam sempre `execucoesPrevistas`;
+- `codigo` da sede vai junto do nome (o Serv3 identifica a sede pelo código).
+
+Ocupação por **pessoa** (sede dela); execução por **bloco** (sede do bloco — o
+remanejo conta onde o trabalho foi feito). `porGrupo` e `geral` calculados sobre o
+conjunto, nunca somando linhas.
+
+### A régua estava copiada em duas telas
+
+Dashboard e Panorama faziam a mesma conta de ocupação cada um do seu jeito
+escrito à mão. Com um terceiro consumidor, cópia vira número diferente para a
+mesma pergunta. Agora é `ocupacaoPorPessoa` + `resumoDeOcupacao` em
+`lib/calculations.ts`, usadas pelas duas telas **e** pelo resumo.
+
+**Medido:** na mesma sede e período (memória, DT set–out), Dashboard 96% · 1h20 ·
+0 sobrecarga · 44 blocos; rota 95.9 · 1.3 h · 0 · 44. Panorama renderiza igual, sem
+erro de console. **No Firestore real** (servidor local lendo produção, só leitura):
+200, 6 sedes, a soma das execuções fecha com as previstas.
+
+Números de set–out/2026: 50 pessoas, ocupação média 97.7%, 12 em sobrecarga (CESIU
+3 de 3, Sul 1 8 de 11); **4.120 blocos previstos, 116 com realizado, 1 dia conferido**.
+
+### Grupos e a operação real
+
+`grupo` da sede é código (UNI, RAL, RDT, RPQ, RSU) → Universidade / Colégio. Dois
+estavam fora do padrão e foram corrigidos **em produção** por decisão do dono:
+CESIU `"Aldeota"` → `UNI`, Dionísio Torres 2 `""` → `RDT` (muda também o
+agrupamento do Panorama).
+
+⚠ **O realizado ainda é teste**: 116 registros em 3 dias (Sul 1 09/09, Pré Sul 22 e
+23/09), todos "conforme", 81 deles do fechar-o-dia em um clique. O planejamento é
+real desde setembro em CESIU, Sul 1, Sul 2, PQL 1, PQL 2 e Pré Sul.
+
+### Matrícula: o campo nasceu, o dado não
+
+O Orkestria **não guardava matrícula** — só id interno e nome, e há 9 nomes
+repetidos entre os ativos. O que existia era texto na observação de 37 pessoas da
+DT, com "001" em 13 delas. Criado `funcionarios.matricula` (opcional, no fim do
+SCHEMA, no formulário de cadastro, em `docs/02`). Testado na tela: salvo "77" e
+lido de volta. **A rota `tarefas-da-pessoa` só será construída quando o RH mandar
+a planilha** nome + sede → matrícula; antes disso ela responderia `null` para todos.
+
+### Ambiente
+
+O `.env` voltou ao original (`DATA_SOURCE=firebase`), que estava em
+`.env.bak-sessao` desde 17/09 — uma sessão trocou para memória e não destrocou.
+Acrescentado `ORKESTRIA_TOKEN` local; em produção, ele precisa ser criado na Vercel.
+
+15 testes novos (386 no total), 2 mutantes mortos (média do grupo pelas linhas;
+um status sumindo da soma). Um teste meu nasceu cego: `execucoesOutras` era o
+**resto** da conta, então a soma fechava por construção — passou a ser contado.
+
+**Arquivos:** `lib/resumoExecutivo.ts`, `services/resumoExecutivoService.ts`,
+`app/api/chromos/resumo/route.ts`, `middleware.ts`, `lib/calculations.ts`,
+`app/(app)/dashboard/page.tsx`, `app/(app)/panorama/page.tsx`,
+`app/(app)/funcionarios/page.tsx`, `types/Funcionario.ts`, `lib/schema.ts`,
+`docs/02-modelo-de-dados.md`, `.env.example`, `testes/resumo-executivo.test.ts`.
+
+---
+
+## 2026-09-28 — CESIU: o que não cabe vai para depois da saída, e a ficha diz o que foi feito
+
+Relato do dono: a equipe da CESIU tem mais tarefa do que jornada. Ela **desvia da
+rota** para cobrir colega ou atender emergência, às vezes pulando item, às vezes
+ficando depois do horário, e a planilha registra o excedente como uma lista sem
+horário **depois da linha `SAIDA`**. Decisão dele, "por enquanto": *"tacar tudo
+depois do horário e na ficha ele fala o que fez"*. **Sem mudança de código** —
+entrada de registro, porque a escrita foi direta no Firestore.
+
+### Por que não precisou de código
+
+Três peças já existentes fazem a ideia funcionar sozinhas:
+- a geração **não valida antes de criar** (`projetarDiaDaRota` não olha jornada);
+  cria tudo e confere depois;
+- bloco que **começa** na saída ou depois é `FORA_DO_EXPEDIENTE`, que a conferência
+  do dia deixa de fora de propósito (`NAO_REPORTADOS` em `lib/validacaoDoDia.ts` —
+  o comentário de lá já citava "27 blocos propositais da CESIU"). Na agenda ele
+  ganha as listras e conta no "· N passam da saída" da coluna;
+- a ficha imprime todo bloco não cancelado, com a caixa "Feito".
+
+O único cuidado: nenhum item pode **cruzar** a saída — esse é `PASSA_DA_SAIDA`, que
+é reportado. A rota de cada um termina exatamente na saída e os itens novos
+começam nela: 0 cruzamentos.
+
+### O que entrou
+
+34 itens na `Rota padrão`, na ordem da planilha "utopia(2)", em sequência a partir
+da saída, com o tempo já cadastrado de cada tarefa (a planilha não dá horário):
+
+| | Saída | Depois da saída | Vai até | Ocupação |
+|---|---|---|---|---|
+| Gleydison | 17:00 | 8 | 18:40 | 99% → **119%** |
+| Eveline | 18:00 | 14 | 20:50 | 98% → **131%** |
+| Jeová | 21:00 | 12 | 23:15 | 97% → **126%** |
+
+- **Segunda passada** (o lugar já está na rota da pessoa de manhã) reaproveita a
+  mesma tarefa: os Consultórios 01–04, Ultrassom 02 e Vestiário da Eveline, os
+  Consultórios 18/19 do Gleydison, o 36 do Jeová;
+- Consultório 18/19 da Eveline e do Jeová tinham 3 tarefas cadastradas cada e a
+  planilha não diz a atividade: ficou a que a sede **já usa na rota** ali
+  ("Limpeza consultórios", a do Gleydison);
+- 1 linha repetida do Jeová ("Recepção Principal (Area de atendimento)") entra uma vez;
+- as linhas de recado ("Funcionário também efetua a limpeza da mangueira às terças
+  e sextas…") não viraram item.
+
+⚠ **A CESIU passa a aparecer em sobrecarga (119–131%)** — decisão aceita pelo dono:
+é a demanda que existe e não cabe, e é o número que a importação da CESIU sempre
+quis mostrar.
+⚠ **A lista comum está nas três fichas** (Servidor, bebedouros, corredores,
+recepções, Cons. 18/19), como na planilha. Se dois marcarem o mesmo item, conta
+duas vezes.
+
+**Conferido lendo de volta:** 125 → 159 itens; 0 órfãos, 0 no intervalo, 0
+cruzando a saída. A única sobreposição é a de 5 min do Gleydison às 09:05, já
+registrada em 17/09. **Não foi conferido na tela nem numa ficha impressa** — as
+três afirmações acima vêm da leitura do código. Os 125 blocos de hoje (28/09)
+já estavam gerados; os 34 novos entram quando alguém clicar "Gerar o dia"
+(a geração é idempotente e só acrescenta o que falta).
+Backup em `Downloads/backup-cesiu-possaida-2026-09-28T19-03-12-784Z.json`.
+
+**O que ficou para depois** (discutido, não feito): cobertura com troca na Central
+("cobre X no lugar de Y" quando ninguém está livre — hoje ela só propõe troca
+100% segura, que na CESIU nunca existe) e um bloco de desvio/hora extra na ficha.
+Serviços eventuais: **0 registros** em produção, em todas as sedes; realizado da
+CESIU: 0.
+
+---
+
+## 2026-09-28 — Benfica conferido contra a planilha: já estava lá, 3 correções
+
+Pedido: *"importar essa planilha do benfica ao orkestria"* ("Rota de Trabalho
+asg- Benfica(1)", 4 abas). **Sem mudança de código** — entrada de registro,
+porque a escrita foi direta no Firestore e não passa pela auditoria.
+
+**O Benfica já estava importado desde 24/06**, desta mesma planilha: 4 pessoas,
+62 itens, 55 tarefas. Reimportar teria duplicado tudo. Comparei item a item —
+**60 de 63 batiam** — e, por decisão do dono, apliquei só a diferença:
+
+| | Antes | Agora |
+|---|---|---|
+| Maria — intervalo | 16:00–**17:15** | 16:00–**17:00** |
+| Maria — "Levar lanche dos professores e garrafas" | não existia | **17:00–17:15** (tarefa `christus_ben_t56`) |
+| Tamires — Sala dos professores 15:35 | 20 min (sobrepunha a das 15:50) | **15 min** |
+| Rejenildo — salas 104 a 106, 21:40 | 30 min (dia acabava 22:10) | **45 min**, até 22:25 |
+
+**Por que o almoço da Maria tinha 1h15:** em junho os intervalos do Benfica foram
+*inferidos pelas lacunas da rota*, e a linha do lanche não tinha entrado — a
+lacuna de 75 min virou almoço. A planilha diz `Intervalo - 16h00min às 17h00min`.
+
+**Onde a coluna D e o horário discordam, mandou o horário.** A importação de junho
+usou a D (duração); a D errada gerava a sobreposição da Tamires e o buraco de
+20 min no fim do Rejenildo. Nos dois casos, corrigidos **item da rota E
+`tempo_base_min` da tarefa** — as duas tarefas são de uso único, e o
+`createRotina` usa o tempo da tarefa, não a duração do item, para regra fixa.
+
+⚠ **Sobrou 1 sobreposição de 5 min, da planilha:** Maria, "Hospital simulado"
+13:35–14:45 e "Recepção odontologia" começando 14:40. Já existia em produção;
+deixada como está, como na CESIU — corrigir seria inventar horário.
+
+Ficou como estava, e fica anotado: **as 56 tarefas do Benfica moram num local
+só, "Geral"** (as sedes importadas depois têm um local por lugar, com metragem).
+Separar foi oferecido e não escolhido agora.
+
+**Conferido lendo de volta:** planilha × produção item a item, 63 = 63; 0
+órfãos, 0 fora do turno, 0 em intervalo. Ocupação 98% / 98% / 98% / 99%. Não
+havia blocos gerados depois de julho, então nada de agenda precisou ser mexido.
+Backup em `Downloads/backup-benfica-2026-09-28T18-48-55-554Z.json`.
+
+---
+
 ## 2026-09-17 — CESIU atualizada pela planilha "utopia(2)"
 
 Relato do dono: *"o Gleydson entra 7 e sai 17h, no sistema tá 6h30 16h30"*.
