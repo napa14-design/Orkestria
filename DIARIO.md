@@ -7,6 +7,210 @@
 
 ---
 
+## 2026-10-14 — Auditoria de segurança: o que foi corrigido e o que ficou pendente
+
+Uma auditoria de segurança (só leitura do repositório) deu **BLOQUEIA**. Cada
+achado foi conferido no código antes de corrigir. O repositório é **público**.
+
+**Corrigido:**
+- **`.env.bak-sessao` com todos os segredos, fora do `.gitignore`** — nunca foi
+  commitado (conferido no histórico) e era cópia exata do `.env`. Apagado; o
+  `.gitignore` passou a `.env*` com exceção do `.env.example`.
+- **Supervisor movia rotina para outra sede (ALTA).** `updateRotina` repassava o
+  corpo do PUT inteiro — o `Pick` só existia no TypeScript — e a rota conferia a
+  sede ATUAL, não a de destino. Agora há lista de campos editáveis (422 para o
+  resto) e validação de valor (`status` da lista, formato de data/horário,
+  duração numérica); bloco que sai de "cancelada" confere conflito. As rotas
+  irmãs (ausências, qualificações, tarefas, tempos) foram revisadas: recalculam
+  `sede_id` pelo funcionário/local depois do spread — sem escalada.
+- **Next 16.3.0 com RCE publicada (ALTA).** `next` 16.4.0, `firebase` 12.19,
+  `nodemailer` 10.1.1, override `@grpc/grpc-js ^1.14.6` (o do SDK web nem é
+  importado). `npm audit` completo: **0**. `firebase-admin` segue no 13.x (ver
+  CLAUDE.md). O portão (middleware) foi testado no 16.4: 307/401 como antes.
+- **Login Google sem `email_verified` (MÉDIA).** Com o provedor e-mail/senha ligado,
+  dava para criar conta com o e-mail de um administrador e entrar. Agora exige
+  `email_verified` e `sign_in_provider === "google.com"` (`lib/loginGoogle.ts`).
+- **Troca de senha sem a atual (BAIXA).** Pede a atual de quem já tem senha; quem
+  entrou só pelo Google cria a primeira sem ela.
+- **Cookie `secure`** sempre em produção; **headers** `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy` (sem CSP de propósito — o login Google usa popup
+  e precisa ser testado de verdade antes); **`DATA_SOURCE`** ausente em produção é
+  erro, e na Vercel só `firebase`/`sheets` (memória explícita continua para testar
+  a tela localmente).
+
+**A revisão do diff pendente (Desligar + SGCP) também pegou:** dado pessoal de
+desligamento nas entradas novas deste diário (retirado), o PUT de funcionário
+aceitando os campos de desligamento (agora 422), justa causa indo para o SGCP
+(vai "Desligamento"), chamada ao SGCP sem exigir https/sem timeout (corrigido), e
+no SGCP dois sistemas com o mesmo segredo (agora 503).
+
+**Segunda rodada da revisão:** os `create*` montavam `{ id: novoId(), ...dados }`,
+então um `id` no corpo do POST ganhava e o `criar` sobrescrevia um registro de
+outra sede (a rota confere só a sede de destino). O `id` foi para **depois** do
+spread nos 16 cadastros, com teste de regressão que cai sem a correção. A
+terceira rodada achou a variante `idFixo` no POST de rotina (o corpo escolhia o
+id do bloco): virou parâmetro interno de `createRotina`, que só a materialização
+passa — o corpo do pedido não o alcança mais.
+
+O que ainda está aberto da auditoria fica registrado no vault, não neste diário
+público.
+
+425 testes (Orkestria) e 12 (vagas do SGCP), `tsc` 0, build 0, 7 mutantes mortos
+— um por correção.
+
+---
+
+## 2026-10-13 — Posto extinto, checkbox "Ativo" fora, e um desligamento no Pré Sul (4 → 3)
+
+> Este diário é público (repositório aberto no GitHub) e aparece em `/da-ata`:
+> **nome de quem foi desligado e motivo de desligamento não entram aqui**.
+
+Pedido do dono: um ASG do Pré Sul saiu e o posto não será reposto — o Pré Sul
+vai de 4 para 3, sem vaga. O desenho do Desligar guardava a rota de quem sai como
+**posto vago** — certo quando alguém vem, errado quando o quadro **diminui**: a
+rota ficaria para sempre no "Assume o posto de" como vaga que não existe.
+
+### Posto extinto
+
+Com a vaga desmarcada, o modal pergunta: **"O posto continua — a rota fica
+guardada"** (padrão) ou **"O posto deixa de existir — o quadro diminui e a rota é
+apagada"**. Extinto: a rota sai no mesmo lote do desligamento, o cadastro ganha
+`posto_extinto` (não aparece como posto vago, e "Abrir vaga" some da linha e é
+recusado no servidor). Posto extinto **com** vaga se contradiz e é recusado sem
+gravar nada.
+
+### Checkbox "Ativo" saiu do cadastro
+
+Era o caminho antigo de saída, sem data, sem motivo e sem vaga. Cuidado que ele
+escondia: era o checkbox que mandava `ativo: true` no cadastro novo — sem ele, a
+pessoa recém-cadastrada nasceria sem `ativo` e sumiria das telas. O
+`createFuncionario` agora grava `ativo: true` quando o campo não vem (o `tsc`
+pegou a primeira versão, que punha o padrão antes do spread e era sobrescrito).
+
+### O desligamento no Pré Sul, em produção
+
+Escrita direta no Firestore, com a regra do serviço para posto extinto: data e
+motivo gravados no cadastro, inativo, `posto_extinto`; saíram os **18 blocos
+planejados de 09/10** e os **18 itens da rota**. Os blocos anteriores ficaram como
+histórico. O Pré Sul passou a ter **3 pessoas ativas**. Como a rota foi apagada,
+nem a versão hoje no ar (que ainda não olha quem saiu) gera bloco para o posto.
+
+⚠ Parte das tarefas desse posto fica sem quem faça; elas continuam no cadastro
+para encaixar à mão.
+
+Backup local, fora do repositório (pasta Downloads da máquina de quem rodou).
+**Medido na tela** (memória): sem "Ativo" no Editar; com a vaga marcada as opções
+de posto não aparecem, desmarcada aparecem com "continua" marcado. 3 testes novos,
+408 no total, `tsc` 0, build 0.
+
+**Arquivos:** `services/funcionariosService.ts`, `app/(app)/funcionarios/page.tsx`,
+`types/Funcionario.ts`, `lib/schema.ts`, `docs/02-modelo-de-dados.md`,
+`testes/desligar.test.ts`.
+
+---
+
+## 2026-10-13 — Desligar: abrir a vaga passa a ser escolha
+
+*"Tem que ter a opção de querer abrir a vaga ou não."* O modal de desligamento
+ganhou a caixinha **"Abrir vaga de substituição no SGCP"**, marcada por padrão.
+Desmarcada, o desligamento acontece igual (data, motivo, blocos, posto vago) e
+nada vai ao SGCP; a linha fica com **"Abrir vaga"** para quem mudar de ideia. No
+motivo "Abandono de emprego" a caixinha nem aparece — essa vaga é do Chromos.
+
+No servidor é `abrirVaga: false` no corpo de `/desligar`; ausente continua
+abrindo. **Medido na tela:** caixinha marcada ao abrir; some no abandono e volta
+em "Transferência"; desmarcada, a resposta foi *"não foi pedida no desligamento"*
+— e não "integração não configurada", o que prova que a escolha chegou ao
+servidor. 1 teste novo (desliga sem vaga, sem chamar o SGCP, e abre depois pelo
+botão), 405 no total, `tsc` 0, build 0.
+
+**Arquivos:** `services/funcionariosService.ts`, `app/(app)/funcionarios/page.tsx`,
+`testes/desligar.test.ts`.
+
+---
+
+## 2026-10-13 — "Excluir" virou "Desligar": data, motivo, posto vago e vaga no SGCP
+
+Pedido do dono: *"Excluir vai virar desligar → com data e motivo → vai abrir uma
+vaga ao SGCP"*.
+
+### Por que o Excluir não servia
+
+`deleteFuncionario` recusa quem tem rota ou histórico — ou seja, quase todo
+mundo — e manda "Editar e desmarcar Ativo". Quem saía virava um checkbox: sem
+data, sem motivo, sem ninguém avisado. E desmarcar escondia um furo: **a geração
+do dia criava blocos para inativo**, porque nada em `projetarDiaDaRota` olhava
+`ativo`. Em produção não doeu ainda (0 inativos em 122), mas o primeiro
+desligamento ia mostrar.
+
+### O que acontece ao desligar
+
+No cadastro de funcionário o botão é **Desligar** (o Excluir sumiu dessa tela via
+`permissao.excluir`), com modal de **data** e **motivo**:
+
+- grava `desligado_em` e `motivo_desligamento` — a pessoa **não é apagada**;
+- tira da agenda os blocos ainda **planejados** a partir da data; bloco com
+  realizado fica (mesma regra do "Assume o posto de");
+- a **rota padrão fica**: vira **posto vago**, e o "Assume o posto de" passa a
+  listar "Fulana — posto vago desde dd/mm". Quando alguém assume, a substituição
+  grava `substituido_por` no cadastro de quem saiu e o posto deixa de ser vago;
+- **abre a vaga no SGCP** (`POST /api/vagas-externas`) com cargo do cadastro (ou
+  ASG), setor Infraestrutura, sigla da sede, quem saiu, o motivo, o supervisor
+  que pediu e, na descrição, **as tarefas da rota** — o que o Chromos queria ter
+  na vaga. O código da vaga fica em `vaga_sgcp`.
+
+**Data futura = aviso prévio**: a vaga abre já, a pessoa segue na agenda até a
+véspera. Para não ensinar o desligamento a cada um dos mais de dez filtros por
+`ativo` das telas, a listagem do serviço entrega `ativo = false` quando a data
+chega (`comAtivoDoDia`), e só onde a data importa (geração, coluna da agenda,
+sugestão da paleta) entra `noQuadro(f, data)`.
+
+**Abandono de emprego não abre vaga daqui**: o Chromos já abre a dele depois de
+15 dias de falta — abrir aqui também daria duas vagas para o mesmo posto.
+
+**A vaga pode falhar e o desligamento não espera por ela.** SGCP fora do ar, sede
+que não existe lá (a **CESIU** — decisão do dono: o RH cadastra no SGCP) ou
+integração não configurada: o desligamento fica gravado, a tela diz por que a
+vaga não abriu, e a linha ganha **"Abrir vaga"** para tentar de novo. É idempotente
+nas duas pontas (`vaga_sgcp` aqui; id `orkestria_<funcionário>` lá).
+
+A geração ganhou o motivo `fora_do_quadro` (desligado na data ou inativo), com a
+frase "desligado(a) desde dd/mm — posto vago" no resultado do "Gerar o dia".
+
+### No SGCP (outro repositório)
+
+`api/vagas-externas.ts` aceitava só o Chromos. Agora **o token diz quem fala**:
+`SGPC_VAGAS_TOKEN` é o do Chromos e `SGPC_VAGAS_TOKEN_ORKESTRIA` o do Orkestria,
+e o corpo não pode alegar outro sistema (mutante "acreditar no corpo" morto). Id,
+`origem` e textos por sistema. 3 testes novos, 455 na suíte do SGCP.
+
+### Para funcionar em produção (falta configurar)
+
+1. SGCP na Vercel: `SGPC_VAGAS_TOKEN_ORKESTRIA = <segredo>`;
+2. Orkestria na Vercel: `SGCP_VAGAS_URL = https://<domínio do SGCP>/api/vagas-externas`
+   e `SGCP_VAGAS_TOKEN = <o mesmo segredo>`;
+3. RH cadastrar a CESIU nas sedes do SGCP.
+
+Sem isso o Desligar funciona e só a vaga não abre — a tela diz.
+
+**Medido na tela** (banco de memória, cadastro de teste): uma pessoa desligada
+para 14/10 → aviso *"A vaga não foi aberta: A integração com o SGCP não está
+configurada"*, selo **"DESLIGA EM 14/10/2026"**, botão **"Abrir vaga"**; agenda de
+13/10 com as 4 colunas, de 14/10 com 3; no "+ Novo funcionário", o "Assume o posto
+de" oferece *"<nome> — posto vago desde 14/10/2026"*. `tsc` 0, build 0, 404 testes
+(18 novos), 3 mutantes mortos (bloco realizado saindo; o próprio dia ainda contando;
+abandono abrindo vaga).
+
+**Arquivos:** `lib/desligamento.ts`, `lib/projecaoDia.ts`, `services/funcionariosService.ts`,
+`services/modelosService.ts`, `app/api/funcionarios/[id]/desligar/route.ts`,
+`app/api/funcionarios/[id]/vaga/route.ts`, `app/(app)/funcionarios/page.tsx`,
+`app/(app)/rotinas/page.tsx`, `components/agenda/TaskPalette.tsx`,
+`components/CrudManager.tsx`, `types/Funcionario.ts`, `lib/schema.ts`,
+`docs/02-modelo-de-dados.md`, `.env.example`, `testes/desligar.test.ts`.
+SGCP: `api/vagas-externas.ts`, `api/vagas-externas.test.ts`.
+
+---
+
 ## 2026-10-07 — DT 1 e DT 2 conferidas contra as planilhas; 8 buracos preenchidos na DT 2
 
 Pergunta do dono: as rotas padrão estão iguais às planilhas? Confronto item a
