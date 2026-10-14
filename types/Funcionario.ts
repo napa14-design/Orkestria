@@ -32,6 +32,18 @@ export interface Funcionario extends Auditoria {
    * O nome não serve: há homônimos ativos. Vazio = ainda não informada.
    */
   matricula?: string;
+  /**
+   * Desligamento (AAAA-MM-DD): a partir deste dia a pessoa sai da geração e da
+   * agenda. Pode ser futuro (aviso prévio). Ver `lib/desligamento.ts`.
+   */
+  desligado_em?: string;
+  motivo_desligamento?: string;
+  /** Código da vaga de substituição aberta no SGCP. Vazio = ainda não abriu. */
+  vaga_sgcp?: string;
+  /** Id de quem assumiu o posto ("Assume o posto de"). Preenchido = não é mais posto vago. */
+  substituido_por?: string;
+  /** No desligamento, o posto deixou de existir: a rota foi apagada e não há posto vago. */
+  posto_extinto?: boolean;
   ativo: boolean;
   observacoes: string;
 }

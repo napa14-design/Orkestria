@@ -81,9 +81,11 @@ export async function gravarSessao(sessao: SessaoUsuario): Promise<void> {
   jar.set(COOKIE_SESSAO, criarTokenSessao(sessao), {
     httpOnly: true,
     sameSite: "lax",
-    // Ative COOKIE_SECURE=true ao publicar atrás de HTTPS. O padrão é false
-    // porque o MVP costuma rodar em HTTP na rede interna.
-    secure: process.env.COOKIE_SECURE === "true",
+    // Em produção, sempre `secure` — o sistema está na Vercel, atrás de HTTPS, e
+    // esquecer a variável não pode mandar o cookie de sessão em texto aberto
+    // (auditoria, 14/10/2026). `localhost` é contexto seguro para o navegador,
+    // então `next start` local continua logando. Fora de produção, COOKIE_SECURE.
+    secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "true",
     maxAge: MAX_IDADE_S,
     path: "/",
   });

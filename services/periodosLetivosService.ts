@@ -47,8 +47,8 @@ export async function createPeriodoLetivo(
 
   const agora = agoraISO();
   return ds.criar("periodos_letivos", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,

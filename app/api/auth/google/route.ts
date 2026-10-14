@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { obterAppAdmin } from "@/lib/firebaseAdmin";
+import { emailDoTokenGoogle } from "@/lib/loginGoogle";
 import { montarSedesDaSessao } from "@/lib/permissions";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
@@ -40,10 +41,9 @@ export async function POST(req: Request) {
     );
   }
 
-  let email: string | undefined;
+  let identidade: ReturnType<typeof emailDoTokenGoogle>;
   try {
-    const decoded = await auth.verifyIdToken(idToken);
-    email = decoded.email?.toLowerCase();
+    identidade = emailDoTokenGoogle(await auth.verifyIdToken(idToken));
   } catch (e) {
     console.error("Login Google: token recusado na verificação:", e);
     return NextResponse.json(
@@ -51,9 +51,11 @@ export async function POST(req: Request) {
       { status: 401 },
     );
   }
-  if (!email) {
-    return NextResponse.json({ erro: "A conta Google não tem e-mail." }, { status: 401 });
+  // Token válido não basta: precisa ser login Google com e-mail verificado.
+  if ("erro" in identidade) {
+    return NextResponse.json({ erro: identidade.erro }, { status: 401 });
   }
+  const { email } = identidade;
 
   const usuario = await getUsuarioPorEmail(email);
   if (!usuario) {

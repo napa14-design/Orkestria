@@ -82,8 +82,8 @@ export async function createQualificacao(dados: Dados, autor: string): Promise<Q
     ]);
   const agora = agoraISO();
   return ds.criar("qualificacoes_funcionario", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sede_id: funcionario.sede_id,
     criado_por: autor,
     criado_em: agora,

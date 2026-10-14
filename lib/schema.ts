@@ -104,8 +104,13 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("ativo", "boolean"),
     col("observacoes"),
     ...AUDITORIA,
-    // Campo novo no FIM (o Sheets grava por posição — ver nota acima).
+    // Campos novos no FIM (o Sheets grava por posição — ver nota acima).
     col("matricula"),
+    col("desligado_em"),
+    col("motivo_desligamento"),
+    col("vaga_sgcp"),
+    col("substituido_por"),
+    col("posto_extinto", "boolean"),
   ],
   sedes: [
     col("id"),

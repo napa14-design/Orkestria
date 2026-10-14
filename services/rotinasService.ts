@@ -17,7 +17,7 @@ import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { formatarDataBR, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
-import type { AlertaValidacao, Funcionario, RotinaPlanejada } from "@/types";
+import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -127,8 +127,6 @@ export interface NovaRotina {
   tarefa_id: string;
   inicio_planejado: string;
   observacao?: string;
-  /** Id fixo (determinístico) — usado só pela materialização; manual usa aleatório. */
-  idFixo?: string;
   /** Autorização manual: rebaixa INTERVALO/SOBREPOSICAO de erro para alerta. */
   forcar?: boolean;
   /**
@@ -221,6 +219,12 @@ async function esperaEntreOsChoques(
 export async function createRotina(
   entrada: NovaRotina,
   supervisorId: string,
+  /**
+   * Id fixo (determinístico) — só a materialização passa. É parâmetro, e não campo
+   * de `NovaRotina`, de propósito: a rota repassa o corpo do POST inteiro, e um
+   * `idFixo` vindo dali sobrescrevia um bloco de outra sede (revisão, 14/10/2026).
+   */
+  idFixo?: string,
 ): Promise<ResultadoRotina> {
   const ds = await getDataSource();
   const [tarefa, funcionario] = await Promise.all([
@@ -301,7 +305,7 @@ export async function createRotina(
 
   const agora = agoraISO();
   const rotina: RotinaPlanejada = {
-    id: entrada.idFixo ?? novoId(),
+    id: idFixo ?? novoId(),
     data: entrada.data,
     funcionario_id: entrada.funcionario_id,
     sede_id: tarefa.sede_id,
@@ -322,6 +326,25 @@ export async function createRotina(
   return { rotina, alertas };
 }
 
+const STATUS_ROTINA: ReadonlySet<unknown> = new Set<StatusRotina>([
+  "planejada",
+  "realizada",
+  "nao_realizada",
+  "remanejada",
+  "cancelada",
+  "pendente",
+]);
+
+/** O que um PUT de rotina pode mudar. Sede, tarefa, local e contas derivadas, nunca. */
+const CAMPOS_EDITAVEIS_ROTINA: ReadonlySet<string> = new Set([
+  "inicio_planejado",
+  "funcionario_id",
+  "data",
+  "status",
+  "observacao",
+  "tempo_previsto_min",
+]);
+
 /**
  * Move a rotina de horário/funcionário e/ou redimensiona a duração,
  * revalidando conflitos. `forcar` autoriza manualmente intervalo/sobreposição.
@@ -341,6 +364,28 @@ export async function updateRotina(
   > & { forcar?: boolean; bloquearAlertas?: boolean },
 ): Promise<ResultadoRotina> {
   const { forcar, bloquearAlertas, ...dados } = mudancas;
+  // O `Pick` acima só existe no TypeScript: o corpo do PUT chega inteiro. Sem esta
+  // lista, `{ sede_id: "<outra sede>" }` passava direto para o banco — a rota
+  // confere a sede ATUAL da rotina, não a de destino (auditoria de 14/10/2026).
+  const fora = Object.keys(dados).filter((k) => !CAMPOS_EDITAVEIS_ROTINA.has(k));
+  if (fora.length)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "CAMPO_NAO_EDITAVEL",
+        mensagem: `Campo(s) que não se alteram por aqui: ${fora.join(", ")}.`,
+      },
+    ]);
+  // O nome do campo estar na lista não basta: o valor também chega cru do PUT.
+  const invalido =
+    (dados.status !== undefined && !STATUS_ROTINA.has(dados.status)) ||
+    (dados.inicio_planejado !== undefined && !/^\d{2}:\d{2}$/u.test(String(dados.inicio_planejado))) ||
+    (dados.data !== undefined && !/^\d{4}-\d{2}-\d{2}$/u.test(String(dados.data))) ||
+    (dados.tempo_previsto_min !== undefined && !Number.isFinite(dados.tempo_previsto_min));
+  if (invalido)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "VALOR_INVALIDO", mensagem: "Valor inválido em status, data, horário ou duração." },
+    ]);
   const ds = await getDataSource();
   const atual = await ds.obter("rotinas_planejadas", id);
   if (!atual) throw new Error("Rotina não encontrada.");
@@ -399,7 +444,9 @@ export async function updateRotina(
     dados.inicio_planejado !== undefined ||
     dados.funcionario_id !== undefined ||
     dados.data !== undefined ||
-    redimensionou;
+    redimensionou ||
+    // Bloco cancelado que volta ao dia ocupa horário de novo: confere conflito.
+    (atual.status === "cancelada" && dados.status !== undefined && dados.status !== "cancelada");
 
   if (mudouPosicao) {
     await exigirPresenca(funcionario.id, funcionario.nome, destinoData);

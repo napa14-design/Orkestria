@@ -2,9 +2,11 @@ node_modules/
 .next/
 out/
 build/
-.env
-.env.local
-.env*.local
+# Qualquer .env* (inclusive cópias como .env.bak-*), menos o modelo sem segredos.
+# O repositório é público: o padrão antigo deixava um .env.bak-sessao com a chave
+# do Firestore a um `git add .` de ser publicado (auditoria de 14/10/2026).
+.env*
+!.env.example
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store

@@ -93,7 +93,14 @@ let instancia: DataSource | null = null;
 /** Singleton do datasource, escolhido por DATA_SOURCE (memory | sheets | firebase). */
 export async function getDataSource(): Promise<DataSource> {
   if (instancia) return instancia;
-  const modo = process.env.DATA_SOURCE ?? "memory";
+  // Variável esquecida não pode virar banco em memória calado: as escritas
+  // sumiriam sem erro e o Chromos leria zeros (auditoria, 14/10/2026). Na Vercel
+  // só valem os bancos de verdade; fora dela, `memory` explícito continua (é
+  // como a tela é testada em `next start` local).
+  const modo = process.env.DATA_SOURCE ?? (process.env.NODE_ENV === "production" ? "" : "memory");
+  if (process.env.VERCEL && modo !== "firebase" && modo !== "sheets")
+    throw new Error(`DATA_SOURCE="${modo}" não é permitido na Vercel — use "firebase" (ou "sheets").`);
+  if (!modo) throw new Error("DATA_SOURCE não definido. Use \"firebase\", \"sheets\" ou, para testes locais, \"memory\".");
   let bruto: DataSource;
   if (modo === "firebase") {
     const { FirebaseDataSource } = await import("./firebaseClient");

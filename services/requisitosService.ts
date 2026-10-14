@@ -28,8 +28,8 @@ export async function createRequisito(dados: Dados, autor: string): Promise<Requ
   const ds = await getDataSource();
   const agora = agoraISO();
   return ds.criar("requisitos", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,

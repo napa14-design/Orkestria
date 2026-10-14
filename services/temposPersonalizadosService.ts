@@ -69,8 +69,8 @@ export async function createTempoPersonalizado(dados: Dados, autor: string): Pro
     ]);
   const agora = agoraISO();
   return ds.criar("tempos_personalizados", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     tempo_min: Math.round(dados.tempo_min),
     sede_id: funcionario.sede_id,
     criado_por: autor,

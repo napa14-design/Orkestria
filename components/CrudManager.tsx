@@ -94,6 +94,11 @@ export interface PermissaoCrud<T> {
   criar?: boolean;
   /** Por item: falso esconde "Editar" e "Excluir" naquela linha. */
   alterar?: (item: T) => boolean;
+  /**
+   * Falso esconde só o "Excluir". Funcionário não se exclui, se desliga (com
+   * data e motivo) — a tela põe o "Desligar" no lugar via `acoesExtra`.
+   */
+  excluir?: boolean;
 }
 
 export interface ColunaTabela<T> {
@@ -801,14 +806,19 @@ export default function CrudManager<T extends Registro>({
                     <>
                       <button className="btn btn-mini btn-fantasma" onClick={() => abrirEdicao(item)}>
                         Editar
-                      </button>{" "}
-                      <button
-                        className="btn btn-mini btn-fantasma"
-                        style={{ color: "var(--vermelho)" }}
-                        onClick={() => { setParaExcluir(item); setErroExcluir(""); }}
-                      >
-                        Excluir
                       </button>
+                      {permissao?.excluir !== false && (
+                        <>
+                          {" "}
+                          <button
+                            className="btn btn-mini btn-fantasma"
+                            style={{ color: "var(--vermelho)" }}
+                            onClick={() => { setParaExcluir(item); setErroExcluir(""); }}
+                          >
+                            Excluir
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </td>

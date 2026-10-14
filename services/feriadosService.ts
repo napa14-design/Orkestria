@@ -49,8 +49,8 @@ export async function createFeriado(dados: DadosFeriado, autor: string): Promise
 
   const agora = agoraISO();
   return ds.criar("feriados", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,

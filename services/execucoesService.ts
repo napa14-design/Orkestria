@@ -232,7 +232,8 @@ export async function registrarExecucao(
       atualizado_em: agora,
     });
   } else {
-    execucao = { id: novoId(), ...registro, criado_em: agora, atualizado_em: agora };
+    // id depois do spread: o do corpo não sobrescreve outro registro (revisão, 14/10/2026).
+    execucao = { ...registro, id: novoId(), criado_em: agora, atualizado_em: agora };
     await ds.criar("execucoes_realizadas", execucao);
   }
 

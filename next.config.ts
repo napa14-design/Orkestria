@@ -21,6 +21,25 @@ const nextConfig: NextConfig = {
     config.module.rules.push({ test: /DIARIO\.md$/u, type: "asset/source" });
     return config;
   },
+  /**
+   * Headers de segurança (auditoria, 14/10/2026). O principal é o DENY: sem
+   * ele, uma página externa embutia o sistema num iframe e induzia o supervisor
+   * logado a clicar em "Limpar dia". Sem CSP por ora: o login com Google usa
+   * popup e scripts do Firebase, e uma CSP errada derruba o login de todos —
+   * só entra testada contra o Google de verdade.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "same-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -30,8 +30,8 @@ export async function createTarefa(dados: DadosTarefa, autor: string): Promise<T
     ]);
   const agora = agoraISO();
   return ds.criar("tarefas", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sede_id: local.sede_id, // herdada do local
     criado_por: autor,
     criado_em: agora,

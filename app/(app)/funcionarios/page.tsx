@@ -1,8 +1,12 @@
 "use client";
 
-import useSWR from "swr";
+import { useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
+import Modal from "@/components/Modal";
+import { apiPost, ErroApi } from "@/lib/clientApi";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
+import { MOTIVOS_DESLIGAMENTO, motivoAbreVaga } from "@/lib/desligamento";
 import {
   csvDoTrio,
   resumoIntervalos,
@@ -35,13 +39,108 @@ export default function PaginaFuncionarios() {
   const nomeSede = (id: string) =>
     sedes?.find((s) => s.id === id)?.nome_sede ?? id;
 
-  /** Quem já está na sede escolhida e pode ter o posto assumido. */
+  const { mutate } = useSWRConfig();
+  const [paraDesligar, setParaDesligar] = useState<Funcionario | null>(null);
+  const [desligamento, setDesligamento] = useState({
+    data: hojeISO(),
+    motivo: "",
+    abrirVaga: true,
+    extinguirPosto: false,
+  });
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  /** O que aconteceu, dito depois de desligar ou de tentar a vaga de novo. */
+  const [aviso, setAviso] = useState<{ tipo: "ok" | "aviso"; texto: string } | null>(null);
+
+  const recarregar = () =>
+    mutate((k) => typeof k === "string" && k.startsWith("/api/funcionarios"));
+  const dataBR = (iso?: string) => (iso ? iso.split("-").reverse().join("/") : "");
+  const fraseDaVaga = (v: { aberta: boolean; codigo?: string; motivo?: string }) =>
+    v.aberta ? `Vaga #${v.codigo} aberta no SGCP.` : `A vaga não foi aberta: ${v.motivo}`;
+
+  const abrirDesligar = (f: Funcionario) => {
+    setParaDesligar(f);
+    setDesligamento({ data: hojeISO(), motivo: "", abrirVaga: true, extinguirPosto: false });
+    setErro("");
+  };
+
+  const confirmarDesligamento = async () => {
+    if (!paraDesligar) return;
+    setEnviando(true);
+    setErro("");
+    try {
+      const r = await apiPost<{
+        blocosRemovidos: number;
+        itensDeRotaApagados: number;
+        vaga: { aberta: boolean; codigo?: string; motivo?: string };
+      }>(`/api/funcionarios/${paraDesligar.id}/desligar`, {
+        ...desligamento,
+        // Só vale sem vaga: com vaga aberta, o posto continua por definição.
+        extinguirPosto: !desligamento.abrirVaga && desligamento.extinguirPosto,
+      });
+      setAviso({
+        tipo: r.vaga.aberta ? "ok" : "aviso",
+        texto:
+          `${paraDesligar.nome} desligado(a) a partir de ${dataBR(desligamento.data)}` +
+          (r.blocosRemovidos ? ` · ${r.blocosRemovidos} bloco(s) planejado(s) saíram da agenda` : "") +
+          (r.itensDeRotaApagados ? ` · posto extinto: ${r.itensDeRotaApagados} item(ns) da rota apagado(s)` : "") +
+          `. ${fraseDaVaga(r.vaga)}`,
+      });
+      setParaDesligar(null);
+      await recarregar();
+    } catch (e) {
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível desligar.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const tentarVaga = async (f: Funcionario) => {
+    try {
+      const v = await apiPost<{ aberta: boolean; codigo?: string; motivo?: string }>(
+        `/api/funcionarios/${f.id}/vaga`,
+        {},
+      );
+      setAviso({ tipo: v.aberta ? "ok" : "aviso", texto: `${f.nome}: ${fraseDaVaga(v)}` });
+      await recarregar();
+    } catch (e) {
+      setAviso({ tipo: "aviso", texto: e instanceof ErroApi ? e.message : "Não foi possível falar com o SGCP." });
+    }
+  };
+
+  /**
+   * Quem pode ter o posto assumido na sede escolhida: quem está lá hoje e os
+   * POSTOS VAGOS — desligados cuja rota ninguém assumiu ainda.
+   */
   const candidatos = (form: Record<string, unknown>) =>
     (equipe ?? [])
-      .filter((f) => f.sede_id === form.sede_id && f.ativo !== false)
-      .map((f) => ({ valor: f.id, rotulo: `${f.nome} (${f.entrada}–${f.saida})` }));
+      .filter(
+        (f) =>
+          f.sede_id === form.sede_id &&
+          !f.substituido_por &&
+          !f.posto_extinto &&
+          (f.ativo !== false || Boolean(f.desligado_em)),
+      )
+      .map((f) => ({
+        valor: f.id,
+        rotulo: f.desligado_em
+          ? `${f.nome} — posto vago desde ${dataBR(f.desligado_em)}`
+          : `${f.nome} (${f.entrada}–${f.saida})`,
+      }));
 
   return (
+    <>
+    {aviso && (
+      <div
+        className={`alerta ${aviso.tipo === "ok" ? "alerta-ok" : "alerta-aviso"}`}
+        style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", gap: 12 }}
+      >
+        <span>{aviso.texto}</span>
+        <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setAviso(null)}>
+          ×
+        </button>
+      </div>
+    )}
     <CrudManager<Funcionario>
       titulo="Funcionários"
       subtitulo="Equipe ASG/serviços gerais. A jornada líquida é calculada automaticamente."
@@ -49,6 +148,27 @@ export default function PaginaFuncionarios() {
       porSede
       textoNovo="+ Novo funcionário"
       vazio="Adicione a equipe (ASGs): horário, sede e escala. Depois é só montar a rotina arrastando tarefas."
+      // Funcionário não se exclui, se desliga: com data, motivo e vaga no SGCP.
+      permissao={{ excluir: false }}
+      acoesExtra={(f) =>
+        !f.desligado_em ? (
+          <button
+            className="btn btn-mini btn-fantasma"
+            style={{ color: "var(--vermelho)" }}
+            onClick={() => abrirDesligar(f)}
+          >
+            Desligar
+          </button>
+        ) : !f.vaga_sgcp && !f.posto_extinto && motivoAbreVaga(f.motivo_desligamento ?? "") ? (
+          <button
+            className="btn btn-mini btn-fantasma"
+            title="A vaga de substituição ainda não foi aberta no SGCP."
+            onClick={() => void tentarVaga(f)}
+          >
+            Abrir vaga
+          </button>
+        ) : null
+      }
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
         {
@@ -126,7 +246,8 @@ export default function PaginaFuncionarios() {
           tipo: "texto",
           dica: "Matrícula do RH. Opcional — é por ela que outros sistemas da Infraestrutura encontram a pessoa, porque nome pode repetir.",
         },
-        { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+        // Sem checkbox "Ativo": desmarcar era o caminho antigo de saída, sem data,
+        // sem motivo e sem vaga. Quem sai, sai pelo "Desligar" (13/10/2026).
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
         {
           key: "substitui",
@@ -223,13 +344,124 @@ export default function PaginaFuncionarios() {
         {
           key: "ativo",
           rotulo: "Status",
-          render: (f) => (
-            <span className={`selo ${f.ativo ? "selo-verde" : "selo-cinza"}`}>
-              {f.ativo ? "Ativo" : "Inativo"}
-            </span>
-          ),
+          render: (f) => {
+            if (f.desligado_em) {
+              const futuro = f.desligado_em > hojeISO();
+              const vaga = f.vaga_sgcp ? ` · vaga #${f.vaga_sgcp} no SGCP` : "";
+              return (
+                <span
+                  className={`selo ${futuro ? "selo-amarelo" : "selo-cinza"}`}
+                  title={`${f.motivo_desligamento ?? ""}${vaga}`}
+                >
+                  {futuro ? "Desliga em" : "Desligado em"} {dataBR(f.desligado_em)}
+                </span>
+              );
+            }
+            return (
+              <span className={`selo ${f.ativo ? "selo-verde" : "selo-cinza"}`}>
+                {f.ativo ? "Ativo" : "Inativo"}
+              </span>
+            );
+          },
         },
       ]}
     />
+
+    <Modal
+      titulo={`Desligar ${paraDesligar?.nome ?? ""}`}
+      aberto={!!paraDesligar}
+      aoFechar={() => setParaDesligar(null)}
+      larguraMax={460}
+    >
+      <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)", marginTop: 0 }}>
+        A partir da data, {paraDesligar?.nome} sai da agenda e da geração do dia. Os dias
+        já trabalhados continuam no nome de quem trabalhou, e a rota padrão fica guardada
+        como posto vago para quem for contratado assumir.
+      </p>
+      <div className="form-grade">
+        <label className="campo">
+          <span className="rotulo">Data do desligamento</span>
+          <input
+            type="date"
+            value={desligamento.data}
+            onChange={(e) => setDesligamento((d) => ({ ...d, data: e.target.value }))}
+          />
+        </label>
+        <label className="campo">
+          <span className="rotulo">Motivo</span>
+          <select
+            value={desligamento.motivo}
+            onChange={(e) => setDesligamento((d) => ({ ...d, motivo: e.target.value }))}
+          >
+            <option value="">Escolha…</option>
+            {MOTIVOS_DESLIGAMENTO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {desligamento.data > hojeISO() && (
+        <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
+          Data futura (aviso prévio): até lá, a pessoa segue na agenda normalmente.
+        </p>
+      )}
+      {desligamento.motivo === "Abandono de emprego" ? (
+        <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
+          Abandono não abre vaga por aqui: o Chromos já abre sozinho depois de 15 dias de falta.
+        </p>
+      ) : (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13.5 }}>
+          <input
+            type="checkbox"
+            checked={desligamento.abrirVaga}
+            onChange={(e) => setDesligamento((d) => ({ ...d, abrirVaga: e.target.checked }))}
+          />
+          Abrir vaga de substituição no SGCP
+        </label>
+      )}
+      {!desligamento.abrirVaga && desligamento.motivo !== "Abandono de emprego" && (
+        <fieldset style={{ border: 0, padding: 0, margin: "10px 0 0 22px", display: "grid", gap: 6, fontSize: 13.5 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            <input
+              type="radio"
+              name="posto"
+              checked={!desligamento.extinguirPosto}
+              onChange={() => setDesligamento((d) => ({ ...d, extinguirPosto: false }))}
+            />
+            O posto continua — a rota fica guardada para quem for contratado
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            <input
+              type="radio"
+              name="posto"
+              checked={desligamento.extinguirPosto}
+              onChange={() => setDesligamento((d) => ({ ...d, extinguirPosto: true }))}
+            />
+            O posto deixa de existir — o quadro diminui e a rota é apagada
+          </label>
+        </fieldset>
+      )}
+      {erro && (
+        <div className="alerta alerta-erro" style={{ marginTop: 12 }}>
+          {erro}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+        <button type="button" className="btn" onClick={() => setParaDesligar(null)}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primario"
+          onClick={() => void confirmarDesligamento()}
+          disabled={enviando || !desligamento.data || !desligamento.motivo}
+        >
+          {enviando ? "Desligando…" : "Desligar"}
+        </button>
+      </div>
+    </Modal>
+    </>
   );
 }

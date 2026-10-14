@@ -4,6 +4,7 @@
 import { useMemo, useState } from "react";
 import { tempoPrevistoMin, blocosOcupados } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
+import { noQuadro } from "@/lib/desligamento";
 import { sugerirPorHabilitacao } from "@/lib/validations";
 import type {
   Categoria,
@@ -107,7 +108,7 @@ export default function TaskPalette({
     const mapa = new Map<string, { id: string; nome: string; nivel: NivelQualificacao }[]>();
     if (!data || !funcionarios.length || !requisitos.length) return mapa;
     // Ausente no dia não é sugestão útil — a alocação recusaria.
-    const elegiveis = funcionarios.filter((f) => f.ativo && !ausentes.has(f.id));
+    const elegiveis = funcionarios.filter((f) => f.ativo && noQuadro(f, data) && !ausentes.has(f.id));
     for (const t of tarefas) {
       if (!t.requisitos) continue;
       const s = sugerirPorHabilitacao({

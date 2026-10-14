@@ -12,6 +12,7 @@
  */
 import { jornadaDoDia } from "./calculations";
 import { diaDaSemana, parseDiasSemana } from "./dateUtils";
+import { noQuadro } from "./desligamento";
 import type { Funcionario, ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
 
 export type MotivoDescarte =
@@ -31,7 +32,12 @@ export type MotivoDescarte =
   /** A TAREFA é semanal e hoje não está nos dias dela. */
   | "outro_dia_da_semana"
   | "folga_pela_escala"
-  | "pessoa_ausente";
+  | "pessoa_ausente"
+  /**
+   * Desligado a partir desta data, ou inativado. Antes deste motivo a geração
+   * criava blocos para inativos: nada aqui olhava `ativo` (13/10/2026).
+   */
+  | "fora_do_quadro";
 
 export interface ItemDescartado {
   item: ModeloRotinaItem;
@@ -148,6 +154,12 @@ export function projetarDiaDaRota(
     const funcionario = ctx.funcionarios.get(item.funcionario_id);
     if (!tarefa || !funcionario) {
       descartar(item, "cadastro_removido");
+      continue;
+    }
+    // Quem saiu do quadro não tem dia: nenhum outro motivo importa. A rota fica
+    // guardada como posto vago, à espera de quem assumir.
+    if (!noQuadro(funcionario, ctx.data)) {
+      descartar(item, "fora_do_quadro");
       continue;
     }
     // Recorrência do próprio item: é o que permite a sede ter a camada de todo

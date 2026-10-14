@@ -65,6 +65,21 @@ export async function definirSenhaUsuario(
 }
 
 /**
+ * O próprio usuário troca a senha em "Minha conta". Quem já tem senha precisa
+ * dizer a atual: sem isso, alguns minutos com o cookie de outra pessoa bastavam
+ * para trocar a senha dela e ficar com a conta (auditoria, 14/10/2026). Quem
+ * ainda não tem senha (entrou só pelo Google) cria a primeira sem ela.
+ */
+export async function trocarPropriaSenha(id: string, senhaAtual: string, novaSenha: string): Promise<void> {
+  const ds = await getDataSource();
+  const usuario = await ds.obter("usuarios", id);
+  if (!usuario) throw new Error("Usuário não encontrado.");
+  if (usuario.senha_hash && !verificarSenha(senhaAtual, usuario.senha_hash))
+    throw new Error("A senha atual não confere.");
+  await definirSenhaUsuario(id, novaSenha);
+}
+
+/**
  * Gera um código de primeiro acesso e devolve o texto puro **uma única vez**.
  *
  * Também apaga a senha atual: é assim que se resolve "esqueci a senha" sem
@@ -178,8 +193,8 @@ export async function createUsuario(dados: DadosUsuario): Promise<Usuario> {
   const ds = await getDataSource();
   const agora = agoraISO();
   const usuario: Usuario = {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sedes_extra,
     criado_em: agora,
     atualizado_em: agora,

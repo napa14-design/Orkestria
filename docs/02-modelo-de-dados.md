@@ -58,6 +58,11 @@ unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | intervalo_min | número | minutos descontados da jornada |
 | intervalo_inicio, intervalo_fim | HH:mm | bloqueado na agenda |
 | matricula | string | opcional — matrícula do RH, chave do Chromos (o nome tem homônimos) |
+| desligado_em | AAAA-MM-DD | desligamento; a partir deste dia sai da geração e da agenda (pode ser futuro — aviso prévio) |
+| motivo_desligamento | string | um de `MOTIVOS_DESLIGAMENTO` (`lib/desligamento.ts`) |
+| vaga_sgcp | string | código da vaga de substituição aberta no SGCP; vazio = não abriu |
+| substituido_por | string | id de quem assumiu o posto; preenchido = não é mais posto vago |
+| posto_extinto | boolean | no desligamento o posto deixou de existir (quadro reduzido): a rota foi apagada |
 | ativo | boolean | |
 | observacoes | string | |
 | criado_por, criado_em, atualizado_por, atualizado_em | auditoria | |

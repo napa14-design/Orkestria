@@ -33,6 +33,7 @@ import {
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
+import { noQuadro } from "@/lib/desligamento";
 import { podeAutorizar, temErro, validarAlocacao } from "@/lib/validations";
 import { useRotinaData } from "./useRotinaData";
 import type { AlertaValidacao, RotinaPlanejada, Tarefa } from "@/types";
@@ -109,11 +110,14 @@ export default function PaginaRotinas() {
       .filter(
         (f) =>
           f.ativo &&
+          // Desligado com data futura (aviso prévio) segue ativo hoje, mas na
+          // agenda de um dia a partir do desligamento ele não tem coluna.
+          noQuadro(f, data) &&
           (!turno || f.turno === turno) &&
           (!q || f.nome.toLowerCase().includes(q)),
       )
       .toSorted((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  }, [funcionarios, turno, buscaFuncionario]);
+  }, [funcionarios, turno, buscaFuncionario, data]);
 
   /** Página de colunas exibida na agenda (8 por vez). */
   const totalPaginasFunc = Math.max(

@@ -345,9 +345,9 @@ export async function aplicarModelo(
             inicio_planejado: item.inicio_planejado,
             duracao_min: item.duracao_min,
             observacao: `Modelo: ${nome}`,
-            idFixo: idMaterializacao(data, item.funcionario_id, item.tarefa_id, item.inicio_planejado),
           },
           supervisorId,
+          idMaterializacao(data, item.funcionario_id, item.tarefa_id, item.inicio_planejado),
         );
         resultado.criadas++;
       } catch (e) {
@@ -648,6 +648,12 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(`${funcionario?.nome}: folga pela escala em ${ctx.data}`);
     else if (motivo === "pessoa_ausente")
       linhas.push(`${funcionario?.nome}: ausente — redistribuir no Remanejo`);
+    else if (motivo === "fora_do_quadro")
+      linhas.push(
+        funcionario?.desligado_em && ctx.data >= funcionario.desligado_em
+          ? `${funcionario.nome}: desligado(a) desde ${funcionario.desligado_em.split("-").reverse().join("/")} — posto vago`
+          : `${funcionario?.nome}: inativo(a) — fora da geração`,
+      );
   }
   return linhas;
 }
@@ -701,6 +707,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,
     pessoa_ausente: 0,
+    fora_do_quadro: 0,
   });
 
   const carregado = await carregarRotaEContexto(sedeId, data);

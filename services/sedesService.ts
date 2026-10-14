@@ -13,8 +13,8 @@ export async function createSede(dados: DadosSede, autor: string): Promise<Sede>
   const ds = await getDataSource();
   const agora = agoraISO();
   return ds.criar("sedes", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,

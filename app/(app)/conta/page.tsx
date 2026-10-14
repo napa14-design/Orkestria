@@ -6,6 +6,7 @@ import { apiPost, ErroApi } from "@/lib/clientApi";
 import { MIN_SENHA } from "@/lib/sessionConstants";
 
 export default function PaginaConta() {
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [senha, setSenha] = useState("");
   const [conf, setConf] = useState("");
   const [estado, setEstado] = useState<"idle" | "enviando" | "ok" | "erro">("idle");
@@ -21,9 +22,10 @@ export default function PaginaConta() {
     setEstado("enviando");
     setMsg("");
     try {
-      await apiPost("/api/auth/senha", { senha });
+      await apiPost("/api/auth/senha", { senha, senhaAtual });
       setEstado("ok");
       setMsg("Senha atualizada. Use-a no próximo login.");
+      setSenhaAtual("");
       setSenha("");
       setConf("");
     } catch (err) {
@@ -41,6 +43,13 @@ export default function PaginaConta() {
       </p>
 
       <form onSubmit={salvar} className="painel" style={{ padding: 16, display: "grid", gap: 12 }}>
+        <label className="campo">
+          <span className="rotulo">Senha atual</span>
+          <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} autoComplete="current-password" />
+          <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>
+            Deixe em branco se você ainda não tem senha (entrou só com o Google).
+          </span>
+        </label>
         <label className="campo">
           <span className="rotulo">Nova senha</span>
           <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" minLength={MIN_SENHA} required />

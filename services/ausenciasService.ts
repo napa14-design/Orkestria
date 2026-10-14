@@ -59,8 +59,8 @@ export async function createAusencia(
 
   const agora = agoraISO();
   return ds.criar("ausencias", {
-    id: novoId(),
     ...dados,
+    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sede_id: funcionario.sede_id, // herdada do funcionário
     criado_por: autor,
     criado_em: agora,
