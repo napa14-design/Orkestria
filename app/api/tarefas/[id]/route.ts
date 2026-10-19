@@ -11,7 +11,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("tarefas", id);
   if (!atual) throw new Error("Tarefa não encontrada.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram tarefas das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram tarefas das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -24,7 +24,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       const ds = await getDataSource();
       const destino = await ds.obter("locais", mudancas.local_id);
       if (destino && !podeAlterarSede(sessao, destino.sede_id))
-        throw new ErroPermissao("Supervisores não podem mover tarefas para outra sede.");
+        throw new ErroPermissao("Coordenadores não podem mover tarefas para outra sede.");
     }
     return ok(await updateTarefa(id, mudancas, sessao.email));
   });

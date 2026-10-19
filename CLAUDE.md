@@ -42,10 +42,14 @@ título, o que mudou e os arquivos principais. Nunca edite entradas antigas.
    herda a sede dele; rotina sempre tem funcionário+tarefa+local+sede+data+hora.
 6. **Auditoria**: toda escrita já é logada automaticamente na tabela
    `historico` pelo decorator `lib/historico.ts` — não criar logs manuais.
-7. **Permissões**: supervisor só altera as sedes que opera — `sede_id`
-   (principal) + `sedes_extra`, resolvidas por `sedesPermitidas`; as telas
-   mostram **uma sede por vez**, nunca agregam; visualizador só lê;
-   parâmetros respeitam `editavel_por_supervisor` (`lib/permissions.ts`).
+7. **Permissões** (`lib/permissions.ts`): **coordenador** (o antigo
+   "supervisor", renomeado em 19/10/2026) só altera as sedes que opera —
+   `sede_id` (principal) + `sedes_extra`, resolvidas por `sedesPermitidas`;
+   **supervisor** (perfil novo, de chão) só vê a rota e registra o realizado
+   (`podeRegistrarRealizado`), nas sedes dele e nunca em "todas"; as telas
+   mostram **uma sede por vez**, nunca agregam; visualizador só lê; parâmetros
+   respeitam `editavel_por_supervisor` (nome antigo da coluna — vale para o
+   coordenador).
 
 ## Comandos
 

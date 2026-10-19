@@ -11,7 +11,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("ausencias", id);
   if (!atual) throw new Error("Ausência não encontrada.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram ausências das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram ausências das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -24,7 +24,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       const ds = await getDataSource();
       const destino = await ds.obter("funcionarios", mudancas.funcionario_id);
       if (destino && !podeAlterarSede(sessao, destino.sede_id))
-        throw new ErroPermissao("Supervisores não podem mover ausências para outra sede.");
+        throw new ErroPermissao("Coordenadores não podem mover ausências para outra sede.");
     }
     return ok(await updateAusencia(id, mudancas, sessao.email));
   });

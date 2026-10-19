@@ -28,7 +28,8 @@ export default function CoberturaPanel({
   rotinas: RotinaPlanejada[];
   tarefas: Tarefa[];
   parametros: ParametrosResolvidos;
-  aoMover: (rotinaId: string, funcionarioId: string, inicio: string) => void;
+  /** Ausente = só leitura (supervisor): lista as órfãs, sem remanejar. */
+  aoMover?: (rotinaId: string, funcionarioId: string, inicio: string) => void;
 }) {
   const [destinos, setDestinos] = useState<Record<string, string>>({});
 
@@ -98,40 +99,46 @@ export default function CoberturaPanel({
                   (de {ausente?.nome ?? "?"} · {formatarDuracao(r.tempo_previsto_min)})
                 </span>
               </span>
-              <select
-                value={destino}
-                onChange={(e) => setDestinos((d) => ({ ...d, [r.id]: e.target.value }))}
-                style={{ fontSize: 12, padding: 4 }}
-              >
-                <option value="">— remanejar para —</option>
-                {candidatos
-                  .filter(
-                    ({ funcionario }) =>
-                      !tarefa?.restricao_genero ||
-                      funcionario.genero === tarefa.restricao_genero,
-                  )
-                  .map(({ funcionario, resumo }) => (
-                    <option key={funcionario.id} value={funcionario.id}>
-                      {funcionario.nome} (livre: {formatarDuracao(resumo.ociosidade_prevista_min)})
-                    </option>
-                  ))}
-              </select>
-              <button
-                className="btn btn-mini btn-primario"
-                disabled={!destino}
-                onClick={() => aoMover(r.id, destino, r.inicio_planejado)}
-                title="Move mantendo o horário; conflitos são validados"
-              >
-                Mover →
-              </button>
+              {aoMover && (
+                <>
+                  <select
+                    value={destino}
+                    onChange={(e) => setDestinos((d) => ({ ...d, [r.id]: e.target.value }))}
+                    style={{ fontSize: 12, padding: 4 }}
+                  >
+                    <option value="">— remanejar para —</option>
+                    {candidatos
+                      .filter(
+                        ({ funcionario }) =>
+                          !tarefa?.restricao_genero ||
+                          funcionario.genero === tarefa.restricao_genero,
+                      )
+                      .map(({ funcionario, resumo }) => (
+                        <option key={funcionario.id} value={funcionario.id}>
+                          {funcionario.nome} (livre: {formatarDuracao(resumo.ociosidade_prevista_min)})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    className="btn btn-mini btn-primario"
+                    disabled={!destino}
+                    onClick={() => aoMover(r.id, destino, r.inicio_planejado)}
+                    title="Move mantendo o horário; conflitos são validados"
+                  >
+                    Mover →
+                  </button>
+                </>
+              )}
             </div>
           );
         })}
-        <p style={{ fontSize: 11, color: "var(--tinta-3)" }}>
-          A movimentação mantém o horário original e passa pelas validações normais
-          (conflito, intervalo, expediente). Se conflitar, arraste o card manualmente
-          para outro horário do colega.
-        </p>
+        {aoMover && (
+          <p style={{ fontSize: 11, color: "var(--tinta-3)" }}>
+            A movimentação mantém o horário original e passa pelas validações normais
+            (conflito, intervalo, expediente). Se conflitar, arraste o card manualmente
+            para outro horário do colega.
+          </p>
+        )}
       </div>
     </div>
   );

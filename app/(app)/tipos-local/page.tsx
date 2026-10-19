@@ -39,7 +39,7 @@ export default function PaginaTiposLocal() {
           tipo: "texto",
           obrigatorio: true,
           ajuda: "Como aparece na lista do cadastro de Locais",
-          dica: "O nome do tipo de ambiente, como a sua operação chama. Ex.: Consultório, Laboratório, Vestiário, Quadra. É o que o supervisor vai escolher ao cadastrar um local.",
+          dica: "O nome do tipo de ambiente, como a sua operação chama. Ex.: Consultório, Laboratório, Vestiário, Quadra. É o que o coordenador vai escolher ao cadastrar um local.",
         },
         {
           key: "fator_intensidade",

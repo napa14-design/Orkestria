@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { podeAlterarSede, podeRegistrarRealizado } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { confirmarDiaComoPlanejado } from "@/services/execucoesService";
 
@@ -12,7 +12,7 @@ import { confirmarDiaComoPlanejado } from "@/services/execucoesService";
  */
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    if (!podeEscrever(sessao)) throw new ErroPermissao();
+    if (!podeRegistrarRealizado(sessao)) throw new ErroPermissao();
     const { sede, data, declarar_epi } = (await req.json()) as {
       sede?: string;
       data?: string;
@@ -20,12 +20,13 @@ export async function POST(req: Request) {
     };
     if (!sede || !data) return ok({ erro: "Informe sede e data." }, 400);
     if (!podeAlterarSede(sessao, sede))
-      throw new ErroPermissao("Supervisores só fecham o dia das sedes que operam.");
+      throw new ErroPermissao("Só se fecha o dia das sedes que você opera.");
 
     return ok(
       await confirmarDiaComoPlanejado(
         { sedeId: sede, data, declararEpi: !!declarar_epi },
         sessao.id,
+        sessao.perfil,
       ),
     );
   });

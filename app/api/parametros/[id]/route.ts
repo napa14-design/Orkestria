@@ -14,7 +14,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       throw new ErroPermissao("Este parâmetro não é editável pelo seu perfil.");
     const mudancas = await req.json();
     if (
-      sessao.perfil === "supervisor" &&
+      sessao.perfil === "coordenador" &&
       ((mudancas.sede_id !== undefined && mudancas.sede_id !== atual.sede_id) ||
         (mudancas.chave !== undefined && mudancas.chave !== atual.chave) ||
         (mudancas.tipo !== undefined && mudancas.tipo !== atual.tipo) ||
@@ -22,7 +22,7 @@ export async function PUT(req: Request, ctx: Ctx) {
           mudancas.editavel_por_supervisor !== atual.editavel_por_supervisor))
     )
       throw new ErroPermissao(
-        "Supervisores alteram o valor do parâmetro, não seu escopo ou regra de permissão.",
+        "Coordenadores alteram o valor do parâmetro, não seu escopo ou regra de permissão.",
       );
     return ok(await updateParametro(id, mudancas, sessao.email));
   });

@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     for (const funcionario of funcionarios) {
       if (funcionario && !podeAlterarSede(sessao, funcionario.sede_id))
         throw new ErroPermissao(
-          `Supervisores só renovam qualificações das sedes que operam — ${funcionario.nome} é de outra sede.`,
+          `Coordenadores só renovam qualificações das sedes que operam — ${funcionario.nome} é de outra sede.`,
         );
     }
 

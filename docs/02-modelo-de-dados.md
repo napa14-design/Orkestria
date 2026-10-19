@@ -28,17 +28,18 @@ parametros (sede_id|geral)   │ ├──< funcionarios (sede_id)
 | id | string | UUID |
 | nome | string | |
 | email | string | chave de login |
-| perfil | enum | administrador · supervisor · visualizador |
+| perfil | enum | administrador · coordenador · supervisor · visualizador (até 19/10/2026, "supervisor" era o coordenador de hoje) |
 | sede_id | string | sede **principal** (abre por padrão). `geral` = todas as sedes |
 | ativo | boolean | |
 | criado_em, atualizado_em | ISO 8601 | |
-| sedes_extra | string | sedes **adicionais** que o supervisor opera: ids separadas por vírgula. Vazio = opera só a principal |
+| sedes_extra | string | sedes **adicionais** que o coordenador/supervisor opera: ids separadas por vírgula. Vazio = opera só a principal |
 
-**Escopo de sede do supervisor.** Um coordenador pode cobrir mais de uma
-unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
+**Escopo de sede do coordenador e do supervisor.** Um coordenador pode cobrir
+mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 
-- Só vale para `perfil = supervisor`; nos outros perfis o campo é normalizado
-  para vazio (administrador e gerência já alcançam todas as sedes).
+- Só vale para `perfil = coordenador` ou `supervisor`; nos outros perfis o campo
+  é normalizado para vazio (administrador e gerência já alcançam todas as sedes).
+- O supervisor não pode ter `sede_id = geral` (o cadastro recusa).
 - Com `sede_id = geral`, `sedes_extra` é irrelevante e também é zerado.
 - As telas mostram **uma sede por vez** (seletor na Central e filtro na
   Agenda). Isso é deliberado: mantém cada consulta em um único `where` do

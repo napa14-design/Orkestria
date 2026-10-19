@@ -11,7 +11,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("locais", id);
   if (!atual) throw new Error("Local não encontrado.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram locais das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram locais das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -21,7 +21,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     await exigirAcesso((s) => podeAlterarSede(sessao, s), id);
     const mudancas = await req.json();
     if (mudancas.sede_id && !podeAlterarSede(sessao, mudancas.sede_id))
-      throw new ErroPermissao("Supervisores não podem mover locais para outra sede.");
+      throw new ErroPermissao("Coordenadores não podem mover locais para outra sede.");
     return ok(await updateLocal(id, mudancas, sessao.email));
   });
 }

@@ -14,7 +14,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("tempos_personalizados", id);
   if (!atual) throw new Error("Registro não encontrado.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram tempos das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram tempos das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -27,7 +27,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       const ds = await getDataSource();
       const destino = await ds.obter("funcionarios", mudancas.funcionario_id);
       if (destino && !podeAlterarSede(sessao, destino.sede_id))
-        throw new ErroPermissao("Supervisores não podem mover tempos para outra sede.");
+        throw new ErroPermissao("Coordenadores não podem mover tempos para outra sede.");
     }
     return ok(await updateTempoPersonalizado(id, mudancas, sessao.email));
   });

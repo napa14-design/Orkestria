@@ -16,6 +16,7 @@ export default function FiltersBar({
   aoMudarModo,
   aoMudarBusca,
   aoPlanejarPeriodo,
+  somenteLeitura,
 }: {
   data: string;
   sedeId: string;
@@ -29,6 +30,8 @@ export default function FiltersBar({
   aoMudarModo: (v: "dia" | "semana") => void;
   aoMudarBusca: (v: string) => void;
   aoPlanejarPeriodo: () => void;
+  /** Supervisor: a agenda é só leitura — sem "Preencher dias". */
+  somenteLeitura?: boolean;
 }) {
   return (
     <div
@@ -45,7 +48,9 @@ export default function FiltersBar({
       <div>
         <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>Rotina do dia</h1>
         <span className="rotulo" style={{ color: "var(--acento)" }}>
-          arraste tarefas para a agenda · salvamento automático
+          {somenteLeitura
+            ? "só leitura · marque o feito no Acompanhamento"
+            : "arraste tarefas para a agenda · salvamento automático"}
         </span>
       </div>
 
@@ -115,14 +120,16 @@ export default function FiltersBar({
       {/* Vale nos dois modos: quem monta um evento monta no DIA e precisa salvar
           a rota ali mesmo — exigir trocar para a semana escondia o caminho.
           O rótulo é o verbo, não o mecanismo: a pessoa quer encher os dias. */}
-      <button
-        className="btn"
-        data-tour="duplicar-modelos"
-        onClick={aoPlanejarPeriodo}
-        title="Copiar este dia (ou uma rota salva) para um período; e a biblioteca de rotas salvas"
-      >
-        ⧉ Preencher dias
-      </button>
+      {!somenteLeitura && (
+        <button
+          className="btn"
+          data-tour="duplicar-modelos"
+          onClick={aoPlanejarPeriodo}
+          title="Copiar este dia (ou uma rota salva) para um período; e a biblioteca de rotas salvas"
+        >
+          ⧉ Preencher dias
+        </button>
+      )}
     </div>
   );
 }

@@ -55,6 +55,7 @@ export default function AgendaGrid({
   aoIniciarArrasto,
   aoTerminarArrasto,
   alturaBloco = ALTURA_BLOCO_PADRAO,
+  somenteLeitura = false,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -79,6 +80,11 @@ export default function AgendaGrid({
   aoTerminarArrasto?: () => void;
   /** Altura de cada bloco em px (densidade da grade). */
   alturaBloco?: number;
+  /**
+   * Supervisor: vê a rota, não a monta. Sem soltar, arrastar, redimensionar nem
+   * remover; o balãozinho abre só para ler.
+   */
+  somenteLeitura?: boolean;
 }) {
   // Altura efetiva do bloco — todas as contas internas usam este valor.
   const ALTURA_BLOCO = alturaBloco;
@@ -377,7 +383,7 @@ export default function AgendaGrid({
               {/* corpo da coluna (zona de drop) */}
               <div
                 style={{ position: "relative", height: totalBlocos * ALTURA_BLOCO }}
-                onDragOver={(e) => {
+                onDragOver={somenteLeitura ? undefined : (e) => {
                   e.preventDefault();
                   const minuto = horarioDoDrop(e, e.currentTarget, f);
                   setPrevia((p) =>
@@ -386,7 +392,7 @@ export default function AgendaGrid({
                       : { funcionarioId: f.id, minuto },
                   );
                 }}
-                onDrop={(e) => {
+                onDrop={somenteLeitura ? undefined : (e) => {
                   e.preventDefault();
                   setPrevia(null);
                   aoTerminarArrasto?.();
@@ -546,7 +552,8 @@ export default function AgendaGrid({
                       passaDaSaida={hhmmParaMin(run.fim) > hhmmParaMin(f.saida)}
                       saida={f.saida}
                       rotuloResize={emResize ? formatarDuracao(resize.blocos * blocoMin) : undefined}
-                      podeRedimensionar={!!aoRedimensionar && unico}
+                      podeRedimensionar={!somenteLeitura && !!aoRedimensionar && unico}
+                      somenteLeitura={somenteLeitura}
                       aoIniciarArrasto={aoIniciarArrasto}
                       aoTerminarArrasto={() => {
                         setPrevia(null);
@@ -574,13 +581,17 @@ export default function AgendaGrid({
           tarefa={tarefaPorId.get(detalhe.run.tarefa_id)}
           local={localPorId.get(detalhe.run.local_id)}
           categoria={catPorId.get(tarefaPorId.get(detalhe.run.tarefa_id)?.categoria_id ?? "")}
-          aoRemover={(run) => {
-            removerRun(run);
-            setDetalhe(null);
-          }}
+          aoRemover={
+            somenteLeitura
+              ? undefined
+              : (run) => {
+                  removerRun(run);
+                  setDetalhe(null);
+                }
+          }
           aoFechar={() => setDetalhe(null)}
           aoEditar={
-            aoEditarBloco
+            aoEditarBloco && !somenteLeitura
               ? (run, inicio, minutos) => aoEditarBloco(run.membros[0].id, inicio, minutos)
               : undefined
           }

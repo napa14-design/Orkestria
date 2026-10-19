@@ -222,7 +222,7 @@ export default function PaginaTarefas() {
           tipo: "select",
           opcoes: FREQUENCIAS,
           padrao: "diaria",
-          dica: "Com que regularidade a tarefa deveria ser feita. Ajuda o painel \"Ficou de fora hoje\" a avisar quando uma tarefa diária não foi alocada ou uma semanal/mensal está vencida. Não cria a tarefa sozinho — é o supervisor que monta a agenda.",
+          dica: "Com que regularidade a tarefa deveria ser feita. Ajuda o painel \"Ficou de fora hoje\" a avisar quando uma tarefa diária não foi alocada ou uma semanal/mensal está vencida. Não cria a tarefa sozinho — é o coordenador que monta a agenda.",
         },
         {
           key: "dias_semana",
@@ -239,7 +239,7 @@ export default function PaginaTarefas() {
           tipo: "select",
           opcoes: PRIORIDADES,
           padrao: "media",
-          dica: "A importância da tarefa (alta, média, baixa). Aparece como cor na lista de tarefas para o supervisor priorizar o que alocar primeiro. Não bloqueia nada.",
+          dica: "A importância da tarefa (alta, média, baixa). Aparece como cor na lista de tarefas para o coordenador priorizar o que alocar primeiro. Não bloqueia nada.",
         },
         {
           key: "restricao_genero",

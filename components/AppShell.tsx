@@ -11,7 +11,7 @@ type Item = {
   href: string;
   rotulo: string;
   apenasAdmin?: boolean;
-  ocultarSupervisor?: boolean;
+  ocultarCoordenador?: boolean;
 };
 type Grupo = { rotulo: string; itens: Item[] };
 
@@ -64,9 +64,9 @@ const GRUPOS: Grupo[] = [
   {
     rotulo: "Sistema",
     itens: [
-      { href: "/da-ata", rotulo: "Da ata ao sistema", ocultarSupervisor: true },
+      { href: "/da-ata", rotulo: "Da ata ao sistema", ocultarCoordenador: true },
       { href: "/parametros", rotulo: "Parâmetros" },
-      { href: "/historico", rotulo: "Histórico", ocultarSupervisor: true },
+      { href: "/historico", rotulo: "Histórico", ocultarCoordenador: true },
       { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
     ],
   },
@@ -74,9 +74,19 @@ const GRUPOS: Grupo[] = [
 
 const ROTULO_PERFIL: Record<string, string> = {
   administrador: "Admin",
+  coordenador: "Coordenador",
   supervisor: "Supervisor",
   visualizador: "Gerência",
 };
+
+/**
+ * O supervisor (perfil de chão) só lê a rota e marca o realizado: o menu dele
+ * tem estas duas telas, e "Minha conta". Em qualquer outra URL a tela mostra
+ * um aviso em vez do conteúdo — quem nega de verdade é o servidor (403); isto
+ * só evita abrir uma tela cheia de botões que ele não pode usar.
+ */
+const TELAS_SUPERVISOR = ["/rotinas", "/acompanhamento"];
+const ALCANCE_SUPERVISOR = [...TELAS_SUPERVISOR, "/conta"];
 
 export default function AppShell({
   sessao,
@@ -94,12 +104,21 @@ export default function AppShell({
   useEffect(() => setAberto(null), [pathname]);
 
   const ehAdmin = sessao.perfil === "administrador";
+  const ehSupervisor = sessao.perfil === "supervisor";
+  const foraDoAlcance = ehSupervisor && !ALCANCE_SUPERVISOR.some((p) => pathname.startsWith(p));
   const visiveis = (g: Grupo) =>
-    g.itens.filter(
-      (i) =>
-        (!i.apenasAdmin || ehAdmin) &&
-        (!i.ocultarSupervisor || sessao.perfil !== "supervisor"),
+    g.itens.filter((i) =>
+      ehSupervisor
+        ? TELAS_SUPERVISOR.includes(i.href)
+        : (!i.apenasAdmin || ehAdmin) &&
+          (!i.ocultarCoordenador || sessao.perfil !== "coordenador"),
     );
+
+  // O login e o logo levam à Central, que não é tela do supervisor: ele cai
+  // direto na rota do dia.
+  useEffect(() => {
+    if (ehSupervisor && pathname === "/inicio") router.replace("/rotinas");
+  }, [ehSupervisor, pathname, router]);
   const grupoAtivo = (g: Grupo) => visiveis(g).some((i) => pathname.startsWith(i.href));
 
   // pequeno atraso ao sair, para o mouse cruzar o vão até o painel
@@ -147,7 +166,7 @@ export default function AppShell({
           zIndex: 50,
         }}
       >
-        <Link href="/inicio" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        <Link href={ehSupervisor ? "/rotinas" : "/inicio"} style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-horizontal-fundo-escuro.png"
@@ -223,7 +242,25 @@ export default function AppShell({
       </header>
 
       <main style={{ flex: 1, padding: 20, maxWidth: 1600, width: "100%", margin: "0 auto" }}>
-        {children}
+        {!foraDoAlcance ? (
+          children
+        ) : pathname === "/inicio" ? null : (
+          <div className="painel" style={{ maxWidth: 560, margin: "48px auto", padding: "20px 24px" }}>
+            <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Esta tela não é do seu perfil</h1>
+            <p style={{ fontSize: 14, color: "var(--tinta-2)", lineHeight: 1.55, marginBottom: 16 }}>
+              Como supervisor, você vê a rota do dia e marca as tarefas como feitas ou não, nas
+              sedes que acompanha.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link href="/rotinas" className="btn btn-primario">
+                Rotina do dia
+              </Link>
+              <Link href="/acompanhamento" className="btn">
+                Acompanhamento
+              </Link>
+            </div>
+          </div>
+        )}
       </main>
     </div>
     </SWRConfig>

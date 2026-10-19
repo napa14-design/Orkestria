@@ -35,7 +35,8 @@ interface BalaoDetalheProps {
   tarefa?: Tarefa;
   local?: Local;
   categoria?: Categoria;
-  aoRemover: (run: Run) => void;
+  /** Ausente junto com `aoEditar` = só leitura (supervisor): o balão não traz botões de ação. */
+  aoRemover?: (run: Run) => void;
   aoFechar: () => void;
   /**
    * Muda hora e duração sem arrastar. Existe porque arrastar é o único caminho
@@ -164,11 +165,13 @@ export default function BalaoDetalhe({ run, x, y, tarefa, local, categoria, aoRe
               </button>
             </div>
           </div>
-        ) : (
+        ) : aoRemover || aoEditar ? (
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button onClick={() => aoRemover(run)} style={{ ...botao, color: "var(--vermelho)" }}>
-              Remover
-            </button>
+            {aoRemover && (
+              <button onClick={() => aoRemover(run)} style={{ ...botao, color: "var(--vermelho)" }}>
+                Remover
+              </button>
+            )}
             <button
               onClick={() => setEditando(true)}
               disabled={!aoEditar || !unico}
@@ -178,7 +181,7 @@ export default function BalaoDetalhe({ run, x, y, tarefa, local, categoria, aoRe
               Editar
             </button>
           </div>
-        )}
+        ) : null}
       </div>
     </>
   );

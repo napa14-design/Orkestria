@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     };
     if (!sede) return ok({ erro: "Informe a sede." }, 400);
     if (!podeAlterarSede(sessao, sede))
-      throw new ErroPermissao("Supervisores só geram a rotina das sedes que operam.");
+      throw new ErroPermissao("Coordenadores só geram a rotina das sedes que operam.");
 
     if (Array.isArray(datas)) {
       // Datas repetidas gerariam o mesmo dia duas vezes na mesma chamada — a

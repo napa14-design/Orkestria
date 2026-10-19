@@ -25,16 +25,19 @@ export default function BotaoAjuda({
   titulo = "Ajuda desta tela",
   /** Chamado antes de abrir o tutorial — a agenda usa para voltar ao modo Dia. */
   aoComecarTutorial,
+  /** Restringe os tutoriais oferecidos (ids). A agenda só leitura do supervisor usa. */
+  soEtapas,
   children,
 }: {
   titulo?: string;
   aoComecarTutorial?: () => void;
+  soEtapas?: string[];
   children?: React.ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
   const router = useRouter();
   const rota = usePathname() ?? "";
-  const etapas = etapasDaRota(rota);
+  const etapas = etapasDaRota(rota).filter((e) => !soEtapas || soEtapas.includes(e.id));
 
   if (etapas.length === 0 && !children) return null;
 

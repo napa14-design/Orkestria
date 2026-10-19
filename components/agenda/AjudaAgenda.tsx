@@ -21,19 +21,39 @@ function Item({ children }: { children: React.ReactNode }) {
   return <li style={{ marginBottom: 8, lineHeight: 1.5 }}>{children}</li>;
 }
 
-export default function AjudaAgenda({ aoComecarTutorial }: { aoComecarTutorial?: () => void }) {
+export default function AjudaAgenda({
+  aoComecarTutorial,
+  somenteLeitura,
+}: {
+  aoComecarTutorial?: () => void;
+  /** Supervisor: a agenda é só leitura — sem as instruções de montar e sem os tutoriais de montar. */
+  somenteLeitura?: boolean;
+}) {
   return (
-    <BotaoAjuda titulo="Ajuda da agenda" aoComecarTutorial={aoComecarTutorial}>
+    <BotaoAjuda
+      titulo="Ajuda da agenda"
+      aoComecarTutorial={aoComecarTutorial}
+      soEtapas={somenteLeitura ? ["confirmar"] : undefined}
+    >
       <div style={{ fontSize: 13, color: "var(--tinta-2)" }}>
-          <p style={{ marginBottom: 12 }}>
-            <strong>Montar:</strong> arraste uma tarefa da <strong>paleta</strong> (à esquerda) para a
-            coluna de um funcionário e solte no horário. O card aparece na hora e já salva.
-          </p>
+          {somenteLeitura ? (
+            <p style={{ marginBottom: 12 }}>
+              <strong>Só leitura:</strong> aqui você vê a rota montada pela coordenação. Para marcar
+              o que foi feito, use <strong>Operação › Acompanhamento</strong>.
+            </p>
+          ) : (
+            <p style={{ marginBottom: 12 }}>
+              <strong>Montar:</strong> arraste uma tarefa da <strong>paleta</strong> (à esquerda) para a
+              coluna de um funcionário e solte no horário. O card aparece na hora e já salva.
+            </p>
+          )}
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            <Item>
-              <strong>Mover / ajustar:</strong> arraste o card para mudar de horário ou pessoa; use a
-              alça <span className="num">⠿</span> na base do card para mudar a duração.
-            </Item>
+            {!somenteLeitura && (
+              <Item>
+                <strong>Mover / ajustar:</strong> arraste o card para mudar de horário ou pessoa; use a
+                alça <span className="num">⠿</span> na base do card para mudar a duração.
+              </Item>
+            )}
             <Item>
               <strong>Blocos de 15 min:</strong> a grade é de 15 em 15 min. O tamanho do card arredonda
               para o bloco, mas os números (ocupação, ociosidade) usam o tempo exato.
@@ -41,7 +61,7 @@ export default function AjudaAgenda({ aoComecarTutorial }: { aoComecarTutorial?:
             <Item>
               <strong>Card:</strong> mostra só o <strong>nome da tarefa</strong>. <strong>Clique</strong>
               {" "}nele para abrir o <em>balãozinho</em> com horário, duração, local, categoria e
-              situação (e o botão Remover). A <strong>faixa colorida à esquerda</strong> indica a
+              situação{somenteLeitura ? "" : " (e o botão Remover)"}. A <strong>faixa colorida à esquerda</strong> indica a
               <em> categoria</em> (limpeza, higienização, apoio…). O <strong>fundo</strong>
               mostra a <em>situação</em>: papel = planejada; e tom suave quando muda —
               <span style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>

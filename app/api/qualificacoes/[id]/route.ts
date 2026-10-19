@@ -14,7 +14,7 @@ async function exigirAcesso(check: (sedeId: string) => boolean, id: string) {
   const atual = await ds.obter("qualificacoes_funcionario", id);
   if (!atual) throw new Error("Qualificação não encontrada.");
   if (!check(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram qualificações das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram qualificações das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -27,7 +27,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       const ds = await getDataSource();
       const destino = await ds.obter("funcionarios", mudancas.funcionario_id);
       if (destino && !podeAlterarSede(sessao, destino.sede_id))
-        throw new ErroPermissao("Supervisores não podem mover qualificações para outra sede.");
+        throw new ErroPermissao("Coordenadores não podem mover qualificações para outra sede.");
     }
     return ok(await updateQualificacao(id, mudancas, sessao.email));
   });

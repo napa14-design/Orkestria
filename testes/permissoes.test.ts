@@ -1,9 +1,12 @@
 /**
  * Escopo de sede — a parte do sistema em que um erro vaza dado de outra sede.
  *
- * A propriedade que estes testes protegem é uma só: **um supervisor nunca
- * amplia o próprio alcance**. Nem omitindo o filtro, nem trocando o parâmetro
- * na URL, nem com cookie antigo.
+ * A propriedade que estes testes protegem é uma só: **quem tem escopo de sede
+ * nunca amplia o próprio alcance**. Nem omitindo o filtro, nem trocando o
+ * parâmetro na URL, nem com cookie antigo.
+ *
+ * Em 19/10/2026 o antigo "supervisor" virou "coordenador" (os testes abaixo da
+ * base são dele), e "supervisor" passou a ser o perfil de chão — bloco no fim.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -14,7 +17,9 @@ import {
   podeCriarNoCatalogo,
   podeEditarItemDoCatalogo,
   podeEditarParametro,
+  podeEscrever,
   podeGerenciarCatalogo,
+  podeRegistrarRealizado,
   sedesPermitidas,
   type SessaoUsuario,
 } from "@/lib/permissions";
@@ -23,7 +28,7 @@ const base: SessaoUsuario = {
   id: "u1",
   nome: "Teste",
   email: "t@t.com",
-  perfil: "supervisor",
+  perfil: "coordenador",
   sede_id: "aldeota",
 };
 
@@ -52,7 +57,7 @@ describe("montarSedesDaSessao", () => {
 });
 
 describe("sedesPermitidas", () => {
-  it("null (sem restrição) para administrador, gerência e supervisor geral", () => {
+  it("null (sem restrição) para administrador, gerência e coordenador geral", () => {
     expect(sedesPermitidas(admin)).toBeNull();
     expect(sedesPermitidas(gerencia)).toBeNull();
     expect(sedesPermitidas(geral)).toBeNull();
@@ -102,7 +107,7 @@ describe("podeAlterarSede", () => {
     expect(podeAlterarSede(admin, "qualquer")).toBe(true);
   });
 
-  it("supervisor altera as que opera e nenhuma outra", () => {
+  it("coordenador altera as que opera e nenhuma outra", () => {
     expect(podeAlterarSede(duasSedes, "aldeota")).toBe(true);
     expect(podeAlterarSede(duasSedes, "messejana")).toBe(true);
     expect(podeAlterarSede(duasSedes, "benfica")).toBe(false);
@@ -133,12 +138,12 @@ describe("podeEditarParametro", () => {
     sede_id,
   });
 
-  it("supervisor edita parâmetro comum marcado como editável", () => {
+  it("coordenador edita parâmetro comum marcado como editável", () => {
     expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min"))).toBe(true);
     expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min", "aldeota"))).toBe(true);
   });
 
-  it("supervisor NÃO edita os limites de ocupação, mesmo marcados como editáveis", () => {
+  it("coordenador NÃO edita os limites de ocupação, mesmo marcados como editáveis", () => {
     for (const chave of CHAVES_SO_ADMINISTRADOR) {
       expect(podeEditarParametro(umaSede, marcado(chave)), chave).toBe(false);
       expect(podeEditarParametro(umaSede, marcado(chave, "aldeota")), chave).toBe(false);
@@ -163,7 +168,7 @@ describe("podeEditarParametro", () => {
     expect(podeEditarParametro(gerencia, marcado("bloco_agenda_min"))).toBe(false);
   });
 
-  it("supervisor não edita parâmetro de sede que não opera", () => {
+  it("coordenador não edita parâmetro de sede que não opera", () => {
     expect(podeEditarParametro(umaSede, marcado("bloco_agenda_min", "messejana"))).toBe(false);
   });
 
@@ -185,7 +190,7 @@ describe("podeEditarParametro", () => {
 describe("catálogo global", () => {
   const item = (autor?: string) => ({ criado_por: autor });
 
-  it("supervisor CRIA — é aditivo e não mexe em registro existente", () => {
+  it("coordenador CRIA — é aditivo e não mexe em registro existente", () => {
     expect(podeCriarNoCatalogo(umaSede)).toBe(true);
     expect(podeCriarNoCatalogo(admin)).toBe(true);
   });
@@ -194,15 +199,15 @@ describe("catálogo global", () => {
     expect(podeCriarNoCatalogo(gerencia)).toBe(false);
   });
 
-  it("supervisor edita o que ELE criou", () => {
+  it("coordenador edita o que ELE criou", () => {
     expect(podeEditarItemDoCatalogo(umaSede, item(umaSede.email))).toBe(true);
   });
 
-  it("supervisor NÃO edita item de outro — muda o cálculo das 18 sedes", () => {
+  it("coordenador NÃO edita item de outro — muda o cálculo das 18 sedes", () => {
     expect(podeEditarItemDoCatalogo(umaSede, item("outra.pessoa@x.com"))).toBe(false);
   });
 
-  it("os itens semeados ficam intocáveis para o supervisor", () => {
+  it("os itens semeados ficam intocáveis para o coordenador", () => {
     // Os 12 tipos, 8 categorias e 17 requisitos vieram com outro autor.
     expect(podeEditarItemDoCatalogo(umaSede, item("ia02@px.com.br"))).toBe(false);
     expect(podeEditarItemDoCatalogo(umaSede, item("catalogo"))).toBe(false);
@@ -240,5 +245,40 @@ describe("catálogo global", () => {
     // tarefas de uma categoria em todas as sedes.
     expect(podeGerenciarCatalogo(admin)).toBe(true);
     expect(podeGerenciarCatalogo(umaSede)).toBe(false);
+  });
+});
+
+/**
+ * Supervisor — o perfil de chão (19/10/2026): vê a rota e marca as tarefas como
+ * feitas ou não, só nas sedes dele. Nada além disso.
+ */
+describe("supervisor (perfil de chão)", () => {
+  const sup: SessaoUsuario = { ...base, perfil: "supervisor", sedes: ["aldeota", "messejana"] };
+
+  it("registra o realizado nas sedes dele e em nenhuma outra", () => {
+    expect(podeRegistrarRealizado(sup)).toBe(true);
+    expect(podeAlterarSede(sup, "aldeota")).toBe(true);
+    expect(podeAlterarSede(sup, "benfica")).toBe(false);
+  });
+
+  it("não escreve no planejado, nos cadastros, nos parâmetros nem no catálogo", () => {
+    expect(podeEscrever(sup)).toBe(false);
+    expect(podeCriarNoCatalogo(sup)).toBe(false);
+    expect(podeEditarItemDoCatalogo(sup, { criado_por: sup.email })).toBe(false);
+    expect(
+      podeEditarParametro(sup, { chave: "bloco_agenda_min", editavel_por_supervisor: true, sede_id: "aldeota" }),
+    ).toBe(false);
+  });
+
+  it("nunca alcança 'todas as sedes' — nem com sede principal 'geral'", () => {
+    expect(sedesPermitidas(sup)).toEqual(["aldeota", "messejana"]);
+    const supGeral: SessaoUsuario = { ...sup, sede_id: "geral", sedes: [] };
+    expect(sedesPermitidas(supGeral)).not.toBeNull();
+    expect(limitarSedeConsulta(supGeral, "benfica")).toBe("geral"); // sede inexistente → nada
+    expect(limitarSedeConsulta(sup, "benfica")).toBe("aldeota");
+  });
+
+  it("gerência lê tudo mas não registra realizado", () => {
+    expect(podeRegistrarRealizado(gerencia)).toBe(false);
   });
 });

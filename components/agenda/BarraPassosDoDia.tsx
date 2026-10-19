@@ -22,6 +22,8 @@ interface BarraPassosDoDiaProps {
   /** Desfaz o dia. "geradas" = só o que a máquina criou; "todas" = o dia inteiro. */
   aoLimparDia?: (escopo: "geradas" | "todas") => void;
   aoAlternarDenso: () => void;
+  /** Supervisor: sem ensinar/desfazer e sem o atalho para Ausências (tela que não é dele). */
+  somenteLeitura?: boolean;
 }
 
 export default function BarraPassosDoDia({
@@ -37,12 +39,13 @@ export default function BarraPassosDoDia({
   aoLimparDia,
   aoSalvarRotaPadrao,
   aoAlternarDenso,
+  somenteLeitura,
 }: BarraPassosDoDiaProps) {
   return (
     <div className="painel agenda-acoes-contextuais">
       <span className="rotulo agenda-acoes-rotulo">Agora</span>
 
-      {!temRotaPadrao && temRotinas && (
+      {!somenteLeitura && !temRotaPadrao && temRotinas && (
         <button
           className="btn btn-mini"
           data-tour="ensinar-rota"
@@ -56,7 +59,7 @@ export default function BarraPassosDoDia({
 
       {/* O caminho de volta do "Gerar o dia": só aparece quando há o que
           desfazer, e some sozinho no dia vazio. */}
-      {temRotinas && aoLimparDia && (
+      {!somenteLeitura && temRotinas && aoLimparDia && (
         <button
           className="btn btn-mini btn-fantasma"
           data-tour="desfazer-geracao"
@@ -68,7 +71,7 @@ export default function BarraPassosDoDia({
         </button>
       )}
 
-      {nFaltas > 0 && (
+      {!somenteLeitura && nFaltas > 0 && (
         <Link
           href="/ausencias"
           className="btn btn-mini agenda-acao-alerta"
@@ -78,7 +81,8 @@ export default function BarraPassosDoDia({
         </Link>
       )}
 
-      {temRotinas && sedeId && (
+      {/* O supervisor vê a rota e marca o feito; imprimir a ficha não é dele (decisão de 19/10/2026). */}
+      {!somenteLeitura && temRotinas && sedeId && (
         <a
           href={`/api/fichas/pdf?data=${data}&sede=${sedeId}`}
           target="_blank"
@@ -112,7 +116,7 @@ export default function BarraPassosDoDia({
             {denso ? "Expandir grade" : "Compactar grade"}
           </button>
         )}
-        <AjudaAgenda />
+        <AjudaAgenda somenteLeitura={somenteLeitura} />
       </span>
     </div>
   );

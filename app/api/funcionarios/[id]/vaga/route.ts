@@ -17,7 +17,7 @@ export async function POST(_req: Request, ctx: Ctx) {
     const atual = await (await getDataSource()).obter("funcionarios", id);
     if (!atual) throw new Error("Funcionário não encontrado.");
     if (!podeAlterarSede(sessao, atual.sede_id))
-      throw new ErroPermissao("Supervisores só mexem em funcionários das sedes que operam.");
+      throw new ErroPermissao("Coordenadores só mexem em funcionários das sedes que operam.");
     return ok(await abrirVagaNoSgcp(id, { nome: sessao.nome, email: sessao.email }));
   });
 }

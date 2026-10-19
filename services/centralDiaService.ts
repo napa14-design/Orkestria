@@ -401,7 +401,7 @@ export async function resolverProximaExcecao(
     ]);
   }
   if (!podeAlterarSede(sessao, proposta.sede_id))
-    throw new ErroPermissao("Supervisores só redistribuem tarefas das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só redistribuem tarefas das sedes que operam.");
 
   return updateRotina(proposta.rotina_id, {
     funcionario_id: proposta.funcionario_id,

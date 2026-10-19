@@ -3,6 +3,7 @@ import {
   CHAVES_SO_ADMINISTRADOR,
   limitarSedeConsulta,
   podeAlterarSede,
+  podeEscrever,
 } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
@@ -33,10 +34,12 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    if (sessao.perfil === "visualizador") throw new ErroPermissao();
+    // podeEscrever, e não "≠ visualizador": o supervisor (perfil de chão, 19/10/2026)
+    // também não cria parâmetro.
+    if (!podeEscrever(sessao)) throw new ErroPermissao();
     const dados = await req.json();
     if (
-      sessao.perfil === "supervisor" &&
+      sessao.perfil === "coordenador" &&
       (!dados.editavel_por_supervisor ||
         !podeAlterarSede(sessao, dados.sede_id) ||
         // Sem isto, travar o PUT seria teatro: bastava CRIAR um
@@ -44,7 +47,7 @@ export async function POST(req: Request) {
         CHAVES_SO_ADMINISTRADOR.has(dados.chave))
     )
       throw new ErroPermissao(
-        "Supervisores só criam parâmetros editáveis no escopo das sedes que operam, e nunca os limites de ocupação.",
+        "Coordenadores só criam parâmetros editáveis no escopo das sedes que operam, e nunca os limites de ocupação.",
       );
     return ok(await createParametro(dados, sessao.email), 201);
   });

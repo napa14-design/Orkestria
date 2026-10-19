@@ -2,10 +2,16 @@
  * Regras de permissão por perfil.
  *
  * administrador → tudo, em todas as sedes.
- * supervisor    → cadastros e rotinas apenas das sedes que ele opera (a
+ * coordenador   → cadastros e rotinas apenas das sedes que ele opera (a
  *                 principal e, quando houver, as adicionais); parâmetros
- *                 apenas quando marcados como editavel_por_supervisor.
- * visualizador  → somente leitura (dashboards e relatórios).
+ *                 apenas quando marcados como editavel_por_supervisor (nome de
+ *                 coluna antigo — vale para o coordenador). Até 19/10/2026 este
+ *                 perfil se chamava "supervisor".
+ * supervisor    → (perfil novo, 19/10/2026) quem acompanha a equipe no chão: vê
+ *                 a rota e marca as tarefas como feitas ou não, SÓ nas sedes
+ *                 dele — nunca "todas", nem com sede principal "geral". Não
+ *                 escreve mais nada.
+ * visualizador  → somente leitura (dashboards e relatórios), todas as sedes.
  */
 import type { Perfil } from "@/types";
 
@@ -25,12 +31,60 @@ export interface SessaoUsuario {
   sedes?: string[];
 }
 
-export function podeEscrever(sessao: SessaoUsuario): boolean {
-  return sessao.perfil === "administrador" || sessao.perfil === "supervisor";
+const PERFIS_CONHECIDOS: ReadonlySet<unknown> = new Set<Perfil>([
+  "administrador",
+  "coordenador",
+  "supervisor",
+  "visualizador",
+]);
+
+/**
+ * O login só cria sessão para perfil conhecido. Um valor estranho no banco
+ * (digitação, edição manual no Console, migração errada) não vira acesso
+ * nenhum — nem à própria sede (revisão de segurança, 19/10/2026).
+ */
+export function perfilConhecido(perfil: unknown): perfil is Perfil {
+  return PERFIS_CONHECIDOS.has(perfil);
 }
 
+/** Cadastros, rotinas, agenda: o que muda o PLANEJADO. */
+export function podeEscrever(sessao: SessaoUsuario): boolean {
+  return sessao.perfil === "administrador" || sessao.perfil === "coordenador";
+}
+
+/**
+ * Registrar o REALIZADO (feita / não feita, fechar o dia): o que o supervisor
+ * novo faz. Sozinho não basta — a rota ainda confere a sede com `podeAlterarSede`.
+ */
+export function podeRegistrarRealizado(sessao: SessaoUsuario): boolean {
+  return podeEscrever(sessao) || sessao.perfil === "supervisor";
+}
+
+/**
+ * Quem lê o dado pessoal inteiro (motivo de desligamento, tipo da ausência,
+ * observações) e imprime ficha. Lista POSITIVA: um perfil futuro começa
+ * mascarado, não aberto (revisão de segurança, 19/10/2026).
+ */
+export function leituraCompleta(sessao: SessaoUsuario): boolean {
+  return (
+    sessao.perfil === "administrador" ||
+    sessao.perfil === "coordenador" ||
+    sessao.perfil === "visualizador"
+  );
+}
+
+/**
+ * Lista POSITIVA de quem vê todas as sedes. Era `perfil !== "supervisor"`, e um
+ * perfil desconhecido no banco (erro de digitação, edição manual no Console)
+ * caía em "todas" — falha abrindo (revisão, 19/10/2026). Agora o desconhecido
+ * não vê sede nenhuma. O supervisor (perfil de chão) nunca vê "todas".
+ */
 export function acessaTodasAsSedes(sessao: SessaoUsuario): boolean {
-  return sessao.perfil !== "supervisor" || sessao.sede_id === "geral";
+  return (
+    sessao.perfil === "administrador" ||
+    sessao.perfil === "visualizador" ||
+    (sessao.perfil === "coordenador" && sessao.sede_id === "geral")
+  );
 }
 
 /** Lê a coluna `sedes_extra` (ids separadas por vírgula) do cadastro. */
@@ -80,10 +134,13 @@ export function limitarSedeConsulta(
   return sessao.sede_id;
 }
 
-/** Supervisor só altera registros das sedes que opera. */
+/**
+ * Coordenador e supervisor só mexem em registros das sedes que operam. (Para o
+ * supervisor, "mexer" é só registrar o realizado — o resto `podeEscrever` barra.)
+ */
 export function podeAlterarSede(sessao: SessaoUsuario, sedeId: string): boolean {
   if (sessao.perfil === "administrador") return true;
-  if (sessao.perfil === "supervisor") {
+  if (sessao.perfil === "coordenador" || sessao.perfil === "supervisor") {
     const permitidas = sedesPermitidas(sessao);
     return !permitidas || permitidas.includes(sedeId);
   }
@@ -113,7 +170,7 @@ export function podeEditarParametro(
   parametro: { chave: string; editavel_por_supervisor: boolean; sede_id: string },
 ): boolean {
   if (sessao.perfil === "administrador") return true;
-  if (sessao.perfil !== "supervisor") return false;
+  if (sessao.perfil !== "coordenador") return false;
   if (CHAVES_SO_ADMINISTRADOR.has(parametro.chave)) return false;
   if (!parametro.editavel_por_supervisor) return false;
   return parametro.sede_id === "geral" || podeAlterarSede(sessao, parametro.sede_id);
@@ -140,7 +197,7 @@ export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {
  *  - **excluir** já é bloqueado quando há alguém usando.
  */
 export function podeCriarNoCatalogo(sessao: SessaoUsuario): boolean {
-  return sessao.perfil === "administrador" || sessao.perfil === "supervisor";
+  return podeEscrever(sessao);
 }
 
 /**
@@ -156,7 +213,7 @@ export function podeEditarItemDoCatalogo(
   item: { criado_por?: string } | null | undefined,
 ): boolean {
   if (sessao.perfil === "administrador") return true;
-  if (sessao.perfil !== "supervisor") return false;
+  if (sessao.perfil !== "coordenador") return false;
   return Boolean(item?.criado_por) && item?.criado_por === sessao.email;
 }
 

@@ -11,7 +11,7 @@ async function exigirAcesso(sessaoSedeCheck: (sedeId: string) => boolean, id: st
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
   if (!sessaoSedeCheck(atual.sede_id))
-    throw new ErroPermissao("Supervisores só alteram funcionários das sedes que operam.");
+    throw new ErroPermissao("Coordenadores só alteram funcionários das sedes que operam.");
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -21,7 +21,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     await exigirAcesso((s) => podeAlterarSede(sessao, s), id);
     const mudancas = await req.json();
     if (mudancas.sede_id && !podeAlterarSede(sessao, mudancas.sede_id))
-      throw new ErroPermissao("Supervisores não podem mover funcionários para outra sede.");
+      throw new ErroPermissao("Coordenadores não podem mover funcionários para outra sede.");
     return ok(await updateFuncionario(id, mudancas, sessao.email));
   });
 }

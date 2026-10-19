@@ -7,6 +7,116 @@
 
 ---
 
+## 2026-10-19 — "Supervisor" vira "Coordenador", e nasce o Supervisor de chão
+
+Pedido do dono: *"Supervisor vira coordenador e criar outro chamado Supervisor.
+Ele só terá acesso a visualizar a rota e marcar as tarefas como feita ou não."*
+
+### Os perfis agora
+
+| Perfil | O que faz | Sedes |
+|---|---|---|
+| Administrador | tudo | todas |
+| **Coordenador** (o antigo supervisor) | monta rotas, cadastros, parâmetros editáveis | as dele (ou todas, com "geral") |
+| **Supervisor** (novo) | vê a rota e marca feita / não feita, fecha o dia | **só as dele — nunca "todas"** |
+| Gerência (visualizador) | só lê | todas |
+
+O renome é **de verdade**, no código e no banco: manter `supervisor` por dentro
+significando coordenador seria armadilha para toda manutenção futura.
+`editavel_por_supervisor` (coluna de parâmetros) ficou com o nome antigo — é
+dado — e vale para o coordenador.
+
+### Servidor
+- `podeEscrever` = administrador | coordenador; **`podeRegistrarRealizado`** =
+  esses + supervisor, usado nas três rotas do realizado (com `podeAlterarSede`).
+- `acessaTodasAsSedes` virou **lista positiva**: perfil desconhecido no banco não
+  vê sede nenhuma (antes `≠ supervisor` caía em "todas" — falha abrindo).
+- Criar parâmetro barrava só a Gerência — o supervisor novo teria passado. Agora
+  `!podeEscrever`.
+- Cadastro de usuário: perfil precisa ser um dos quatro; supervisor não pode ter
+  sede "geral".
+
+### Telas (agente `front`)
+O supervisor tem no menu só **Rotina do dia** e **Acompanhamento**; a agenda é
+**só leitura** (uma flag, `somenteLeitura`): sem paleta, arrastar, gerar o dia,
+editar, apagar nem imprimir ficha. Outra URL mostra "Esta tela não é do seu
+perfil". Usuários: perfis novos, sedes adicionais para coordenador e supervisor.
+
+### O que a revisão de segurança pegou (e foi corrigido)
+- **O supervisor cancelaria tarefa pela rota do realizado** — e ela sumiria da
+  ocupação e do Chromos: quem é medido apagando o medidor. Agora ele só registra
+  conforme / com atraso / parcial / não realizada; status fora do enum é recusado
+  para todos.
+- O realizado aceitava **data diferente da rotina** e **bloco que ainda não
+  aconteceu**. Agora a data é a da rotina e há a trava "ainda não terminou" (a
+  mesma régua do fechar o dia); o registro é montado campo a campo. A trava vale
+  só para o que afirma **feita** (conforme, com atraso, parcial): cancelar,
+  remanejar ou "não realizada" com antecedência continua valendo — a primeira
+  versão travava tudo e tirava do coordenador o remanejo antecipado.
+- **Mínimo necessário (LGPD):** o supervisor recebe ausência sem tipo nem
+  observação (não vê "atestado") e funcionário sem motivo de desligamento nem
+  observações (o Desligar escreve o motivo lá).
+
+### O que o auditor pegou (e foi corrigido)
+- O supervisor **reabria** tarefa que o coordenador tinha cancelado ou
+  remanejado, marcando "feita" por cima — e ela voltava à medição. A primeira
+  correção entrou só numa das duas rotas do realizado (o "✓ Conforme" seguia
+  desfazendo) e só olhava o registro de execução (cancelar direto na rotina
+  escapava). Agora `registrarExecucao` **exige o perfil** (parâmetro
+  obrigatório — esquecer vira erro de compilação) e deriva as restrições lá
+  dentro; as três rotas do realizado, o fechar o dia inclusive, passam. A guarda
+  olha o status da **rotina**, relido na hora de gravar. Na tela, linha
+  cancelada/remanejada não tem botão para ele.
+- **Máscara de dado pessoal em lista positiva** (`leituraCompleta`):
+  administrador, coordenador e gerência leem tudo; qualquer outro perfil recebe
+  sem motivo de desligamento, tipo de ausência e observações, e não imprime
+  ficha. No realizado, o supervisor vê só as justificativas que ele escreveu (a
+  do coordenador pode dizer "atestado").
+- No supervisor a trava do horário vale para **todos** os status ("não
+  realizada" de amanhã também é afirmação sem lastro); no coordenador, só para
+  "feita".
+- **Ficha em PDF**: escondida na tela, mas a rota imprimia. Agora 403.
+- **Login com perfil fora da lista** (digitação, edição no Console) criava
+  sessão. Agora o login, o Google e o primeiro acesso recusam.
+- 35 mensagens de erro ainda diziam "Supervisores…" para o que agora é do
+  coordenador.
+- **Acompanhamento**: o supervisor não vê mais "Remanejada" nem "Cancelada" no
+  registro, e o "✓ Conforme" fica desligado até o horário da tarefa passar.
+- O script da migração foi versionado (`scripts/migrar-perfis-coordenador.mjs`)
+  e a documentação de perfis (docs/01–04, CONTEXTO-IA) foi atualizada.
+
+### ⚠ Migração e deploy — a ordem importa
+Os usuários com perfil `supervisor` no banco (**10** hoje) passam a `coordenador`
+por script, **só DEPOIS do deploy**: `node scripts/migrar-perfis-coordenador.mjs`
+lista; com `--gravar`, faz backup (fora do repo), grava e relê. Ao contrário, o código antigo leria
+"coordenador" como desconhecido e daria leitura de todas as sedes. Até a
+migração, eles ficam com o perfil restrito (falha fechando). Rode a migração
+**logo depois** do deploy e confira a lista: um supervisor de chão criado nesse
+intervalo seria migrado junto. Quem estiver logado precisa sair e entrar para
+pegar o perfil novo.
+
+**Reverter o deploy só depois de** `node scripts/migrar-perfis-coordenador.mjs
+--desfazer <backup> --gravar`: todo coordenador volta a "supervisor" e todo
+supervisor de chão é desativado (o código antigo não sabe restringi-lo). O modo
+recusa backup vazio ou que não confere com o banco. Se havia supervisor de chão,
+troque também o `AUTH_SECRET` — desativar não derruba sessão aberta.
+
+Testes de **rota** com sessão de supervisor (`testes/supervisor-rotas.test.ts`,
+18 casos, com pessoa fictícia nos casos de LGPD — o repo é público) e 25
+mutantes, um por correção, todos mortos (um 26º sobreviveu e revelou guarda
+redundante, removida). Tela conferida com banco em memória, logado como
+supervisor. 450 testes, `tsc` 0, build 0.
+
+### Decisões do dono no fechamento
+- O supervisor **corrige só o que ele mesmo lançou**: um "não realizada —
+  funcionária ausente" do coordenador não vira "feita" por cima.
+- A trava "ainda não terminou" segue valendo para o coordenador no "feita" e no
+  "parcial" (as fichas de papel são conferidas depois do expediente).
+- Contexto: o treinamento dos supervisores é na quarta, 21/10 — o perfil precisa
+  estar no ar e a migração feita antes.
+
+---
+
 ## 2026-10-16 — Vaga no SGCP: sedes conferidas uma a uma, e os motivos alinhados
 
 O time do SGCP publicou a parte dele (`d105bcb`) e respondeu: a CESIU já existe

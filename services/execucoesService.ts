@@ -7,10 +7,18 @@
 import { cobraDesvio, exigeJustificativa } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { agoraHHMM, hojeISO } from "@/lib/dateUtils";
-import type { ExecucaoRealizada, StatusRealizado, StatusRotina } from "@/types";
-import { ErroValidacao } from "./erros";
+import type { ExecucaoRealizada, Perfil, StatusRealizado, StatusRotina } from "@/types";
+import { ErroPermissao, ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
 import { getRotinasByData } from "./rotinasService";
+
+/** O que o supervisor (perfil de chão) registra: feita ou não, e como foi feita. */
+export const STATUS_DO_SUPERVISOR: readonly StatusRealizado[] = [
+  "conforme_planejado",
+  "com_atraso",
+  "parcial",
+  "nao_realizada",
+];
 
 const STATUS_ROTINA_POR_EXECUCAO: Record<StatusRealizado, StatusRotina> = {
   conforme_planejado: "realizada",
@@ -73,6 +81,7 @@ export interface ResultadoFechamentoDia {
 export async function confirmarDiaComoPlanejado(
   opts: { sedeId: string; data: string; declararEpi?: boolean },
   supervisorId: string,
+  perfil: Perfil,
 ): Promise<ResultadoFechamentoDia> {
   const ds = await getDataSource();
   const [rotinas, execucoes, requisitos, tarefas] = await Promise.all([
@@ -148,7 +157,7 @@ export async function confirmarDiaComoPlanejado(
       },
       // Sem atalho quando há EPI: aí a declaração é de verdade, e o servidor
       // deve tratá-la como o formulário completo.
-      { confirmacaoRapida: epis.length === 0 },
+      { perfil, confirmacaoRapida: epis.length === 0 },
     ),
   );
   res.confirmadas = aConfirmar.length;
@@ -166,12 +175,57 @@ async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25)
 export async function registrarExecucao(
   // sede_id é preenchida aqui a partir da rotina (o cliente não envia).
   dados: Omit<ExecucaoRealizada, "id" | "sede_id" | "criado_em" | "atualizado_em">,
-  opcoes?: { confirmacaoRapida?: boolean },
+  /**
+   * `perfil` é OBRIGATÓRIO de propósito: as restrições do supervisor nascem aqui
+   * dentro, e não em cada rota. Quando era opcional, a rota do "✓ Conforme"
+   * esqueceu de passar e o supervisor desfazia o cancelamento do coordenador.
+   */
+  opcoes: { perfil: Perfil; confirmacaoRapida?: boolean },
 ): Promise<ExecucaoRealizada> {
   const ds = await getDataSource();
   const rotina = await ds.obter("rotinas_planejadas", dados.rotina_id);
   if (!rotina) throw new Error("Rotina planejada não encontrada.");
-  const comSede = { ...dados, sede_id: rotina.sede_id };
+  // hasOwn, não `in`: `"constructor"`/`"__proto__"` passavam no `in`.
+  if (!Object.hasOwn(STATUS_ROTINA_POR_EXECUCAO, dados.status_realizado))
+    throw new ErroValidacao([{ nivel: "erro", codigo: "STATUS_INVALIDO", mensagem: "Status do realizado inválido." }]);
+  // O supervisor (perfil de chão) só diz se foi feito ou não: "cancelada" e
+  // "remanejada" tiram a tarefa da ocupação e do Chromos — quem é medido não
+  // apaga o que o mede (revisão, 19/10/2026).
+  const restrito = opcoes.perfil === "supervisor";
+  if (restrito && !STATUS_DO_SUPERVISOR.includes(dados.status_realizado))
+    throw new ErroPermissao("Seu perfil só registra se a tarefa foi feita ou não.");
+  // Quem só pode "feita ou não" não desfaz o que o coordenador decidiu: reabrir
+  // traria a tarefa de volta à medição. Olha o status da ROTINA, não o registro
+  // de execução — o coordenador também cancela direto na rotina (auditoria).
+  if (restrito && (rotina.status === "cancelada" || rotina.status === "remanejada"))
+    throw new ErroPermissao("Esta tarefa foi cancelada ou remanejada pelo coordenador — só ele altera.");
+  // "Foi feita" antes de a tarefa terminar é afirmação sem lastro — mesma régua
+  // do "fechar o dia" (`limite` em confirmarDiaComoPlanejado). Para o
+  // coordenador, só o que afirma realização: cancelar, remanejar ou "não vai
+  // dar" com antecedência é decisão de quem planeja. O supervisor não planeja —
+  // nele vale para tudo, "não realizada" inclusive.
+  const hoje = hojeISO();
+  const limite = rotina.data > hoje ? "00:00" : rotina.data === hoje ? agoraHHMM() : "23:59";
+  if ((restrito || STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] === "realizada") && rotina.fim_planejado > limite)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "AINDA_NAO_TERMINOU", mensagem: "Esta tarefa ainda não terminou — registre depois do horário dela." },
+    ]);
+  // Campo a campo, e não `...dados`: o corpo do pedido não escolhe id, data nem
+  // sede. A data é a da rotina — outra data criava um registro paralelo.
+  const comSede: Omit<ExecucaoRealizada, "id" | "criado_em" | "atualizado_em"> = {
+    rotina_id: rotina.id,
+    sede_id: rotina.sede_id,
+    data_execucao: rotina.data,
+    status_realizado: dados.status_realizado,
+    // String(): o corpo chega cru; objeto ou número no lugar de texto não entra.
+    inicio_real: String(dados.inicio_real ?? ""),
+    fim_real: String(dados.fim_real ?? ""),
+    tempo_real_min: Number(dados.tempo_real_min) || 0,
+    justificativa: String(dados.justificativa ?? ""),
+    epis_confirmados: String(dados.epis_confirmados ?? ""),
+    observacao: String(dados.observacao ?? ""),
+    supervisor_id: dados.supervisor_id,
+  };
 
   const parametros = await resolverParametros(rotina.sede_id);
   // Tarefa com "tempo é referência" não cobra desvio (execução varia muito).
@@ -179,7 +233,7 @@ export async function registrarExecucao(
 
   // O caminho de um toque não pode afirmar uso de EPI sem a declaração humana.
   // A UI já esconde o atalho, e esta validação fecha também chamadas diretas.
-  if (opcoes?.confirmacaoRapida && tarefa?.requisitos) {
+  if (opcoes.confirmacaoRapida && tarefa?.requisitos) {
     const requisitos = await Promise.all(
       tarefa.requisitos
         .split(",")
@@ -201,9 +255,9 @@ export async function registrarExecucao(
   const statusQueExigem: StatusRealizado[] = ["nao_realizada", "remanejada", "cancelada"];
   const desvioGrande =
     cobraDesvio(tarefa) &&
-    dados.tempo_real_min > 0 &&
-    exigeJustificativa(dados.tempo_real_min, rotina.tempo_previsto_min, parametros);
-  if ((statusQueExigem.includes(dados.status_realizado) || desvioGrande) && !dados.justificativa.trim()) {
+    comSede.tempo_real_min > 0 &&
+    exigeJustificativa(comSede.tempo_real_min, rotina.tempo_previsto_min, parametros);
+  if ((statusQueExigem.includes(comSede.status_realizado) || desvioGrande) && !comSede.justificativa.trim()) {
     throw new ErroValidacao([
       {
         nivel: "erro",
@@ -216,7 +270,7 @@ export async function registrarExecucao(
   }
 
   const agora = agoraISO();
-  const registro = { ...comSede, epis_confirmados: comSede.epis_confirmados ?? "" };
+  const registro = comSede;
 
   // Idempotência: uma execução por (rotina, data). Reenviar a mesma ficha
   // ATUALIZA o registro em vez de duplicar.
@@ -224,6 +278,11 @@ export async function registrarExecucao(
     { campo: "rotina_id", op: "==" as const, valor: registro.rotina_id },
   ]);
   const existente = doRotina.find((e) => e.data_execucao === registro.data_execucao);
+  // O supervisor corrige o que ELE lançou, não o de outra pessoa: um "não
+  // realizada — funcionária ausente" do coordenador virava "feita" por cima, e a
+  // justificativa sumia (decisão do dono, 19/10/2026).
+  if (restrito && existente && existente.supervisor_id !== registro.supervisor_id)
+    throw new ErroPermissao("Este registro foi feito por outra pessoa — só o coordenador altera.");
 
   let execucao: ExecucaoRealizada;
   if (existente) {

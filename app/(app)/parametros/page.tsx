@@ -69,10 +69,10 @@ export default function PaginaParametros() {
         },
         {
           key: "editavel_por_supervisor",
-          rotulo: "Editável por supervisor",
+          rotulo: "Editável por coordenador",
           tipo: "checkbox",
           padrao: true,
-          dica: "Se marcado, supervisores podem alterar este parâmetro. Desmarcado, só administradores. Útil para travar configurações sensíveis. Os limites de ocupação (ocupacao_baixa/adequada/alta) são sempre só de administrador, marcados ou não: é a régua que mede a própria sede.",
+          dica: "Se marcado, coordenadores podem alterar este parâmetro. Desmarcado, só administradores. Útil para travar configurações sensíveis. Os limites de ocupação (ocupacao_baixa/adequada/alta) são sempre só de administrador, marcados ou não: é a régua que mede a própria sede.",
         },
         {
           key: "ativo",
@@ -90,7 +90,7 @@ export default function PaginaParametros() {
         { key: "descricao", rotulo: "Descrição" },
         {
           key: "editavel_por_supervisor",
-          rotulo: "Supervisor edita?",
+          rotulo: "Coordenador edita?",
           render: (p) => {
             // A trava da régua de ocupação é de código, não do campo: a coluna
             // mostraria "Sim" e o servidor recusaria — a tela mentiria.

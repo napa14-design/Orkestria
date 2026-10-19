@@ -1,18 +1,18 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
-import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { podeAlterarSede, podeRegistrarRealizado } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { registrarExecucao } from "@/services/execucoesService";
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    if (!podeEscrever(sessao)) throw new ErroPermissao();
+    if (!podeRegistrarRealizado(sessao)) throw new ErroPermissao();
     const { rotina_id } = (await req.json()) as { rotina_id?: string };
     const ds = await getDataSource();
     const rotina = rotina_id ? await ds.obter("rotinas_planejadas", rotina_id) : null;
     if (!rotina) throw new Error("Rotina planejada não encontrada.");
     if (!podeAlterarSede(sessao, rotina.sede_id))
-      throw new ErroPermissao("Supervisores só registram execuções das sedes que operam.");
+      throw new ErroPermissao("Só se registra execução das sedes que você opera.");
 
     return ok(
       await registrarExecucao(
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
           supervisor_id: sessao.id,
           epis_confirmados: "",
         },
-        { confirmacaoRapida: true },
+        { perfil: sessao.perfil, confirmacaoRapida: true },
       ),
       201,
     );

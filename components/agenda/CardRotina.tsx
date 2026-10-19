@@ -31,6 +31,8 @@ interface CardRotinaProps {
   /** Duração formatada exibida durante o arrasto da alça (só quando emResize). */
   rotuloResize?: string;
   podeRedimensionar: boolean;
+  /** Sem arrastar e sem o "×" de remover — o clique só abre o detalhe. */
+  somenteLeitura?: boolean;
   aoIniciarArrasto?: (blocos: number) => void;
   aoTerminarArrasto?: () => void;
   aoAbrirDetalhe: (run: Run, ancora: DOMRect) => void;
@@ -53,6 +55,7 @@ export default function CardRotina({
   saida,
   rotuloResize,
   podeRedimensionar,
+  somenteLeitura,
   aoIniciarArrasto,
   aoTerminarArrasto,
   aoAbrirDetalhe,
@@ -74,7 +77,7 @@ export default function CardRotina({
   return (
     <div
       className={`agenda-card-tarefa pop-card${passaDaSaida ? " passa-da-saida" : ""}`}
-      draggable={unico && !emResize}
+      draggable={!somenteLeitura && unico && !emResize}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", JSON.stringify({ tipo: "mover", rotina_id: run.id }));
         e.dataTransfer.effectAllowed = "move";
@@ -115,19 +118,21 @@ export default function CardRotina({
         passaDaSaida
           ? `\n⚠ Passa da saída${saida ? ` (${saida})` : ""} — este serviço não cabe na jornada.`
           : ""
-      }\nArraste para mover.`}
+      }${somenteLeitura ? "" : "\nArraste para mover."}`}
     >
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          aoRemoverRun(run);
-        }}
-        aria-label="Remover"
-        className="card-x"
-        style={{ position: "absolute", top: 2, right: 4, border: "none", background: "transparent", color: "inherit", fontSize: 13, fontWeight: 700 }}
-      >
-        ×
-      </button>
+      {!somenteLeitura && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            aoRemoverRun(run);
+          }}
+          aria-label="Remover"
+          className="card-x"
+          style={{ position: "absolute", top: 2, right: 4, border: "none", background: "transparent", color: "inherit", fontSize: 13, fontWeight: 700 }}
+        >
+          ×
+        </button>
+      )}
       <div
         style={{
           fontWeight: 600,

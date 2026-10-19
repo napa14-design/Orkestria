@@ -36,18 +36,23 @@ DT" (45 m²) são **registros distintos**, com metragens, tempos e rotinas próp
 
 ## 3. Perfis e permissões
 
-| Ação | Administrador | Supervisor | Visualizador/Gerência |
-|---|---|---|---|
-| Cadastrar usuários | ✔ | ✘ | ✘ |
-| Cadastrar sedes | ✔ | ✘ | ✘ |
-| Cadastrar funcionários/locais/tarefas | ✔ (todas) | ✔ (sedes que opera) | ✘ |
-| Editar parâmetros gerais | ✔ | ✔ (quando `editavel_por_supervisor`) | ✘ |
-| Montar/editar rotinas | ✔ | ✔ (sedes que opera) | ✘ |
-| Registrar execução realizada | ✔ | ✔ | ✘ |
-| Dashboards e relatórios | ✔ (tudo) | ✔ (sua sede) | ✔ |
+| Ação | Administrador | Coordenador | Supervisor | Visualizador/Gerência |
+|---|---|---|---|---|
+| Cadastrar usuários | ✔ | ✘ | ✘ | ✘ |
+| Cadastrar sedes | ✔ | ✘ | ✘ | ✘ |
+| Cadastrar funcionários/locais/tarefas | ✔ (todas) | ✔ (sedes que opera) | ✘ | ✘ |
+| Editar parâmetros gerais | ✔ | ✔ (quando `editavel_por_supervisor`) | ✘ | ✘ |
+| Montar/editar rotinas | ✔ | ✔ (sedes que opera) | ✘ (vê a agenda, só leitura) | ✘ |
+| Imprimir fichas | ✔ | ✔ | ✘ | ✘ |
+| Registrar execução realizada | ✔ | ✔ | ✔ feita / não feita / fechar o dia (sedes dele) | ✘ |
+| Dashboards e relatórios | ✔ (tudo) | ✔ (sua sede) | ✘ | ✔ |
+
+Até 19/10/2026 o **Coordenador** se chamava "Supervisor". O Supervisor de hoje
+é o perfil de chão: abre só a Agenda (leitura) e o Acompanhamento, nunca tem
+sede `geral` e não cancela nem remaneja tarefa.
 
 O perfil e a sede do usuário vêm do cadastro na tabela `usuarios`; a sede
-`geral` dá acesso a todas as sedes.
+`geral` dá acesso a todas as sedes (não vale para o Supervisor).
 
 ## 4. Módulos
 

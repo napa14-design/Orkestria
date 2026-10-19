@@ -78,7 +78,7 @@ describe("confirmarDiaComoPlanejado", () => {
     await bloco("b1", ONTEM, "07:00", "07:10", t);
     await bloco("b2", ONTEM, "08:00", "08:10", t);
 
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(res.confirmadas).toBe(2);
     somaFecha(res, 2);
 
@@ -94,7 +94,7 @@ describe("confirmarDiaComoPlanejado", () => {
     await bloco("f1", FUTURO, "07:00", "07:10", t);
     await bloco("f2", FUTURO, "23:00", "23:10", t);
 
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: FUTURO }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: FUTURO }, "sup", "coordenador");
     expect(res.confirmadas).toBe(0);
     expect(res.aguardando_horario).toBe(2);
     somaFecha(res, 2);
@@ -107,7 +107,7 @@ describe("confirmarDiaComoPlanejado", () => {
     await bloco("h1", hoje, "00:01", "00:02", t); // já passou
     await bloco("h2", hoje, "23:58", "23:59", t); // ainda não
 
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: hoje }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: hoje }, "sup", "coordenador");
     expect(res.confirmadas).toBe(1);
     expect(res.aguardando_horario).toBe(1);
     somaFecha(res, 2);
@@ -120,7 +120,7 @@ describe("confirmarDiaComoPlanejado", () => {
     await bloco("d1", ONTEM, "07:00", "07:10", t, { status: "nao_realizada" });
     await bloco("d2", ONTEM, "08:00", "08:10", t);
 
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(res.confirmadas).toBe(1);
     expect(res.ja_registradas).toBe(1);
     somaFecha(res, 2);
@@ -136,7 +136,7 @@ describe("confirmarDiaComoPlanejado", () => {
       epis_confirmados: "", ...aud,
     } as never);
 
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(res.confirmadas).toBe(0);
     expect(res.ja_registradas).toBe(1);
     const execs = await getExecucoes(ONTEM, ONTEM, SEDE);
@@ -146,7 +146,7 @@ describe("confirmarDiaComoPlanejado", () => {
 
   it("tarefa que exige EPI não entra sem declaração", async () => {
     await bloco("e1", ONTEM, "07:00", "07:10", TAREFA_COM_EPI);
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(res.confirmadas).toBe(0);
     expect(res.sem_declaracao).toBe(1);
     somaFecha(res, 1);
@@ -155,7 +155,7 @@ describe("confirmarDiaComoPlanejado", () => {
 
   it("com a declaração, entra e grava os NOMES dos EPIs", async () => {
     await bloco("e1", ONTEM, "07:00", "07:10", TAREFA_COM_EPI);
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM, declararEpi: true }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM, declararEpi: true }, "sup", "coordenador");
     expect(res.confirmadas).toBe(1);
     expect(res.epis_declarados.length).toBeGreaterThan(0);
     const execs = await getExecucoes(ONTEM, ONTEM, SEDE);
@@ -166,8 +166,8 @@ describe("confirmarDiaComoPlanejado", () => {
     const t = await tarefaSemEpi("t-sem-epi");
     await bloco("i1", ONTEM, "07:00", "07:10", t);
 
-    const um = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
-    const dois = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const um = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
+    const dois = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(um.confirmadas).toBe(1);
     expect(dois.confirmadas).toBe(0);
     expect(dois.ja_registradas).toBe(1);
@@ -180,7 +180,7 @@ describe("confirmarDiaComoPlanejado", () => {
     await bloco("m1", ONTEM, "07:00", "07:10", t); // confirma
     await bloco("m2", ONTEM, "08:00", "08:10", t, { status: "nao_realizada" }); // já registrada
     await bloco("m3", ONTEM, "09:00", "09:10", TAREFA_COM_EPI); // sem declaração
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     expect(res.confirmadas).toBe(1);
     expect(res.ja_registradas).toBe(1);
     expect(res.sem_declaracao).toBe(1);
@@ -188,7 +188,7 @@ describe("confirmarDiaComoPlanejado", () => {
   });
 
   it("dia sem bloco nenhum devolve tudo zerado, sem quebrar", async () => {
-    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup");
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
     somaFecha(res, 0);
     expect(res.epis_declarados).toEqual([]);
   });

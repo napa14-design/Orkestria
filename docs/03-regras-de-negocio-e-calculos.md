@@ -18,7 +18,9 @@ no cliente (feedback imediato) e no servidor (validação definitiva).
 10. Solicitar justificativa quando o tempo real desviar além do parâmetro.
 11. Registrar quem criou/alterou os principais dados (auditoria).
 12. Parâmetros podem ser globais (`geral`) ou específicos por sede.
-13. Supervisores editam parâmetros apenas quando `editavel_por_supervisor = true`.
+13. Coordenadores editam parâmetros apenas quando `editavel_por_supervisor = true`
+    (o nome da coluna é de antes de 19/10/2026, quando o perfil se chamava
+    "supervisor"); o supervisor de hoje não edita parâmetro nenhum.
 14. Ociosidade inicial é **prevista** (baseada no planejamento), não realizada.
 15. A comparação com o realizado serve para melhorar a base teórica de tempos.
 

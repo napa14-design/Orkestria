@@ -9,13 +9,15 @@ import type { Sede, UsuarioListado } from "@/types";
 
 const PERFIS = [
   { valor: "administrador", rotulo: "Administrador" },
+  { valor: "coordenador", rotulo: "Coordenador" },
   { valor: "supervisor", rotulo: "Supervisor" },
   { valor: "visualizador", rotulo: "Visualizador/Gerência" },
 ];
 
 const SELO_PERFIL: Record<string, string> = {
   administrador: "selo-vermelho",
-  supervisor: "selo-azul",
+  coordenador: "selo-azul",
+  supervisor: "selo-roxo",
   visualizador: "selo-cinza",
 };
 
@@ -74,7 +76,7 @@ export default function PaginaUsuarios() {
     <>
     <CrudManager<UsuarioListado>
       titulo="Usuários"
-      subtitulo="Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance dos supervisores — um coordenador pode operar mais de uma. Acesso restrito a administradores."
+      subtitulo="Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance de coordenadores e supervisores — cada um pode operar mais de uma. Acesso restrito a administradores."
       endpoint="/api/usuarios"
       textoNovo="+ Novo usuário"
       campos={[
@@ -93,7 +95,7 @@ export default function PaginaUsuarios() {
           tipo: "select",
           obrigatorio: true,
           opcoes: PERFIS,
-          dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • SUPERVISOR: monta rotinas e cadastra, apenas nas sedes que opera (uma ou várias). • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
+          dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • COORDENADOR: monta as rotas e faz os cadastros, apenas nas sedes que opera (uma ou várias). • SUPERVISOR: vê a rota e marca as tarefas como feitas ou não, só nas sedes dele — não pode ter \"Geral\" (todas as sedes). • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
         },
         {
           key: "sede_id",
@@ -101,20 +103,26 @@ export default function PaginaUsuarios() {
           tipo: "select",
           obrigatorio: true,
           // SEM padrão de propósito: com "Geral" pré-selecionado, salvar um
-          // supervisor sem olhar este campo dava a ele escrita em TODAS as
+          // coordenador sem olhar este campo dava a ele escrita em TODAS as
           // sedes. Escolha aberta obriga uma decisão consciente — um clique a
           // mais no cadastro (raro) para não distribuir acesso por descuido.
+          // O supervisor nunca alcança todas as sedes (o servidor recusa
+          // "Geral" para ele), então a opção nem aparece.
           opcoes: (form) => [
-            {
-              valor: "geral",
-              rotulo:
-                form.perfil === "supervisor"
-                  ? "Geral — TODAS as sedes (incomum para supervisor)"
-                  : "Geral (todas as sedes)",
-            },
+            ...(form.perfil === "supervisor"
+              ? []
+              : [
+                  {
+                    valor: "geral",
+                    rotulo:
+                      form.perfil === "coordenador"
+                        ? "Geral — TODAS as sedes (incomum para coordenador)"
+                        : "Geral (todas as sedes)",
+                  },
+                ]),
             ...(sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
           ],
-          dica: "A sede principal do usuário — é ela que abre por padrão nas telas. Para supervisor, define o alcance básico; se ele cobre mais de uma sede, acrescente as outras no campo abaixo. Administrador e gerência costumam usar \"Geral\" (todas as sedes).",
+          dica: "A sede principal do usuário — é ela que abre por padrão nas telas. Para coordenador e supervisor, define o alcance básico; se ele cobre mais de uma sede, acrescente as outras no campo abaixo. Supervisor não pode ter \"Geral\". Administrador e gerência costumam usar \"Geral\" (todas as sedes).",
         },
         {
           key: "sedes_extra",
@@ -125,12 +133,12 @@ export default function PaginaUsuarios() {
           ajuda:
             "Marque as sedes extras. Deixe vazio se ele cuida só da principal (com sede \"Geral\" este campo é ignorado)",
           dica:
-            "Para o coordenador que cobre mais de uma sede. Ele passa a enxergar e editar todas as marcadas aqui, além da principal, trocando de sede num seletor — a Central e a Agenda mostram uma sede por vez. A sede principal já está incluída, não precisa marcar.",
-          // Aparece para TODO supervisor, mesmo antes de escolher a sede
+            "Para o coordenador ou supervisor que cobre mais de uma sede. Ele passa a enxergar todas as marcadas aqui, além da principal, trocando de sede num seletor — as telas mostram uma sede por vez. O coordenador edita nelas; o supervisor marca o realizado. A sede principal já está incluída, não precisa marcar.",
+          // Aparece para TODO coordenador e supervisor, mesmo antes de escolher a sede
           // principal: escondê-lo até a sede estar preenchida deixou o campo
           // invisível para quem estava cadastrando — o mesmo erro do botão de
           // modelos, que só existia na visão Semana.
-          mostrarSe: (f) => f.perfil === "supervisor",
+          mostrarSe: (f) => f.perfil === "coordenador" || f.perfil === "supervisor",
         },
         { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
       ]}

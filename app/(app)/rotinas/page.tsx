@@ -23,6 +23,7 @@ import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import Carregando from "@/components/Carregando";
+import { useSessao } from "@/components/SessaoContexto";
 import {
   blocosOcupados,
   funcionarioNoDia,
@@ -44,6 +45,10 @@ interface RespostaRotina {
 }
 
 export default function PaginaRotinas() {
+  // Supervisor (perfil de chão) vê a rota e troca data/sede; quem monta é a
+  // coordenação. Uma flag só, repassada aos componentes — o servidor recusa
+  // a escrita de qualquer jeito (403), isto só não oferece o que ele não pode.
+  const somenteLeitura = useSessao()?.perfil === "supervisor";
   const [data, setData] = useState(hojeISO());
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [turno, setTurno] = useState("");
@@ -840,6 +845,7 @@ export default function PaginaRotinas() {
           setPaginaFunc(0);
         }}
         aoPlanejarPeriodo={() => setPlanejamentoAberto(true)}
+        somenteLeitura={somenteLeitura}
       />
 
       {modo === "dia" && (temRotinas || nFaltas > 0) ? (
@@ -856,6 +862,7 @@ export default function PaginaRotinas() {
           aoLimparDia={limparDia}
           aoSalvarRotaPadrao={salvarRotaPadrao}
           aoAlternarDenso={() => setDenso((v) => !v)}
+          somenteLeitura={somenteLeitura}
         />
       ) : modo === "semana" ? (
         <div
@@ -870,14 +877,14 @@ export default function PaginaRotinas() {
           {/* O "gerar" da semana mora AQUI, e não na barra do dia: é a tela em
               que a semana inteira está à vista, e é onde dá para conferir o
               resultado sem trocar de data sete vezes. */}
-          {temRotaPadrao && (
+          {!somenteLeitura && temRotaPadrao && (
             <button className="btn btn-primario" onClick={gerarSemana} disabled={gerandoSemana}>
               {gerandoSemana ? "Gerando…" : "⚡ Gerar a semana da rota padrão"}
             </button>
           )}
           {/* O caminho de volta, do lado da ida. Só aparece quando a semana tem
               algo — no vazio não há o que desfazer. */}
-          {(rotinasSemana?.length ?? 0) > 0 && (
+          {!somenteLeitura && (rotinasSemana?.length ?? 0) > 0 && (
             <button
               className="btn btn-fantasma"
               onClick={limparSemana}
@@ -887,7 +894,7 @@ export default function PaginaRotinas() {
               {limpandoSemana ? "Limpando…" : "↺ Desfazer a semana"}
             </button>
           )}
-          <AjudaAgenda aoComecarTutorial={() => setModo("dia")} />
+          <AjudaAgenda aoComecarTutorial={() => setModo("dia")} somenteLeitura={somenteLeitura} />
         </div>
       ) : null}
 
@@ -910,7 +917,7 @@ export default function PaginaRotinas() {
         </div>
       ) : (
         <>
-          {!temRotinas && temRotaPadrao && (
+          {!somenteLeitura && !temRotinas && temRotaPadrao && (
             <div
               className="painel entra agenda-proximo-passo"
             >
@@ -924,7 +931,7 @@ export default function PaginaRotinas() {
             </div>
           )}
 
-          {!temRotinas && !temRotaPadrao && fonteRepetir && (
+          {!somenteLeitura && !temRotinas && !temRotaPadrao && fonteRepetir && (
             <div
               className="painel entra agenda-proximo-passo"
             >
@@ -944,7 +951,7 @@ export default function PaginaRotinas() {
             rotinas={rotinas ?? []}
             tarefas={tarefas ?? []}
             parametros={params}
-            aoMover={mover}
+            aoMover={somenteLeitura ? undefined : mover}
           />
 
           <PendenciasPanel
@@ -987,21 +994,23 @@ export default function PaginaRotinas() {
             </div>
           )}
 
-          <div className="linha-rotina">
-            <TaskPalette
-              tarefas={tarefas ?? []}
-              locais={locais ?? []}
-              categorias={categorias ?? []}
-              blocoMin={blocoMin}
-              fatorDoTipo={fatorDoTipo}
-              funcionarios={funcionarios ?? []}
-              qualificacoes={qualificacoes ?? []}
-              requisitos={requisitos ?? []}
-              data={data}
-              ausentes={ausentesMap}
-              aoIniciarArrasto={setBlocosArrasto}
-              aoTerminarArrasto={() => setBlocosArrasto(null)}
-            />
+          <div className={`linha-rotina${somenteLeitura ? " sem-paleta" : ""}`}>
+            {!somenteLeitura && (
+              <TaskPalette
+                tarefas={tarefas ?? []}
+                locais={locais ?? []}
+                categorias={categorias ?? []}
+                blocoMin={blocoMin}
+                fatorDoTipo={fatorDoTipo}
+                funcionarios={funcionarios ?? []}
+                qualificacoes={qualificacoes ?? []}
+                requisitos={requisitos ?? []}
+                data={data}
+                ausentes={ausentesMap}
+                aoIniciarArrasto={setBlocosArrasto}
+                aoTerminarArrasto={() => setBlocosArrasto(null)}
+              />
+            )}
 
             <AgendaGrid
               funcionarios={efetivosPagina}
@@ -1022,6 +1031,7 @@ export default function PaginaRotinas() {
               aoIniciarArrasto={setBlocosArrasto}
               aoTerminarArrasto={() => setBlocosArrasto(null)}
               alturaBloco={Math.round(blocoMin * (denso ? 1.4 : 2.4))}
+              somenteLeitura={somenteLeitura}
             />
 
             <OccupancySummary
@@ -1037,7 +1047,7 @@ export default function PaginaRotinas() {
       )}
 
       <ModalPlanejamento
-        aberto={planejamentoAberto}
+        aberto={!somenteLeitura && planejamentoAberto}
         aoFechar={() => setPlanejamentoAberto(false)}
         dataAtual={data}
         sedeId={sedeId}

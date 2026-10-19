@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { obterAppAdmin } from "@/lib/firebaseAdmin";
 import { emailDoTokenGoogle } from "@/lib/loginGoogle";
-import { montarSedesDaSessao } from "@/lib/permissions";
+import { montarSedesDaSessao, perfilConhecido } from "@/lib/permissions";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
 
@@ -63,6 +63,9 @@ export async function POST(req: Request) {
       { erro: `O e-mail ${email} não está cadastrado como usuário do sistema.` },
       { status: 403 },
     );
+  }
+  if (!perfilConhecido(usuario.perfil)) {
+    return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
   }
 
   await gravarSessao({

@@ -1,6 +1,6 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
-import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { leituraCompleta, limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createAusencia, getAusencias } from "@/services/ausenciasService";
 
@@ -12,13 +12,18 @@ export async function GET(req: Request) {
       sessao,
       url.searchParams.get("sede") ?? undefined,
     );
+    const ausencias = await getAusencias({
+      data: url.searchParams.get("data") ?? undefined,
+      de: url.searchParams.get("de") ?? undefined,
+      ate: url.searchParams.get("ate") ?? undefined,
+      sedeId,
+    });
+    // Mínimo necessário (LGPD): o supervisor precisa saber QUEM está ausente, não
+    // se foi atestado nem o que diz a observação (revisão, 19/10/2026).
     return ok(
-      await getAusencias({
-        data: url.searchParams.get("data") ?? undefined,
-        de: url.searchParams.get("de") ?? undefined,
-        ate: url.searchParams.get("ate") ?? undefined,
-        sedeId,
-      }),
+      leituraCompleta(sessao)
+        ? ausencias
+        : ausencias.map((a) => ({ ...a, tipo: "outro" as const, observacao: "" })),
     );
   });
 }
@@ -33,7 +38,7 @@ export async function POST(req: Request) {
       ? await ds.obter("funcionarios", dados.funcionario_id)
       : null;
     if (funcionario && !podeAlterarSede(sessao, funcionario.sede_id))
-      throw new ErroPermissao("Supervisores só registram ausências das sedes que operam.");
+      throw new ErroPermissao("Coordenadores só registram ausências das sedes que operam.");
     return ok(await createAusencia(dados, sessao.email), 201);
   });
 }

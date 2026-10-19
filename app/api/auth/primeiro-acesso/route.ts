@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { montarSedesDaSessao } from "@/lib/permissions";
+import { montarSedesDaSessao, perfilConhecido } from "@/lib/permissions";
 import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import {
@@ -60,6 +60,9 @@ export async function POST(req: Request) {
 
   const problema = problemaNaSenha(nova_senha, senha_atual);
   if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
+  if (!perfilConhecido(usuario.perfil)) {
+    return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
+  }
 
   // `definirSenhaUsuario` apaga o código junto, então ele não serve duas vezes.
   await definirSenhaUsuario(usuario.id, nova_senha, senha_atual);

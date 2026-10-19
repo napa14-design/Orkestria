@@ -1,6 +1,6 @@
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
-import { limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
+import { leituraCompleta, limitarSedeConsulta, podeAlterarSede, podeRegistrarRealizado } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { getExecucoes, registrarExecucao } from "@/services/execucoesService";
 
@@ -11,26 +11,39 @@ export async function GET(req: Request) {
       sessao,
       url.searchParams.get("sede") ?? undefined,
     );
+    const lista = await getExecucoes(
+      url.searchParams.get("de") ?? undefined,
+      url.searchParams.get("ate") ?? undefined,
+      sede,
+    );
+    // Mínimo necessário (LGPD): justificativa e observação são texto livre — o
+    // coordenador pode ter escrito "atestado" ali. O supervisor vê só as dele.
     return ok(
-      await getExecucoes(
-        url.searchParams.get("de") ?? undefined,
-        url.searchParams.get("ate") ?? undefined,
-        sede,
-      ),
+      leituraCompleta(sessao)
+        ? lista
+        : lista.map((e) => (e.supervisor_id === sessao.id ? e : { ...e, justificativa: "", observacao: "" })),
     );
   });
 }
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    if (!podeEscrever(sessao)) throw new ErroPermissao();
+    // Registrar o realizado é o que o supervisor (perfil de chão) pode fazer.
+    if (!podeRegistrarRealizado(sessao)) throw new ErroPermissao();
     const dados = await req.json();
     const ds = await getDataSource();
     const rotina = dados.rotina_id
       ? await ds.obter("rotinas_planejadas", dados.rotina_id)
       : null;
     if (rotina && !podeAlterarSede(sessao, rotina.sede_id))
-      throw new ErroPermissao("Supervisores só registram execuções das sedes que operam.");
-    return ok(await registrarExecucao({ ...dados, supervisor_id: sessao.id }), 201);
+      throw new ErroPermissao("Só se registra execução das sedes que você opera.");
+    return ok(
+      await registrarExecucao(
+        { ...dados, supervisor_id: sessao.id },
+        // Supervisor: feita ou não. Cancelar/remanejar some com a tarefa da medição.
+        { perfil: sessao.perfil },
+      ),
+      201,
+    );
   });
 }

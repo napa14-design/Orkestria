@@ -157,9 +157,9 @@ async function normalizarSedesExtra(
   sedePrincipal: string,
   sedesExtra: string | undefined,
 ): Promise<string> {
-  // Só supervisor tem escopo por sede; para os outros perfis a lista não
-  // significa nada (administrador e gerência já alcançam tudo).
-  if (perfil !== "supervisor" || sedePrincipal === "geral") return "";
+  // Só coordenador e supervisor têm escopo por sede; para os outros perfis a
+  // lista não significa nada (administrador e gerência já alcançam tudo).
+  if ((perfil !== "coordenador" && perfil !== "supervisor") || sedePrincipal === "geral") return "";
   const ids = [...new Set(lerSedesExtra(sedesExtra))].filter(
     (id) => id !== sedePrincipal && id !== "geral",
   );
@@ -181,9 +181,35 @@ async function normalizarSedesExtra(
   return ids.join(",");
 }
 
+const PERFIS: ReadonlySet<unknown> = new Set<Usuario["perfil"]>([
+  "administrador",
+  "coordenador",
+  "supervisor",
+  "visualizador",
+]);
+
+/**
+ * O perfil precisa existir (o corpo chega cru do formulário), e o supervisor —
+ * perfil de chão, 19/10/2026 — precisa de uma sede de verdade: com "geral" ele
+ * ficaria sem sede nenhuma (o escopo dele nunca vira "todas").
+ */
+function validarPerfil(perfil: unknown, sedeId: string): void {
+  if (!PERFIS.has(perfil))
+    throw new ErroValidacao([{ nivel: "erro", codigo: "PERFIL_INVALIDO", mensagem: "Perfil inválido." }]);
+  if (perfil === "supervisor" && sedeId === "geral")
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SUPERVISOR_SEM_SEDE",
+        mensagem: "Supervisor precisa de uma sede principal (não \"todas as sedes\").",
+      },
+    ]);
+}
+
 export async function createUsuario(dados: DadosUsuario): Promise<Usuario> {
   const existente = await getUsuarioPorEmail(dados.email);
   if (existente) throw new Error(`Já existe um usuário ativo com o e-mail ${dados.email}.`);
+  validarPerfil(dados.perfil, dados.sede_id);
   await validarSedeUsuario(dados.sede_id);
   const sedes_extra = await normalizarSedesExtra(
     dados.perfil,
@@ -211,6 +237,7 @@ export async function updateUsuario(
   if (!atual) throw new Error("Usuário não encontrado.");
   const perfil = mudancas.perfil ?? atual.perfil;
   const sedeId = mudancas.sede_id ?? atual.sede_id;
+  validarPerfil(perfil, sedeId);
   await validarSedeUsuario(sedeId);
   // Renormaliza sempre, mesmo quando `sedes_extra` não veio no corpo: trocar só
   // o perfil (ou passar a sede para "geral") tem que limpar as extras, senão

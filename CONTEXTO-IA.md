@@ -112,9 +112,10 @@ padrão**, não para vigiar pessoas.
    realizada/remanejada/cancelada.
 7. Exclusão de cadastros com histórico é bloqueada (orienta a inativar) — os
    relatórios antigos nunca quebram.
-8. Permissões: **administrador** (tudo), **supervisor** (cadastros e rotinas
-   apenas da própria sede; parâmetros quando autorizado), **visualizador/
-   gerência** (só leitura).
+8. Permissões: **administrador** (tudo), **coordenador** (cadastros e rotinas
+   apenas das sedes que opera; parâmetros quando autorizado — até 19/10/2026 se
+   chamava "supervisor"), **supervisor** (perfil de chão: vê a agenda e marca
+   feita/não feita nas sedes dele), **visualizador/gerência** (só leitura).
 9. Tudo é auditado: campos criado_por/atualizado_por + log automático na
    tabela `historico`.
 

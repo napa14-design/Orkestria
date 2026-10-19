@@ -18,7 +18,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const atual = await (await getDataSource()).obter("funcionarios", id);
     if (!atual) throw new Error("Funcionário não encontrado.");
     if (!podeAlterarSede(sessao, atual.sede_id))
-      throw new ErroPermissao("Supervisores só desligam funcionários das sedes que operam.");
+      throw new ErroPermissao("Coordenadores só desligam funcionários das sedes que operam.");
     const dados = await req.json();
     return ok(await desligarFuncionario(id, dados, sessao.email, { nome: sessao.nome, email: sessao.email }));
   });

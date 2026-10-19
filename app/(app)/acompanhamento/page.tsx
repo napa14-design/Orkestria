@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
+import { useSessao } from "@/components/SessaoContexto";
 import {
   cobraDesvio,
   desvioPercentual,
@@ -117,6 +118,20 @@ export default function PaginaAcompanhamento() {
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
   const hoje = hojeISO();
+  /**
+   * Até que horário as tarefas do dia já terminaram — a mesma régua do servidor
+   * (`AINDA_NAO_TERMINOU`): realizado só depois do horário da tarefa.
+   */
+  const limiteDoDia = data > hoje ? "00:00" : data === hoje ? agoraHHMM() : "23:59";
+  const sessao = useSessao();
+  /** O supervisor só diz se foi feita ou não; cancelar/remanejar é do coordenador. */
+  const opcoesStatus =
+    sessao?.perfil === "supervisor"
+      ? OPCOES_STATUS.filter((o) => o.valor !== "remanejada" && o.valor !== "cancelada")
+      : OPCOES_STATUS;
+  /** Cancelada/remanejada é decisão do coordenador: o supervisor não reabre (o servidor recusa). */
+  const decididaPeloCoordenador = (r: RotinaPlanejada) =>
+    sessao?.perfil === "supervisor" && (r.status === "cancelada" || r.status === "remanejada");
   /** Fechamento do dia: dois toques (o segundo confirma) e declaração de EPI à parte. */
   const [declararEpi, setDeclararEpi] = useState(false);
   const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
@@ -165,12 +180,11 @@ export default function PaginaAcompanhamento() {
    */
   const fechamento = useMemo(() => {
     // Futuro ≠ hoje: num dia futuro nada terminou, seja que hora for.
-    const limite = data > hoje ? "00:00" : data === hoje ? agoraHHMM() : "23:59";
     const alvos = linhas.filter(
       (r) =>
         !execucaoPorRotina.has(r.id) &&
         (r.status === "planejada" || r.status === "pendente") &&
-        r.fim_planejado <= limite,
+        r.fim_planejado <= limiteDoDia,
     );
     const epis = new Set<string>();
     let comEpi = 0;
@@ -185,7 +199,7 @@ export default function PaginaAcompanhamento() {
       for (const n of nomes) epis.add(n);
     }
     return { total: alvos.length, comEpi, epis: [...epis].sort() };
-  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, data, hoje]);
+  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia]);
 
   async function fecharDia() {
     if (!confirmandoFechamento) {
@@ -549,12 +563,14 @@ export default function PaginaAcompanhamento() {
                   </>
                 )}
               </div>
+              {!decididaPeloCoordenador(r) && (
               <div className="acompanhamento-acoes-linha">
                 {!exec && !exigeEpi && (
                   <button
                     type="button"
                     className="btn btn-mini btn-conforme"
-                    disabled={confirmando}
+                    disabled={confirmando || r.fim_planejado > limiteDoDia}
+                    title={r.fim_planejado > limiteDoDia ? "Ainda não terminou — confirme depois do horário" : undefined}
                     onClick={() => void confirmarConforme(r)}
                   >
                     {confirmando ? "Confirmando…" : "✓ Conforme"}
@@ -575,6 +591,7 @@ export default function PaginaAcompanhamento() {
                         : "Houve desvio"}
                 </button>
               </div>
+              )}
             </div>
           );
         })}
@@ -657,12 +674,14 @@ export default function PaginaAcompanhamento() {
                     <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>
                   </td>
                   <td style={{ textAlign: "right" }}>
+                    {!decididaPeloCoordenador(r) && (
                     <div className="acompanhamento-acoes-tabela">
                       {!exec && !exigeEpi && (
                         <button
                           type="button"
                           className="btn btn-mini btn-conforme"
-                          disabled={confirmando}
+                          disabled={confirmando || r.fim_planejado > limiteDoDia}
+                          title={r.fim_planejado > limiteDoDia ? "Ainda não terminou — confirme depois do horário" : undefined}
                           onClick={() => void confirmarConforme(r)}
                         >
                           {confirmando ? "Confirmando…" : "✓ Conforme"}
@@ -683,6 +702,7 @@ export default function PaginaAcompanhamento() {
                               : "Desvio"}
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -717,7 +737,7 @@ export default function PaginaAcompanhamento() {
                   setForm((f) => ({ ...f, status_realizado: e.target.value as StatusRealizado }))
                 }
               >
-                {OPCOES_STATUS.map((o) => (
+                {opcoesStatus.map((o) => (
                   <option key={o.valor} value={o.valor}>
                     {o.rotulo}
                   </option>

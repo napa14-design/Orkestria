@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     };
     if (!sede) return ok({ erro: "Informe a sede." }, 400);
     if (!podeAlterarSede(sessao, sede))
-      throw new ErroPermissao("Supervisores só limpam o dia das sedes que operam.");
+      throw new ErroPermissao("Coordenadores só limpam o dia das sedes que operam.");
     const alcance: EscopoLimpeza = escopo === "todas" ? "todas" : "geradas";
 
     if (Array.isArray(datas)) {

@@ -1,6 +1,10 @@
 /** Tipos compartilhados entre as entidades do sistema. */
 
-export type Perfil = "administrador" | "supervisor" | "visualizador";
+/**
+ * "coordenador" é o antigo "supervisor" (renomeado em 19/10/2026); "supervisor"
+ * agora é o perfil de chão: vê a rota e marca o realizado. Ver lib/permissions.ts.
+ */
+export type Perfil = "administrador" | "coordenador" | "supervisor" | "visualizador";
 
 export type Turno = "manha" | "tarde" | "noite" | "integral";
 
