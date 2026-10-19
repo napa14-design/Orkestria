@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-10-16 — Vaga no SGCP: sedes conferidas uma a uma, e os motivos alinhados
+
+O time do SGCP publicou a parte dele (`d105bcb`) e respondeu: a CESIU já existe
+lá, e o cargo "ASG" e o setor "Infraestrutura" também. Conferido contra o
+**cadastro de sedes do SGCP** (30 sedes, leitura só da coleção `sedes`):
+
+- **CESIU ia ser recusada sempre.** O Orkestria mandava o código dela, `CES`, e lá
+  ela é `CESIU` (nome e sigla) — não casava com nada. Agora vai `CESIU`.
+- **Benfica ia para o RH errado.** O Orkestria mandava `BN`, que no SGCP é a
+  BENFICA do **Colégio**; a do Orkestria é a da **Universidade** (o quadro de
+  pessoal confirma). Agora vai `UBN` (UNIBENFICA). Como o SGCP passou a mostrar a
+  vaga só para a unidade dela, a vaga sumiria da vista do RH certo.
+- As outras 17 já casavam, inclusive a DT 2 indo como `DT`.
+
+**Motivos:** o SGCP aceita uma lista fechada e troca o resto por "desligamento"
+genérico. As duas listas foram juntadas: o Orkestria passou a oferecer também
+**Término de experiência, Acordo e Aposentadoria**; o pedido ao SGCP é aceitar
+também **Demissão sem justa causa** e **Transferência**. Justa causa continua
+indo como "Desligamento".
+
+426 testes, `tsc` 0, build 0. **Arquivos:** `lib/desligamento.ts`, `testes/desligar.test.ts`.
+
+---
+
 ## 2026-10-14 — Auditoria de segurança: o que foi corrigido e o que ficou pendente
 
 Uma auditoria de segurança (só leitura do repositório) deu **BLOQUEIA**. Cada

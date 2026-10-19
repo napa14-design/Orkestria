@@ -82,10 +82,17 @@ describe("regras puras", () => {
     expect(validarDesligamento({ motivo: "Pedido de demissão" })).toMatch(/data/);
     expect(validarDesligamento({ data: "2026-10-20", motivo: "Sumiu" })).toMatch(/motivo/);
     expect(validarDesligamento({ data: "2026-10-20", motivo: "Outros" })).toBeNull();
+    // Os que vieram da lista do SGCP.
+    for (const m of ["Término de experiência", "Acordo", "Aposentadoria"])
+      expect(validarDesligamento({ data: "2026-10-20", motivo: m })).toBeNull();
   });
 
-  it("sigla do SGCP: DT 2 vira DT; as outras seguem como estão", () => {
+  it("sigla do SGCP: DT 2 vira DT, CES vira CESIU; as outras seguem como estão", () => {
     expect(siglaNoSgcp({ codigo: "DT2", nome_sede: "Dionísio Torres 2" })).toBe("DT");
+    // "CES" não casa com nada no SGCP: lá a CESIU é "CESIU" (nome e sigla).
+    expect(siglaNoSgcp({ codigo: "CES", nome_sede: "CESIU" })).toBe("CESIU");
+    // A Benfica daqui é a da Universidade: "BN" lá é a do Colégio.
+    expect(siglaNoSgcp({ codigo: "BN", nome_sede: "Benfica" })).toBe("UBN");
     expect(siglaNoSgcp({ codigo: "SUL 1", nome_sede: "Sul 1" })).toBe("SUL 1");
     expect(siglaNoSgcp({ codigo: "", nome_sede: "Benfica" })).toBe("Benfica");
   });

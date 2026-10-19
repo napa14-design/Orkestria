@@ -11,11 +11,19 @@
  */
 import type { Funcionario, Sede } from "@/types";
 
+/**
+ * A junção com a lista que o SGCP aceita (16/10/2026): o que estiver fora dela
+ * chega lá como "desligamento" genérico. Justa causa vai como "Desligamento" de
+ * propósito (ver `pedidoDeVaga`).
+ */
 export const MOTIVOS_DESLIGAMENTO = [
   "Pedido de demissão",
   "Demissão sem justa causa",
   "Demissão por justa causa",
   "Término de contrato",
+  "Término de experiência",
+  "Acordo",
+  "Aposentadoria",
   "Transferência",
   "Abandono de emprego",
   "Outros",
@@ -60,11 +68,16 @@ export function validarDesligamento(d: { data?: unknown; motivo?: unknown }): st
 
 /**
  * Sigla com que o SGCP conhece cada sede. O SGCP aceita nome ou sigla, e quase
- * todas as siglas do Orkestria já são as dele (SUL 1, DT, BN, PQL 1…). A DT 2 é
- * divisão daqui: lá é tudo "DIONISIO TORRES". A CESIU não existe no SGCP — vai
- * como está, e o SGCP responde dizendo que a sede não existe até o RH cadastrar.
+ * todas as siglas do Orkestria já são as dele (SUL 1, DT, BN, PQL 1…). Exceções:
+ *  - a DT 2 é divisão daqui: lá é tudo "DIONISIO TORRES";
+ *  - a CESIU aqui tem código "CES", que lá não casa com nada — no SGCP ela é
+ *    "CESIU" (nome e sigla). Confirmado pelo time do SGCP em 16/10/2026;
+ *  - a Benfica daqui é a da UNIVERSIDADE (no quadro de pessoal as quatro estão
+ *    como UNIBEN). "BN" no SGCP é a BENFICA do Colégio — a vaga cairia para o RH
+ *    errado. Lá a da Universidade é UNIBENFICA [UBN].
+ * Conferido contra o cadastro de sedes do SGCP em 16/10/2026: as 19 casam.
  */
-const SIGLA_NO_SGCP: Record<string, string> = { DT2: "DT" };
+const SIGLA_NO_SGCP: Record<string, string> = { DT2: "DT", CES: "CESIU", BN: "UBN" };
 
 export function siglaNoSgcp(sede: Pick<Sede, "codigo" | "nome_sede">): string {
   const codigo = (sede.codigo ?? "").trim();
