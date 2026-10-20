@@ -256,6 +256,10 @@ export class MemoryDataSource implements DataSource {
     ) as unknown as MapaTabelas[K][];
   }
 
+  async contar(tabela: NomeTabela, condicoes: CondicaoConsulta[]): Promise<number> {
+    return filtrarEmMemoria(banco()[tabela] as unknown as Array<Record<string, unknown>>, condicoes).length;
+  }
+
   async obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {
     const achado = (banco()[tabela] as Array<{ id: string }>).find((r) => r.id === id);
     return (achado as MapaTabelas[K] | undefined) ?? null;

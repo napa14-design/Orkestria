@@ -86,6 +86,11 @@ export class GoogleSheetsDataSource implements DataSource {
     return ordenarELimitar(filtrarEmMemoria(todos, condicoes), opcoes) as unknown as MapaTabelas[K][];
   }
 
+  async contar(tabela: NomeTabela, condicoes: CondicaoConsulta[]): Promise<number> {
+    const todos = (await this.listar(tabela)) as unknown as Array<Record<string, unknown>>;
+    return filtrarEmMemoria(todos, condicoes).length;
+  }
+
   async obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {
     const todos = await this.listar(tabela);
     return todos.find((r) => (r as { id: string }).id === id) ?? null;

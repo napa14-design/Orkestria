@@ -99,6 +99,17 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
 };
 
 /**
+ * A cobertura desta tarefa depende de QUANDO ela foi planejada pela última vez?
+ * Só a periódica sem dia fixo (semanal sem dia marcado, quinzenal, mensal): o
+ * painel "Ficou de fora hoje" cobra pelo intervalo desde a última vez. Diária e
+ * semanal de dia fixo se decidem pelo dia de hoje — não precisam de histórico.
+ */
+export function coberturaPorHistorico(t: Pick<Tarefa, "frequencia" | "dias_semana">): boolean {
+  if (t.frequencia === "semanal") return parseDiasSemana(t.dias_semana).length === 0;
+  return t.frequencia === "quinzenal" || t.frequencia === "mensal";
+}
+
+/**
  * Bloco que ainda ocupa o horário e a jornada da pessoa. Cancelado e
  * **remanejado** liberam: remanejado é o que ela deixou de fazer para fazer
  * outra coisa — a troca por prioridade da Central cede o bloco assim

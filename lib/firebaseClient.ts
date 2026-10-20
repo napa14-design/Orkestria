@@ -41,6 +41,12 @@ export class FirebaseDataSource implements DataSource {
     return snap.docs.map((doc) => doc.data() as MapaTabelas[K]);
   }
 
+  async contar(tabela: NomeTabela, condicoes: CondicaoConsulta[]): Promise<number> {
+    let q: FirebaseFirestore.Query = this.db.collection(tabela);
+    for (const c of condicoes) q = q.where(c.campo, c.op, c.valor);
+    return (await q.count().get()).data().count;
+  }
+
   async obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {
     const doc = await this.db.collection(tabela).doc(id).get();
     return doc.exists ? (doc.data() as MapaTabelas[K]) : null;

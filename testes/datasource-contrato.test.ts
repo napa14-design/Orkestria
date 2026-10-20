@@ -233,6 +233,19 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(r.map((x) => x.id)).toEqual([`${P}ord-2`, `${P}ord-3`]);
     });
 
+    it("contar devolve quantos casam, sem ler os registros", async () => {
+      for (const [id, sede] of [["cnt-1", "a"], ["cnt-2", "a"], ["cnt-3", "b"]])
+        await criarFeriado(feriado(id, "2032-02-02", `${P}cnt-${sede}`));
+      expect(await ds.contar("feriados", [{ campo: "sede_id", op: "==", valor: `${P}cnt-a` }])).toBe(2);
+      expect(
+        await ds.contar("feriados", [
+          { campo: "sede_id", op: "==", valor: `${P}cnt-b` },
+          { campo: "data_inicio", op: "==", valor: "2032-02-02" },
+        ]),
+      ).toBe(1);
+      expect(await ds.contar("feriados", [{ campo: "sede_id", op: "==", valor: `${P}cnt-nada` }])).toBe(0);
+    });
+
     it("consultar sem nenhum resultado devolve lista vazia", async () => {
       const r = await ds.consultar("feriados", [
         { campo: "sede_id", op: "==", valor: `${P}sede-que-nao-existe` },

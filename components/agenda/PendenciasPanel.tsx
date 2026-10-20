@@ -6,7 +6,7 @@
  * vencidas em relação ao último planejamento.
  */
 import { useMemo, useState } from "react";
-import { ocupaHorario, statusPeriodoLetivo } from "@/lib/calculations";
+import { coberturaPorHistorico, ocupaHorario, statusPeriodoLetivo } from "@/lib/calculations";
 import { diaDaSemana, DIAS_SEMANA, parseDiasSemana } from "@/lib/dateUtils";
 import type { Local, PeriodoLetivo, RotinaPlanejada, Tarefa } from "@/types";
 
@@ -72,7 +72,9 @@ export default function PendenciasPanel({
         regra = "diaria";
       } else if (dias.length) {
         if (dias.includes(dowHoje)) regra = "doDia";
-      } else if (t.frequencia in JANELA_DIAS) {
+      } else if (coberturaPorHistorico(t) && t.frequencia in JANELA_DIAS) {
+        // Mesma regra que decide se a Agenda busca o histórico — uma só, para
+        // as duas não se desencontrarem.
         ultima = ultimaData.get(t.id) ?? null;
         const limite = JANELA_DIAS[t.frequencia];
         const diasDesde = ultima

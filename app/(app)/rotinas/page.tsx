@@ -101,7 +101,7 @@ export default function PaginaRotinas() {
     fonteRepetir,
     nFaltas,
     faltamRegistrar,
-  } = useRotinaData(sedeEscolhida, data, modo);
+  } = useRotinaData(sedeEscolhida, data, modo, somenteLeitura);
 
   const params = parametros ?? PARAMETROS_PADRAO;
   const blocoMin = params.bloco_agenda_min || 30;

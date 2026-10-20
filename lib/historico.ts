@@ -49,6 +49,10 @@ export class HistoricoDataSource implements DataSource {
     return this.interno.consultar(tabela, condicoes, opcoes);
   }
 
+  contar(tabela: NomeTabela, condicoes: CondicaoConsulta[]): Promise<number> {
+    return this.interno.contar(tabela, condicoes);
+  }
+
   obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {
     return this.interno.obter(tabela, id);
   }

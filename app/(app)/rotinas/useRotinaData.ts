@@ -8,7 +8,7 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
-import { jornadaDoDia } from "@/lib/calculations";
+import { coberturaPorHistorico, jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import type {
@@ -41,7 +41,13 @@ function segundaDaSemana(iso: string): string {
   return somarDias(iso, -((d.getDay() + 6) % 7));
 }
 
-export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" | "semana") {
+export function useRotinaData(
+  sedeEscolhida: string,
+  data: string,
+  modo: "dia" | "semana",
+  /** Supervisor: vê a agenda, nunca repete dia — não busca a fonte do "repetir". */
+  somenteLeitura = false,
+) {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
 
@@ -70,11 +76,6 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   const { data: ausencias } = useSWR<Ausencia[]>(sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null, fetcher);
   // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
   const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
-  // Últimos 31 dias: base do cálculo de "periódica vencida" e do "repetir".
-  const { data: historico } = useSWR<RotinaPlanejada[]>(
-    sedeId ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,
-    fetcher,
-  );
   // Modelos da sede — saber se há "rota padrão" (gera o dia em 1 clique).
   const { data: modelos, mutate: mutateModelos } = useSWR<
     { nome_modelo: string; padrao: boolean; evento?: boolean }[]
@@ -82,6 +83,25 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
   // `!m.evento` espelha o filtro de `getRotaPadrao`: sem isso a tela ofereceria
   // "Gerar o dia" e a geração devolveria "sem rota".
   const temRotaPadrao = (modelos ?? []).some((m) => m.padrao && !m.evento);
+  // Últimos 31 dias: só servem a dois casos — a "periódica vencida" (tarefa
+  // periódica sem dia fixo) e o "repetir o dia anterior" (dia vazio e sem rota
+  // padrão). Fora deles não busca. Era a maior leitura da tela: ~10 mil por
+  // abertura numa sede grande rodando todo dia, e cada troca de data buscava os
+  // 31 dias de novo — e em 20/10/2026 TODAS as tarefas da produção eram diárias,
+  // ou seja, a leitura não servia a nada (levantamento de leituras).
+  const precisaHistorico = (tarefas ?? []).some((t) => t.ativo && coberturaPorHistorico(t));
+  const { data: historico } = useSWR<RotinaPlanejada[]>(
+    sedeId && precisaHistorico ? `/api/rotinas?de=${somarDias(data, -31)}&ate=${somarDias(data, -1)}&sede=${sedeId}` : null,
+    fetcher,
+  );
+  // O "repetir o dia anterior" só precisa da data mais recente e de quantos
+  // blocos ela tem — contados no servidor. E só para quem pode repetir: o
+  // supervisor nunca vê o botão (auditoria de leituras, 20/10/2026).
+  const diaVazioSemRota = rotinas !== undefined && rotinas.length === 0 && modelos !== undefined && !temRotaPadrao;
+  const { data: fonteRepetir } = useSWR<{ data: string; n: number } | null>(
+    sedeId && diaVazioSemRota && !somenteLeitura ? `/api/rotinas/ultimo-dia?sede=${sedeId}&antes=${data}` : null,
+    fetcher,
+  );
 
   // Visão semanal: rotinas e ausências da semana inteira (seg–dom).
   const segunda = segundaDaSemana(data);
@@ -104,18 +124,6 @@ export function useRotinaData(sedeEscolhida: string, data: string, modo: "dia" |
     }
     return m;
   }, [ausencias, funcionarios, data]);
-
-  // Dia anterior com rotina (fonte do "repetir") — o mais recente antes de hoje.
-  const fonteRepetir = useMemo(() => {
-    const porData = new Map<string, number>();
-    for (const r of historico ?? []) {
-      if (r.status === "cancelada") continue;
-      porData.set(r.data, (porData.get(r.data) ?? 0) + 1);
-    }
-    let melhor: { data: string; n: number } | null = null;
-    for (const [d, n] of porData) if (!melhor || d > melhor.data) melhor = { data: d, n };
-    return melhor;
-  }, [historico]);
 
   const nFaltas = (ausencias ?? []).length;
   const faltamRegistrar = useMemo(() => {

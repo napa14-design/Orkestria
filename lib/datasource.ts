@@ -78,6 +78,13 @@ export interface DataSource {
     condicoes: CondicaoConsulta[],
     opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]>;
+  /**
+   * Quantos registros casam — sem ler os registros. No Firestore é a agregação
+   * `count()`: 1 leitura por até mil entradas, em vez de 1 por documento. Com só
+   * igualdades nas condições, o Firestore junta os índices de campo único e não
+   * pede índice composto (conferido na produção em 20/10/2026).
+   */
+  contar(tabela: NomeTabela, condicoes: CondicaoConsulta[]): Promise<number>;
   obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null>;
   criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]>;
   atualizar<K extends NomeTabela>(

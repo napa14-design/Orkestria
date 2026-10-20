@@ -15,7 +15,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { formatarDataBR, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
+import { formatarDataBR, hhmmParaMin, minParaHHMM, somarDias } from "@/lib/dateUtils";
 import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
@@ -187,6 +187,68 @@ export async function getRotinasPeriodo(
   ];
   if (sedeId) cond.unshift({ campo: "sede_id", op: "==", valor: sedeId });
   return ds.consultar("rotinas_planejadas", cond);
+}
+
+/**
+ * Dias da última semana (antes de `hoje`) com blocos ainda sem registro — o
+ * aviso do Acompanhamento. Conta em vez de ler: 2 contagens por dia (planejada
+ * e pendente), ~14 leituras, no lugar de carregar 7 dias de rotinas (~2.800
+ * numa sede grande; levantamento de leituras, 20/10/2026).
+ */
+export async function diasComPendencia(sedeId: string, hoje: string): Promise<Array<[string, number]>> {
+  const ds = await getDataSource();
+  const dias = Array.from({ length: 7 }, (_, i) => somarDias(hoje, i - 7));
+  const contagens = await Promise.all(
+    dias.map(async (data) => {
+      const base = [
+        { campo: "sede_id", op: "==" as const, valor: sedeId },
+        { campo: "data", op: "==" as const, valor: data },
+      ];
+      const [planejada, pendente] = await Promise.all([
+        ds.contar("rotinas_planejadas", [...base, { campo: "status", op: "==", valor: "planejada" }]),
+        ds.contar("rotinas_planejadas", [...base, { campo: "status", op: "==", valor: "pendente" }]),
+      ]);
+      return [data, planejada + pendente] as [string, number];
+    }),
+  );
+  return contagens.filter(([, n]) => n > 0);
+}
+
+/**
+ * O dia mais recente antes de `antes` (até 31 dias) com rotina na sede, e quantos
+ * blocos ele tem — a fonte do "repetir o dia anterior" na Agenda.
+ *
+ * Conta dia a dia para trás, de 7 em 7, e para no primeiro com blocos: em geral
+ * poucas leituras, no máximo ~31. A alternativa — ordenar por data decrescente
+ * com limite 1 — exige um índice composto novo (sede ASC, data DESC) publicado
+ * no Firestore; a Agenda lia os 31 dias inteiros (~10 mil leituras numa sede
+ * grande) só para achar esse dia (auditoria de leituras, 20/10/2026).
+ */
+export async function ultimoDiaComRotina(
+  sedeId: string,
+  antes: string,
+): Promise<{ data: string; n: number } | null> {
+  const ds = await getDataSource();
+  const doDia = (data: string) => [
+    { campo: "sede_id", op: "==" as const, valor: sedeId },
+    { campo: "data", op: "==" as const, valor: data },
+  ];
+  for (let inicio = 1; inicio <= 31; inicio += 7) {
+    const dias = Array.from({ length: Math.min(7, 32 - inicio) }, (_, i) => somarDias(antes, -(inicio + i)));
+    const totais = await Promise.all(dias.map((d) => ds.contar("rotinas_planejadas", doDia(d))));
+    for (let i = 0; i < dias.length; i++) {
+      if (totais[i] === 0) continue;
+      // O "repetir" copia o que ocupa o horário: cancelada e remanejada não vão.
+      const [canceladas, remanejadas] = await Promise.all(
+        (["cancelada", "remanejada"] as const).map((status) =>
+          ds.contar("rotinas_planejadas", [...doDia(dias[i]), { campo: "status", op: "==", valor: status }]),
+        ),
+      );
+      const n = totais[i] - canceladas - remanejadas;
+      if (n > 0) return { data: dias[i], n };
+    }
+  }
+  return null;
 }
 
 /**

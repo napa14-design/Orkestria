@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-10-20 — Leituras do Firestore: a Agenda para de carregar 31 dias à toa, e o Acompanhamento conta em vez de ler
+
+Segundo passo do levantamento de leituras (Firebase no plano pago).
+
+- **Agenda.** Os 31 dias de rotinas carregados a cada abertura — e de novo a
+  cada troca de data — só servem a dois casos: a "periódica vencida" (tarefa
+  semanal sem dia marcado, quinzenal ou mensal) e o "repetir o dia anterior"
+  (dia vazio e sede sem rota padrão). Contado na produção: **todas as 1.229
+  tarefas são diárias**, ou seja, a leitura não servia a nada. Agora o
+  histórico só é buscado com periódica sem dia fixo (`coberturaPorHistorico`,
+  a mesma regra que o painel usa), e o "repetir" — o caso comum de abrir um dia
+  futuro vazio — vem de `/api/rotinas/ultimo-dia`, que conta dia a dia para
+  trás e para no primeiro com blocos (ordenar por data decrescente pediria
+  índice novo publicado; conferido na produção). E só para quem pode repetir:
+  o supervisor não busca. Na sede grande rodando todo dia eram ~10 mil leituras
+  por abertura. Visto na tela: a Agenda abre pedindo só as rotinas do dia, e o
+  dia futuro vazio oferece "Repetir o dia anterior (20/10 · 44 tarefas)".
+- **Acompanhamento.** O aviso "dias anteriores com tarefas sem registro"
+  carregava 7 dias de rotinas para contar. Agora conta no servidor
+  (`/api/rotinas/pendentes`): 2 contagens por dia, ~14 leituras no lugar de
+  ~2.800. `DataSource.contar` novo nas quatro implementações (`count()` no
+  Firestore), provado no contrato também contra o emulador (50 testes). Só
+  igualdades nas condições — conferido na produção que o Firestore resolve sem
+  índice composto. Visto na tela: o aviso aparece com o dia e a quantidade.
+
+De passagem, a contagem na produção mostrou a DT com 395 blocos de 19/10 ainda
+"planejados", sem registro de realizado.
+
+`lib/calculations.ts`, `app/(app)/rotinas/useRotinaData.ts`,
+`components/agenda/PendenciasPanel.tsx`, `app/(app)/acompanhamento/page.tsx`,
+`app/api/rotinas/pendentes/route.ts`, `app/api/rotinas/ultimo-dia/route.ts`,
+`services/rotinasService.ts`, `lib/datasource.ts` e as quatro implementações.
+Testes em `testes/historico-leituras.test.ts` (inclusive o escopo do supervisor
+nas duas rotas novas) e no contrato. Auditor: APROVADO COM RESSALVAS
+(aplicadas). `seguranca`: LIBERA — e as duas observações opcionais entraram: o
+"último dia" só responde a quem escreve no planejado, e data inválida
+(`2026-13-45`) volta vazia sem gastar contagem. 484 testes, `tsc` 0, build 0.
+
+---
+
 ## 2026-10-20 — Leituras do Firestore: o Histórico e os catálogos param de ler à toa
 
 O Firebase passou para o plano **Blaze** (pago por uso) depois que a cota

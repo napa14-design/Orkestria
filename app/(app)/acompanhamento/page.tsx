@@ -23,7 +23,6 @@ import {
   formatarDuracao,
   hhmmParaMin,
   hojeISO,
-  somarDias,
 } from "@/lib/dateUtils";
 import type {
   ExecucaoRealizada,
@@ -136,18 +135,12 @@ export default function PaginaAcompanhamento() {
   const [declararEpi, setDeclararEpi] = useState(false);
   const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
   const [fechando, setFechando] = useState(false);
-  const { data: rotinasAnteriores } = useSWR<RotinaPlanejada[]>(
-    sedeId ? `/api/rotinas?de=${somarDias(hoje, -7)}&ate=${somarDias(hoje, -1)}&sede=${sedeId}` : null,
+  // Contado no servidor (~14 leituras) em vez de trazer 7 dias de rotinas.
+  const { data: diasPendentesBrutos } = useSWR<Array<[string, number]>>(
+    sedeId ? `/api/rotinas/pendentes?sede=${sedeId}` : null,
     fetcher,
   );
-  const diasPendentes = useMemo(() => {
-    const porDia = new Map<string, number>();
-    for (const r of rotinasAnteriores ?? []) {
-      if (r.status !== "planejada" && r.status !== "pendente") continue;
-      porDia.set(r.data, (porDia.get(r.data) ?? 0) + 1);
-    }
-    return [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rotinasAnteriores]);
+  const diasPendentes = diasPendentesBrutos ?? [];
 
   const funcPorId = useMemo(() => new Map((funcionarios ?? []).map((f) => [f.id, f])), [funcionarios]);
   const tarefaPorId = useMemo(() => new Map((tarefas ?? []).map((t) => [t.id, t])), [tarefas]);
