@@ -10,6 +10,7 @@
  * novo no servidor antes de gravar.
  */
 import { useMemo, useState } from "react";
+import { useSWRConfig } from "swr";
 import AgendaGrid from "@/components/agenda/AgendaGrid";
 import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import AlertPanel from "@/components/agenda/AlertPanel";
@@ -18,6 +19,7 @@ import CoberturaPanel from "@/components/agenda/CoberturaPanel";
 import FiltersBar from "@/components/agenda/FiltersBar";
 import ModaisRotina, { type TextoConfirmacao } from "@/components/agenda/ModaisRotina";
 import ModalPlanejamento from "@/components/agenda/ModalPlanejamento";
+import NovaTarefaRapida from "@/components/agenda/NovaTarefaRapida";
 import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
@@ -35,6 +37,7 @@ import {
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
 import { noQuadro } from "@/lib/desligamento";
+import { podeEscrever } from "@/lib/permissions";
 import { podeAutorizar, temErro, validarAlocacao } from "@/lib/validations";
 import { useRotinaData } from "./useRotinaData";
 import type { AlertaValidacao, RotinaPlanejada, Tarefa } from "@/types";
@@ -48,7 +51,8 @@ export default function PaginaRotinas() {
   // Supervisor (perfil de chão) vê a rota e troca data/sede; quem monta é a
   // coordenação. Uma flag só, repassada aos componentes — o servidor recusa
   // a escrita de qualquer jeito (403), isto só não oferece o que ele não pode.
-  const somenteLeitura = useSessao()?.perfil === "supervisor";
+  const sessao = useSessao();
+  const somenteLeitura = sessao?.perfil === "supervisor";
   const [data, setData] = useState(hojeISO());
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [turno, setTurno] = useState("");
@@ -74,6 +78,9 @@ export default function PaginaRotinas() {
     resolver: (min: number | null) => void;
   } | null>(null);
   const [duracaoInput, setDuracaoInput] = useState("");
+  // "+ Nova tarefa" da paleta: null = fechado; texto = nome sugerido (a busca).
+  const [novaTarefaNome, setNovaTarefaNome] = useState<string | null>(null);
+  const { mutate: mutateGlobal } = useSWRConfig();
 
   const {
     sedes,
@@ -1009,6 +1016,26 @@ export default function PaginaRotinas() {
                 ausentes={ausentesMap}
                 aoIniciarArrasto={setBlocosArrasto}
                 aoTerminarArrasto={() => setBlocosArrasto(null)}
+                // Só quem escreve no planejado: a gerência também vê a paleta,
+                // e o botão lhe daria 403 (auditoria, 20/10/2026).
+                aoNovaTarefa={sedeId && sessao && podeEscrever(sessao) ? setNovaTarefaNome : undefined}
+              />
+            )}
+            {novaTarefaNome !== null && sedeId && (
+              <NovaTarefaRapida
+                aberto
+                aoFechar={() => setNovaTarefaNome(null)}
+                sedeId={sedeId}
+                nomeInicial={novaTarefaNome}
+                locais={locais ?? []}
+                aoLocalCriado={() => void mutateGlobal(`/api/locais?sede=${sedeId}`)}
+                aoCriada={() => {
+                  setNovaTarefaNome(null);
+                  // A tarefa (e o local, se nasceu junto) aparece na paleta já
+                  // pronta para arrastar.
+                  void mutateGlobal(`/api/tarefas?sede=${sedeId}`);
+                  void mutateGlobal(`/api/locais?sede=${sedeId}`);
+                }}
               />
             )}
 

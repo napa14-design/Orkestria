@@ -7,6 +7,59 @@
 
 ---
 
+## 2026-10-20 — "+ Nova tarefa" na Rotina, e "+ novo local" dentro do cadastro de tarefa
+
+Pedido do dono, a partir da reunião de 19/10: quem monta o dia descobria na
+agenda que a tarefa não existia ("plantão do esporte") e tinha de largar a
+agenda, ir a Estrutura › Locais, depois a Tarefas, e voltar.
+
+- **Rotina:** botão fixo **"+ Nova tarefa"** na paleta; com a busca sem
+  resultado aparece também **"+ Criar 'texto buscado'"**, já com o nome. O
+  formulário curto pede nome, local, tempo e categoria — e o local, se faltar,
+  nasce ali mesmo ("+ novo local": nome, andar, tipo; a sede é a da agenda). A
+  tarefa nasce diária, de tempo fixo e prioridade média, e aparece na paleta
+  pronta para arrastar. O resto (regra de cálculo, frequência, requisitos,
+  janela) segue em Estrutura › Tarefas.
+- **Estrutura › Tarefas:** o campo Local ganhou **"+ novo"** (sede, nome,
+  andar, tipo, metragem), no mesmo mecanismo do "+ nova categoria"; o local
+  criado já fica escolhido.
+
+**Exceção à doutrina, decidida pelo dono.** `docs/00-doutrina.md` diz que
+ferramenta de implantação não mora no fluxo da Agenda e, se voltar por demanda
+observada, traz um gatilho programável de aposentadoria. Ofereci o atalho só
+quando a busca não acha (o gatilho natural); o dono escolheu **botão fixo**.
+Fica registrado aqui para ninguém removê-lo achando que é engano. O portão:
+elimina sair da agenda para três telas; é implantação no meio da operação (a
+exceção); o caminho básico não muda; só quem escreve no planejado vê o botão
+(supervisor e gerência não).
+
+Visto na tela com banco em memória: "Plantão do esporte" + local novo "Quadra
+coberta" criados pela paleta, na sede da agenda, e a tarefa já na paleta; em
+Tarefas, "Sala de judô" criada pelo "+ novo" e já escolhida no formulário.
+
+Auditoria (APROVADO COM RESSALVAS) — três caminhos davam **cadastro
+duplicado**, todos corrigidos e vistos na tela:
+- **Falha no meio:** local criado e a tarefa falha → o local sumia do select e
+  a pessoa o criava de novo. Agora ele fica escolhido na lista e o pai já
+  revalida (simulado com a rede falhando no envio da tarefa: um "Ginásio" só).
+- **Coordenador com sede extra** em Estrutura › Tarefas só via os locais da
+  principal, e o "+ novo" o levava a duplicar os da outra. A lista agora traz
+  as sedes que ele opera.
+- **"+ Criar 'busca'"** aparecia quando um filtro escondia uma tarefa que
+  existe. Agora só quando a busca não casa com nenhuma tarefa, nem inativa.
+- E: a gerência (visualizador) via o botão e levava 403 — agora só quem
+  escreve; logo após trocar de sede, a lista do formulário mostrava os locais
+  da anterior — agora filtra pela sede da agenda.
+
+`components/agenda/NovaTarefaRapida.tsx` (novo), `components/agenda/TaskPalette.tsx`,
+`lib/agenda.ts` (`locaisDoFormulario`, `buscaCasaAlgumaTarefa`),
+`app/(app)/rotinas/page.tsx`, `app/(app)/tarefas/page.tsx`. Sem regra de
+servidor nova: usa `POST /api/locais` e `POST /api/tarefas`, com as permissões
+de sempre. Testes: `testes/nova-tarefa-rapida.test.ts`. 488 testes, `tsc` 0,
+build 0.
+
+---
+
 ## 2026-10-20 — Leituras do Firestore: a Agenda para de carregar 31 dias à toa, e o Acompanhamento conta em vez de ler
 
 Segundo passo do levantamento de leituras (Firebase no plano pago).

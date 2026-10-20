@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { useSessao } from "@/components/SessaoContexto";
-import { podeCriarNoCatalogo } from "@/lib/permissions";
+import { podeCriarNoCatalogo, podeEscrever, sedesPermitidas } from "@/lib/permissions";
 import { nivelPrioridade, rotuloPrioridade, tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
@@ -50,7 +50,20 @@ export default function PaginaTarefas() {
   // seria um botão que promete e devolve 403.
   const podeCriarCatalogo = !sessao || podeCriarNoCatalogo(sessao);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  // Locais de TODAS as sedes que a pessoa opera. `/api/locais` sem `?sede` só
+  // devolve a principal para quem tem escopo: o coordenador com sede extra não
+  // achava o local da outra sede e o "+ novo" o levava a duplicá-lo (auditoria,
+  // 20/10/2026). Quem vê todas as sedes continua numa chamada só.
+  const sedesDoEscopo = sessao ? sedesPermitidas(sessao) : null;
+  const chaveLocais =
+    sedesDoEscopo && sedesDoEscopo.length > 1 ? `locais-das-sedes:${sedesDoEscopo.join(",")}` : "/api/locais";
+  const { data: locais, mutate: mutateLocais } = useSWR<Local[]>(chaveLocais, (chave: string): Promise<Local[]> =>
+    chave === "/api/locais"
+      ? (fetcher(chave) as Promise<Local[]>)
+      : Promise.all(sedesDoEscopo!.map((id) => fetcher(`/api/locais?sede=${encodeURIComponent(id)}`) as Promise<Local[]>)).then(
+          (listas) => listas.flat(),
+        ),
+  );
   const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
   // Mesmo mapa que o servidor monta: o número da tela tem de bater com o gravado.
   const fatorDoTipo = useMemo(
@@ -160,8 +173,41 @@ export default function PaginaTarefas() {
             valor: l.id,
             rotulo: `${l.nome_local} (${l.andar}) — ${nomeSede(l.sede_id)}`,
           })),
-          ajuda: "Obrigatório — a sede vem do local",
+          ajuda: "Obrigatório — a sede vem do local · dá para criar aqui",
           inteira: true,
+          // Faltou o local? Cria aqui mesmo, em vez de largar o formulário e ir a
+          // Estrutura › Locais (pedido da reunião de 19/10/2026). Só o essencial;
+          // metragem e intensidade se completam depois em Locais.
+          criarInline: !sessao || !podeEscrever(sessao) ? undefined : {
+            titulo: "Novo local",
+            endpoint: "/api/locais",
+            campos: [
+              {
+                key: "sede_id",
+                rotulo: "Sede",
+                tipo: "select",
+                obrigatorio: true,
+                inteira: true,
+                opcoes: (sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
+              },
+              { key: "nome_local", rotulo: "Nome do local", tipo: "texto", obrigatorio: true, inteira: true },
+              { key: "andar", rotulo: "Andar", tipo: "texto", padrao: "Térreo" },
+              {
+                key: "tipo_local",
+                rotulo: "Tipo",
+                tipo: "select",
+                obrigatorio: true,
+                opcoes: (tiposLocal ?? []).filter((t) => t.ativo).map((t) => ({ valor: t.id, rotulo: t.nome })),
+              },
+              { key: "metragem", rotulo: "Metragem (m²)", tipo: "numero", passo: "0.1", padrao: 0 },
+              { key: "ativo", rotulo: "Ativo", tipo: "checkbox", padrao: true },
+            ],
+            paraOpcao: (novo) => ({
+              valor: String(novo.id),
+              rotulo: `${String(novo.nome_local)} (${String(novo.andar ?? "")}) — ${nomeSede(String(novo.sede_id))}`,
+            }),
+            aoCriado: () => void mutateLocais(),
+          },
           dica: "Onde a tarefa é executada. Ao escolher o local, o sistema já sabe automaticamente a sede e a metragem (m²) dele — por isso não existe tarefa sem local.",
         },
         {

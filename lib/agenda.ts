@@ -1,8 +1,34 @@
 /**
  * Lógica de exibição da agenda (pura, sem React) — testável isolada.
  */
-import type { RotinaPlanejada, StatusRotina } from "@/types";
+import type { Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 import { hhmmParaMin } from "./dateUtils";
+
+/**
+ * Locais que o "+ Nova tarefa" da Rotina oferece: só os ATIVOS da sede da
+ * agenda — logo após trocar de sede, a lista anterior ainda está em cache e a
+ * tarefa herdaria a sede do local errado (auditoria, 20/10/2026) — mais o local
+ * que acabou de nascer no próprio formulário, que a lista do pai ainda não tem.
+ * Sem ele, uma falha na tarefa deixava o select em "Escolha…" e a pessoa criava
+ * o local de novo.
+ */
+export function locaisDoFormulario(locais: Local[], sedeId: string, criadoAgora?: Local | null): Local[] {
+  const daSede = locais.filter((l) => l.ativo && l.sede_id === sedeId);
+  if (criadoAgora && criadoAgora.sede_id === sedeId && !daSede.some((l) => l.id === criadoAgora.id))
+    daSede.push(criadoAgora);
+  return daSede.sort((a, b) => a.nome_local.localeCompare(b.nome_local, "pt-BR"));
+}
+
+/**
+ * A busca da paleta casa com alguma tarefa — ativa ou não, com ou sem filtro?
+ * O "+ Criar 'busca'" só aparece quando NÃO casa: um filtro de prioridade ou
+ * andar esconder a tarefa não é motivo para criar outra igual.
+ */
+export function buscaCasaAlgumaTarefa(tarefas: Tarefa[], locais: Map<string, Local> | ReadonlyMap<string, Local>, busca: string): boolean {
+  const q = busca.trim().toLowerCase();
+  if (!q) return true;
+  return tarefas.some((t) => `${t.nome_tarefa} ${locais.get(t.local_id)?.nome_local ?? ""}`.toLowerCase().includes(q));
+}
 
 /**
  * Uma rotina só cobra confirmação depois do fim planejado. Dias passados

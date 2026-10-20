@@ -2,6 +2,7 @@
 
 /** Lado esquerdo da tela de rotina: tarefas disponíveis para arrastar. */
 import { useMemo, useState } from "react";
+import { buscaCasaAlgumaTarefa } from "@/lib/agenda";
 import { tempoPrevistoMin, blocosOcupados } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
 import { noQuadro } from "@/lib/desligamento";
@@ -38,6 +39,7 @@ export default function TaskPalette({
   ausentes = SEM_AUSENTES,
   aoIniciarArrasto,
   aoTerminarArrasto,
+  aoNovaTarefa,
 }: {
   tarefas: Tarefa[];
   locais: Local[];
@@ -59,6 +61,8 @@ export default function TaskPalette({
   /** Informa quantos blocos o item arrastado ocupa (para o fantasma da agenda). */
   aoIniciarArrasto?: (blocos: number) => void;
   aoTerminarArrasto?: () => void;
+  /** "+ Nova tarefa": recebe o que estava digitado na busca. Ausente = sem botão. */
+  aoNovaTarefa?: (nomeInicial: string) => void;
 }) {
   const [busca, setBusca] = useState("");
   const [filtroAndar, setFiltroAndar] = useState("");
@@ -131,7 +135,19 @@ export default function TaskPalette({
     <aside className="painel entra paleta-tarefas" data-tour="paleta-tarefas">
       <div className="painel-cabecalho" style={{ padding: "10px 12px" }}>
         <span className="rotulo">Tarefas disponíveis</span>
-        <span className="selo selo-cinza num">{visiveis.length}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span className="selo selo-cinza num">{visiveis.length}</span>
+          {aoNovaTarefa && (
+            <button
+              type="button"
+              className="btn btn-mini"
+              onClick={() => aoNovaTarefa(busca.trim())}
+              title="Criar uma tarefa (e o local, se faltar) sem sair da agenda"
+            >
+              + Nova tarefa
+            </button>
+          )}
+        </span>
       </div>
 
       <div style={{ padding: 10, display: "grid", gap: 6, borderBottom: "1px solid var(--linha)" }}>
@@ -171,6 +187,14 @@ export default function TaskPalette({
         {visiveis.length === 0 && (
           <p style={{ fontSize: 12, color: "var(--tinta-3)", textAlign: "center", padding: 12 }}>
             Nenhuma tarefa para os filtros atuais.
+            {aoNovaTarefa && !buscaCasaAlgumaTarefa(tarefas, localPorId, busca) && (
+              <>
+                <br />
+                <button type="button" className="btn btn-mini" style={{ marginTop: 8 }} onClick={() => aoNovaTarefa(busca.trim())}>
+                  + Criar “{busca.trim()}”
+                </button>
+              </>
+            )}
           </p>
         )}
         {visiveis.map((t) => {
