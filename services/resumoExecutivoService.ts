@@ -2,6 +2,7 @@
  * Leitura do resumo executivo do Chromos. A conta mora em `lib/resumoExecutivo.ts`
  * (pura, testada sem banco); aqui só se busca o que ela precisa.
  */
+import { CATEGORIA_APOIO_OUTRO_SETOR } from "@/lib/calculations";
 import { getDataSource } from "@/lib/datasource";
 import { limitesDeDatas, montarResumo } from "@/lib/resumoExecutivo";
 import { resolverParametros } from "./parametrosService";
@@ -20,7 +21,7 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
 
   const ds = await getDataSource();
   const { inicio, fim } = limitesDeDatas(de, ate);
-  const [sedes, funcionarios, rotinas, execucoes, params] = await Promise.all([
+  const [sedes, funcionarios, rotinas, execucoes, params, tarefasDeApoio] = await Promise.all([
     ds.listar("sedes"),
     ds.listar("funcionarios"),
     ds.consultar("rotinas_planejadas", [
@@ -33,9 +34,21 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
     ]),
     // Sem sede: os limites de ocupação são globais e só o administrador muda.
     resolverParametros(),
+    // Só as tarefas da categoria — dezenas de leituras, não as 1.200.
+    ds.consultar("tarefas", [{ campo: "categoria_id", op: "==", valor: CATEGORIA_APOIO_OUTRO_SETOR }]),
   ]);
 
-  const corpo = montarResumo({ sedes, funcionarios, rotinas, execucoes, params, de, ate, agora });
+  const corpo = montarResumo({
+    sedes,
+    funcionarios,
+    rotinas,
+    execucoes,
+    params,
+    de,
+    ate,
+    agora,
+    tarefasDeApoio: new Set(tarefasDeApoio.map((t) => t.id)),
+  });
   // Com período, as chaves possíveis se multiplicam: o vencido sai ao guardar.
   for (const [k, v] of cache) if (v.expiraEm <= agora.getTime()) cache.delete(k);
   cache.set(chave, { corpo, expiraEm: agora.getTime() + CACHE_MS });

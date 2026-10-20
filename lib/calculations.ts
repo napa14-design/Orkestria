@@ -99,6 +99,33 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
 };
 
 /**
+ * Categoria do trabalho que a equipe de serviços gerais faz PARA OUTRO SETOR —
+ * plantão com crianças, apoio à cantina, portaria, eventos (reunião de
+ * coordenadores, 19/10/2026: "quanto da nossa mão de obra vai para fora da
+ * infra"). Id fixo para o sistema reconhecer; nome e cor se editam no catálogo.
+ * Café NÃO entra (decisão do dono: "café é sagrado").
+ */
+export const CATEGORIA_APOIO_OUTRO_SETOR = "apoio_outro_setor";
+
+/**
+ * Quanto do tempo planejado vai para apoio a outro setor, em %. `null` sem nada
+ * planejado — porcentagem de nada não é 0%.
+ */
+export function percentualApoioOutroSetor(
+  rotinas: Pick<RotinaPlanejada, "tarefa_id" | "status" | "tempo_previsto_min">[],
+  tarefasDeApoio: ReadonlySet<string>,
+): number | null {
+  let total = 0;
+  let apoio = 0;
+  for (const r of rotinas) {
+    if (!ocupaHorario(r)) continue;
+    total += r.tempo_previsto_min || 0;
+    if (tarefasDeApoio.has(r.tarefa_id)) apoio += r.tempo_previsto_min || 0;
+  }
+  return total > 0 ? Math.round((apoio / total) * 1000) / 10 : null;
+}
+
+/**
  * A cobertura desta tarefa depende de QUANDO ela foi planejada pela última vez?
  * Só a periódica sem dia fixo (semanal sem dia marcado, quinzenal, mensal): o
  * painel "Ficou de fora hoje" cobra pelo intervalo desde a última vez. Diária e

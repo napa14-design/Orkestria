@@ -24,7 +24,7 @@
  * inteiro, nunca a partir das linhas de `porSede`.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
-import { ocupacaoPorPessoa, resumoDeOcupacao } from "./calculations";
+import { ocupacaoPorPessoa, percentualApoioOutroSetor, resumoDeOcupacao } from "./calculations";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -115,6 +115,12 @@ export interface Numeros {
   execucoesOutras: number;
   execucoesSemRegistro: number;
   diasConferidos: number;
+  /**
+   * % do tempo planejado em apoio a outro setor (plantão, cantina, portaria,
+   * eventos — não café). `null` sem nada planejado. Campo acrescentado em
+   * 20/10/2026: aditivo, quem não conhece ignora.
+   */
+  apoioOutroSetorPct: number | null;
 }
 
 const umaCasa = (n: number) => Math.round(n * 10) / 10;
@@ -129,6 +135,8 @@ export function montarResumo(args: {
   de: string;
   ate: string;
   agora: Date;
+  /** Ids das tarefas da categoria "Apoio a outro setor". */
+  tarefasDeApoio?: ReadonlySet<string>;
 }) {
   const { sedes, params, de, ate, agora } = args;
   const ativos = args.funcionarios.filter((f) => f.ativo);
@@ -175,6 +183,7 @@ export function montarResumo(args: {
       execucoesOutras: status("remanejada") + status("cancelada"),
       execucoesSemRegistro: semRegistro,
       diasConferidos: [...dias.values()].filter(Boolean).length,
+      apoioOutroSetorPct: percentualApoioOutroSetor(daqui, args.tarefasDeApoio ?? new Set()),
     };
   };
   const teveAlgo = (n: Numeros) => n.pessoasPlanejadas > 0 || n.execucoesPrevistas > 0;

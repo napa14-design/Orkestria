@@ -14,6 +14,8 @@ import {
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
   ocupaHorario,
+  CATEGORIA_APOIO_OUTRO_SETOR,
+  percentualApoioOutroSetor,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
@@ -71,7 +73,12 @@ export default function PaginaDashboard() {
       ),
     [tiposLocal],
   );
-  const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
+  // Mesma sede das rotinas: sem `?sede=` o coordenador recebe só as da sede
+  // principal, e o apoio/desvio de uma sede extra contaria 0.
+  const { data: tarefas, mutate: mutateTarefas } = useSWR<Tarefa[]>(
+    `/api/tarefas${sedeFiltro ? `?sede=${sedeFiltro}` : ""}`,
+    fetcher,
+  );
   const { data: parametros } = useSWR<ParametrosResolvidos>(
     "/api/parametros?resolvidos=1",
     fetcher,
@@ -95,6 +102,11 @@ export default function PaginaDashboard() {
     const validas = rs.filter(ocupaHorario);
 
     const tempoPlanejadoTotal = validas.reduce((s, r) => s + r.tempo_previsto_min, 0);
+    // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos).
+    const tarefasDeApoio = new Set(
+      (tarefas ?? []).filter((t) => t.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR).map((t) => t.id),
+    );
+    const apoioOutroSetorPct = percentualApoioOutroSetor(validas, tarefasDeApoio);
 
     // Ocupação média por funcionário nos dias em que houve planejamento.
     const porFuncionario = ocupacaoPorPessoa(funcs, validas);
@@ -142,6 +154,7 @@ export default function PaginaDashboard() {
       .slice(0, 10);
 
     return {
+      apoioOutroSetorPct,
       tempoRealizadoTotal,
       tarefasRealizadas,
       tarefasNaoRealizadas,
@@ -259,7 +272,7 @@ export default function PaginaDashboard() {
         : "var(--laranja)",
   }));
 
-  if (!rotinas || !funcionarios) {
+  if (!rotinas || !funcionarios || !tarefas) {
     return (
       <div className="painel entra" style={{ marginTop: 24 }}>
         <Carregando texto="Carregando indicadores…" style={{ padding: 64 }} />
@@ -362,6 +375,12 @@ export default function PaginaDashboard() {
           valor={String(indicadores.subutilizados)}
           detalhe={`abaixo de ${params.ocupacao_baixa}%`}
           cor="var(--cinza-bloco)"
+        />
+        <CartaoKpi
+          rotulo="Apoio a outro setor"
+          valor={indicadores.apoioOutroSetorPct === null ? "—" : `${indicadores.apoioOutroSetorPct.toFixed(1)}%`}
+          detalhe="do tempo planejado · plantão, cantina, portaria, eventos"
+          cor="var(--acento)"
         />
       </div>
 

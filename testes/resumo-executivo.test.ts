@@ -9,7 +9,15 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { GET } from "@/app/api/chromos/resumo/route";
-import { ocupacaoPorPessoa, PARAMETROS_PADRAO, resumoDeOcupacao } from "@/lib/calculations";
+import {
+  CATEGORIA_APOIO_OUTRO_SETOR,
+  ocupacaoPorPessoa,
+  PARAMETROS_PADRAO,
+  percentualApoioOutroSetor,
+  resumoDeOcupacao,
+} from "@/lib/calculations";
+import { getDataSource } from "@/lib/datasource";
+import { reiniciarBanco } from "@/lib/memoryStore";
 import {
   grupoDaSede,
   lerPeriodo,
@@ -174,6 +182,42 @@ describe("montarResumo", () => {
     expect(r.geral.execucoesSemRegistro).toBe(1); // r3
   });
 
+  it("apoio a outro setor: % do tempo planejado, sem cancelado, e null sem lista", () => {
+    // r6 (60 de 600 min em Sul 1) e r4 (todo o Benfica) viram apoio; r5 também,
+    // mas está cancelado e não conta.
+    const comApoio = montarResumo({
+      sedes, funcionarios,
+      rotinas: rotinas.map((x) => (["r4", "r5", "r6"].includes(x.id) ? { ...x, tarefa_id: "t-apoio" } : x)),
+      execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+      tarefasDeApoio: new Set(["t-apoio"]),
+    });
+    const pct = (nome: string) => comApoio.porSede.find((s) => s.sede === nome)!.apoioOutroSetorPct;
+    expect(pct("Sul 1")).toBe(10);
+    expect(pct("Sul 2")).toBe(0);
+    expect(pct("Benfica")).toBe(100);
+    // Geral é a conta do conjunto inteiro: 654 de 1734 min = 37,7 — não a
+    // média das linhas (36,7), nem uma sede só, nem arredondado para inteiro.
+    expect(comApoio.geral.apoioOutroSetorPct).toBe(37.7);
+    // Sem a lista (chamada antiga), o campo não inventa número: 0% onde há planejamento.
+    expect(linha("Sul 1").apoioOutroSetorPct).toBe(0);
+  });
+
+  it("percentualApoioOutroSetor: null sem nada planejado; remanejada e cancelada fora", () => {
+    expect(percentualApoioOutroSetor([], new Set(["t"]))).toBeNull();
+    const base = { tarefa_id: "t", tempo_previsto_min: 30 } as const;
+    expect(
+      percentualApoioOutroSetor(
+        [
+          { ...base, status: "planejada" },
+          { ...base, tarefa_id: "outra", status: "planejada" },
+          { ...base, status: "remanejada" },
+          { ...base, status: "cancelada" },
+        ],
+        new Set(["t"]),
+      ),
+    ).toBe(50);
+  });
+
   it("dia conferido é o dia da sede em que TODO bloco tem realizado", () => {
     expect(linha("Sul 1").diasConferidos).toBe(1);
     expect(linha("Sul 2").diasConferidos).toBe(0); // r3 sem registro
@@ -210,5 +254,20 @@ describe("GET /api/chromos/resumo — as portas", () => {
     expect(corpo).toMatchObject({ versao: 1, de: "2026-09", ate: "2026-09" });
     expect(Array.isArray(corpo.porSede)).toBe(true);
     expect(corpo.geral).toHaveProperty("execucoesSemRegistro");
+  });
+
+  it("apoio a outro setor sai do banco: tarefa da categoria conta, a outra não", async () => {
+    process.env.ORKESTRIA_TOKEN = "segredo";
+    reiniciarBanco();
+    const ds = await getDataSource();
+    const tarefa = (id: string, categoria_id: string) =>
+      ds.criar("tarefas", { id, nome_tarefa: id, sede_id: "christus_dt", local_id: "christus_l1", categoria_id, ativo: true } as never);
+    await tarefa("t-plantao", CATEGORIA_APOIO_OUTRO_SETOR);
+    await tarefa("t-limpeza", "c1");
+    for (const [id, tarefa_id, min] of [["b1", "t-plantao", 30], ["b2", "t-limpeza", 240]] as const)
+      await ds.criar("rotinas_planejadas", rotina({ id, tarefa_id, sede_id: "christus_dt", data: "2026-08-10", tempo_previsto_min: min }));
+    // Agosto: o mês que nenhum outro teste pede, para o cache de 5 min não responder.
+    const corpo = await (await pedir("?de=2026-08&ate=2026-08", "segredo")).json();
+    expect(corpo.geral.apoioOutroSetorPct).toBe(11.1); // 30 de 270
   });
 });

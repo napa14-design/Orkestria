@@ -108,6 +108,8 @@ function seed(): Banco {
       { id: "c6", nome: "Limpeza terminal", descricao: "Limpeza profunda/periódica de maior duração.", cor: "#555555", fator_intensidade: 1, ativo: true, ...aud },
       { id: "c7", nome: "Limpeza externa", descricao: "Áreas externas e fachadas.", cor: "#8a6d3b", fator_intensidade: 1, ativo: true, ...aud },
       { id: "c8", nome: "Apoio operacional", descricao: "Atividades que não são limpeza: café, recolhimento, aguação, montagem.", cor: "#5a7a8a", fator_intensidade: 1, ativo: true, ...aud },
+      // Id fixo (CATEGORIA_APOIO_OUTRO_SETOR): é por ele que o painel e o Chromos medem.
+      { id: "apoio_outro_setor", nome: "Apoio a outro setor", descricao: "Trabalho para outro setor: plantão com crianças, cantina, portaria, eventos. Café não entra.", cor: "#9C0D38", fator_intensidade: 1, ativo: true, ...aud },
     ],
     requisitos: [
       { id: "rq1", nome: "Manuseio de produtos químicos", tipo: "treinamento", descricao: "Capacitação para uso de saneantes/desinfetantes.", ativo: true, ...aud },

@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-10-20 — Categoria "Apoio a outro setor": quanto da equipe vai para fora da infra
+
+Pedido da reunião de coordenadores (19/10): medir quanto da mão de obra de
+serviços gerais vai para outro setor — plantão com crianças, apoio à cantina,
+portaria, eventos. Decisão do dono: **só rótulo** (uma categoria, sem campo
+novo nem tela nova) e triagem pelos nomes das tarefas. **Café não entra**
+("café é sagrado").
+
+- **Categoria nova `apoio_outro_setor`** ("Apoio a outro setor", cor vinho
+  #9C0D38). O id é fixo para o sistema reconhecer; nome e cor se editam no
+  catálogo. A agenda já pinta o cartão pela cor da categoria, então o apoio
+  aparece destacado sem código de tela.
+- **Produção:** criada a categoria e passadas para ela **29 tarefas** (25 nomes)
+  aprovadas na triagem — plantões, acompanhar alunos do infantil para o
+  idiomas, pegar lanche das crianças, cantina, portaria principal, horário de
+  eventos. Seleção pelo nome exato da lista aprovada; uma primeira versão por
+  regex pegava 70 (puxava "limpeza da sala de atendimento", "apoio na limpeza")
+  e foi descartada antes de gravar. Backup do `categoria_id` anterior de cada
+  tarefa em Downloads (`backup-categoria-apoio-2026-10-20T19-46-29-688Z.json`).
+  Tarefa nova de apoio: o coordenador escolhe a categoria no cadastro.
+- **Painel:** cartão "Apoio a outro setor" — % do tempo planejado (sem
+  cancelada/remanejada) que vai para essas tarefas. "—" sem nada planejado.
+  O Painel passou a pedir as tarefas **da sede filtrada** (`/api/tarefas?sede=`):
+  sem isso o coordenador recebia só as da sede principal, e numa sede extra o
+  apoio dava 0% calado — o mesmo furo já existia nos desvios por tarefa
+  (achado do auditor). A tela espera as tarefas antes de mostrar os números.
+- **Resumo do Chromos:** `Numeros` ganhou `apoioOutroSetorPct` (por sede e no
+  total). Aditivo — `VERSAO` segue 1, quem não conhece ignora. O serviço lê só
+  as tarefas da categoria (`where categoria_id ==`), não o catálogo inteiro.
+
+Arquivos: `lib/calculations.ts` (`CATEGORIA_APOIO_OUTRO_SETOR`,
+`percentualApoioOutroSetor`), `lib/resumoExecutivo.ts`,
+`services/resumoExecutivoService.ts`, `app/(app)/dashboard/page.tsx`,
+`lib/memoryStore.ts` (seed), `testes/resumo-executivo.test.ts`.
+
+---
+
 ## 2026-10-20 — Tela do supervisor: "✓ Feita" / "✗ Não feita", e cartões mais baixos
 
 Véspera do treinamento dos supervisores (21/10). O supervisor usava o
