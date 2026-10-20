@@ -5,7 +5,14 @@
  * do Google. Os dados vivem no processo do servidor — reiniciou, voltou ao
  * seed. Exclusivo para desenvolvimento/demonstração.
  */
-import { type CondicaoConsulta, type DataSource, filtrarEmMemoria, type OperacaoLote } from "./datasource";
+import {
+  type CondicaoConsulta,
+  type DataSource,
+  filtrarEmMemoria,
+  type OperacaoLote,
+  type OpcoesConsulta,
+  ordenarELimitar,
+} from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
 import { exigirId, semUndefined } from "./semUndefined";
@@ -241,10 +248,11 @@ export class MemoryDataSource implements DataSource {
   async consultar<K extends NomeTabela>(
     tabela: K,
     condicoes: CondicaoConsulta[],
+    opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]> {
-    return filtrarEmMemoria(
-      banco()[tabela] as unknown as Array<Record<string, unknown>>,
-      condicoes,
+    return ordenarELimitar(
+      filtrarEmMemoria(banco()[tabela] as unknown as Array<Record<string, unknown>>, condicoes),
+      opcoes,
     ) as unknown as MapaTabelas[K][];
   }
 

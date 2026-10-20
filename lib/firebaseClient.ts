@@ -10,7 +10,7 @@
  *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
  */
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import type { CondicaoConsulta, DataSource, OperacaoLote } from "./datasource";
+import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
 import { obterAppAdmin } from "./firebaseAdmin";
 import { exigirId, semUndefined } from "./semUndefined";
 import type { MapaTabelas, NomeTabela } from "./schema";
@@ -30,10 +30,13 @@ export class FirebaseDataSource implements DataSource {
   async consultar<K extends NomeTabela>(
     tabela: K,
     condicoes: CondicaoConsulta[],
+    opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]> {
     // Condições sobre um único campo → índice automático (sem índice composto).
     let q: FirebaseFirestore.Query = this.db.collection(tabela);
     for (const c of condicoes) q = q.where(c.campo, c.op, c.valor);
+    if (opcoes?.ordenarPor) q = q.orderBy(opcoes.ordenarPor, opcoes.decrescente ? "desc" : "asc");
+    if (opcoes?.limite !== undefined) q = q.limit(opcoes.limite);
     const snap = await q.get();
     return snap.docs.map((doc) => doc.data() as MapaTabelas[K]);
   }

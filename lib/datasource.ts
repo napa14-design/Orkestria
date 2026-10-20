@@ -28,6 +28,37 @@ export type CondicaoConsulta = {
 };
 
 /**
+ * Ordenar e limitar NO BANCO — no Firestore, cada documento devolvido é uma
+ * leitura cobrada; ler 6 mil para mostrar 500 custava 6 mil (o Histórico,
+ * levantamento de 20/10/2026). Ordene pelo MESMO campo das condições de
+ * intervalo: assim o índice automático de campo único serve, sem índice composto.
+ */
+export type OpcoesConsulta = {
+  ordenarPor?: string;
+  decrescente?: boolean;
+  limite?: number;
+};
+
+/**
+ * Ordena e corta em memória (memory e Sheets) com a mesma semântica do
+ * Firestore — inclusive esta: o `orderBy` dele deixa de fora o documento que
+ * não tem o campo.
+ */
+export function ordenarELimitar<T extends Record<string, unknown>>(registros: T[], opcoes?: OpcoesConsulta): T[] {
+  let r = registros;
+  if (opcoes?.ordenarPor) {
+    const campo = opcoes.ordenarPor;
+    const sinal = opcoes.decrescente ? -1 : 1;
+    r = r.filter((x) => x[campo] !== undefined && x[campo] !== null).sort((a, b) => {
+      const va = a[campo] as string | number;
+      const vb = b[campo] as string | number;
+      return va < vb ? -sinal : va > vb ? sinal : 0;
+    });
+  }
+  return opcoes?.limite !== undefined ? r.slice(0, opcoes.limite) : r;
+}
+
+/**
  * Uma escrita dentro de um lote atômico. Ver `DataSource.gravarLote`.
  *
  * O tipo é frouxo de propósito (`NomeTabela` genérico em vez de `K` amarrado):
@@ -45,6 +76,7 @@ export interface DataSource {
   consultar<K extends NomeTabela>(
     tabela: K,
     condicoes: CondicaoConsulta[],
+    opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]>;
   obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null>;
   criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]>;

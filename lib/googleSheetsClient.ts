@@ -8,7 +8,14 @@
  * O frontend NUNCA chama este módulo — apenas as rotas de API via services.
  */
 import { google, type sheets_v4 } from "googleapis";
-import { type CondicaoConsulta, type DataSource, filtrarEmMemoria, type OperacaoLote } from "./datasource";
+import {
+  type CondicaoConsulta,
+  type DataSource,
+  filtrarEmMemoria,
+  type OperacaoLote,
+  type OpcoesConsulta,
+  ordenarELimitar,
+} from "./datasource";
 import {
   cabecalho,
   linhaParaObjeto,
@@ -72,10 +79,11 @@ export class GoogleSheetsDataSource implements DataSource {
   async consultar<K extends NomeTabela>(
     tabela: K,
     condicoes: CondicaoConsulta[],
+    opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]> {
     // Sheets não tem consulta nativa: lista (com cache) e filtra em memória.
     const todos = (await this.listar(tabela)) as unknown as Array<Record<string, unknown>>;
-    return filtrarEmMemoria(todos, condicoes) as unknown as MapaTabelas[K][];
+    return ordenarELimitar(filtrarEmMemoria(todos, condicoes), opcoes) as unknown as MapaTabelas[K][];
   }
 
   async obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {

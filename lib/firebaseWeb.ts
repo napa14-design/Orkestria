@@ -25,6 +25,9 @@ export async function loginGoogleObterToken(): Promise<string> {
   const auth = getAuth(appWeb());
   auth.useDeviceLanguage();
   const provider = new GoogleAuthProvider();
+  // Sempre pergunta a conta: em computador compartilhado, o popup completava
+  // sozinho com quem estava logado no Google antes (revisão de segurança, 20/10/2026).
+  provider.setCustomParameters({ prompt: "select_account" });
   const cred = await signInWithPopup(auth, provider);
   return cred.user.getIdToken();
 }

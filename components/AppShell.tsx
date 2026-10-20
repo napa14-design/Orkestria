@@ -4,8 +4,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ProvedorSessao } from "./SessaoContexto";
 import { useEffect, useRef, useState } from "react";
-import { SWRConfig } from "swr";
+import { SWRConfig, type Middleware } from "swr";
 import type { SessaoUsuario } from "@/lib/permissions";
+
+/**
+ * Catálogos que mudam raramente: com o dado já em cache, trocar de tela não
+ * busca de novo (o SWR rebuscava toda chave a cada montagem — ~70 leituras por
+ * navegação; levantamento de 20/10/2026, Firestore pago). Quem cria ou edita um
+ * deles já atualiza o cache (CrudManager e os "+ novo" chamam `mutate`).
+ *
+ * Só o que é IGUAL para todo mundo. `/api/sedes` fica de fora de propósito: a
+ * lista depende de quem está logado, e o próximo da mesma aba herdaria a do
+ * anterior (auditoria, 20/10/2026).
+ */
+const CATALOGOS = new Set(["/api/requisitos", "/api/tipos-local", "/api/categorias"]);
+const catalogoSemRebusca: Middleware = (useSWRNext) => (chave, buscar, config) =>
+  useSWRNext(
+    chave,
+    buscar,
+    typeof chave === "string" && CATALOGOS.has(chave) ? { ...config, revalidateIfStale: false } : config,
+  );
 
 type Item = {
   href: string;
@@ -140,7 +158,14 @@ export default function AppShell({
   return (
     <ProvedorSessao sessao={sessao}>
     <SWRConfig
+      // Cache POR SESSÃO, por construção: cada pessoa começa com um cache novo
+      // (`provider`), e a `key` refaz tudo se a sessão mudar sem desmontar (login
+      // de outra pessoa numa segunda aba). Antes o cache era o global da aba, e
+      // o próximo usuário herdava o que o anterior via — depender de cada tela
+      // de login lembrar de limpar não é garantia (revisão de segurança, 20/10/2026).
+      key={sessao.id}
       value={{
+        provider: () => new Map(),
         // Mantém os dados anteriores enquanto revalida ou ao trocar de chave —
         // assim a agenda não desmonta (não pisca nem "some") a cada atualização.
         keepPreviousData: true,
@@ -148,6 +173,7 @@ export default function AppShell({
         // reduz leituras do Firestore. As mutações já mantêm a tela fresca.
         revalidateOnFocus: false,
         revalidateOnReconnect: false,
+        use: [catalogoSemRebusca],
       }}
     >
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>

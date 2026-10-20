@@ -12,7 +12,7 @@
  * atomicidade perfeita, mas a requisição não termina antes da auditoria.
  */
 import { usuarioAtual } from "./contextoUsuario";
-import type { CondicaoConsulta, DataSource, OperacaoLote } from "./datasource";
+import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
@@ -44,8 +44,9 @@ export class HistoricoDataSource implements DataSource {
   consultar<K extends NomeTabela>(
     tabela: K,
     condicoes: CondicaoConsulta[],
+    opcoes?: OpcoesConsulta,
   ): Promise<MapaTabelas[K][]> {
-    return this.interno.consultar(tabela, condicoes);
+    return this.interno.consultar(tabela, condicoes, opcoes);
   }
 
   obter<K extends NomeTabela>(tabela: K, id: string): Promise<MapaTabelas[K] | null> {

@@ -7,6 +7,54 @@
 
 ---
 
+## 2026-10-20 — Leituras do Firestore: o Histórico e os catálogos param de ler à toa
+
+O Firebase passou para o plano **Blaze** (pago por uso) depois que a cota
+grátis derrubou o banco na demonstração de 19/10. Levantamento contado no banco
+de produção (`count()`, só leitura) — leituras por abertura de tela:
+
+| Tela | Hoje | Com a sede rodando todo dia |
+|---|---|---|
+| Histórico (admin/gerência) | ~6.100 | cresce sem parar |
+| Agenda | 400–900 | ~10.000 (31 dias de rotinas; recarrega a cada troca de data) |
+| Acompanhamento | ~500 | ~3.200 (7 dias só para contar pendências) |
+| Painéis em "todas as sedes" | ~2.200 + período | idem |
+
+Feito agora (os rápidos):
+- **Histórico**: pede ao banco os 500 mais recentes já ordenados, em vez de ler
+  os 30 dias (~6.100) e cortar. `DataSource.consultar` ganhou `ordenarPor` /
+  `decrescente` / `limite` nas quatro implementações, provado no contrato
+  **também contra o Firestore** (emulador na 8085: 48 testes). O filtro por
+  tabela fica como estava — ordenar ali exige índice composto publicado.
+- **Catálogos** (requisitos, tipos de local, categorias): com o dado em cache,
+  trocar de tela não busca de novo. Quem cria ou edita já atualiza o cache.
+  **Sedes ficaram de fora**: a lista muda com quem está logado, e a auditoria
+  mostrou que o próximo da mesma aba herdaria a do anterior (no treinamento,
+  alternando coordenador e supervisor). E o cache do SWR passou a ser **por
+  sessão, por construção** (`provider` novo + `key` da sessão no `AppShell`) —
+  em vez de depender de cada tela de login lembrar de limpar. Visto na tela:
+  administrador sai, supervisor entra na mesma aba sem recarregar, e vê só a
+  sede dele.
+- Revisão de segurança (LIBERA COM RESSALVAS), resolvidas: o `limite` do
+  Histórico vira sempre inteiro positivo (negativo dava erro no Firestore e
+  outro resultado na memória); o login com Google sempre pergunta a conta
+  (em computador compartilhado entrava sozinho com a do Google anterior).
+- **Central**: lê tarefas, locais e parâmetros uma vez por montagem (entrada da
+  troca por prioridade).
+
+Fica para o próximo passo (pede desenho): a **Agenda** buscar só o histórico das
+tarefas periódicas (as diárias não precisam), e o **Acompanhamento** contar os
+dias pendentes com `count()`.
+
+`lib/datasource.ts`, `lib/firebaseClient.ts`, `lib/memoryStore.ts`,
+`lib/googleSheetsClient.ts`, `lib/historico.ts`, `app/api/historico/route.ts`,
+`components/AppShell.tsx`, `lib/firebaseWeb.ts`. Testes:
+`testes/historico-leituras.test.ts` e um caso novo no contrato do `DataSource`.
+Revisões: auditor (achados anteriores fechados; regressão das sedes corrigida),
+`seguranca` LIBERA COM RESSALVAS (resolvidas). 478 testes, `tsc` 0, build 0.
+
+---
+
 ## 2026-10-19 — Troca por prioridade: quem falta é coberto por quem está em tarefa menos importante
 
 Pedido da reunião de coordenadores de hoje: as equipes rodam perto de 100%, e

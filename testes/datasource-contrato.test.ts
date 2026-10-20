@@ -221,6 +221,18 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(r.map((x) => x.id).sort()).toEqual([`${P}faixa-1`, `${P}faixa-2`]);
     });
 
+    it("consultar ordena e limita no banco (o Histórico depende disso)", async () => {
+      // Faixa de datas só deste teste, para não misturar com outros registros.
+      for (const [id, data] of [["ord-1", "2031-01-10"], ["ord-2", "2031-01-30"], ["ord-3", "2031-01-20"]])
+        await criarFeriado(feriado(id, data, `${P}ord`));
+      const r = await ds.consultar(
+        "feriados",
+        [{ campo: "data_inicio", op: ">=", valor: "2031-01-01" }, { campo: "data_inicio", op: "<=", valor: "2031-01-31" }],
+        { ordenarPor: "data_inicio", decrescente: true, limite: 2 },
+      );
+      expect(r.map((x) => x.id)).toEqual([`${P}ord-2`, `${P}ord-3`]);
+    });
+
     it("consultar sem nenhum resultado devolve lista vazia", async () => {
       const r = await ds.consultar("feriados", [
         { campo: "sede_id", op: "==", valor: `${P}sede-que-nao-existe` },
