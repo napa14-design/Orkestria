@@ -3,7 +3,7 @@
  * duplicado, apontadas pela auditoria.
  */
 import { describe, expect, it } from "vitest";
-import { buscaCasaAlgumaTarefa, locaisDoFormulario } from "@/lib/agenda";
+import { buscaCasaAlgumaTarefa, listaDoSupervisor, locaisDoFormulario } from "@/lib/agenda";
 import type { Local, Tarefa } from "@/types";
 
 const local = (id: string, sede_id: string, nome_local: string, ativo = true) =>
@@ -21,6 +21,29 @@ describe("locais oferecidos no formulário", () => {
     expect(r.map((l) => l.id)).toEqual(["novo", "a"]); // em ordem alfabética
     // quando a lista do pai já o trouxer, não duplica
     expect(locaisDoFormulario([local("a", "dt", "Sala"), criado], "dt", criado).map((l) => l.id)).toEqual(["novo", "a"]);
+  });
+});
+
+describe("lista do supervisor no Acompanhamento", () => {
+  const linhas = [
+    { id: "a", funcionario_id: "maria" },
+    { id: "b", funcionario_id: "maria" },
+    { id: "c", funcionario_id: "joao" },
+  ];
+  const marcadas = new Set(["b"]);
+  const jaMarcada = (r: { id: string }) => marcadas.has(r.id);
+
+  it("filtra a pessoa e esconde o que já foi marcado", () => {
+    const r = listaDoSupervisor(linhas, "maria", true, jaMarcada);
+    expect(r.filtroEfetivo).toBe("maria");
+    expect(r.visiveis.map((x) => x.id)).toEqual(["a"]);
+    expect(listaDoSupervisor(linhas, "maria", false, jaMarcada).visiveis.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("pessoa filtrada sem blocos no dia (folga) não esvazia a lista: o filtro cai", () => {
+    const r = listaDoSupervisor(linhas, "ana-de-folga", true, jaMarcada);
+    expect(r.filtroEfetivo).toBe("");
+    expect(r.visiveis.map((x) => x.id)).toEqual(["a", "c"]);
   });
 });
 

@@ -7,6 +7,73 @@
 
 ---
 
+## 2026-10-20 — Tela do supervisor: "✓ Feita" / "✗ Não feita", e cartões mais baixos
+
+Véspera do treinamento dos supervisores (21/10). O supervisor usava o
+Acompanhamento do coordenador com restrições — e no celular pesava justamente
+onde ele mais mexe: 23 de 29 tarefas exigem EPI, e cada uma abria um formulário
+de 8 campos (status, horários, tempo, desvio…); a DT tem 395 blocos por dia num
+rolar só; e a linguagem era de coordenador.
+
+Agora, **só para o perfil supervisor** (a tela do coordenador não muda):
+- **Dois botões por tarefa: "✓ Feita" e "✗ Não feita".** O "Não feita" pede só
+  o motivo — um toque numa lista curta (funcionário faltou, cobriu outra
+  tarefa, faltou material, local fechado, não deu tempo, outro) e um detalhe
+  opcional. Nada de horários, tempo ou desvio.
+- **O toque é a declaração de EPI** (decisão do dono): nas tarefas com EPI o
+  botão é "✓ Feita · EPI", e o servidor grava os nomes dos EPIs **do cadastro
+  da tarefa** — nunca uma lista vinda do cliente. Os EPIs aparecem escritos no
+  cartão ("EPI: luvas…") e uma linha no topo diz que o toque é a declaração —
+  tela de toque não mostra dica (revisão de segurança). Sem a declaração, o
+  atalho segue sem afirmar EPI. `POST /api/execucoes/conforme` ganhou
+  `declaro_epi` (vale para quem registra o realizado; a tela só o oferece ao
+  supervisor). O detalhe do "Não feita" avisa: saúde e atestado vão pelas
+  Ausências, não ali.
+- **Filtro por funcionário** e **"só o que falta marcar"** ligado por padrão: o
+  que já foi marcado sai da frente.
+- Textos simples ("Confirmar o dia", "marque o que foi feito e o que não foi"),
+  sem "Exportar CSV"; o "Fechar o dia" avisa que fecha **a sede inteira**, não
+  só quem está filtrado. Corrigir o próprio toque: o botão contrário continua
+  ali (feita ↔ não feita); o que outra pessoa marcou, só o coordenador muda.
+
+**Cartões mais baixos, para todos no celular:** duas linhas (horário e pessoa;
+tarefa e local) com os botões à direita, no lugar da faixa de botão inteira
+embaixo — de ~4 para ~8 tarefas por tela.
+
+Visto na tela (celular, banco em memória, logado como supervisor): "✓ Feita ·
+EPI" gravou "Luvas nitrílicas" e a tarefa saiu da lista; "✗ Não feita" com
+"Faltou material" gravou o motivo; o filtro deixou só os 6 blocos de uma pessoa.
+
+Auditoria (REPROVADO) — corrigido e visto na tela:
+- **O filtro de pessoa sobrevivia à troca de dia/sede**: com alguém de folga
+  filtrado, a lista dizia "Tudo marcado por aqui" com centenas de blocos sem
+  marcação, e o seletor mostrava "Todos". Agora o filtro só vale se a pessoa
+  tem blocos no dia (`listaDoSupervisor`, com teste).
+- **No computador a lista saía duas vezes** (um `display:grid` inline vencia o
+  `.so-mobile`, desde antes): agora só a tabela.
+- **O cartão marcado sumia e o de baixo subia para baixo do dedo** — um segundo
+  toque declarava EPI na tarefa errada. O que é marcado na visita fica no
+  lugar com o selo novo; o aviso flutua embaixo (em portal — a animação da
+  página prendia o `fixed`) e o de sucesso some sozinho.
+- O cartão mostra "Marque depois das HH:MM" quando o botão está desligado, a
+  tela se atualiza a cada minuto, a linha de EPI aparece também ao corrigir
+  uma "não feita", e o andar volta ao lado do local.
+
+`app/(app)/acompanhamento/page.tsx`, `app/api/execucoes/conforme/route.ts`,
+`services/execucoesService.ts` (`episDaTarefa`), `lib/agenda.ts`
+(`listaDoSupervisor`), `app/globals.css`. Testes em
+`testes/supervisor-rotas.test.ts` (sem declarar → 422; declarando → grava os
+nomes do cadastro e ignora a lista do corpo; corrigir "não feita" → mesmo
+registro com os EPIs; sede alheia → 403) e `testes/nova-tarefa-rapida.test.ts`
+(a lista do supervisor), 5 mutantes mortos. `seguranca`: LIBERA COM RESSALVAS
+(aplicadas). Auditor, segunda rodada: APROVADO COM RESSALVAS, também
+aplicadas — só os avisos curtos somem sozinhos (o resumo do fechamento do dia
+fica), o botão que some deixa o lugar reservado para o outro não escorregar
+para baixo do dedo, a lista se limpa ao trocar de dia ou sede, e o aviso fecha
+com um toque. 493 testes, `tsc` 0, build 0.
+
+---
+
 ## 2026-10-20 — "+ Nova tarefa" na Rotina, e "+ novo local" dentro do cadastro de tarefa
 
 Pedido do dono, a partir da reunião de 19/10: quem monta o dia descobria na

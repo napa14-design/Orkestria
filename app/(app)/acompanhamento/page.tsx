@@ -5,7 +5,8 @@
  * aconteceu (status, tempo real, justificativa) e o sistema confronta
  * previsto × realizado.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { useSessao } from "@/components/SessaoContexto";
@@ -15,6 +16,7 @@ import {
   exigeJustificativa,
   PARAMETROS_PADRAO,
 } from "@/lib/calculations";
+import { listaDoSupervisor } from "@/lib/agenda";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import {
@@ -83,7 +85,15 @@ export default function PaginaAcompanhamento() {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [processandoRapido, setProcessandoRapido] = useState<Set<string>>(() => new Set());
-  const [mensagem, setMensagem] = useState<{ texto: string; erro?: boolean } | null>(null);
+  const [mensagem, setMensagem] = useState<{ texto: string; erro?: boolean; efemera?: boolean } | null>(null);
+  // O aviso flutua sobre a lista: os curtos de confirmação ("Marcada como
+  // feita") somem sozinhos; o resto — erro, resumo do fechamento do dia — fica
+  // até a próxima ação ou um toque nele.
+  useEffect(() => {
+    if (!mensagem?.efemera) return;
+    const t = setTimeout(() => setMensagem(null), 3500);
+    return () => clearTimeout(t);
+  }, [mensagem]);
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
@@ -121,6 +131,13 @@ export default function PaginaAcompanhamento() {
    * Até que horário as tarefas do dia já terminaram — a mesma régua do servidor
    * (`AINDA_NAO_TERMINOU`): realizado só depois do horário da tarefa.
    */
+  // Redesenha a cada minuto: sem isso, com a tela parada no celular, o botão de
+  // uma tarefa que acabou de terminar seguia cinza até a pessoa mexer em algo.
+  const [, setMinuto] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setMinuto((m) => m + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
   const limiteDoDia = data > hoje ? "00:00" : data === hoje ? agoraHHMM() : "23:59";
   const sessao = useSessao();
   /** O supervisor só diz se foi feita ou não; cancelar/remanejar é do coordenador. */
@@ -131,6 +148,20 @@ export default function PaginaAcompanhamento() {
   /** Cancelada/remanejada é decisão do coordenador: o supervisor não reabre (o servidor recusa). */
   const decididaPeloCoordenador = (r: RotinaPlanejada) =>
     sessao?.perfil === "supervisor" && (r.status === "cancelada" || r.status === "remanejada");
+  // Supervisor de chão (20/10/2026): só diz "feita" ou "não feita", olhando uma
+  // pessoa por vez e só o que falta — a DT tem 395 blocos por dia, e rolar tudo
+  // no celular não fecha. O coordenador segue com a tela completa.
+  const ehSupervisor = sessao?.perfil === "supervisor";
+  const [filtroFunc, setFiltroFunc] = useState("");
+  const [soFaltam, setSoFaltam] = useState(true);
+  const [naoFeita, setNaoFeita] = useState<RotinaPlanejada | null>(null);
+  // O que foi marcado AGORA fica no lugar (com o selo novo) até a lista ser
+  // reaberta: sumindo na hora, o cartão de baixo subia para baixo do dedo e um
+  // segundo toque rápido declarava EPI na tarefa errada (auditoria, 20/10/2026).
+  const [marcadasAgora, setMarcadasAgora] = useState<Set<string>>(() => new Set());
+  const lembrarMarcada = (id: string) => setMarcadasAgora((atual) => new Set(atual).add(id));
+  // Outro dia ou outra sede é outra lista: o que foi marcado antes já pode sair.
+  useEffect(() => setMarcadasAgora(new Set()), [data, sedeId]);
   /** Fechamento do dia: dois toques (o segundo confirma) e declaração de EPI à parte. */
   const [declararEpi, setDeclararEpi] = useState(false);
   const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
@@ -165,6 +196,19 @@ export default function PaginaAcompanhamento() {
   );
 
   const pendentes = linhas.filter((r) => !execucaoPorRotina.has(r.id)).length;
+  // Quem tem blocos no dia, para o filtro do supervisor.
+  const pessoasDoDia = [...new Set(linhas.map((r) => r.funcionario_id))]
+    .map((id) => ({ id, nome: funcPorId.get(id)?.nome ?? id }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  // Filtro só vale com a pessoa no dia — ver `listaDoSupervisor`.
+  const doSupervisor = listaDoSupervisor(
+    linhas,
+    filtroFunc,
+    soFaltam,
+    (r) => (execucaoPorRotina.has(r.id) || decididaPeloCoordenador(r)) && !marcadasAgora.has(r.id),
+  );
+  const filtroEfetivo = doSupervisor.filtroEfetivo;
+  const visiveis = ehSupervisor ? doSupervisor.visiveis : linhas;
 
   /**
    * O que o fechamento por exceção alcança: só o que **já passou do horário** e
@@ -232,6 +276,16 @@ export default function PaginaAcompanhamento() {
     }
   }
 
+  /** Nomes dos EPIs da tarefa — mostrados no cartão do supervisor, que os declara ao tocar. */
+  function episDe(tarefaId: string): string[] {
+    const nomes: string[] = [];
+    for (const id of (tarefaPorId.get(tarefaId)?.requisitos ?? "").split(",").filter(Boolean)) {
+      const req = reqPorId.get(id);
+      if (req?.tipo === "epi" && !nomes.includes(req.nome)) nomes.push(req.nome);
+    }
+    return nomes;
+  }
+
   function tarefaExigeEpi(tarefaId: string): boolean {
     const tarefa = tarefaPorId.get(tarefaId);
     if (!tarefa) return true; // sem cadastro carregado, mantém o caminho seguro
@@ -241,17 +295,27 @@ export default function PaginaAcompanhamento() {
       .some((id) => reqPorId.get(id)?.tipo === "epi");
   }
 
-  async function confirmarConforme(rotina: RotinaPlanejada) {
-    // A declaração de EPI exige gesto explícito no formulário completo.
-    if (tarefaExigeEpi(rotina.tarefa_id)) {
+  /**
+   * `declaroEpi`: o "✓ Feita" do supervisor É a declaração de uso dos EPIs
+   * (decisão do dono, 20/10/2026) — o servidor grava os nomes do cadastro da
+   * tarefa. No "✓ Conforme" do coordenador, tarefa com EPI segue para o
+   * formulário completo.
+   */
+  async function confirmarConforme(rotina: RotinaPlanejada, declaroEpi = false) {
+    const comEpi = tarefaExigeEpi(rotina.tarefa_id);
+    if (comEpi && !declaroEpi) {
       abrirRegistro(rotina);
       return;
     }
     setMensagem(null);
     setProcessandoRapido((atuais) => new Set(atuais).add(rotina.id));
     try {
-      await apiPost("/api/execucoes/conforme", { rotina_id: rotina.id });
-      setMensagem({ texto: "Realizado confirmado sem abrir formulário." });
+      await apiPost("/api/execucoes/conforme", { rotina_id: rotina.id, declaro_epi: comEpi && declaroEpi });
+      if (ehSupervisor) lembrarMarcada(rotina.id);
+      setMensagem({
+        texto: declaroEpi ? "Marcada como feita." : "Realizado confirmado sem abrir formulário.",
+        efemera: true,
+      });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
     } catch (err) {
       setMensagem({
@@ -265,6 +329,76 @@ export default function PaginaAcompanhamento() {
         return proximos;
       });
     }
+  }
+
+  /** "✗ Não feita" do supervisor: só o motivo — sem horários, tempo ou desvio. */
+  async function registrarNaoFeita(rotina: RotinaPlanejada, motivo: string) {
+    setProcessandoRapido((atuais) => new Set(atuais).add(rotina.id));
+    try {
+      await apiPost("/api/execucoes", {
+        rotina_id: rotina.id,
+        data_execucao: rotina.data,
+        status_realizado: "nao_realizada",
+        inicio_real: "",
+        fim_real: "",
+        tempo_real_min: 0,
+        justificativa: motivo,
+        observacao: "",
+        epis_confirmados: "",
+      });
+      lembrarMarcada(rotina.id);
+      setNaoFeita(null);
+      setMensagem({ texto: "Marcada como não feita.", efemera: true });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+    } catch (err) {
+      throw err instanceof ErroApi ? err : new Error("Não foi possível registrar.");
+    } finally {
+      setProcessandoRapido((atuais) => {
+        const proximos = new Set(atuais);
+        proximos.delete(rotina.id);
+        return proximos;
+      });
+    }
+  }
+
+  /** Os dois botões do supervisor — no cartão do celular e na tabela. */
+  function acoesDoSupervisor(r: RotinaPlanejada) {
+    const exec = execucaoPorRotina.get(r.id);
+    if (decididaPeloCoordenador(r)) return null;
+    // Já marcado por outra pessoa: só o coordenador muda (o servidor recusa).
+    if (exec && exec.supervisor_id !== sessao?.id) return null;
+    const ocupado = processandoRapido.has(r.id);
+    const cedo = r.fim_planejado > limiteDoDia;
+    const titulo = cedo ? "Ainda não terminou — marque depois do horário" : undefined;
+    const comEpi = tarefaExigeEpi(r.tarefa_id);
+    const feita = exec?.status_realizado !== undefined && exec.status_realizado !== "nao_realizada";
+    return (
+      <>
+        {/* Botão que some deixa o lugar reservado: senão o "✗ Não feita" subia
+            para onde estava o "✓ Feita", sob o dedo (auditoria, 20/10/2026). */}
+        {feita && (
+          <span className="btn btn-mini" aria-hidden="true" style={{ visibility: "hidden" }}>
+            ✓ Feita · EPI
+          </span>
+        )}
+        {!feita && (
+          <button
+            type="button"
+            className="btn btn-mini btn-conforme"
+            disabled={ocupado || cedo}
+            title={titulo ?? (comEpi ? "Ao marcar, você declara que os EPIs da tarefa foram usados" : undefined)}
+            onClick={() => void confirmarConforme(r, true)}
+          >
+            {ocupado ? "…" : comEpi ? "✓ Feita · EPI" : "✓ Feita"}
+          </button>
+        )}
+        {exec?.status_realizado !== "nao_realizada" && (
+          <button type="button" className="btn btn-mini" disabled={ocupado || cedo} title={titulo} onClick={() => setNaoFeita(r)}>
+            ✗ Não feita
+          </button>
+        )}
+      </>
+    );
   }
 
   function abrirRegistro(rotina: RotinaPlanejada) {
@@ -389,18 +523,22 @@ export default function PaginaAcompanhamento() {
         style={{ display: "flex", alignItems: "flex-end", gap: 14, padding: "12px 16px", marginBottom: 16, flexWrap: "wrap" }}
       >
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>Acompanhamento do dia</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>
+            {ehSupervisor ? "Confirmar o dia" : "Acompanhamento do dia"}
+          </h1>
           <span className="rotulo" style={{ color: "var(--acento)" }}>
-            registre o realizado e confronte com o previsto
+            {ehSupervisor ? "marque o que foi feito e o que não foi" : "registre o realizado e confronte com o previsto"}
           </span>
         </div>
         <div style={{ flex: 1 }} />
         {pendentes > 0 && (
-          <span className="selo selo-laranja">{pendentes} sem registro</span>
+          <span className="selo selo-laranja">{pendentes} {ehSupervisor ? "sem marcação" : "sem registro"}</span>
         )}
-        <button className="btn" onClick={exportarCSV} disabled={linhas.length === 0}>
-          ⬇ Exportar CSV
-        </button>
+        {!ehSupervisor && (
+          <button className="btn" onClick={exportarCSV} disabled={linhas.length === 0}>
+            ⬇ Exportar CSV
+          </button>
+        )}
         <label className="campo">
           <span className="rotulo">Data</span>
           <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
@@ -417,16 +555,46 @@ export default function PaginaAcompanhamento() {
               ))}
           </select>
         </label>
+        {ehSupervisor && (
+          <>
+            <label className="campo">
+              <span className="rotulo">Funcionário</span>
+              <select value={filtroEfetivo} onChange={(e) => setFiltroFunc(e.target.value)}>
+                <option value="">Todos</option>
+                {pessoasDoDia.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, paddingBottom: 8 }}>
+              <input type="checkbox" checked={soFaltam} onChange={(e) => setSoFaltam(e.target.checked)} />
+              Só o que falta marcar
+            </label>
+            <p style={{ flexBasis: "100%", margin: 0, fontSize: 12, color: "var(--tinta-2)" }}>
+              Ao tocar <strong>✓ Feita · EPI</strong>, você declara que os EPIs listados na tarefa foram usados.
+            </p>
+          </>
+        )}
       </div>
 
-      {mensagem && (
-        <div
-          className={`alerta ${mensagem.erro ? "alerta-erro" : "alerta-ok"} acompanhamento-mensagem`}
-          role="status"
-        >
-          {mensagem.texto}
-        </div>
-      )}
+      {/* Em portal no <body>: o contêiner da página anima com transform, e isso
+          prendia o `position: fixed` do aviso a ele — no celular o aviso ia
+          parar fora da tela. */}
+      {mensagem &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className={`alerta ${mensagem.erro ? "alerta-erro" : "alerta-ok"} acompanhamento-mensagem`}
+            role="status"
+            onClick={() => setMensagem(null)}
+            title="Toque para fechar"
+          >
+            {mensagem.texto}
+          </div>,
+          document.body,
+        )}
 
       {/* Fechamento por exceção. Confirmar era UMA AÇÃO POR BLOCO: numa sede de 277
           blocos, a promessa de validar o dia em 5 minutos era aritmeticamente
@@ -437,8 +605,18 @@ export default function PaginaAcompanhamento() {
           style={{ marginBottom: 16, padding: "12px 16px", borderLeft: "6px solid var(--acento)", display: "grid", gap: 8 }}
         >
           <span style={{ fontSize: 13 }}>
-            <strong>{fechamento.total} tarefa(s)</strong> já passaram do horário e seguem sem
-            registro. Registre acima o que fugiu do plano — depois feche o resto de uma vez.
+            {ehSupervisor ? (
+              <>
+                <strong>{fechamento.total} tarefa(s) da sede</strong>
+                {filtroEfetivo ? " (de todos, não só de quem está filtrado)" : ""} já passaram do horário sem
+                marcação. Marque abaixo o que <strong>não</strong> foi feito — o resto você fecha aqui de uma vez.
+              </>
+            ) : (
+              <>
+                <strong>{fechamento.total} tarefa(s)</strong> já passaram do horário e seguem sem
+                registro. Registre acima o que fugiu do plano — depois feche o resto de uma vez.
+              </>
+            )}
           </span>
           {fechamento.epis.length > 0 && (
             <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)", alignItems: "flex-start" }}>
@@ -451,9 +629,17 @@ export default function PaginaAcompanhamento() {
                 }}
               />
               <span>
-                Declaro que os EPIs foram usados nas {fechamento.comEpi} tarefa(s) que os exigem:{" "}
-                <strong>{fechamento.epis.join(", ")}</strong>. Sem esta declaração, essas tarefas
-                ficam de fora e você as registra uma a uma.
+                {ehSupervisor ? (
+                  <>
+                    Declaro que os EPIs foram usados: <strong>{fechamento.epis.join(", ")}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Declaro que os EPIs foram usados nas {fechamento.comEpi} tarefa(s) que os exigem:{" "}
+                    <strong>{fechamento.epis.join(", ")}</strong>. Sem esta declaração, essas tarefas
+                    ficam de fora e você as registra uma a uma.
+                  </>
+                )}
               </span>
             </label>
           )}
@@ -505,13 +691,16 @@ export default function PaginaAcompanhamento() {
       )}
 
       {/* visão mobile: cards empilhados (supervisor andando pelo prédio) */}
-      <div className="so-mobile" style={{ display: "grid", gap: 10 }}>
-        {linhas.length === 0 && (
+      {/* O display vem do CSS: um `display:grid` inline aqui vencia o
+          `.so-mobile { display:none }` e no computador a lista saía duas vezes
+          — cartões e tabela (auditoria, 20/10/2026). */}
+      <div className="so-mobile acomp-lista">
+        {visiveis.length === 0 && (
           <div className="painel" style={{ padding: 24, textAlign: "center", color: "var(--tinta-3)" }}>
-            Nenhuma rotina planejada para esta data/sede.
+            {linhas.length > 0 ? "Tudo marcado por aqui." : "Nenhuma rotina planejada para esta data/sede."}
           </div>
         )}
-        {linhas.map((r) => {
+        {visiveis.map((r) => {
           const exec = execucaoPorRotina.get(r.id);
           const tarefa = tarefaPorId.get(r.tarefa_id);
           const local = localPorId.get(r.local_id);
@@ -524,24 +713,38 @@ export default function PaginaAcompanhamento() {
               ? desvioPercentual(exec.tempo_real_min, r.tempo_previsto_min)
               : null;
           return (
-            <div key={r.id} className="painel" style={{ padding: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                <strong style={{ fontSize: 14 }}>
-                  {funcPorId.get(r.funcionario_id)?.nome ?? "?"}
-                </strong>
-                <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>
-              </div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
-                {tarefa?.nome_tarefa ?? "Tarefa"}
-                <span style={{ color: "var(--tinta-3)" }}>
-                  {local ? ` — ${local.nome_local} · ${local.andar}` : ""}
-                </span>
-              </div>
-              <div className="num" style={{ fontSize: 12, color: "var(--tinta-2)", marginTop: 4 }}>
-                {r.inicio_planejado}–{r.fim_planejado} · previsto {formatarDuracao(r.tempo_previsto_min)}
-                {exec && exec.tempo_real_min > 0 && (
-                  <>
-                    {" "}· real {formatarDuracao(exec.tempo_real_min)}{" "}
+            <div key={r.id} className="painel acomp-cartao">
+              <div style={{ minWidth: 0 }}>
+                <div className="acomp-cartao-topo">
+                  <span className="num">
+                    {r.inicio_planejado}–{r.fim_planejado}
+                  </span>
+                  {/* Com o filtro numa pessoa, repetir o nome em cada linha é ruído. */}
+                  {!(ehSupervisor && filtroEfetivo) && <strong>{funcPorId.get(r.funcionario_id)?.nome ?? "?"}</strong>}
+                  {r.status !== "planejada" && <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>}
+                </div>
+                <div className="acomp-cartao-tarefa">
+                  {tarefa?.nome_tarefa ?? "Tarefa"}
+                  <span style={{ color: "var(--tinta-3)" }}>
+                    {local ? ` · ${local.nome_local}` : ""}
+                    {/* O andar desfaz a dúvida entre locais de mesmo nome. */}
+                    {local?.andar && local.andar !== "—" ? ` (${local.andar})` : ""}
+                  </span>
+                </div>
+                {/* O "✓ Feita · EPI" declara ESTES EPIs: eles têm de estar à vista —
+                    tela de toque não mostra o `title` (revisão de segurança). Some
+                    só quando já está marcada como feita (corrigir uma "não feita"
+                    também declara). */}
+                {ehSupervisor && exigeEpi && (!exec || exec.status_realizado === "nao_realizada") && (
+                  <div style={{ fontSize: 11, color: "var(--acento)", marginTop: 2 }}>EPI: {episDe(r.tarefa_id).join(", ")}</div>
+                )}
+                {/* Botão desligado precisa dizer por quê — o `title` não aparece no toque. */}
+                {ehSupervisor && !exec && r.fim_planejado > limiteDoDia && (
+                  <div style={{ fontSize: 11, color: "var(--tinta-3)", marginTop: 2 }}>Marque depois das {r.fim_planejado}</div>
+                )}
+                {!ehSupervisor && exec && exec.tempo_real_min > 0 && (
+                  <div className="num" style={{ fontSize: 12, color: "var(--tinta-2)", marginTop: 2 }}>
+                    previsto {formatarDuracao(r.tempo_previsto_min)} · real {formatarDuracao(exec.tempo_real_min)}{" "}
                     <strong
                       style={{
                         color:
@@ -553,11 +756,13 @@ export default function PaginaAcompanhamento() {
                       ({desvio !== null && desvio > 0 ? "+" : ""}
                       {desvio?.toFixed(0)}%)
                     </strong>
-                  </>
+                  </div>
                 )}
               </div>
-              {!decididaPeloCoordenador(r) && (
-              <div className="acompanhamento-acoes-linha">
+              {ehSupervisor ? (
+                <div className="acomp-cartao-acoes">{acoesDoSupervisor(r)}</div>
+              ) : !decididaPeloCoordenador(r) && (
+              <div className="acomp-cartao-acoes">
                 {!exec && !exigeEpi && (
                   <button
                     type="button"
@@ -606,14 +811,14 @@ export default function PaginaAcompanhamento() {
             </tr>
           </thead>
           <tbody>
-            {linhas.length === 0 && (
+            {visiveis.length === 0 && (
               <tr>
                 <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--tinta-3)" }}>
-                  Nenhuma rotina planejada para esta data/sede.
+                  {linhas.length > 0 ? "Tudo marcado por aqui." : "Nenhuma rotina planejada para esta data/sede."}
                 </td>
               </tr>
             )}
-            {linhas.map((r) => {
+            {visiveis.map((r) => {
               const exec = execucaoPorRotina.get(r.id);
               const tarefa = tarefaPorId.get(r.tarefa_id);
               const local = localPorId.get(r.local_id);
@@ -667,7 +872,9 @@ export default function PaginaAcompanhamento() {
                     <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    {!decididaPeloCoordenador(r) && (
+                    {ehSupervisor ? (
+                      <div className="acompanhamento-acoes-tabela">{acoesDoSupervisor(r)}</div>
+                    ) : !decididaPeloCoordenador(r) && (
                     <div className="acompanhamento-acoes-tabela">
                       {!exec && !exigeEpi && (
                         <button
@@ -870,6 +1077,86 @@ export default function PaginaAcompanhamento() {
           </form>
         )}
       </Modal>
+
+      {naoFeita && (
+        <NaoFeitaModal
+          titulo={tarefaPorId.get(naoFeita.tarefa_id)?.nome_tarefa ?? "Tarefa"}
+          aoFechar={() => setNaoFeita(null)}
+          aoConfirmar={(motivo) => registrarNaoFeita(naoFeita, motivo)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Motivos mais comuns — a pessoa toca um, e só escreve se for "Outro". */
+const MOTIVOS_NAO_FEITA = ["Funcionário faltou", "Cobriu outra tarefa", "Faltou material", "Local fechado / em uso", "Não deu tempo"];
+
+/** "✗ Não feita" do supervisor: o motivo e nada mais. */
+function NaoFeitaModal({
+  titulo,
+  aoFechar,
+  aoConfirmar,
+}: {
+  titulo: string;
+  aoFechar: () => void;
+  aoConfirmar: (motivo: string) => Promise<void>;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [texto, setTexto] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const final = motivo === "Outro" ? texto.trim() : [motivo, texto.trim()].filter(Boolean).join(" — ");
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!final) return setErro(motivo === "Outro" ? "Escreva o motivo." : "Escolha o motivo.");
+    setEnviando(true);
+    setErro("");
+    try {
+      await aoConfirmar(final);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível registrar.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal titulo={`Não feita — ${titulo}`} aberto aoFechar={aoFechar} larguraMax={440}>
+      <form onSubmit={enviar} style={{ display: "grid", gap: 10 }}>
+        <span className="rotulo">Por quê?</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {[...MOTIVOS_NAO_FEITA, "Outro"].map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`btn btn-mini${motivo === m ? " btn-primario" : ""}`}
+              aria-pressed={motivo === m}
+              onClick={() => setMotivo(m)}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <label className="campo">
+          <span className="rotulo">{motivo === "Outro" ? "Motivo" : "Detalhe (opcional)"}</span>
+          {/* Texto livre é lido pela gerência: saúde e atestado vão pelas Ausências (LGPD). */}
+          <input
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Sem motivo de saúde ou atestado — isso vai nas Ausências"
+          />
+        </label>
+        {erro && <div className="alerta alerta-erro">{erro}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button type="button" className="btn" onClick={aoFechar}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primario" disabled={enviando}>
+            {enviando ? "Registrando…" : "Marcar não feita"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

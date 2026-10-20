@@ -143,6 +143,44 @@ describe("supervisor pelas rotas", () => {
     expect((await (await getDataSource()).obter("rotinas_planejadas", b.id))?.status).toBe("realizada");
   });
 
+  it("'✓ Feita' em tarefa com EPI: o toque é a declaração, e os nomes vêm do cadastro", async () => {
+    const ds = await getDataSource();
+    const comEpi = { ...(await bloco()), id: `r-epi-${Math.random()}`, tarefa_id: "christus_t1" };
+    await ds.criar("rotinas_planejadas", comEpi);
+    // Sem declarar, o atalho continua não afirmando uso de EPI.
+    expect((await postConforme(json({ rotina_id: comEpi.id }))).status).toBe(422);
+    // Declarando: grava os EPIs da tarefa — mesmo que o corpo tente mandar outra lista.
+    const res = await postConforme(json({ rotina_id: comEpi.id, declaro_epi: true, epis_confirmados: "Qualquer coisa" }));
+    expect(res.status).toBe(201);
+    const [exec] = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: comEpi.id }]);
+    const esperados = (await ds.obter("tarefas", "christus_t1"))!.requisitos!.split(",")
+      .map((id) => id.trim()).filter(Boolean);
+    const nomes = (await Promise.all(esperados.map((id) => ds.obter("requisitos", id))))
+      .filter((r) => r?.tipo === "epi").map((r) => r!.nome);
+    expect(exec.epis_confirmados).toBe(nomes.join(", "));
+    expect(exec.epis_confirmados).not.toContain("Qualquer coisa");
+    expect((await ds.obter("rotinas_planejadas", comEpi.id))?.status).toBe("realizada");
+  });
+
+  it("corrigir 'não feita' para 'feita' declara todos os EPIs da tarefa, no mesmo registro", async () => {
+    const ds = await getDataSource();
+    // christus_t4: tarefa de banheiro com 3 requisitos.
+    const r = { ...(await bloco()), id: `r-cor-${Math.random()}`, tarefa_id: "christus_t4" };
+    await ds.criar("rotinas_planejadas", r);
+    await postExecucao(json(execucao(r, { status_realizado: "nao_realizada", justificativa: "faltou material" })));
+    expect((await postConforme(json({ rotina_id: r.id, declaro_epi: true }))).status).toBe(201);
+    const execs = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: r.id }]);
+    expect(execs.length).toBe(1);
+    expect(execs[0].status_realizado).toBe("conforme_planejado");
+    expect(execs[0].justificativa).toBe("");
+    expect(execs[0].epis_confirmados.split(", ").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("'✓ Feita' com EPI não abre a sede alheia", async () => {
+    const r = await bloco("christus_ald");
+    expect((await postConforme(json({ rotina_id: r.id, declaro_epi: true }))).status).toBe(403);
+  });
+
   it("não imprime ficha", async () => {
     await bloco();
     const url = `http://x/api/fichas/pdf?data=${somarDias(hojeISO(), -7)}&sede=christus_dt`;

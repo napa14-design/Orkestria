@@ -172,6 +172,18 @@ async function emLotes<T>(itens: T[], fn: (x: T) => Promise<unknown>, lote = 25)
   }
 }
 
+/**
+ * Nomes dos EPIs que a tarefa exige — lidos do cadastro, no servidor. A
+ * declaração de uso grava ESTES nomes, nunca uma lista vinda do cliente.
+ */
+export async function episDaTarefa(tarefaId: string): Promise<string[]> {
+  const ds = await getDataSource();
+  const tarefa = await ds.obter("tarefas", tarefaId);
+  const ids = (tarefa?.requisitos ?? "").split(",").filter(Boolean);
+  const requisitos = await Promise.all(ids.map((id) => ds.obter("requisitos", id)));
+  return [...new Set(requisitos.filter((r) => r?.tipo === "epi").map((r) => r!.nome))];
+}
+
 export async function registrarExecucao(
   // sede_id é preenchida aqui a partir da rotina (o cliente não envia).
   dados: Omit<ExecucaoRealizada, "id" | "sede_id" | "criado_em" | "atualizado_em">,

@@ -20,6 +20,26 @@ export function locaisDoFormulario(locais: Local[], sedeId: string, criadoAgora?
 }
 
 /**
+ * O que a lista do supervisor mostra no Acompanhamento. O filtro de pessoa só
+ * vale se ela tem blocos NESTE dia/sede: trocar a data com alguém de folga
+ * filtrado deixava a lista vazia dizendo "Tudo marcado" com centenas de blocos
+ * sem marcação (auditoria, 20/10/2026). Devolve também o filtro que de fato vale,
+ * para o seletor mostrar a verdade.
+ */
+export function listaDoSupervisor<R extends { id: string; funcionario_id: string }>(
+  linhas: R[],
+  filtro: string,
+  soFaltam: boolean,
+  jaMarcada: (r: R) => boolean,
+): { filtroEfetivo: string; visiveis: R[] } {
+  const filtroEfetivo = linhas.some((r) => r.funcionario_id === filtro) ? filtro : "";
+  const visiveis = linhas.filter(
+    (r) => (!filtroEfetivo || r.funcionario_id === filtroEfetivo) && (!soFaltam || !jaMarcada(r)),
+  );
+  return { filtroEfetivo, visiveis };
+}
+
+/**
  * A busca da paleta casa com alguma tarefa — ativa ou não, com ou sem filtro?
  * O "+ Criar 'busca'" só aparece quando NÃO casa: um filtro de prioridade ou
  * andar esconder a tarefa não é motivo para criar outra igual.
