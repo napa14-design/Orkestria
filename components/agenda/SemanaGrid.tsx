@@ -11,6 +11,7 @@ import {
   jornadaLiquidaMin,
   ocupacaoPercentual,
   tempoPlanejadoMin,
+  ocupaHorario,
 } from "@/lib/calculations";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
@@ -145,7 +146,7 @@ export default function SemanaGrid({
                   }
 
                   const doDia = rotinas.filter(
-                    (r) => r.funcionario_id === f.id && r.data === data && r.status !== "cancelada",
+                    (r) => r.funcionario_id === f.id && r.data === data && ocupaHorario(r),
                   );
                   const planejado = tempoPlanejadoMin(doDia);
                   const ocupacao = ocupacaoPercentual(planejado, jornada);

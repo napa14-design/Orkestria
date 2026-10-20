@@ -3,6 +3,7 @@
  * geometria do leitor OMR (lib/fichaGeometria). É a ficha "oficial" para
  * impressão — o que sai daqui é lido com 100% de confiança por lib/omr.
  */
+import { ocupaHorario } from "@/lib/calculations";
 import { readFile } from "fs/promises";
 import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
@@ -244,7 +245,7 @@ export async function gerarFichasPdf(
   const entradas: FichaInput[] = [];
   for (const f of funcs.filter((x) => x.ativo && !ausentes.has(x.id))) {
     const doFunc = rotinas
-      .filter((r) => r.funcionario_id === f.id && r.status !== "cancelada")
+      .filter((r) => r.funcionario_id === f.id && ocupaHorario(r))
       .sort((a, b) => hhmmParaMin(a.inicio_planejado) - hhmmParaMin(b.inicio_planejado));
     if (!doFunc.length) continue;
 

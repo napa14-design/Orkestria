@@ -5,7 +5,7 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { useSessao } from "@/components/SessaoContexto";
 import { podeCriarNoCatalogo } from "@/lib/permissions";
-import { tempoPrevistoMin } from "@/lib/calculations";
+import { nivelPrioridade, rotuloPrioridade, tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
 import type {
@@ -34,7 +34,7 @@ const FREQUENCIAS = [
 
 const PRIORIDADES = [
   { valor: "alta", rotulo: "Alta" },
-  { valor: "media", rotulo: "Média" },
+  { valor: "media", rotulo: "Média (ou a do tipo do local)" },
   { valor: "baixa", rotulo: "Baixa" },
 ];
 
@@ -239,7 +239,7 @@ export default function PaginaTarefas() {
           tipo: "select",
           opcoes: PRIORIDADES,
           padrao: "media",
-          dica: "A importância da tarefa (alta, média, baixa). Aparece como cor na lista de tarefas para o coordenador priorizar o que alocar primeiro. Não bloqueia nada.",
+          dica: "Quando alguém falta e ninguém tem o horário livre, a Central propõe que quem está numa tarefa de prioridade MENOR cubra a da falta (baixa é cedida antes de média). Deixe em Média para seguir o tipo do local: banheiro, copa e consultório contam como alta; escada, área externa, almoxarifado e auditório como baixa. Marque Alta ou Baixa para a exceção — ex.: a sala de aula (alta) e a sala de judô sem aula (baixa).",
         },
         {
           key: "restricao_genero",
@@ -370,15 +370,20 @@ export default function PaginaTarefas() {
         {
           key: "prioridade",
           rotulo: "Prioridade",
-          render: (t) => (
-            <span
-              className={`selo ${
-                t.prioridade === "alta" ? "selo-vermelho" : t.prioridade === "media" ? "selo-amarelo" : "selo-cinza"
-              }`}
-            >
-              {t.prioridade}
-            </span>
-          ),
+          // A prioridade que a Central de fato usa — a "média" cede ao tipo do local.
+          render: (t) => {
+            const rotulo = rotuloPrioridade(nivelPrioridade(t, localPorId(t.local_id)));
+            return (
+              <span
+                className={`selo ${
+                  rotulo === "crítica" || rotulo === "alta" ? "selo-vermelho" : rotulo === "média" ? "selo-amarelo" : "selo-cinza"
+                }`}
+                title={t.prioridade === "media" && rotulo !== "média" ? "Pelo tipo do local" : undefined}
+              >
+                {rotulo}
+              </span>
+            );
+          },
         },
         {
           key: "restricao_genero",

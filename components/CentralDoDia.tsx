@@ -5,7 +5,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
-import type { CentralDiaDados, NivelCentralDia } from "@/types";
+import type { CentralDiaDados, NivelCentralDia, ResolucaoCentralDia } from "@/types";
 import Carregando from "./Carregando";
 
 const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
@@ -25,13 +25,17 @@ export default function CentralDoDia({ nome }: { nome: string }) {
     fetcher,
   );
 
-  async function confirmarAlocacao(rotinaId: string, funcionarioId: string) {
+  async function confirmarAlocacao(resolucao: ResolucaoCentralDia, sede: string) {
     setResolvendo(true);
     setErroAcao("");
     try {
+      // As cedidas vão junto: o servidor só confirma se for exatamente a troca
+      // que esta tela mostrou.
       await apiPost("/api/central-dia/resolver", {
-        rotina_id: rotinaId,
-        funcionario_id: funcionarioId,
+        rotina_id: resolucao.rotina_id,
+        funcionario_id: resolucao.funcionario_id,
+        cedidas: (resolucao.cedidas ?? []).map((c) => c.rotina_id),
+        sede: sede || undefined,
       });
       await mutate();
     } catch (erro) {
@@ -142,22 +146,28 @@ export default function CentralDoDia({ nome }: { nome: string }) {
         {data.proxima.resolucao ? (
           <div className="central-proxima-operacao">
             <div className="central-proposta" aria-label="Alocação sugerida">
-              <span className="rotulo">Sem conflitos ou alertas</span>
+              <span className="rotulo">
+                {data.proxima.resolucao.tipo === "trocar_por_prioridade"
+                  ? "Troca por prioridade"
+                  : "Sem conflitos ou alertas"}
+              </span>
               <strong>{data.proxima.resolucao.funcionario_nome}</strong>
               <small className="num">
                 {data.proxima.resolucao.inicio_planejado}–{data.proxima.resolucao.fim_planejado}
               </small>
+              {data.proxima.resolucao.cedidas?.map((c) => (
+                <small key={c.rotina_id}>
+                  deixa <span className="num">{c.inicio_planejado}–{c.fim_planejado}</span> {c.tarefa_nome} ({c.prioridade})
+                </small>
+              ))}
             </div>
             <button
               className="btn btn-primario central-proxima-acao"
               type="button"
               disabled={resolvendo}
-              onClick={() =>
-                void confirmarAlocacao(
-                  data.proxima.resolucao!.rotina_id,
-                  data.proxima.resolucao!.funcionario_id,
-                )
-              }
+              // A MESMA sede da consulta (vazio = a padrão do servidor): o
+              // servidor recalcula a Central e só confirma se a proposta bater.
+              onClick={() => void confirmarAlocacao(data.proxima.resolucao!, sedeVista)}
             >
               {resolvendo ? "Confirmando..." : data.proxima.acao}
               <span aria-hidden="true">→</span>

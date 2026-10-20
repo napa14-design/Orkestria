@@ -10,6 +10,7 @@ import {
   blocosOcupados,
   funcionarioNoDia,
   jornadaDoDia,
+  ocupaHorario,
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
@@ -202,7 +203,7 @@ async function esperaEntreOsChoques(
 ): Promise<Set<string>> {
   const ids = new Set(
     rotinas
-      .filter((r) => r.status !== "cancelada")
+      .filter(ocupaHorario)
       .filter((r) => {
         const ini = hhmmParaMin(r.inicio_planejado);
         const fim = hhmmParaMin(r.fim_planejado);
@@ -445,8 +446,9 @@ export async function updateRotina(
     dados.funcionario_id !== undefined ||
     dados.data !== undefined ||
     redimensionou ||
-    // Bloco cancelado que volta ao dia ocupa horário de novo: confere conflito.
-    (atual.status === "cancelada" && dados.status !== undefined && dados.status !== "cancelada");
+    // Bloco cancelado ou remanejado que volta ao dia ocupa horário de novo:
+    // confere conflito (remanejada passou a liberar o horário em 19/10/2026).
+    (!ocupaHorario(atual) && dados.status !== undefined && ocupaHorario({ status: dados.status }));
 
   if (mudouPosicao) {
     await exigirPresenca(funcionario.id, funcionario.nome, destinoData);
@@ -505,9 +507,9 @@ export async function duplicarDia(
   supervisorId: string,
 ): Promise<{ copiadas: number; puladas: number; comProblema?: number; detalhes?: string[] }> {
   const ds = await getDataSource();
-  const origem = (await getRotinasByData(dataOrigem, sedeId)).filter(
-    (r) => r.status !== "cancelada",
-  );
+  // Cancelada e remanejada não vão para o outro dia: a cedida numa troca é
+  // exceção daquele dia, não rotina (auditoria, 20/10/2026).
+  const origem = (await getRotinasByData(dataOrigem, sedeId)).filter(ocupaHorario);
   const agora = agoraISO();
   let copiadas = 0;
   let puladas = 0;

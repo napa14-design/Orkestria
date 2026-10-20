@@ -17,6 +17,7 @@ import { NIVEL_ORDEM } from "@/types";
 import {
   intervalosDoFuncionario,
   jornadaLiquidaMin,
+  ocupaHorario,
   ocupacaoPercentual,
   tempoPlanejadoMin,
 } from "./calculations";
@@ -108,7 +109,7 @@ export function validarAlocacao(args: {
   const espera = args.tarefasEspera;
   const novaEhEspera = args.tarefa?.espera === true;
   for (const r of rotinasExistentes) {
-    if (r.status === "cancelada") continue;
+    if (!ocupaHorario(r)) continue;
     if (novaEhEspera || espera?.has(r.tarefa_id)) continue;
     const rIni = hhmmParaMin(r.inicio_planejado);
     const rFim = hhmmParaMin(r.fim_planejado);

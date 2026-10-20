@@ -1,8 +1,27 @@
 export type NivelCentralDia = "critico" | "atencao" | "ok";
 
+/** Bloco que quem assume deixa de fazer hoje para cobrir a falta (vira "remanejada"). */
+export interface BlocoCedido {
+  rotina_id: string;
+  tarefa_nome: string;
+  /** Rótulo do nível efetivo: "baixa" ou "média" (crítica e alta nunca são cedidas para alta). */
+  prioridade: string;
+  inicio_planejado: string;
+  fim_planejado: string;
+}
+
 /** Decisão pronta que o servidor recalcula e valida antes de executar. */
 export interface ResolucaoCentralDia {
-  tipo: "redistribuir_rotina";
+  /**
+   * "redistribuir_rotina": alguém tem o horário livre.
+   * "trocar_por_prioridade": ninguém tem; quem assume deixa `cedidas` — de
+   * prioridade menor que a da falta, baixa antes de média (decisão do dono,
+   * 19/10/2026).
+   */
+  tipo: "redistribuir_rotina" | "trocar_por_prioridade";
+  /** Só na troca: rótulo da prioridade da tarefa que precisa de alguém. */
+  tarefa_prioridade?: string;
+  cedidas?: BlocoCedido[];
   rotina_id: string;
   sede_id: string;
   funcionario_id: string;

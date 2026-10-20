@@ -7,6 +7,89 @@
 
 ---
 
+## 2026-10-19 — Troca por prioridade: quem falta é coberto por quem está em tarefa menos importante
+
+Pedido da reunião de coordenadores de hoje: as equipes rodam perto de 100%, e
+quando alguém falta a Central quase nunca achava horário livre — mandava para a
+Agenda, onde o coordenador procurava na mão quem estava numa sala dispensável,
+arrastava e o motivo se perdia.
+
+**Agora**, sem horário livre, a Central propõe a troca em um clique: *"“Sala 3”
+(alta) era de A, que faltou. B assume e deixa “Escada” (baixa) para outro dia"*.
+Ao confirmar, a tarefa passa para B e o que B fazia ali vira **remanejado**, com
+o motivo escrito sozinho no realizado ("Cedida para cobrir…") — é o "por que não
+foi feito" que os coordenadores pediram.
+
+Decisões do dono:
+- a cedida fica **remanejada** — e remanejada passou a **liberar o horário** e
+  sair da ocupação, como a cancelada (`ocupaHorario`). Antes ela seguia
+  ocupando, e quem cedia aparecia fazendo duas coisas na mesma hora;
+- cede qualquer prioridade **menor**, **baixa antes de média**; nunca por
+  igual; crítica e bloco já realizado nunca;
+- a prioridade é **derivada** do tipo do local (banheiro/copa/consultório alta;
+  escada/área externa/almoxarifado/auditório baixa; o resto média), e alta/baixa
+  escrita na tarefa vence. "Média" vale como "não informado" porque é o que a
+  importação grava em tudo. A lista de tarefas mostra a prioridade efetiva.
+
+Pelo portão da doutrina: elimina o remanejamento manual na Agenda e o registro
+do motivo; é operação (a exceção da Central); só aparece quando há tarefa de
+prioridade menor no horário; o caminho básico não muda.
+
+Visto na tela com banco em memória: cobrir 55 min pode ceder um bloco longo
+inteiro (a coleta de 3 h) — e o tempo liberado a Central já usa na proposta
+seguinte, para cobrir as próximas tarefas de quem faltou. Partir o bloco cedido
+ficou para depois, se a operação pedir.
+
+Corrigido de passagem: o "Confirmar" da Central recalculava a sede principal
+mesmo quando a tela mostrava outra (quem opera várias sedes recebia "a situação
+mudou"); agora vai a mesma sede da consulta.
+
+Revisão de segurança (LIBERA COM RESSALVAS), todas resolvidas:
+- remanejada que volta a "planejada" confere conflito de novo (antes só a
+  cancelada conferia, e a pessoa ficava com duas tarefas no mesmo horário);
+- só cede tarefa que **ainda não começou** — ceder a das 07:00 às 10:00 gravaria
+  "remanejada" no que talvez tenha sido feito;
+- se mover a tarefa falhar, as cedidas **voltam** (o realizado some e o status
+  anterior volta);
+- tarefa que não se acha nunca é cedida; `sede` do corpo só entra se for texto.
+
+Auditoria (REPROVADO na primeira passada), corrigido:
+- **A troca quase nunca aparecia no caso real.** A Central olhava sempre o
+  primeiro bloco de quem faltou; com a falta percebida no meio do turno ele já
+  tinha começado e nada podia ser cedido. Agora ela tenta os blocos que ainda
+  não terminaram, em ordem (até 5), e para no primeiro com solução. Visto na
+  tela: às 10:00 ela pulou a manhã e propôs a troca das 10:15.
+- **Remanejada liberar o horário virou regra única**, aplicada em todas as
+  portas que contam ocupação ou mostram a tarefa: dashboard, panorama, semana,
+  remanejo, ficha PDF e conferência (juntas, para casarem linha a linha) e
+  duplicar. A cedida volta a ser cobrada em "Ficou de fora hoje" (visto na
+  tela). As checagens de "já existe, não recria" continuam vendo **todos** os
+  blocos — senão gerar de novo recriaria a cedida.
+- Registrar o realizado numa cedida (pelo Acompanhamento) também confere
+  conflito — era uma segunda porta que a trazia de volta por cima da outra.
+  Tarefa de espera não conta como conflito, igual na Agenda.
+- Efeito retroativo: nenhum. A produção tem **zero** registros "remanejada".
+- Segunda passada (REPROVADO de novo): eu tinha trocado o filtro justamente na
+  checagem de "já existe" da **geração do dia** — gerar de novo depois da troca
+  recriava a cedida por cima. Voltou a ver todos os blocos, o que de quebra
+  fecha um bug antigo: regerar desfazia um **cancelamento** vindo da rota. E a
+  Central lê tarefas, locais e parâmetros uma vez por montagem, não a cada
+  bloco tentado.
+- Salvar como modelo um dia com remanejamento é **recusado** (levaria a troca
+  para a rota e perderia a cedida). Duplicar um dia com troca ainda leva a
+  tarefa movida junto — o sistema não guarda de quem ela era; o dia seguinte se
+  gera pela rota padrão.
+
+`lib/calculations.ts` (`ocupaHorario`, `nivelPrioridade`), `services/centralDiaService.ts`,
+`services/execucoesService.ts`, `services/rotinasService.ts`,
+`services/modelosService.ts`, `services/fichaPdf.ts`, `components/CentralDoDia.tsx`,
+telas de tarefas, dashboard, panorama, semana, remanejo, conferir e pendências.
+22 testes novos (`testes/troca-prioridade*.test.ts`, com permissão e escopo do
+"Confirmar"), 23 mutantes — 22 mortos, o 23º é atalho de leitura e não regra.
+Revisões: `seguranca` LIBERA; auditor REPROVADO duas vezes, tudo corrigido.
+
+---
+
 ## 2026-10-19 — "Supervisor" vira "Coordenador", e nasce o Supervisor de chão
 
 Pedido do dono: *"Supervisor vira coordenador e criar outro chamado Supervisor.

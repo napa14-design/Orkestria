@@ -23,6 +23,18 @@ no cliente (feedback imediato) e no servidor (validação definitiva).
     "supervisor"); o supervisor de hoje não edita parâmetro nenhum.
 14. Ociosidade inicial é **prevista** (baseada no planejamento), não realizada.
 15. A comparação com o realizado serve para melhorar a base teórica de tempos.
+16. **Troca por prioridade (19/10/2026).** Quando alguém falta e ninguém tem o
+    horário livre, a Central propõe que quem está numa tarefa de prioridade
+    **menor** assuma a da falta. A cedida vira "remanejada", com o motivo
+    escrito sozinho. Cede baixa antes de média; nunca por igual; crítica, bloco
+    já realizado e bloco que já começou nunca. Prioridade efetiva
+    (`nivelPrioridade`): crítica > alta/baixa escrita na tarefa > tipo do local
+    (`PRIORIDADE_POR_TIPO_LOCAL`) > média — "média" vale como "não informado".
+17. **Remanejada não ocupa o horário** (`ocupaHorario`), como a cancelada: sai
+    da ocupação, do conflito, da ficha, do duplicar/modelo, e volta a ser
+    cobrada em "Ficou de fora hoje". Trazê-la de volta (pela Agenda ou pelo
+    realizado) confere conflito de novo. As checagens de "já existe, não
+    recria" da geração/importação continuam contando a remanejada.
 
 ## 2. Fórmulas
 

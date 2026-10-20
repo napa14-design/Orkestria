@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
-import { jornadaDoDia, jornadaLiquidaMin } from "@/lib/calculations";
+import { jornadaDoDia, jornadaLiquidaMin, ocupaHorario } from "@/lib/calculations";
 import { apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import type {
@@ -81,7 +81,7 @@ export default function PaginaRemanejo() {
     return (funcionarios ?? [])
       .filter((f) => f.ativo && !ausentes.has(f.id) && jornadaDoDia(f, data).trabalha)
       .map((f) => {
-        const minhas = (rotinas ?? []).filter((r) => r.funcionario_id === f.id && r.status !== "cancelada");
+        const minhas = (rotinas ?? []).filter((r) => r.funcionario_id === f.id && ocupaHorario(r));
         const planejado = minhas.reduce((s, r) => s + (r.tempo_previsto_min || 0), 0);
         const folga = Math.max(0, jornadaLiquidaMin({ ...f, ...jornadaDoDia(f, data) }) - planejado);
         return { funcionario: f, folga };
@@ -122,7 +122,7 @@ export default function PaginaRemanejo() {
     const carga = new Map<string, { folga: number; ocupados: Array<[number, number]> }>();
     for (const c of candidatos) {
       const minhas = (rotinas ?? []).filter(
-        (r) => r.funcionario_id === c.funcionario.id && r.status !== "cancelada",
+        (r) => r.funcionario_id === c.funcionario.id && ocupaHorario(r),
       );
       carga.set(c.funcionario.id, {
         folga: c.folga,

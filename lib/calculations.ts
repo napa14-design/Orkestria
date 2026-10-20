@@ -12,7 +12,9 @@ import type {
   Local,
   ParametrosResolvidos,
   PeriodoLetivo,
+  Prioridade,
   RotinaPlanejada,
+  StatusRotina,
   Tarefa,
   TipoLocal,
   TipoServico,
@@ -95,6 +97,68 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
   almoxarifado: 1,
   outros: 1,
 };
+
+/**
+ * Bloco que ainda ocupa o horário e a jornada da pessoa. Cancelado e
+ * **remanejado** liberam: remanejado é o que ela deixou de fazer para fazer
+ * outra coisa — a troca por prioridade da Central cede o bloco assim
+ * (19/10/2026). Antes só o cancelado liberava, e a pessoa que cedia aparecia
+ * fazendo as duas tarefas no mesmo horário.
+ */
+export function ocupaHorario(r: { status?: StatusRotina }): boolean {
+  return r.status !== "cancelada" && r.status !== "remanejada";
+}
+
+/**
+ * Prioridade sugerida pelo TIPO do local, quando a tarefa não diz outra —
+ * "derivado por padrão, configurável por exceção", como o fator acima.
+ * Banheiro, copa e consultório não esperam; escada, área externa, almoxarifado
+ * e auditório podem ficar para amanhã; o resto é média. Sala fica em média de
+ * propósito: a mesma palavra cobre a sala de aula e a de judô sem aula hoje —
+ * quem distingue é a tarefa (prioridade alta ou baixa no cadastro).
+ */
+export const PRIORIDADE_POR_TIPO_LOCAL: Record<TipoLocal, Prioridade> = {
+  banheiro: "alta",
+  copa: "alta",
+  consultorio: "alta",
+  sala: "media",
+  corredor: "media",
+  area_comum: "media",
+  recepcao: "media",
+  outros: "media",
+  escada: "baixa",
+  area_externa: "baixa",
+  almoxarifado: "baixa",
+  auditorio: "baixa",
+};
+
+const NIVEL_PRIORIDADE: Record<Prioridade, number> = { baixa: 1, media: 2, alta: 3 };
+/** Nível da tarefa crítica ("circuito essencial"): acima de alta, e nunca cedida. */
+export const NIVEL_CRITICA = 4;
+
+/**
+ * Nível efetivo de prioridade (1 baixa · 2 média · 3 alta · 4 crítica).
+ *
+ * "alta"/"baixa" na tarefa são escolha de alguém e vencem. "media" é o valor
+ * que a importação grava em tudo — então vale como "não informado" e cede ao
+ * tipo do local. Consequência aceita: uma tarefa de banheiro não fica em média
+ * (para rebaixar, marque "baixa").
+ */
+export function nivelPrioridade(
+  tarefa: Pick<Tarefa, "prioridade" | "critica"> | undefined,
+  local: Pick<Local, "tipo_local"> | undefined,
+): number {
+  if (!tarefa) return NIVEL_PRIORIDADE.media;
+  if (tarefa.critica) return NIVEL_CRITICA;
+  if (tarefa.prioridade === "alta" || tarefa.prioridade === "baixa") return NIVEL_PRIORIDADE[tarefa.prioridade];
+  const doTipo = local ? (PRIORIDADE_POR_TIPO_LOCAL as Record<string, Prioridade>)[local.tipo_local] : undefined;
+  return NIVEL_PRIORIDADE[doTipo ?? "media"];
+}
+
+/** Rótulo do nível, para a tela. */
+export function rotuloPrioridade(nivel: number): string {
+  return nivel >= NIVEL_CRITICA ? "crítica" : nivel === 3 ? "alta" : nivel === 1 ? "baixa" : "média";
+}
 
 /**
  * Fator de intensidade do AMBIENTE (local): o quanto o espaço suja e pesa na
@@ -364,7 +428,7 @@ export function fimPlanejadoMin(inicioMin: number, tempoPrevistoMin: number): nu
 /** Soma dos tempos previstos reais das rotinas (não o tempo visual). */
 export function tempoPlanejadoMin(rotinas: RotinaPlanejada[]): number {
   return rotinas
-    .filter((r) => r.status !== "cancelada")
+    .filter(ocupaHorario)
     .reduce((soma, r) => soma + (r.tempo_previsto_min || 0), 0);
 }
 
@@ -419,7 +483,7 @@ export function ocupacaoPorPessoa<F extends Parameters<typeof jornadaLiquidaMin>
 ): OcupacaoDaPessoa<F>[] {
   const porPessoa = new Map<string, { dias: Set<string>; planejado: number }>();
   for (const r of rotinas) {
-    if (r.status === "cancelada") continue;
+    if (!ocupaHorario(r)) continue;
     const acc = porPessoa.get(r.funcionario_id) ?? { dias: new Set<string>(), planejado: 0 };
     acc.dias.add(r.data);
     acc.planejado += r.tempo_previsto_min;
@@ -506,7 +570,7 @@ export function resumoFuncionario(
 ): ResumoFuncionario {
   const jornada = jornadaLiquidaMin(funcionario);
   const planejado = tempoPlanejadoMin(rotinasDoDia);
-  const totalTarefas = rotinasDoDia.filter((r) => r.status !== "cancelada").length;
+  const totalTarefas = rotinasDoDia.filter(ocupaHorario).length;
   const ocupacao = ocupacaoPercentual(planejado, jornada);
   return {
     jornada_liquida_min: jornada,

@@ -5,6 +5,7 @@
  * NAVEGADOR lê o QR e mede as caixas "Feito" (lib/omr.ts), casa com as rotinas
  * planejadas do dia e mostra o realizado para confirmar. Nada de serviço externo.
  */
+import { ocupaHorario } from "@/lib/calculations";
 import { useRef, useState } from "react";
 import { lerFicha, parseQR, type LinhaOMR, type ResultadoOMR } from "@/lib/omr";
 import { codigoLinha } from "@/lib/fichaGeometria";
@@ -110,7 +111,7 @@ export default function PaginaConferir() {
       const tPorId = new Map(tarefas.map((t) => [t.id, t]));
       const reqPorId = new Map(requisitos.map((r) => [r.id, r]));
       const doFunc = rotinas
-        .filter((r) => r.funcionario_id === info.funcionario && r.status !== "cancelada")
+        .filter((r) => r.funcionario_id === info.funcionario && ocupaHorario(r))
         .sort((a, b) => a.inicio_planejado.localeCompare(b.inicio_planejado));
 
       // EPIs do dia: união (em ordem) dos requisitos tipo "epi" das tarefas

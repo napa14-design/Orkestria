@@ -4,9 +4,12 @@ import { ErroValidacao } from "@/services/erros";
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    const { rotina_id, funcionario_id } = (await req.json()) as {
+    const { rotina_id, funcionario_id, cedidas, sede } = (await req.json()) as {
       rotina_id?: string;
       funcionario_id?: string;
+      /** Na troca por prioridade: ids dos blocos que a pessoa viu que seriam cedidos. */
+      cedidas?: unknown;
+      sede?: unknown;
     };
     if (!rotina_id || !funcionario_id)
       throw new ErroValidacao([
@@ -16,6 +19,15 @@ export async function POST(req: Request) {
           mensagem: "A proposta de alocação está incompleta.",
         },
       ]);
-    return ok(await resolverProximaExcecao(sessao, rotina_id, funcionario_id));
+    const cedidasIds = Array.isArray(cedidas) ? cedidas.filter((c): c is string => typeof c === "string") : [];
+    return ok(
+      await resolverProximaExcecao(
+        sessao,
+        rotina_id,
+        funcionario_id,
+        cedidasIds,
+        typeof sede === "string" ? sede : undefined,
+      ),
+    );
   });
 }

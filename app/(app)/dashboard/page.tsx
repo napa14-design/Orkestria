@@ -13,6 +13,7 @@ import {
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
+  ocupaHorario,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
@@ -91,7 +92,7 @@ export default function PaginaDashboard() {
     const funcs = (funcionarios ?? []).filter(
       (f) => f.ativo && (!sedeFiltro || f.sede_id === sedeFiltro),
     );
-    const validas = rs.filter((r) => r.status !== "cancelada");
+    const validas = rs.filter(ocupaHorario);
 
     const tempoPlanejadoTotal = validas.reduce((s, r) => s + r.tempo_previsto_min, 0);
 
@@ -109,7 +110,7 @@ export default function PaginaDashboard() {
     const porStatus = new Map<string, number>();
     for (const r of rs) {
       porStatus.set(r.status, (porStatus.get(r.status) ?? 0) + 1);
-      if (r.status === "cancelada") continue;
+      if (!ocupaHorario(r)) continue;
       tempoPorLocal.set(r.local_id, (tempoPorLocal.get(r.local_id) ?? 0) + r.tempo_previsto_min);
       tempoPorSede.set(r.sede_id, (tempoPorSede.get(r.sede_id) ?? 0) + r.tempo_previsto_min);
     }

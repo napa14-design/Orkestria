@@ -166,9 +166,18 @@ export async function salvarModelo(
           "Um modelo de evento não pode ser a rota padrão da sede: o \"Gerar o dia\" passaria a montar a programação do evento todo dia.",
       },
     ]);
-  const rotinas = (await getRotinasByData(dataOrigem, sedeId)).filter(
-    (r) => r.status !== "cancelada",
-  );
+  const doDia = await getRotinasByData(dataOrigem, sedeId);
+  // Dia com remanejamento (uma troca por prioridade, por exemplo) é exceção: a
+  // rota levaria a tarefa movida para quem cobriu e perderia a cedida.
+  if (doDia.some((r) => r.status === "remanejada"))
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "MODELO_DIA_COM_REMANEJO",
+        mensagem: `Em ${dataOrigem} há tarefa remanejada (por troca para cobrir falta ou marcada no Acompanhamento). Salve como modelo um dia comum.`,
+      },
+    ]);
+  const rotinas = doDia.filter((r) => r.status !== "cancelada");
   if (rotinas.length === 0)
     throw new ErroValidacao([
       {
@@ -599,7 +608,11 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     data,
     tarefas: new Map(tarefas.map((t) => [t.id, t])),
     funcionarios: new Map(funcionarios.map((f) => [f.id, f])),
-    blocosDoDia: existentes.filter((r) => r.status !== "cancelada"),
+    // TODOS os blocos, inclusive cancelados e remanejados: isto é a checagem de
+    // "já existe, não recria" (`projetarDiaDaRota` descarta o que não está mais
+    // planejado). Filtrar aqui fazia gerar de novo recriar a tarefa cedida numa
+    // troca — e desfazer um cancelamento vindo da rota (auditoria, 20/10/2026).
+    blocosDoDia: existentes,
     ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
     letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
   };

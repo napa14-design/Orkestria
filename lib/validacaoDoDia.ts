@@ -16,6 +16,7 @@
  * é **contar e nomear** o que a agenda manual teria recusado, para aparecer no
  * resultado da geração/importação em vez de virar exceção às 7h da manhã.
  */
+import { ocupaHorario } from "./calculations";
 import { validarAlocacao } from "./validations";
 import { hhmmParaMin } from "./dateUtils";
 import type {
@@ -77,7 +78,7 @@ export function validarDia(args: {
   // seria O(n²) sobre o dia todo da sede (277 blocos em DT).
   const porFuncionario = new Map<string, BlocoDoDia[]>();
   for (const b of blocos) {
-    if (b.status === "cancelada") continue;
+    if (!ocupaHorario(b)) continue;
     const lista = porFuncionario.get(b.funcionario_id);
     if (lista) lista.push(b);
     else porFuncionario.set(b.funcionario_id, [b]);

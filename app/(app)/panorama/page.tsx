@@ -15,6 +15,7 @@ import {
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
+  ocupaHorario,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
@@ -66,7 +67,7 @@ export default function PaginaPanorama() {
 
   // Métricas por sede (mesma lógica do Dashboard, mas para todas as sedes).
   const porSede = useMemo<MetricaSede[]>(() => {
-    const rs = (rotinas ?? []).filter((r) => r.status !== "cancelada");
+    const rs = (rotinas ?? []).filter(ocupaHorario);
     const funcs = (funcionarios ?? []).filter((f) => f.ativo);
     return (sedes ?? [])
       .filter((s) => s.ativo)

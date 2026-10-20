@@ -4,9 +4,9 @@
  * A estrutura completa (tipos, aba no Sheets, API) já existe no MVP para que
  * a Fase 2 seja apenas a construção da tela de acompanhamento.
  */
-import { cobraDesvio, exigeJustificativa } from "@/lib/calculations";
+import { cobraDesvio, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { agoraHHMM, hojeISO } from "@/lib/dateUtils";
+import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem } from "@/lib/dateUtils";
 import type { ExecucaoRealizada, Perfil, StatusRealizado, StatusRotina } from "@/types";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -284,6 +284,39 @@ export async function registrarExecucao(
   if (restrito && existente && existente.supervisor_id !== registro.supervisor_id)
     throw new ErroPermissao("Este registro foi feito por outra pessoa — só o coordenador altera.");
 
+  // Cancelada/remanejada não ocupa o horário; registrar o realizado a traz de
+  // volta. Se outro bloco da pessoa já ocupa aquela faixa (a troca por
+  // prioridade põe um ali), recusa — mesma regra do `updateRotina`, que esta
+  // porta pulava (auditoria, 20/10/2026).
+  const novoStatus = STATUS_ROTINA_POR_EXECUCAO[registro.status_realizado];
+  // Tarefa de espera não disputa a pessoa (mesma exceção do `updateRotina`).
+  if (!tarefa?.espera && !ocupaHorario(rotina) && ocupaHorario({ status: novoStatus })) {
+    const ini = hhmmParaMin(rotina.inicio_planejado);
+    const fim = hhmmParaMin(rotina.fim_planejado);
+    const sobrepostas = (await getRotinasByData(rotina.data, rotina.sede_id)).filter(
+      (r) =>
+        r.id !== rotina.id &&
+        r.funcionario_id === rotina.funcionario_id &&
+        ocupaHorario(r) &&
+        intervalosSobrepoem(ini, fim, hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)),
+    );
+    let choque: (typeof sobrepostas)[number] | undefined;
+    for (const r of sobrepostas) {
+      if (!(await ds.obter("tarefas", r.tarefa_id))?.espera) {
+        choque = r;
+        break;
+      }
+    }
+    if (choque)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "SOBREPOSICAO",
+          mensagem: `Esta tarefa saiu do horário e outra já ocupa ${choque.inicio_planejado}–${choque.fim_planejado}. Ajuste na Agenda antes de registrar.`,
+        },
+      ]);
+  }
+
   let execucao: ExecucaoRealizada;
   if (existente) {
     execucao = await ds.atualizar("execucoes_realizadas", existente.id, {
@@ -298,7 +331,7 @@ export async function registrarExecucao(
 
   // Sincroniza o status da rotina planejada.
   await ds.atualizar("rotinas_planejadas", rotina.id, {
-    status: STATUS_ROTINA_POR_EXECUCAO[registro.status_realizado],
+    status: novoStatus,
     atualizado_em: agora,
   });
 

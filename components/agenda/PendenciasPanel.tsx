@@ -6,7 +6,7 @@
  * vencidas em relação ao último planejamento.
  */
 import { useMemo, useState } from "react";
-import { statusPeriodoLetivo } from "@/lib/calculations";
+import { ocupaHorario, statusPeriodoLetivo } from "@/lib/calculations";
 import { diaDaSemana, DIAS_SEMANA, parseDiasSemana } from "@/lib/dateUtils";
 import type { Local, PeriodoLetivo, RotinaPlanejada, Tarefa } from "@/types";
 
@@ -38,11 +38,11 @@ export default function PendenciasPanel({
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
   const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas, letivasSemCalendario } = useMemo(() => {
-    const alocadasHoje = new Set(rotinasDoDia.map((r) => r.tarefa_id));
+    const alocadasHoje = new Set(rotinasDoDia.filter(ocupaHorario).map((r) => r.tarefa_id));
     const dowHoje = diaDaSemana(data);
     const ultimaData = new Map<string, string>();
     for (const r of historico) {
-      if (r.status === "cancelada") continue;
+      if (!ocupaHorario(r)) continue;
       const atual = ultimaData.get(r.tarefa_id);
       if (!atual || r.data > atual) ultimaData.set(r.tarefa_id, r.data);
     }
