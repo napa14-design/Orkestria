@@ -224,6 +224,19 @@ export async function substituirNoPosto(
         mensagem: "A substituição vale dentro da mesma sede — a rota é do posto daquela unidade.",
       },
     ]);
+  // Posto já assumido: a segunda substituição apontava o antigo para o novo
+  // cadastro, mas a rota já tinha ido para o primeiro — e o segundo nascia sem
+  // rota, com mensagem de sucesso (auditoria, 21/10/2026).
+  if (antigo.substituido_por) {
+    const quem = await ds.obter("funcionarios", antigo.substituido_por);
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "POSTO_JA_ASSUMIDO",
+        mensagem: `O posto de ${antigo.nome} já foi assumido${quem ? ` por ${quem.nome}` : ""}. O cadastro novo foi salvo, sem rota — monte a agenda dele à mão ou escolha outro posto.`,
+      },
+    ]);
+  }
 
   const agora = agoraISO();
   const [itens, blocos] = await Promise.all([

@@ -16,6 +16,7 @@ import {
 import { cargaSemanalMin, jornadaLiquidaMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, Sede } from "@/types";
 
 const TURNOS = [
@@ -33,9 +34,10 @@ const ESCALAS = [
 
 export default function PaginaFuncionarios() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  // Lista sem filtro de sede: as candidatas a ser substituídas são escolhidas
-  // pela sede do FORMULÁRIO, que pode não ser a que está aberta na tabela.
-  const { data: equipe } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
+  // Todas as sedes da pessoa: as candidatas a ser substituídas são escolhidas
+  // pela sede do FORMULÁRIO, que pode não ser a que está aberta na tabela — e
+  // sem `?sede` a API só devolvia a principal do coordenador.
+  const { data: equipe } = useDasSedes<Funcionario>("funcionarios");
   const nomeSede = (id: string) =>
     sedes?.find((s) => s.id === id)?.nome_sede ?? id;
 
@@ -53,7 +55,7 @@ export default function PaginaFuncionarios() {
   const [aviso, setAviso] = useState<{ tipo: "ok" | "aviso"; texto: string } | null>(null);
 
   const recarregar = () =>
-    mutate((k) => typeof k === "string" && k.startsWith("/api/funcionarios"));
+    mutate((k) => typeof k === "string" && (k.startsWith("/api/funcionarios") || k.startsWith("funcionarios-das-sedes")));
   const dataBR = (iso?: string) => (iso ? iso.split("-").reverse().join("/") : "");
   const fraseDaVaga = (v: { aberta: boolean; codigo?: string; motivo?: string }) =>
     v.aberta ? `Vaga #${v.codigo} aberta no SGCP.` : `A vaga não foi aberta: ${v.motivo}`;
@@ -146,6 +148,9 @@ export default function PaginaFuncionarios() {
       subtitulo="Equipe ASG/serviços gerais. A jornada líquida é calculada automaticamente."
       endpoint="/api/funcionarios"
       porSede
+      // Cadastrar pode assumir um posto: a lista de candidatas (outra chave SWR,
+      // de todas as sedes) precisa refletir isso antes do próximo cadastro.
+      aoCriar={() => void recarregar()}
       textoNovo="+ Novo funcionário"
       vazio="Adicione a equipe (ASGs): horário, sede e escala. Depois é só montar a rotina arrastando tarefas."
       // Funcionário não se exclui, se desliga: com data, motivo e vaga no SGCP.

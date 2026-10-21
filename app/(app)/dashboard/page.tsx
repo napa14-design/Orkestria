@@ -61,8 +61,13 @@ export default function PaginaDashboard() {
   const [sedeFiltro, setSedeFiltro] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  // Mesma sede das rotinas: sem `?sede=` o coordenador recebia só a equipe e
+  // os locais da principal, e numa sede extra a ocupação saía sobre ninguém.
+  const { data: funcionarios } = useSWR<Funcionario[]>(
+    `/api/funcionarios${sedeFiltro ? `?sede=${sedeFiltro}` : ""}`,
+    fetcher,
+  );
+  const { data: locais } = useSWR<Local[]>(`/api/locais${sedeFiltro ? `?sede=${sedeFiltro}` : ""}`, fetcher);
   const { data: tiposLocal } = useSWR<TipoLocalCatalogo[]>("/api/tipos-local", fetcher);
   const fatorDoTipo = useMemo(
     () =>

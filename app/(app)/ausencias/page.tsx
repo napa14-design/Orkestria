@@ -4,6 +4,7 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import type { Ausencia, Funcionario, Sede } from "@/types";
 
 const TIPOS = [
@@ -23,7 +24,9 @@ const SELO_TIPO: Record<string, string> = {
 };
 
 export default function PaginaAusencias() {
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
+  // Todas as sedes da pessoa: sem isso, a ausência de quem é da sede extra não
+  // tinha como ser lançada (a pessoa não aparecia na lista).
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
 
   const nomeFuncionario = (id: string) =>
@@ -36,6 +39,7 @@ export default function PaginaAusencias() {
       titulo="Ausências"
       subtitulo="Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário fica bloqueada e as tarefas dele viram candidatas a remanejamento."
       endpoint="/api/ausencias"
+      porSede
       textoNovo="+ Nova ausência"
       campos={[
         {

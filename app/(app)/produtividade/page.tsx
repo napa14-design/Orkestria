@@ -35,10 +35,17 @@ export default function PaginaProdutividade() {
   const [sedeFiltro, setSedeFiltro] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: tarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
-  const { data: rotinas } = useSWR<RotinaPlanejada[]>(`/api/rotinas?de=${de}&ate=${ate}`, fetcher);
-  const { data: execucoes } = useSWR<ExecucaoRealizada[]>(`/api/execucoes?de=${de}&ate=${ate}`, fetcher);
+  // Tudo com a sede do filtro: sem `?sede` a API devolve ao coordenador só a
+  // principal, e escolher a sede extra mostrava a lista vazia. "Todas" continua
+  // sem sede — para o coordenador, a principal (uma sede por vez).
+  const daSede = sedeFiltro ? `sede=${encodeURIComponent(sedeFiltro)}` : "";
+  const { data: funcionarios } = useSWR<Funcionario[]>(`/api/funcionarios${daSede ? `?${daSede}` : ""}`, fetcher);
+  const { data: tarefas } = useSWR<Tarefa[]>(`/api/tarefas${daSede ? `?${daSede}` : ""}`, fetcher);
+  const { data: rotinas } = useSWR<RotinaPlanejada[]>(`/api/rotinas?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`, fetcher);
+  const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
+    `/api/execucoes?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`,
+    fetcher,
+  );
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
 
   const params = parametros ?? PARAMETROS_PADRAO;

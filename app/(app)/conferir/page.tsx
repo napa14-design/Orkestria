@@ -102,10 +102,11 @@ export default function PaginaConferir() {
 
       // busca as rotinas planejadas daquele funcionário/data/sede
       const [rotinas, tarefas, requisitos, funcionarios] = await Promise.all([
-        fetcher(`/api/rotinas?data=${info.data}&sede=${info.sede}`) as Promise<RotinaPlanejada[]>,
-        fetcher(`/api/tarefas?sede=${info.sede}`) as Promise<Tarefa[]>,
+        fetcher(`/api/rotinas?data=${encodeURIComponent(info.data)}&sede=${encodeURIComponent(info.sede)}`) as Promise<RotinaPlanejada[]>,
+        fetcher(`/api/tarefas?sede=${encodeURIComponent(info.sede)}`) as Promise<Tarefa[]>,
         fetcher("/api/requisitos").catch(() => []) as Promise<Requisito[]>,
-        fetcher("/api/funcionarios") as Promise<Funcionario[]>,
+        // Sede da ficha: sem ela, quem é da sede extra do coordenador saía pelo código.
+        fetcher(`/api/funcionarios?sede=${encodeURIComponent(info.sede)}`) as Promise<Funcionario[]>,
       ]);
       setFuncNome(funcionarios.find((f) => f.id === info.funcionario)?.nome ?? info.funcionario);
       const tPorId = new Map(tarefas.map((t) => [t.id, t]));

@@ -12,6 +12,7 @@ import { podeCriarNoCatalogo } from "@/lib/permissions";
 import LoteQualificacoes from "@/components/LoteQualificacoes";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import { NIVEIS_QUALIFICACAO, NIVEL_ORDEM } from "@/types";
 import type { Funcionario, QualificacaoFuncionario, Requisito, Sede } from "@/types";
 
@@ -21,7 +22,8 @@ export default function PaginaQualificacoes() {
   // seria um botão que promete e devolve 403.
   const podeCriarCatalogo = !sessao || podeCriarNoCatalogo(sessao);
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
+  // Todas as sedes da pessoa — sem `?sede` a API só devolve a principal.
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
   const { data: requisitos, mutate: mutateRequisitos } = useSWR<Requisito[]>(
     "/api/requisitos",
     fetcher,
@@ -45,6 +47,7 @@ export default function PaginaQualificacoes() {
       titulo="Qualificações"
       subtitulo="Aptidões e treinamentos que cada funcionário possui. A agenda bloqueia tarefas cujo requisito a pessoa não tem ou está vencido. EPIs são exigidos pela tarefa, não cadastrados aqui."
       endpoint="/api/qualificacoes"
+      porSede
       textoNovo="+ Nova qualificação"
       campos={[
         {

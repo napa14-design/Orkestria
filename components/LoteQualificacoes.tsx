@@ -18,6 +18,9 @@ import { formatarDataBR, hojeISO } from "@/lib/dateUtils";
 import { NIVEIS_QUALIFICACAO } from "@/types";
 import type { Funcionario, Requisito, Sede } from "@/types";
 
+/** Toda lista de qualificações em cache: a da sede escolhida e a de várias sedes. */
+const daQualificacao = (k: unknown) => typeof k === "string" && (k.startsWith("/api/qualificacoes") || k.startsWith("qualificacoes-das-sedes"));
+
 interface Resultado {
   criadas: number;
   ja_tinham: number;
@@ -120,7 +123,7 @@ export default function LoteQualificacoes({
         // O que a pessoa VIU. Se a base mudou no meio, o servidor recusa.
         esperado: plano.renovaria.length,
       });
-      await mutate("/api/qualificacoes");
+      await mutate(daQualificacao);
       setPlano(null);
       setMensagem({ texto: `${r.renovadas} validade(s) renovada(s) para ${validade}.` });
     } catch (err) {
@@ -149,7 +152,7 @@ export default function LoteQualificacoes({
         validade,
         nivel,
       });
-      await mutate("/api/qualificacoes");
+      await mutate(daQualificacao);
       setPessoas(new Set());
       setCapacitacoes(new Set());
       setMensagem({

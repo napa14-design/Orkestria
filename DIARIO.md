@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-10-21 — Sede extra do coordenador nas outras telas (lote)
+
+Mesmo furo dos Serviços eventuais, em mais telas: pediam a lista sem `?sede`,
+e a API devolve ao coordenador só a sede **principal**. Para quem opera uma
+sede extra, ela sumia. O servidor não mudou — cada consulta continua sendo de
+uma sede; quem mudou foi a tela, que agora diz qual sede quer.
+
+- **Hook `useDasSedes`** (`lib/useDasSedes.ts`): uma chamada por sede da
+  pessoa, juntadas (quem vê todas continua numa chamada). Os Serviços
+  eventuais passaram a usá-lo.
+- **Ausências, Tempos por pessoa, Qualificações:** o formulário lista
+  funcionários de todas as sedes da pessoa, e a lista de registros ganhou o
+  seletor de sede (`porSede`). Em Tempos, as tarefas também vêm de todas e
+  acompanham a sede do funcionário escolhido.
+- **Funcionários:** a lista de quem pode ter o posto assumido vem de todas as
+  sedes (a tabela já tinha seletor); a recarga após desligar pega as duas chaves.
+- **Capacitações e Panorama:** funcionários (e qualificações/rotinas) de todas
+  as sedes — cada sede segue na sua linha, sem misturar.
+- **Painel e Produtividade:** funcionários, locais e tarefas vão com a sede do
+  filtro, como as rotinas já iam. "Todas" continua sem sede: para o
+  coordenador, a principal — uma sede por vez.
+- **Conferir ficha:** o nome de quem é da sede extra saía pelo código; os
+  parâmetros que vêm do QR passam a ir codificados.
+- **Lote de qualificações:** a recarga pega a lista da sede escolhida também.
+- O Remanejo é só do administrador, que já vê tudo — não mexi.
+
+**Achado da auditoria, corrigido:** em Funcionários, a lista de candidatas ao
+posto passou a ter chave própria e não se atualizava depois de cadastrar —
+dava para pôr duas pessoas no posto da mesma B. Duas pontas: a tela recarrega
+a lista depois de cadastrar (`aoCriar`), e o servidor recusa substituir um
+posto já assumido (`POSTO_JA_ASSUMIDO` em `substituirNoPosto`), com teste — o
+furo existia também por outra aba aberta.
+
+Verificado no modo demonstração, com coordenador de duas sedes e uma
+funcionária na sede extra: formulários de Ausências/Tempos/Qualificações,
+seletores, Funcionários, Capacitações, Produtividade, Painel; Panorama com
+rotina planejada na sede extra (50%); e cadastrar alguém que assume o posto
+da Bia tira a Bia das candidatas sem recarregar.
+
+Arquivos: `lib/useDasSedes.ts`, `app/(app)/{ausencias,tempos,qualificacoes,funcionarios,capacitacoes,panorama,produtividade,dashboard,conferir,eventuais}/page.tsx`,
+`components/LoteQualificacoes.tsx`, `services/funcionariosService.ts`,
+`testes/substituir-no-posto.test.ts`.
+
+---
+
 ## 2026-10-21 — Serviços eventuais: funcionários da sede extra do coordenador
 
 Relato: no Parquelândia 2 o formulário de Serviços eventuais só listava

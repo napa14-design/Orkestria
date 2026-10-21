@@ -9,12 +9,14 @@ import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, Sede, Tarefa, TempoPersonalizado } from "@/types";
 
 export default function PaginaTempos() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: tarefas } = useSWR<Tarefa[]>("/api/tarefas", fetcher);
+  // Todas as sedes da pessoa — sem `?sede` a API só devolve a principal.
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
+  const { data: tarefas } = useDasSedes<Tarefa>("tarefas");
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const nomeFunc = (id: string) => funcionarios?.find((f) => f.id === id)?.nome ?? id;
@@ -25,6 +27,7 @@ export default function PaginaTempos() {
       titulo="Tempos por pessoa"
       subtitulo="Tempo realista de uma tarefa para cada funcionário. Serve só para planejar uma rotina realista — não é usado para avaliar nem premiar."
       endpoint="/api/tempos-personalizados"
+      porSede
       textoNovo="+ Novo tempo por pessoa"
       campos={[
         {
@@ -43,10 +46,13 @@ export default function PaginaTempos() {
           rotulo: "Tarefa",
           tipo: "select",
           obrigatorio: true,
-          opcoes: (tarefas ?? []).filter((t) => t.ativo).map((t) => ({
-            valor: t.id,
-            rotulo: `${t.nome_tarefa} — ${nomeSede(t.sede_id)}`,
-          })),
+          // Só as tarefas da sede de quem foi escolhido (sem pessoa ainda: todas).
+          opcoes: (form) => {
+            const sede = funcionarios?.find((f) => f.id === form.funcionario_id)?.sede_id;
+            return (tarefas ?? [])
+              .filter((t) => t.ativo && (!sede || t.sede_id === sede))
+              .map((t) => ({ valor: t.id, rotulo: `${t.nome_tarefa} — ${nomeSede(t.sede_id)}` }));
+          },
           dica: "A atividade cujo tempo varia para esta pessoa.",
         },
         {

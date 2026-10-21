@@ -7,9 +7,8 @@
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
-import { useSessao } from "@/components/SessaoContexto";
 import { fetcher } from "@/lib/clientApi";
-import { sedesPermitidas } from "@/lib/permissions";
+import { useDasSedes } from "@/lib/useDasSedes";
 import { formatarDataBR, formatarDuracao } from "@/lib/dateUtils";
 import type { Categoria, Funcionario, Local, Sede, ServicoEventual } from "@/types";
 
@@ -18,30 +17,11 @@ const TIPOS = [
   { valor: "imprevisto", rotulo: "Imprevisto (consumiu tempo)" },
 ];
 
-/**
- * Lista de TODAS as sedes que a pessoa opera. Sem `?sede`, a API devolve ao
- * coordenador só a sede principal: quem operava Parquelândia 1 e 2 não achava
- * ninguém da 2 no formulário (relato de 21/10/2026). Quem vê todas as sedes
- * continua numa chamada só.
- */
-function useDasSedes<T>(recurso: string, sedesDoEscopo: string[] | null) {
-  const chave =
-    sedesDoEscopo && sedesDoEscopo.length > 1 ? `${recurso}-das-sedes:${sedesDoEscopo.join(",")}` : `/api/${recurso}`;
-  return useSWR<T[]>(chave, (c: string): Promise<T[]> =>
-    c === `/api/${recurso}`
-      ? (fetcher(c) as Promise<T[]>)
-      : Promise.all(
-          sedesDoEscopo!.map((id) => fetcher(`/api/${recurso}?sede=${encodeURIComponent(id)}`) as Promise<T[]>),
-        ).then((listas) => listas.flat()),
-  );
-}
-
 export default function PaginaEventuais() {
-  const sessao = useSessao();
-  const sedesDoEscopo = sessao ? sedesPermitidas(sessao) : null;
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios", sedesDoEscopo);
-  const { data: locais } = useDasSedes<Local>("locais", sedesDoEscopo);
+  // Todas as sedes da pessoa: o formulário filtra pela sede escolhida.
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
+  const { data: locais } = useDasSedes<Local>("locais");
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;

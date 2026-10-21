@@ -14,6 +14,7 @@ import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDataBR, hojeISO, somarDias } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, QualificacaoFuncionario, Requisito, Sede } from "@/types";
 
 function corCobertura(pct: number): string {
@@ -21,10 +22,11 @@ function corCobertura(pct: number): string {
 }
 
 export default function PaginaCapacitacoes() {
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
+  // Todas as sedes da pessoa (cada uma segue numa linha própria da cobertura).
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
-  const { data: qualificacoes } = useSWR<QualificacaoFuncionario[]>("/api/qualificacoes", fetcher);
+  const { data: qualificacoes } = useDasSedes<QualificacaoFuncionario>("qualificacoes");
 
   const hoje = hojeISO();
   const limite30 = somarDias(hoje, 30);

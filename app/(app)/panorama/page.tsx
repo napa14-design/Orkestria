@@ -19,6 +19,7 @@ import {
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede } from "@/types";
 
 function diasAtras(n: number): string {
@@ -60,8 +61,10 @@ export default function PaginaPanorama() {
   const [dim, setDim] = useState<"grupo" | "tipo">("grupo");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: rotinas } = useSWR<RotinaPlanejada[]>(`/api/rotinas?de=${de}&ate=${ate}`, fetcher);
+  // Todas as sedes da pessoa: sem `?sede` a API só devolve a principal, e a
+  // sede extra do coordenador aparecia zerada.
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
+  const { data: rotinas } = useDasSedes<RotinaPlanejada>("rotinas", `de=${de}&ate=${ate}`);
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
 

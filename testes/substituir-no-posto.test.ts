@@ -156,4 +156,19 @@ describe("substituirNoPosto", () => {
   it("recusa substituir a si mesmo", async () => {
     await expect(substituirNoPosto(ANTIGO, ANTIGO, CORTE, "t@t.com")).rejects.toThrow();
   });
+
+  it("posto já assumido recusa a segunda substituição — e a rota fica com quem assumiu primeiro", async () => {
+    // A lista de candidatas da tela pode estar velha (outra aba, cache): o
+    // servidor é quem garante que um posto não vai para duas pessoas.
+    const depois = await bloco(DEPOIS, "07:00");
+    const jorge = await criarSubstituto("Jorge");
+    await substituirNoPosto(jorge.id, ANTIGO, CORTE, "t@t.com");
+    const outro = await criarSubstituto("Outro");
+
+    await expect(substituirNoPosto(outro.id, ANTIGO, CORTE, "t@t.com")).rejects.toThrow(/já foi assumido por Jorge/u);
+
+    const ds = await getDataSource();
+    expect((await ds.obter("funcionarios", ANTIGO))?.substituido_por).toBe(jorge.id);
+    expect((await ds.obter("rotinas_planejadas", depois.id))?.funcionario_id).toBe(jorge.id);
+  });
 });
