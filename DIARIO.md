@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-10-21 — Gerar o dia não põe mais bloco da rota por cima do que já está lá
+
+Relato: na Pré Sul, o dia 20/10 amanheceu com tarefas sobrepostas. O histórico
+contou a história inteira:
+
+1. 20/10 de manhã, "Gerar o dia" criou a rota padrão.
+2. A coordenadora **excluiu** vários blocos da rota e montou outros à mão no
+   lugar (a rota não batia com o dia).
+3. 21/10, "⚡ Gerar a semana da rota padrão" para 20 a 24/10 — e o dia 20
+   entrou no período.
+4. A geração confere "já existe?" pelo id do bloco. Bloco excluído não deixa
+   rastro, então os 21 excluídos (de duas funcionárias) **voltaram**, 17 deles
+   por cima do que foi montado à mão. Os dias 22–24 saíram limpos.
+
+**Conserto:** motivo de descarte novo, `horario_ocupado` — a geração não
+materializa item da rota se a mesma pessoa já tem, naquele horário, um bloco
+que ocupa (cancelada/remanejada não contam; encostar não é sobrepor). A tela
+do "Gerar o dia" passa a dizer *"já tem outra tarefa nesse horário — a rota não
+põe por cima"*. Sobreposição **entre itens da própria rota** continua passando,
+de propósito (rota que não cabe é o dado): bloco que é de item **atual** da rota,
+ainda `planejada` e no lugar onde a rota o pôs, não conta como ocupado — inclusive
+no dia já gerado. Movido à mão (de horário ou para outra pessoa), já realizado
+ou de item que saiu da rota, conta.
+A primeira versão contava qualquer bloco, e a auditoria pegou a regressão: rota
+reorganizada (t1 07:00 → 10:00, t3 novo às 07:00) alinhava t1 e recusava t3,
+porque a checagem olhava o dia de antes do alinhamento. A duração do item agora vem do
+contexto (`duracaoDoItem`), o mesmo cálculo que a geração grava, então a
+geração sombra julga igual; e o item recusado por horário ocupado conta como
+divergência na sombra (a rota está desatualizada).
+
+**Produção:** os 21 blocos recriados em 20/10 foram apagados (todos
+`planejada`, nenhum com realizado; backup em Downloads,
+`backup-psul-20-10-recriados-2026-10-21T18-13-53-542Z.json`; cada exclusão
+registrada no histórico como `migracao-21-10-2026`). O dia voltou a 58 blocos,
+zero sobreposições.
+
+**O que continua:** bloco da rota excluído **sem nada no lugar** ainda volta
+numa regeração do mesmo dia — excluir segue sem memória. Fica para decidir.
+
+Também continua, sem mudança: **alinhar** (rota mudou de horário) pode levar o
+bloco para cima de um manual — já era assim, e o aviso de problema aparece.
+
+Testes: casos na projeção (bordas, outra pessoa, status, rota interna no dia
+limpo e no já gerado, bloco movido/realizado/de item que saiu, ordem dos
+motivos); no serviço, o fluxo do incidente, a rota reorganizada e a sombra.
+Mutação: as 10 variações (filtro, regra da rota, sombra) ficam vermelhas.
+
+Arquivos: `lib/projecaoDia.ts`, `services/modelosService.ts`,
+`testes/projecao.test.ts`, `testes/gerar-semana.test.ts`, `testes/desligar.test.ts`.
+
+---
+
 ## 2026-10-20 — Categoria "Apoio a outro setor": quanto da equipe vai para fora da infra
 
 Pedido da reunião de coordenadores (19/10): medir quanto da mão de obra de

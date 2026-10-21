@@ -328,7 +328,7 @@ describe("geração do dia", () => {
   };
   const ctx = (f: ReturnType<typeof funcionario>, data = "2026-08-10"): ContextoProjecao => ({
     data, tarefas: new Map([["t1", tarefa()]]), funcionarios: new Map([["f1", f]]),
-    blocosDoDia: [], ausentes: new Set(), letivoFora: false,
+    blocosDoDia: [], ausentes: new Set(), letivoFora: false, duracaoDoItem: () => 30,
   });
 
   it("não gera para desligado a partir da data; gera antes dela (aviso prévio)", () => {

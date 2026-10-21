@@ -45,6 +45,7 @@ function contexto(parcial: Partial<ContextoProjecao> = {}): ContextoProjecao {
     blocosDoDia: [],
     ausentes: new Set(),
     letivoFora: false,
+    duracaoDoItem: (it) => it.duracao_min ?? 30,
     ...parcial,
   };
 }
@@ -278,6 +279,91 @@ describe("projetarDiaDaRota", () => {
       tarefas: new Map([["t1", tarefa({ frequencia: "semanal", dias_semana: "2" })]]),
     });
     expect(projetarDiaDaRota([item()], ctx).descartados[0].motivo).toBe("ja_no_dia");
+  });
+
+  it("não põe bloco da rota por cima do que já está no horário da pessoa", () => {
+    // Pré Sul, 20/10/2026: a coordenadora excluiu blocos da rota e montou outros
+    // à mão no lugar; "Gerar a semana" no dia seguinte recriou os 21 excluídos
+    // por cima. Aqui: o item das 08:00–08:30 encontra 07:50–08:10 e 08:20–09:00.
+    for (const [ini, fim] of [["07:50", "08:10"], ["08:20", "09:00"], ["08:00", "08:30"]]) {
+      const manual = rotina({ id: "manual", tarefa_id: "t9", inicio_planejado: ini, fim_planejado: fim });
+      const p = projetarDiaDaRota([item()], contexto({ blocosDoDia: [manual] }));
+      expect(p.materializar).toHaveLength(0);
+      expect(p.descartados[0].motivo).toBe("horario_ocupado");
+    }
+  });
+
+  it("horário ocupado mede pela duração do item, e encostar não é sobrepor", () => {
+    const manual = rotina({ id: "manual", tarefa_id: "t9", inicio_planejado: "08:30", fim_planejado: "09:00" });
+    // 30 min: termina 08:30, encosta — entra.
+    expect(projetarDiaDaRota([item()], contexto({ blocosDoDia: [manual] })).materializar).toHaveLength(1);
+    // E pelo outro lado: o manual termina às 08:00, quando o item começa — entra.
+    const antes = rotina({ id: "antes", tarefa_id: "t9", inicio_planejado: "07:30", fim_planejado: "08:00" });
+    expect(projetarDiaDaRota([item()], contexto({ blocosDoDia: [antes] })).materializar).toHaveLength(1);
+    // 45 min: invade 08:30–08:45 — não entra.
+    expect(
+      projetarDiaDaRota([item({ duracao_min: 45 })], contexto({ blocosDoDia: [manual] })).descartados[0].motivo,
+    ).toBe("horario_ocupado");
+  });
+
+  it("só bloqueia o horário da MESMA pessoa, e só bloco que ocupa", () => {
+    const deOutra = rotina({ id: "x", funcionario_id: "f2", tarefa_id: "t9", inicio_planejado: "08:00" });
+    const cancelado = rotina({ id: "y", tarefa_id: "t9", inicio_planejado: "08:00", status: "cancelada" });
+    const remanejado = rotina({ id: "z", tarefa_id: "t9", inicio_planejado: "08:00", status: "remanejada" });
+    const p = projetarDiaDaRota([item()], contexto({ blocosDoDia: [deOutra, cancelado, remanejado] }));
+    expect(p.materializar).toHaveLength(1);
+  });
+
+  it("bloco da PRÓPRIA rota, planejado e no lugar, não ocupa — nem no dia já gerado", () => {
+    // Rota a 08:00 já gerada; b entra depois às 08:15. Tem de dar o mesmo que o
+    // dia limpo (os dois entram), senão a geração incremental decide diferente.
+    const blocoDeA = rotina({ id: "ri_a", inicio_planejado: "08:00", origem_item_id: "a", origem_inicio: "08:00" });
+    const itens = [item({ id: "a" }), item({ id: "b", tarefa_id: "t2", inicio_planejado: "08:15" })];
+    const ctx = contexto({ blocosDoDia: [blocoDeA] });
+    ctx.tarefas.set("t2", tarefa({ id: "t2" }));
+    expect(projetarDiaDaRota(itens, ctx).materializar.map((i) => i.id)).toEqual(["b"]);
+  });
+
+  it("bloco da rota movido à mão, já realizado ou de item que saiu da rota OCUPA", () => {
+    // Em todos, o bloco está às 08:00–08:30 e o item "b" quer entrar às 08:15.
+    const b = item({ id: "b", tarefa_id: "t2", inicio_planejado: "08:15" });
+    const casos: Array<[string, ModeloRotinaItem, ReturnType<typeof rotina>]> = [
+      // "a" está na rota às 07:00, mas alguém arrastou o bloco dele para 08:00.
+      ["movido à mão", item({ id: "a", inicio_planejado: "07:00" }), rotina({ id: "1", inicio_planejado: "08:00", origem_item_id: "a", origem_inicio: "07:00" })],
+      // O bloco veio de um item que não existe mais na rota.
+      ["saiu da rota", item({ id: "a", inicio_planejado: "07:00" }), rotina({ id: "2", inicio_planejado: "08:00", origem_item_id: "zz", origem_inicio: "08:00" })],
+      // O bloco de "a" (que na rota é de f2) foi arrastado para f1, mesmo horário.
+      ["arrastado para outra pessoa", item({ id: "a", funcionario_id: "f2" }), rotina({ id: "4", inicio_planejado: "08:00", origem_item_id: "a", origem_inicio: "08:00" })],
+      // O bloco de "a" está no lugar, mas já foi realizado: aconteceu ali.
+      ["realizado", item({ id: "a" }), rotina({ id: "3", inicio_planejado: "08:00", origem_item_id: "a", origem_inicio: "08:00", status: "realizada" })],
+    ];
+    for (const [nome, a, bloco] of casos) {
+      const ctx = contexto({ blocosDoDia: [bloco] });
+      ctx.tarefas.set("t2", tarefa({ id: "t2" }));
+      ctx.funcionarios.set("f2", funcionario({ id: "f2" }));
+      const p = projetarDiaDaRota([a, b], ctx);
+      expect(p.descartados.find((d) => d.item.id === "b")?.motivo, nome).toBe("horario_ocupado");
+    }
+  });
+
+  it("sobreposição DENTRO da rota continua passando (rota que não cabe é o dado)", () => {
+    const p = projetarDiaDaRota(
+      [item({ id: "a" }), item({ id: "b", tarefa_id: "t2", inicio_planejado: "08:15" })],
+      (() => {
+        const ctx = contexto();
+        ctx.tarefas.set("t2", tarefa({ id: "t2" }));
+        return ctx;
+      })(),
+    );
+    expect(p.materializar.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("ausência e folga continuam sendo o motivo relatado antes de horário ocupado", () => {
+    const manual = rotina({ id: "manual", tarefa_id: "t9", inicio_planejado: "08:00" });
+    expect(
+      projetarDiaDaRota([item()], contexto({ blocosDoDia: [manual], ausentes: new Set(["f1"]) })).descartados[0]
+        .motivo,
+    ).toBe("pessoa_ausente");
   });
 
   it("preserva a ordem da rota nos descartes (o texto na tela segue essa ordem)", () => {

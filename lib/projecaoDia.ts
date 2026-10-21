@@ -10,8 +10,8 @@
  * A ORDEM dos testes é significativa: o motivo relatado é o primeiro que se
  * aplica. Mexer na ordem muda o texto que o supervisor lê.
  */
-import { jornadaDoDia } from "./calculations";
-import { diaDaSemana, parseDiasSemana } from "./dateUtils";
+import { jornadaDoDia, ocupaHorario } from "./calculations";
+import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
 import { noQuadro } from "./desligamento";
 import type { Funcionario, ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
 
@@ -33,6 +33,12 @@ export type MotivoDescarte =
   | "outro_dia_da_semana"
   | "folga_pela_escala"
   | "pessoa_ausente"
+  /**
+   * A pessoa já tem outra tarefa nesse horário — montada à mão no lugar de um
+   * bloco da rota que alguém excluiu. Excluir não deixa rastro, então sem este
+   * motivo gerar de novo recriava o bloco por cima (Pré Sul, 20/10/2026).
+   */
+  | "horario_ocupado"
   /**
    * Desligado a partir desta data, ou inativado. Antes deste motivo a geração
    * criava blocos para inativos: nada aqui olhava `ativo` (13/10/2026).
@@ -67,6 +73,8 @@ export interface ContextoProjecao {
   /** Ids de funcionários com ausência registrada na data. */
   ausentes: Set<string>;
   letivoFora: boolean;
+  /** Minutos que o item ocuparia — o mesmo cálculo que a geração grava. */
+  duracaoDoItem: (item: ModeloRotinaItem) => number;
 }
 
 /**
@@ -125,6 +133,14 @@ export function projetarDiaDaRota(
     if (b.origem_item_id) porItem.set(b.origem_item_id, b);
     chavesDoDia.add(chaveMaterializacao(b.funcionario_id, b.tarefa_id, b.inicio_planejado));
   }
+  // Dono do item na rota: bloco arrastado para OUTRA pessoa, mesmo sem mudar o
+  // horário, já é decisão humana e ocupa o horário dela (auditoria, 21/10/2026).
+  const donoDoItem = new Map(itens.map((i) => [i.id, i.funcionario_id]));
+  const daRotaNoLugar = (b: RotinaPlanejada) =>
+    !!b.origem_item_id &&
+    donoDoItem.get(b.origem_item_id) === b.funcionario_id &&
+    b.status === "planejada" &&
+    (!b.origem_inicio || b.inicio_planejado === b.origem_inicio);
 
   for (const item of itens) {
     const existente = porItem.get(item.id);
@@ -190,6 +206,25 @@ export function projetarDiaDaRota(
     }
     if (ctx.ausentes.has(item.funcionario_id)) {
       descartar(item, "pessoa_ausente");
+      continue;
+    }
+    // Só contra o que a MÃO pôs no dia. Bloco que é da rota atual, ainda
+    // planejado e no lugar onde ela o pôs não conta: rota contra rota continua
+    // passando (rota que não cabe é o dado), e esse bloco pode estar sendo
+    // alinhado agora mesmo para outro horário — contá-lo recusava o item novo
+    // que entra no horário que ele deixa (auditoria, 21/10/2026).
+    const inicio = hhmmParaMin(item.inicio_planejado);
+    const fim = inicio + ctx.duracaoDoItem(item);
+    const ocupado = ctx.blocosDoDia.some(
+      (b) =>
+        b.funcionario_id === item.funcionario_id &&
+        ocupaHorario(b) &&
+        !daRotaNoLugar(b) &&
+        hhmmParaMin(b.inicio_planejado) < fim &&
+        inicio < hhmmParaMin(b.fim_planejado),
+    );
+    if (ocupado) {
+      descartar(item, "horario_ocupado");
       continue;
     }
     materializar.push(item);

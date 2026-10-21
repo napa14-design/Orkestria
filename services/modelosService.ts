@@ -406,6 +406,7 @@ export async function gerarDiaDaRotaPadrao(
   if (carregado.feriado)
     return { fechado: carregado.feriado.nome, geradas: 0, puladas: 0, detalhes: [] };
   const { itens, ctx, locais, params } = carregado;
+  const previstoDoItem = ctx.duracaoDoItem;
 
   const { materializar, atualizar, descartados } = projetarDiaDaRota(itens, ctx);
 
@@ -417,14 +418,6 @@ export async function gerarDiaDaRotaPadrao(
 
   const ds = await getDataSource();
   const agora = agoraISO();
-
-  // Uma leitura só para o dia inteiro, não uma por item.
-  const fatorDoTipo = await mapaFatorDoTipo();
-
-  /** Tempo previsto do item: a duração do snapshot, ou o cálculo da tarefa. */
-  const previstoDoItem = (it: ModeloRotinaItem) =>
-    it.duracao_min ??
-    tempoPrevistoMin(ctx.tarefas.get(it.tarefa_id)!, locais.get(it.local_id) ?? undefined, fatorDoTipo);
 
   const medidas = (inicio: string, previsto: number) => ({
     inicio_planejado: inicio,
@@ -590,7 +583,7 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
 
   const ds = await getDataSource();
   const existentes = await getRotinasByData(data, sedeId);
-  const [tarefas, locais, funcionarios, periodos, feriados, params] = await Promise.all([
+  const [tarefas, locais, funcionarios, periodos, feriados, params, fatorDoTipo] = await Promise.all([
     ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
@@ -598,7 +591,11 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     // Coleção pequena e sem consulta possível por "vazio OU esta sede": lê tudo.
     ds.listar("feriados"),
     resolverParametros(sedeId),
+    // Uma leitura só para o dia inteiro, não uma por item.
+    mapaFatorDoTipo(),
   ]);
+  const mapaTarefas = new Map(tarefas.map((t) => [t.id, t]));
+  const mapaLocais = new Map(locais.map((l) => [l.id, l]));
 
   // Presença de todos os funcionários numa só rodada (era 1 query por item).
   const idsFunc = [...new Set(itens.map((i) => i.funcionario_id))];
@@ -606,7 +603,7 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
 
   const ctx: ContextoProjecao = {
     data,
-    tarefas: new Map(tarefas.map((t) => [t.id, t])),
+    tarefas: mapaTarefas,
     funcionarios: new Map(funcionarios.map((f) => [f.id, f])),
     // TODOS os blocos, inclusive cancelados e remanejados: isto é a checagem de
     // "já existe, não recria" (`projetarDiaDaRota` descarta o que não está mais
@@ -615,12 +612,18 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     blocosDoDia: existentes,
     ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
     letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
+    // Tempo previsto do item: a duração do snapshot, ou o cálculo da tarefa.
+    // O `!` é o de antes: na criação a projeção já descartou tarefa removida; o
+    // ramo de alinhamento passa antes desse descarte (risco antigo, não novo).
+    duracaoDoItem: (it) =>
+      it.duracao_min ??
+      tempoPrevistoMin(mapaTarefas.get(it.tarefa_id)!, mapaLocais.get(it.local_id) ?? undefined, fatorDoTipo),
   };
   return {
     itens,
     existentes,
     ctx,
-    locais: new Map(locais.map((l) => [l.id, l])),
+    locais: mapaLocais,
     params,
     feriado: feriadoDoDia(feriados, sedeId, data),
   };
@@ -661,6 +664,10 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(`${funcionario?.nome}: folga pela escala em ${ctx.data}`);
     else if (motivo === "pessoa_ausente")
       linhas.push(`${funcionario?.nome}: ausente — redistribuir no Remanejo`);
+    else if (motivo === "horario_ocupado")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: ${funcionario?.nome} já tem outra tarefa nesse horário — a rota não põe por cima`,
+      );
     else if (motivo === "fora_do_quadro")
       linhas.push(
         funcionario?.desligado_em && ctx.data >= funcionario.desligado_em
@@ -720,6 +727,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,
     pessoa_ausente: 0,
+    horario_ocupado: 0,
     fora_do_quadro: 0,
   });
 
@@ -764,10 +772,18 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
   // diário acusaria "faltam 2 blocos" num dia perfeito. Foi o que a verificação
   // com a rota real do Pré Sul pegou: as duas tarefas semanais "escala de segunda"
   // e "escala de terça" apareciam como falta numa quarta-feira.
+  // `horario_ocupado` entra: a rota prevê o item hoje e o dia tem outra coisa no
+  // lugar — é divergência de verdade (rota desatualizada), não descarte legítimo.
   const aplicaveis = [
     ...materializar,
     ...descartados
-      .filter((d) => d.motivo === "ja_no_dia" || d.motivo === "movido_a_mao" || d.motivo === "bloco_ja_iniciado")
+      .filter(
+        (d) =>
+          d.motivo === "ja_no_dia" ||
+          d.motivo === "movido_a_mao" ||
+          d.motivo === "bloco_ja_iniciado" ||
+          d.motivo === "horario_ocupado",
+      )
       .map((d) => d.item),
   ];
   // O que a geração vai ALINHAR sai dos dois lados da comparação: não é

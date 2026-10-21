@@ -15,7 +15,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { getDataSource } from "@/lib/datasource";
-import { gerarPeriodoDaRotaPadrao, salvarModelo } from "@/services/modelosService";
+import { gerarPeriodoDaRotaPadrao, projetarDiaSombra, salvarModelo } from "@/services/modelosService";
 import { createRotina, getRotinasByData } from "@/services/rotinasService";
 
 const SEDE = "christus_dt";
@@ -52,6 +52,23 @@ async function ensinar(nome: string, data: string, hora: string, diasSemana: str
   for (const r of await getRotinasByData(data, SEDE)) {
     await ds.excluir("rotinas_planejadas", r.id);
   }
+}
+
+/**
+ * Salva a rota padrão inteira (substituindo a anterior) a partir de pares
+ * tarefa+hora da mesma pessoa. Salvar de novo mantém o id dos itens que
+ * continuam — é o que permite testar o alinhamento.
+ */
+async function ensinarRota(blocos: Array<[string, string]>) {
+  const ORIGEM = "2026-08-03";
+  for (const [tarefa_id, hora] of blocos)
+    await createRotina(
+      { data: ORIGEM, funcionario_id: "christus_f1", tarefa_id, local_id: "christus_l1", inicio_planejado: hora, supervisor_id: "u1" } as never,
+      "t@t.com",
+    );
+  await salvarModelo("Rota", ORIGEM, SEDE, "t@t.com", { padrao: true, comDuracao: true, diasSemana: "", substitui: false });
+  const ds = await getDataSource();
+  for (const r of await getRotinasByData(ORIGEM, SEDE)) await ds.excluir("rotinas_planejadas", r.id);
 }
 
 const horasDe = async (data: string) =>
@@ -97,6 +114,66 @@ describe("gerarPeriodoDaRotaPadrao", () => {
     expect(segunda.geradas).toBe(0);
     expect(segunda.puladas).toBeGreaterThan(0);
     for (const d of SEMANA) expect(await horasDe(d)).toEqual(["06:00"]);
+  });
+
+  it("bloco da rota excluído e trocado à mão não volta por cima ao gerar de novo", async () => {
+    // Pré Sul, 20/10/2026: excluir não deixa rastro, e "Gerar a semana" no dia
+    // seguinte recriou os blocos da rota sobre o que a coordenadora montou.
+    await ensinar("Rota de todo dia", "2026-08-03", "06:00", ""); // t1 = 55 min
+    await gerarPeriodoDaRotaPadrao(SEDE, [SEGUNDA], "t@t.com");
+    const ds = await getDataSource();
+    for (const r of await getRotinasByData(SEGUNDA, SEDE)) await ds.excluir("rotinas_planejadas", r.id);
+    await createRotina(
+      {
+        data: SEGUNDA,
+        funcionario_id: "christus_f1",
+        tarefa_id: "christus_t3",
+        local_id: "christus_l1",
+        inicio_planejado: "06:10",
+        supervisor_id: "u1",
+      } as never,
+      "t@t.com",
+    );
+
+    const r = await gerarPeriodoDaRotaPadrao(SEDE, [SEGUNDA], "t@t.com");
+
+    expect(r.geradas).toBe(0);
+    expect(await horasDe(SEGUNDA)).toEqual(["06:10"]);
+    expect(r.detalhes.join(" ")).toMatch(/já tem outra tarefa nesse horário/u);
+  });
+
+  it("rota reorganizada: alinha o bloco E cria o item novo no horário que ele deixou", async () => {
+    // Achado da auditoria do conserto acima: a checagem via o dia de ANTES do
+    // alinhamento, e recusava t3 às 07:00 dizendo que t1 ainda estava lá.
+    await ensinarRota([["christus_t1", "07:00"]]);
+    await gerarPeriodoDaRotaPadrao(SEDE, [SEGUNDA], "t@t.com");
+    await ensinarRota([["christus_t1", "10:00"], ["christus_t3", "07:00"]]);
+
+    const r = await gerarPeriodoDaRotaPadrao(SEDE, [SEGUNDA], "t@t.com");
+
+    expect(r.geradas).toBe(1);
+    expect(r.atualizadas).toBe(1);
+    const dia = (await getRotinasByData(SEGUNDA, SEDE)).map((b) => `${b.inicio_planejado} ${b.tarefa_id}`).sort();
+    expect(dia).toEqual(["07:00 christus_t3", "10:00 christus_t1"]);
+  });
+
+  it("a sombra conta o item recusado por horário ocupado como divergência", async () => {
+    await ensinar("Rota de todo dia", "2026-08-03", "06:00", "");
+    await gerarPeriodoDaRotaPadrao(SEDE, [SEGUNDA], "t@t.com");
+    const ds = await getDataSource();
+    for (const b of await getRotinasByData(SEGUNDA, SEDE)) await ds.excluir("rotinas_planejadas", b.id);
+    await createRotina(
+      { data: SEGUNDA, funcionario_id: "christus_f1", tarefa_id: "christus_t3", local_id: "christus_l1", inicio_planejado: "06:10", supervisor_id: "u1" } as never,
+      "t@t.com",
+    );
+
+    const s = await projetarDiaSombra(SEDE, SEGUNDA);
+
+    expect(s.materializaria).toBe(0);
+    expect(s.descartes.horario_ocupado).toBe(1);
+    // A rota prevê t1 às 06:00 e o dia tem t3 às 06:10 no lugar.
+    expect(s.divergencia.so_na_rota).toBe(1);
+    expect(s.divergencia.so_no_dia).toBe(1);
   });
 
   it("sede sem rota padrão responde UMA vez, em vez de repetir por dia", async () => {
