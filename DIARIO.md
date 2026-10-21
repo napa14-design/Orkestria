@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-10-21 — Serviços eventuais: funcionários da sede extra do coordenador
+
+Relato: no Parquelândia 2 o formulário de Serviços eventuais só listava
+funcionários do Parquelândia 1. A tela pedia `/api/funcionarios` e
+`/api/locais` sem `?sede`, e a API devolve ao coordenador só a sede
+**principal** (`limitarSedeConsulta`) — quem opera uma sede extra não a via.
+
+Agora a tela carrega funcionários e locais de **todas** as sedes da pessoa
+(uma chamada por sede, como o cadastro de tarefas já fazia) e o formulário
+mostra só os da **sede escolhida**. A lista de registros também passa a mostrar
+o nome de quem é da sede extra (antes saía "—"). Verificado no modo
+demonstração com coordenador de duas sedes.
+
+O mesmo furo existe em outras telas que pedem a lista sem sede — tratadas em
+seguida, em lote.
+
+Arquivo: `app/(app)/eventuais/page.tsx`.
+
+---
+
 ## 2026-10-21 — Importação de rota lê fórmula do Excel
 
 A planilha da DT2 deu 361 erros `"[object Object]" não é uma hora válida`. O

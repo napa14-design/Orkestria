@@ -7,7 +7,9 @@
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { useSessao } from "@/components/SessaoContexto";
 import { fetcher } from "@/lib/clientApi";
+import { sedesPermitidas } from "@/lib/permissions";
 import { formatarDataBR, formatarDuracao } from "@/lib/dateUtils";
 import type { Categoria, Funcionario, Local, Sede, ServicoEventual } from "@/types";
 
@@ -16,14 +18,37 @@ const TIPOS = [
   { valor: "imprevisto", rotulo: "Imprevisto (consumiu tempo)" },
 ];
 
+/**
+ * Lista de TODAS as sedes que a pessoa opera. Sem `?sede`, a API devolve ao
+ * coordenador só a sede principal: quem operava Parquelândia 1 e 2 não achava
+ * ninguém da 2 no formulário (relato de 21/10/2026). Quem vê todas as sedes
+ * continua numa chamada só.
+ */
+function useDasSedes<T>(recurso: string, sedesDoEscopo: string[] | null) {
+  const chave =
+    sedesDoEscopo && sedesDoEscopo.length > 1 ? `${recurso}-das-sedes:${sedesDoEscopo.join(",")}` : `/api/${recurso}`;
+  return useSWR<T[]>(chave, (c: string): Promise<T[]> =>
+    c === `/api/${recurso}`
+      ? (fetcher(c) as Promise<T[]>)
+      : Promise.all(
+          sedesDoEscopo!.map((id) => fetcher(`/api/${recurso}?sede=${encodeURIComponent(id)}`) as Promise<T[]>),
+        ).then((listas) => listas.flat()),
+  );
+}
+
 export default function PaginaEventuais() {
+  const sessao = useSessao();
+  const sedesDoEscopo = sessao ? sedesPermitidas(sessao) : null;
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const { data: funcionarios } = useSWR<Funcionario[]>("/api/funcionarios", fetcher);
-  const { data: locais } = useSWR<Local[]>("/api/locais", fetcher);
+  const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios", sedesDoEscopo);
+  const { data: locais } = useDasSedes<Local>("locais", sedesDoEscopo);
   const { data: categorias } = useSWR<Categoria[]>("/api/categorias", fetcher);
 
   const nomeSede = (id: string) => sedes?.find((s) => s.id === id)?.nome_sede ?? id;
   const nomeFunc = (id: string) => funcionarios?.find((f) => f.id === id)?.nome ?? "—";
+  /** Só o que é da sede escolhida no formulário (sem sede ainda: tudo). */
+  const daSede = <T extends { sede_id: string }>(lista: T[] | undefined, form: Record<string, unknown>) =>
+    (lista ?? []).filter((x) => !form.sede_id || x.sede_id === form.sede_id);
 
   return (
     <CrudManager<ServicoEventual>
@@ -68,7 +93,8 @@ export default function PaginaEventuais() {
           key: "funcionario_id",
           rotulo: "Funcionário",
           tipo: "select",
-          opcoes: (funcionarios ?? []).map((f) => ({ valor: f.id, rotulo: `${f.nome} — ${nomeSede(f.sede_id)}` })),
+          opcoes: (form) =>
+            daSede(funcionarios, form).map((f) => ({ valor: f.id, rotulo: `${f.nome} — ${nomeSede(f.sede_id)}` })),
           ajuda: "Opcional — deixe em branco se não foi de uma pessoa específica",
           dica: "Quem executou/atendeu. Opcional: alguns imprevistos envolvem a equipe toda.",
         },
@@ -84,7 +110,8 @@ export default function PaginaEventuais() {
           key: "local_id",
           rotulo: "Local",
           tipo: "select",
-          opcoes: (locais ?? []).map((l) => ({ valor: l.id, rotulo: `${l.nome_local} — ${nomeSede(l.sede_id)}` })),
+          opcoes: (form) =>
+            daSede(locais, form).map((l) => ({ valor: l.id, rotulo: `${l.nome_local} — ${nomeSede(l.sede_id)}` })),
           ajuda: "Opcional",
           dica: "Onde ocorreu, quando aplicável. Opcional.",
         },
