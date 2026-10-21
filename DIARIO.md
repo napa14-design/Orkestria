@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-10-21 — Importação de rota lê fórmula do Excel
+
+A planilha da DT2 deu 361 erros `"[object Object]" não é uma hora válida`. O
+"Início da tarefa" era a fórmula `=H2` (o fim da tarefa anterior) copiada para
+baixo — jeito natural de montar a rota —, e a importação só entendia hora em
+Date ou texto puro: fórmula, fórmula copiada, texto formatado e link caíam como
+"[object Object]".
+
+Agora `textoDaCelula` (`lib/importacaoRota.ts`) lê qualquer forma que o ExcelJS
+entrega: fórmula vale pelo resultado; hora em Date ou em fração do dia (célula
+sem formato de hora) vira HH:mm — só nas colunas de hora, para não mexer em
+metragem; texto formatado é juntado; link vale pelo texto; erro de fórmula
+(`#REF!`) aparece na mensagem; forma desconhecida vira "(valor não reconhecido)",
+nunca "[object Object]".
+
+Com a planilha real da DT2 pela rota de análise: de 361 erros para 5, todos de
+dado (duração zero, fim antes do início, uma sobreposição). Testes em
+`testes/importacao-celula.test.ts`.
+
+Arquivos: `lib/importacaoRota.ts`, `app/api/importar/analisar/route.ts`,
+`testes/importacao-celula.test.ts`.
+
+---
+
 ## 2026-10-21 — Gerar o dia não põe mais bloco da rota por cima do que já está lá
 
 Relato: na Pré Sul, o dia 20/10 amanheceu com tarefas sobrepostas. O histórico

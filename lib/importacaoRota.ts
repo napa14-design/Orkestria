@@ -38,6 +38,36 @@ export const COLUNAS: ColunaModelo[] = [
 
 export type LinhaPlanilha = Record<string, string>;
 
+/** Colunas de hora: número e Date viram HH:mm. */
+export const COLUNAS_HORA = new Set(["entrada", "saida", "inicio", "fim"]);
+
+const hhmm = (totalMin: number) =>
+  `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+
+/**
+ * O texto de uma célula, do jeito que a pessoa vê no Excel — seja qual for a
+ * forma em que o ExcelJS a entrega. Antes só Date e texto puro eram lidos, e
+ * qualquer outra forma virava "[object Object]": a planilha da DT2 (21/10/2026)
+ * tinha o início de cada tarefa como fórmula (`=H2`, o fim da anterior), e as
+ * 361 linhas caíram como hora inválida.
+ */
+export function textoDaCelula(v: unknown, hora: boolean): string {
+  if (v == null) return "";
+  if (v instanceof Date) return hhmm(v.getUTCHours() * 60 + v.getUTCMinutes());
+  // Hora sem formato de hora no Excel chega como fração do dia (0,5 = 12:00).
+  if (typeof v === "number") return hora && v >= 0 && v < 1 ? hhmm(Math.round(v * 24 * 60)) : String(v);
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    // Fórmula (`formula`) ou fórmula copiada (`sharedFormula`): vale o resultado.
+    if ("result" in o || "formula" in o || "sharedFormula" in o) return textoDaCelula(o.result, hora);
+    if (Array.isArray(o.richText)) return o.richText.map((p) => String((p as { text?: unknown }).text ?? "")).join("");
+    if ("text" in o) return textoDaCelula(o.text, hora); // link
+    if ("error" in o) return String(o.error); // "#REF!" aparece na mensagem de erro, e não "[object Object]"
+    return "(valor não reconhecido)"; // forma desconhecida: a validação acusa a linha com texto legível
+  }
+  return String(v);
+}
+
 export interface FuncionarioImp {
   nome: string;
   entrada: string;
