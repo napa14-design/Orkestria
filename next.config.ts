@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   // Evita o ERR_REQUIRE_ESM em serverless (Vercel).
   serverExternalPackages: ["firebase-admin"],
   /**
+   * Versão do build, gravada no código do navegador E no do servidor. A aba
+   * aberta compara a sua com a de `/api/versao` (servida pelo deploy novo) e,
+   * se mudou, avisa para recarregar — quem passou o dia com a aba aberta
+   * continuava esbarrando em defeito já consertado (21/10/2026). Na Vercel é o
+   * commit; fora dela, o instante do build.
+   */
+  env: {
+    NEXT_PUBLIC_VERSAO: process.env.VERCEL_GIT_COMMIT_SHA ?? `local-${Date.now()}`,
+  },
+  /**
    * O DIARIO entra no bundle como texto durante o build. A página de evolução
    * não toca no filesystem nem relê o arquivo a cada request autenticado — e
    * `fs` não serviria: na Vercel o arquivo da raiz não vai para a função

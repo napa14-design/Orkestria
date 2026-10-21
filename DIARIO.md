@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-10-21 — Aviso "O Orkestria foi atualizado"
+
+Pedido do dono, no dia dos consertos em produção: quem deixava a aba aberta
+continuava rodando o código de antes do deploy e esbarrando em defeito já
+consertado.
+
+- Cada build ganha uma versão (`NEXT_PUBLIC_VERSAO` em `next.config.ts`: o
+  commit na Vercel, o instante do build fora dela), gravada no código do
+  navegador e no do servidor.
+- `GET /api/versao` (com sessão, sem banco — zero leitura no Firestore)
+  devolve a versão no ar.
+- `AvisoAtualizacao` (no `AppShell`) confere a cada 5 min e quando a aba volta
+  a ficar visível; versão diferente → modal com "Recarregar agora" e "Depois".
+  "Depois" adia 15 min — recarregar não é obrigatório (formulário pela
+  metade), mas não some.
+
+Verificado com dois builds de verdade: página aberta na versão A, servidor
+trocado pela B sem fechar a página — sem modal com a mesma versão, modal ao
+voltar à aba depois da troca, e "Depois" não reabre na hora.
+
+Quem está com a aba aberta AGORA ainda não tem este código: precisa recarregar
+uma vez. A partir do próximo deploy, o aviso aparece sozinho.
+
+Arquivos: `next.config.ts`, `app/api/versao/route.ts`,
+`components/AvisoAtualizacao.tsx`, `components/AppShell.tsx`.
+
+---
+
 ## 2026-10-21 — Sede extra do coordenador nas outras telas (lote)
 
 Mesmo furo dos Serviços eventuais, em mais telas: pediam a lista sem `?sede`,

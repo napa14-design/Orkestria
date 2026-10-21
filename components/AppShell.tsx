@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import AvisoAtualizacao from "./AvisoAtualizacao";
 import { ProvedorSessao } from "./SessaoContexto";
 import { useEffect, useRef, useState } from "react";
 import { SWRConfig, type Middleware } from "swr";
@@ -177,6 +178,7 @@ export default function AppShell({
       }}
     >
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <AvisoAtualizacao />
       <header
         className="nao-imprimir"
         style={{
