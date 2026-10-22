@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { montarSedesDaSessao, perfilConhecido } from "@/lib/permissions";
+import { sessaoDoCadastro } from "@/lib/permissions";
 import { verificarSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import { codigoConfere, getUsuarioPorEmail } from "@/services/usuariosService";
@@ -51,18 +51,12 @@ export async function POST(req: Request) {
   if (!usuario.senha_hash) {
     return NextResponse.json({ primeiro_acesso: true, nome: usuario.nome });
   }
-  if (!perfilConhecido(usuario.perfil)) {
+  const sessao = sessaoDoCadastro(usuario);
+  if (!sessao) {
     return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
   }
 
-  await gravarSessao({
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    perfil: usuario.perfil,
-    sede_id: usuario.sede_id,
-    sedes: montarSedesDaSessao(usuario.sede_id, usuario.sedes_extra),
-  });
+  await gravarSessao(sessao, { sv: usuario.versao_sessao ?? 0 });
   return NextResponse.json({
     nome: usuario.nome,
     perfil: usuario.perfil,

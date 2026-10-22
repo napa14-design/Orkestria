@@ -7,6 +7,7 @@ import { getDataSource } from "@/lib/datasource";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { hashSenha, verificarSenha } from "@/lib/senha";
 import { trocarPropriaSenha } from "@/services/usuariosService";
+import { ErroPermissao } from "@/services/erros";
 import type { Usuario } from "@/types";
 
 const ATUAL = "Atual-segura-123";
@@ -44,5 +45,22 @@ describe("trocarPropriaSenha", () => {
     const id = await usuario(false);
     await trocarPropriaSenha(id, "", NOVA);
     expect(verificarSenha(NOVA, await hashDe(id))).toBe(true);
+  });
+
+  // A rota já barra antes; estas travas do serviço valem para qualquer outro
+  // chamador (revisão de segurança, 22/10/2026).
+  it("cadastro desativado não troca a senha", async () => {
+    const id = await usuario(true);
+    await (await getDataSource()).atualizar("usuarios", id, { ativo: false });
+    await expect(trocarPropriaSenha(id, ATUAL, NOVA)).rejects.toBeInstanceOf(ErroPermissao);
+    expect(verificarSenha(ATUAL, await hashDe(id))).toBe(true);
+  });
+
+  it("versão de sessão diferente da do cadastro (código novo no meio) recusa", async () => {
+    const id = await usuario(true);
+    await (await getDataSource()).atualizar("usuarios", id, { versao_sessao: 2 });
+    await expect(trocarPropriaSenha(id, ATUAL, NOVA, 1)).rejects.toBeInstanceOf(ErroPermissao);
+    expect(verificarSenha(ATUAL, await hashDe(id))).toBe(true);
+    expect(await trocarPropriaSenha(id, ATUAL, NOVA, 2)).toBe(3);
   });
 });

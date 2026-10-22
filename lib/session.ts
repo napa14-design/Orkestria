@@ -11,10 +11,38 @@ import type { SessaoUsuario } from "./permissions";
 import { COOKIE_SESSAO } from "./sessionConstants";
 
 export { COOKIE_SESSAO };
-const MAX_IDADE_S = 60 * 60 * 12; // 12 horas
 
-/** O que vai assinado no cookie: a sessão mais o instante em que ela caduca. */
-type SessaoComExpiracao = SessaoUsuario & { exp: number };
+/**
+ * Sessão que RENOVA com o uso (pedido do dono, 22/10/2026: "o Orkestria não
+ * mantém conectado?" — eram 12 h fixas). Três prazos:
+ * - inatividade: sem nenhuma chamada por 7 dias, cai;
+ * - teto: 7 dias desde o LOGIN, use quanto usar (decisão do dono) — a renovação
+ *   nunca reinicia este relógio. Sem teto, um cookie copiado se renovaria para
+ *   sempre (revisão de segurança);
+ * - reconferência: passada 1 h desde a emissão, a próxima chamada relê o
+ *   cadastro (`comSessao`) — desativar, rebaixar o perfil ou tirar uma sede vale
+ *   em até 1 h, e não só no próximo login.
+ */
+const INATIVIDADE_S = 7 * 24 * 60 * 60;
+const TETO_S = 7 * 24 * 60 * 60;
+export const RECONFERIR_S = 60 * 60;
+/** Relógio adiantado de servidor para servidor não pode recusar um token recém-emitido. */
+const FOLGA_RELOGIO_S = 5 * 60;
+
+/**
+ * Metadados assinados junto com a sessão: `iat` (emitido em), `auth_em` (login
+ * que originou a cadeia de renovações), `sv` (versão de sessão do cadastro —
+ * trocar a senha ou gerar código novo a incrementa e derruba as outras) e `exp`.
+ */
+export interface MetaSessao {
+  iat: number;
+  auth_em: number;
+  sv: number;
+  exp: number;
+}
+
+/** O que vai assinado no cookie. */
+export type SessaoComMeta = SessaoUsuario & MetaSessao;
 
 /** Valor de fallback — está no código, logo é público. Só serve em dev. */
 const SEGREDO_DEV = "segredo-dev-inseguro";
@@ -38,11 +66,29 @@ function assinar(payload: string): string {
   return createHmac("sha256", segredo()).update(payload).digest("base64url");
 }
 
-export function criarTokenSessao(sessao: SessaoUsuario, agoraMs = Date.now()): string {
+/**
+ * `auth_em` ausente = login novo (o teto começa agora). A renovação passa o do
+ * token antigo e o teto não anda.
+ */
+export function criarTokenSessao(
+  sessao: SessaoUsuario,
+  agoraMs = Date.now(),
+  meta: { auth_em?: number; sv?: number } = {},
+): string {
   // A validade vai DENTRO do payload, assinada. O `maxAge` do cookie é só uma
   // dica ao navegador: um token copiado (log, captura de tela, máquina
   // compartilhada) continuaria valendo para sempre se a expiração morasse só lá.
-  const corpo: SessaoComExpiracao = { ...sessao, exp: Math.floor(agoraMs / 1000) + MAX_IDADE_S };
+  const iat = Math.floor(agoraMs / 1000);
+  const auth_em = meta.auth_em ?? iat;
+  // Só os campos da sessão: metadados velhos de um token anterior não vazam.
+  const { id, nome, email, perfil, sede_id, sedes } = sessao;
+  const corpo: SessaoComMeta = {
+    id, nome, email, perfil, sede_id, sedes,
+    iat,
+    auth_em,
+    sv: meta.sv ?? 0,
+    exp: Math.min(iat + INATIVIDADE_S, auth_em + TETO_S),
+  };
   const payload = Buffer.from(JSON.stringify(corpo), "utf8").toString("base64url");
   return `${payload}.${assinar(payload)}`;
 }
@@ -50,7 +96,7 @@ export function criarTokenSessao(sessao: SessaoUsuario, agoraMs = Date.now()): s
 export function verificarToken(
   token: string | undefined,
   agoraMs = Date.now(),
-): SessaoUsuario | null {
+): SessaoComMeta | null {
   if (!token) return null;
   const [payload, assinatura] = token.split(".");
   if (!payload || !assinatura) return null;
@@ -58,27 +104,50 @@ export function verificarToken(
   const a = Buffer.from(assinatura);
   const b = Buffer.from(esperada);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  let dados: SessaoComExpiracao;
+  let dados: SessaoComMeta;
   try {
-    dados = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as SessaoComExpiracao;
+    dados = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as SessaoComMeta;
   } catch {
     return null;
   }
-  // Sem `exp` = cookie emitido antes desta trava existir. Recusa: quem estiver
-  // com sessão aberta entra de novo uma vez, e ninguém fica com token eterno.
-  if (typeof dados.exp !== "number" || dados.exp * 1000 <= agoraMs) return null;
+  // Sem algum dos metadados = cookie de um formato anterior (o de 12 h não tem
+  // `iat`, `auth_em` nem `sv`). Recusa: quem estiver com sessão aberta entra de
+  // novo uma vez, e ninguém fica com token que pula a reconferência.
+  const agoraS = agoraMs / 1000;
+  if (
+    typeof dados.exp !== "number" ||
+    typeof dados.iat !== "number" ||
+    typeof dados.auth_em !== "number" ||
+    typeof dados.sv !== "number"
+  )
+    return null;
+  if (dados.exp <= agoraS) return null;
+  // O teto vale por si, mesmo com `exp` lá na frente.
+  if (dados.auth_em + TETO_S <= agoraS) return null;
+  // Emitido "no futuro" pularia a reconferência para sempre.
+  if (dados.iat > agoraS + FOLGA_RELOGIO_S) return null;
   return dados;
 }
 
 /** Lê e valida a sessão do cookie da requisição atual (rotas/server components). */
-export async function obterSessao(): Promise<SessaoUsuario | null> {
+export async function obterSessao(): Promise<SessaoComMeta | null> {
   const jar = await cookies();
   return verificarToken(jar.get(COOKIE_SESSAO)?.value);
 }
 
-export async function gravarSessao(sessao: SessaoUsuario): Promise<void> {
+/**
+ * Grava o cookie. Login: `{ sv }` do cadastro (o teto começa agora). Renovação:
+ * `{ auth_em, sv }` do token antigo.
+ */
+export async function gravarSessao(
+  sessao: SessaoUsuario,
+  meta: { auth_em?: number; sv?: number } = {},
+  agoraMs = Date.now(),
+): Promise<void> {
   const jar = await cookies();
-  jar.set(COOKIE_SESSAO, criarTokenSessao(sessao), {
+  const token = criarTokenSessao(sessao, agoraMs, meta);
+  const exp = verificarToken(token, agoraMs)?.exp ?? 0;
+  jar.set(COOKIE_SESSAO, token, {
     httpOnly: true,
     sameSite: "lax",
     // Em produção, sempre `secure` — o sistema está na Vercel, atrás de HTTPS, e
@@ -86,7 +155,7 @@ export async function gravarSessao(sessao: SessaoUsuario): Promise<void> {
     // (auditoria, 14/10/2026). `localhost` é contexto seguro para o navegador,
     // então `next start` local continua logando. Fora de produção, COOKIE_SECURE.
     secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "true",
-    maxAge: MAX_IDADE_S,
+    maxAge: Math.max(0, exp - Math.floor(agoraMs / 1000)),
     path: "/",
   });
 }

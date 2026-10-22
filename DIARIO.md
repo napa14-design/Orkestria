@@ -7,6 +7,63 @@
 
 ---
 
+## 2026-10-22 — Login de 7 dias, relendo o cadastro a cada hora
+
+Pergunta do dono: "o Orkestria não mantém conectado?". O login durava 12 h
+fixas a partir da entrada, mesmo usando. Agora (`lib/session.ts`, `lib/api.ts`):
+
+- **Teto de 7 dias desde o login** (decisão do dono) e 7 dias de inatividade —
+  como os dois são iguais, a renovação não estica o prazo: **é um login por
+  semana**, sem queda no meio do expediente. Renovar nunca reinicia o teto —
+  sem ele, um cookie copiado se renovaria para sempre.
+- **Reconferência a cada 1 h:** a primeira chamada depois de 1 h relê o
+  cadastro (`comSessao`). Desativado, apagado, perfil desconhecido, e-mail
+  trocado ou senha trocada em outro aparelho → 401 e cookie apagado. Perfil e
+  sedes vêm do banco: rebaixar alguém ou tirar uma sede extra vale em até 1 h
+  (antes, só no próximo login), já na requisição que renova.
+- **Banco fora na reconferência → 503**, sem apagar o cookie e sem rodar a
+  rota: seguir com o token velho tiraria a reconferência de todo mundo.
+- **`versao_sessao`** no cadastro (fim do schema; docs/02): sobe ao trocar a
+  senha e ao gerar código de primeiro acesso ("esqueci a senha" derruba a
+  sessão aberta, inclusive uma copiada). Primeiro acesso e "trocar a própria
+  senha" emitem o cookie já com a versão nova — e a troca regrava a partir do
+  CADASTRO relido, não do cookie: do contrário, quem foi desativado trocava a
+  senha a cada 50 min e ficava dentro até o teto (bloqueio da segurança, com
+  prova). Antes de qualquer escrita, a troca confere a `versao_sessao` do
+  cookie com a do cadastro: depois do "esqueci a senha" (senha zerada), um
+  cookie copiado ainda não reconferido definia senha sem saber a atual e ficava
+  com a conta, e o código entregue à dona deixava de valer (2º bloqueio da
+  segurança, com prova). Cadastro inativo não troca senha, e `trocarPropriaSenha`
+  recebe a versão do cookie e confere de novo na própria leitura (fecha o
+  intervalo entre a conferência da rota e a escrita).
+- Sessão sem `iat` (só existe em teste que simula a sessão) segue sem
+  reconferir; em produção, fecha com 401.
+- **`sessaoDoCadastro`** (`lib/permissions.ts`): uma regra só para "pode ter
+  sessão" — login, primeiro acesso, Google e renovação. `ativo === true`
+  estrito (conferido: os 13 usuários de produção têm booleano).
+- Token ganha `iat`, `auth_em` e `sv`; o formato de 12 h é recusado — **todo
+  mundo entra de novo uma vez** depois do deploy.
+
+Desenho revisto ANTES de codar pela segurança (7 ajustes obrigatórios, todos
+dentro). 35 testes de token, de renovação pelo `comSessao` de verdade e das
+portas de login (senha, primeiro acesso, Google, trocar senha)
+(`testes/sessao.test.ts`, `testes/sessao-renovacao.test.ts`,
+`testes/trocar-senha.test.ts`); 24 mutações nas travas. As duas provas de
+ataque da segurança (desativado adiando a reconferência; tomada de conta depois
+do "esqueci a senha") rodam contra esta versão e falham, como devem. **O deploy derruba todas as sessões abertas** (formato de token
+novo): avisar os usuários que vão entrar de novo uma vez.
+
+Riscos que ficam: server component (layout, início) só confere a assinatura
+— **regra: server component não lê dado de negócio só com `obterSessao`**;
+perfil e sede podem ficar até 1 h desatualizados; o logout limpa só o
+aparelho onde foi feito; trocar o `AUTH_SECRET` derruba todas as sessões.
+
+Arquivos: `lib/session.ts`, `lib/api.ts`, `lib/permissions.ts`,
+`services/usuariosService.ts`, `app/api/auth/{login,primeiro-acesso,google,senha}/route.ts`,
+`app/api/versao/route.ts`, `types/Usuario.ts`, `lib/schema.ts`, `docs/02-modelo-de-dados.md`.
+
+---
+
 ## 2026-10-22 — Visão semanal com totais e as fichas da semana num PDF só
 
 Pedido do dono: melhorar a visão semanal e imprimir as fichas da semana de uma

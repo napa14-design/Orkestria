@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { obterAppAdmin } from "@/lib/firebaseAdmin";
 import { emailDoTokenGoogle } from "@/lib/loginGoogle";
-import { montarSedesDaSessao, perfilConhecido } from "@/lib/permissions";
+import { sessaoDoCadastro } from "@/lib/permissions";
 import { gravarSessao } from "@/lib/session";
 import { getUsuarioPorEmail } from "@/services/usuariosService";
 
@@ -64,20 +64,14 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
-  if (!perfilConhecido(usuario.perfil)) {
+  // Mesma regra do login por senha (`sessaoDoCadastro`): perfil, ativo e as
+  // sedes extras — senão entrar pelo Google reduziria o acesso à principal.
+  const sessao = sessaoDoCadastro(usuario);
+  if (!sessao) {
     return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
   }
 
-  await gravarSessao({
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    perfil: usuario.perfil,
-    sede_id: usuario.sede_id,
-    // Mesmo escopo do login por senha: quem opera mais de uma sede precisa da
-    // lista aqui também, senão entrar pelo Google reduziria o acesso à principal.
-    sedes: montarSedesDaSessao(usuario.sede_id, usuario.sedes_extra),
-  });
+  await gravarSessao(sessao, { sv: usuario.versao_sessao ?? 0 });
   return NextResponse.json({ nome: usuario.nome, perfil: usuario.perfil, sede_id: usuario.sede_id });
 }
 

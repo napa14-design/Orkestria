@@ -9,7 +9,7 @@ import {
   verificarSenha,
 } from "@/lib/senha";
 import type { Usuario, UsuarioListado } from "@/types";
-import { ErroValidacao } from "./erros";
+import { ErroPermissao, ErroValidacao } from "./erros";
 
 /** O código de primeiro acesso está gerado e ainda dentro da validade? */
 export function conviteValido(u: Usuario, agora = new Date()): boolean {
@@ -50,18 +50,24 @@ export async function definirSenhaUsuario(
   id: string,
   novaSenha: string,
   codigoUsado?: string,
-): Promise<void> {
+): Promise<number> {
   const problema = problemaNaSenha(novaSenha, codigoUsado);
   if (problema) throw new Error(problema);
   const ds = await getDataSource();
   const usuario = await ds.obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
+  // Senha nova derruba as sessões abertas em outros aparelhos (na próxima
+  // reconferência). Quem chamou recebe a versão para emitir o próprio cookie
+  // já com ela — senão a sessão recém-criada nasceria velha.
+  const versao_sessao = (usuario.versao_sessao ?? 0) + 1;
   await ds.atualizar("usuarios", id, {
     senha_hash: hashSenha(novaSenha),
     convite_hash: "",
     convite_expira_em: "",
+    versao_sessao,
     atualizado_em: agoraISO(),
   });
+  return versao_sessao;
 }
 
 /**
@@ -70,13 +76,28 @@ export async function definirSenhaUsuario(
  * para trocar a senha dela e ficar com a conta (auditoria, 14/10/2026). Quem
  * ainda não tem senha (entrou só pelo Google) cria a primeira sem ela.
  */
-export async function trocarPropriaSenha(id: string, senhaAtual: string, novaSenha: string): Promise<void> {
+/**
+ * Devolve a versão de sessão nova, para a rota regravar o cookie de quem trocou.
+ * `versaoDaSessao` é a do cookie: se o cadastro já está em outra (o admin gerou
+ * código novo no meio do pedido), recusa — a rota confere antes, isto fecha o
+ * intervalo entre a conferência dela e esta leitura.
+ */
+export async function trocarPropriaSenha(
+  id: string,
+  senhaAtual: string,
+  novaSenha: string,
+  versaoDaSessao?: number,
+): Promise<number> {
   const ds = await getDataSource();
   const usuario = await ds.obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
+  // Cadastro desativado não troca senha (e com isso não regrava a sessão).
+  if (usuario.ativo !== true) throw new ErroPermissao("Seu acesso está desativado.");
+  if (versaoDaSessao !== undefined && (usuario.versao_sessao ?? 0) !== versaoDaSessao)
+    throw new ErroPermissao("Sua sessão terminou. Entre de novo.");
   if (usuario.senha_hash && !verificarSenha(senhaAtual, usuario.senha_hash))
     throw new Error("A senha atual não confere.");
-  await definirSenhaUsuario(id, novaSenha);
+  return definirSenhaUsuario(id, novaSenha);
 }
 
 /**
@@ -96,6 +117,9 @@ export async function gerarConviteUsuario(id: string): Promise<{ codigo: string;
     senha_hash: "",
     convite_hash: hashSenha(normalizarCodigo(codigo)),
     convite_expira_em: expira.toISOString(),
+    // "Esqueci a senha" também derruba a sessão que estiver aberta (inclusive
+    // uma copiada): sem isto, com a renovação ela viveria até o teto.
+    versao_sessao: (usuario.versao_sessao ?? 0) + 1,
     atualizado_em: agoraISO(),
   });
   return { codigo, expira_em: expira.toISOString() };

@@ -84,6 +84,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("convite_expira_em"),
     col("tutorial_concluido"),
     col("tutorial_estado"),
+    col("versao_sessao", "number"),
   ],
   funcionarios: [
     col("id"),

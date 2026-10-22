@@ -103,6 +103,32 @@ export function montarSedesDaSessao(sedeId: string, sedesExtra?: string): string
 }
 
 /**
+ * A ÚNICA regra de "este cadastro pode ter sessão" — login, primeiro acesso,
+ * Google e a renovação passam por aqui. Monta a sessão só a partir do banco.
+ * `ativo === true` estrito: a string "false" é verdadeira num teste frouxo
+ * (revisão de segurança, 22/10/2026).
+ */
+export function sessaoDoCadastro(u: {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: unknown;
+  sede_id: string;
+  sedes_extra?: string;
+  ativo: unknown;
+}): SessaoUsuario | null {
+  if (u.ativo !== true || !perfilConhecido(u.perfil)) return null;
+  return {
+    id: u.id,
+    nome: u.nome,
+    email: u.email,
+    perfil: u.perfil,
+    sede_id: u.sede_id,
+    sedes: montarSedesDaSessao(u.sede_id, u.sedes_extra),
+  };
+}
+
+/**
  * Sedes que a sessão alcança. `null` = sem restrição (todas).
  *
  * Nunca devolve lista vazia para quem tem escopo: sem `sedes` no cookie, cai

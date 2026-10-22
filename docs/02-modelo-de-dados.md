@@ -33,6 +33,7 @@ parametros (sede_id|geral)   │ ├──< funcionarios (sede_id)
 | ativo | boolean | |
 | criado_em, atualizado_em | ISO 8601 | |
 | sedes_extra | string | sedes **adicionais** que o coordenador/supervisor opera: ids separadas por vírgula. Vazio = opera só a principal |
+| versao_sessao | number | sobe ao trocar a senha ou gerar código de primeiro acesso; sessão com versão diferente cai na próxima reconferência. Ausente = 0 |
 
 **Escopo de sede do coordenador e do supervisor.** Um coordenador pode cobrir
 mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
@@ -44,9 +45,9 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 - As telas mostram **uma sede por vez** (seletor na Central e filtro na
   Agenda). Isso é deliberado: mantém cada consulta em um único `where` do
   Firestore, sem multiplicar leituras por sede.
-- O escopo entra na sessão no **login** (`montarSedesDaSessao`). Cookie emitido
-  antes deste campo existir cai em `[sede_id]` — ou seja, muda de escopo só ao
-  relogar, e falha fechando.
+- O escopo entra na sessão no **login** (`sessaoDoCadastro`) e é relido do
+  cadastro a cada **1 h** de uso (renovação da sessão, `lib/api.ts`): mudar
+  `sedes_extra`, perfil ou `ativo` vale em até 1 h.
 
 ### funcionarios
 | Campo | Tipo | Observação |

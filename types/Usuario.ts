@@ -42,6 +42,12 @@ export interface Usuario {
    * Ver `lib/tutorial/estado.ts`.
    */
   tutorial_estado?: string;
+  /**
+   * Versão das sessões desta pessoa. Trocar a senha ou gerar código novo a
+   * incrementa, e o cookie de qualquer outro aparelho cai na próxima
+   * reconferência (até 1 h). Ausente = 0.
+   */
+  versao_sessao?: number;
   ativo: boolean;
   criado_em: string;
   atualizado_em: string;

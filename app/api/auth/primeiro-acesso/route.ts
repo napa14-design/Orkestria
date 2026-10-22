@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { montarSedesDaSessao, perfilConhecido } from "@/lib/permissions";
+import { sessaoDoCadastro } from "@/lib/permissions";
 import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import {
@@ -60,19 +60,15 @@ export async function POST(req: Request) {
 
   const problema = problemaNaSenha(nova_senha, senha_atual);
   if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
-  if (!perfilConhecido(usuario.perfil)) {
+  const sessao = sessaoDoCadastro(usuario);
+  if (!sessao) {
     return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
   }
 
   // `definirSenhaUsuario` apaga o código junto, então ele não serve duas vezes.
-  await definirSenhaUsuario(usuario.id, nova_senha, senha_atual);
-  await gravarSessao({
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    perfil: usuario.perfil,
-    sede_id: usuario.sede_id,
-    sedes: montarSedesDaSessao(usuario.sede_id, usuario.sedes_extra),
-  });
+  // Ele também sobe a versão de sessão: o cookie sai com a NOVA, senão a sessão
+  // recém-criada cairia na primeira reconferência.
+  const sv = await definirSenhaUsuario(usuario.id, nova_senha, senha_atual);
+  await gravarSessao(sessao, { sv });
   return NextResponse.json({ nome: usuario.nome, perfil: usuario.perfil });
 }
