@@ -308,20 +308,20 @@ export const TRILHA: EtapaTutorial[] = [
       {
         titulo: "Sábado e segunda podem ter rota própria",
         texto:
-          "Se a segunda tem um serviço que os outros dias não têm, monte essa segunda e salve como OUTRA rota, marcando só o dia dela. As rotas se somam: a de todo dia entra sempre, e a da segunda entra por cima na segunda.",
+          "Se o sábado (ou a segunda) é diferente, monte esse dia como ele deve ser e use \"★ Usar este dia como padrão\" marcando só ele. A partir daí ele monta só aquele dia da semana; os outros continuam com a rota de antes.",
         avancarEm: "leitura",
       },
       {
         titulo: "E quando a rotina mudar?",
         texto:
-          "Monte o dia novo do jeito certo e ensine de novo — a rota da sede passa a ser essa. Não existe \"editar a rota\": o que vale é sempre o último dia ensinado.",
+          "Monte o dia novo do jeito certo e use \"★ Usar este dia como padrão\" nos dias em que ele vale — ele substitui a rota desses dias. Não existe \"editar a rota\": o que vale é sempre o último dia usado como padrão.",
         avancarEm: "leitura",
       },
       {
         alvo: "duplicar-modelos",
         titulo: "E os dias fora do comum?",
         texto:
-          "Formatura, feira, prova. Monte o dia do evento uma vez, abra aqui, vá em \"Rotas salvas\" e salve marcando que é um modelo de evento. No próximo, você aplica na véspera e o dia já amanhece programado.",
+          "Formatura, feira, prova. Monte o dia do evento uma vez, abra aqui, escolha \"Evento\" e guarde com um nome. No próximo, você escolhe a data e aplica na véspera — o dia já amanhece programado.",
         avancarEm: "leitura",
       },
     ],
@@ -377,16 +377,17 @@ export const TRILHA: EtapaTutorial[] = [
         avancarEm: "leitura",
       },
       {
-        alvo: "duplicar-modelos",
+        // Sem alvo: o botão da semana só aparece na visão Semana, e este passo
+        // roda na visão Dia (o anterior aponta para o "Gerar o dia").
         titulo: "E a semana inteira de uma vez",
         texto:
-          "Em \"Preencher dias\" você joga este dia (ou uma rota salva) para um período inteiro: escolhe de quando até quando, marca os dias da semana e o botão diz exatamente para onde vai. Sem período, ele copia para o próximo dia marcado.",
+          "Na visão Semana, \"⚡ Gerar a semana da rota padrão\" monta todos os dias de uma vez — cada um com a rota do seu dia da semana, pulando feriado e o dia que já tem tarefa.",
         avancarEm: "leitura",
       },
       {
         titulo: "O ciclo, em uma frase",
         texto:
-          "Monta um dia normal uma vez → ensina a rota → todos os outros dias saem em um clique. Se a rotina mudar, monte o dia novo do jeito certo e ensine de novo: a rota da sede passa a ser essa.",
+          "Monta um dia normal uma vez → ensina a rota → todos os outros dias saem em um clique. Se a rotina mudar, monte o dia novo do jeito certo e use \"★ Usar este dia como padrão\" nos dias em que ele vale: a rota desses dias passa a ser essa.",
         avancarEm: "leitura",
       },
     ],

@@ -30,7 +30,7 @@ export default function FiltersBar({
   aoMudarModo: (v: "dia" | "semana") => void;
   aoMudarBusca: (v: string) => void;
   aoPlanejarPeriodo: () => void;
-  /** Supervisor: a agenda é só leitura — sem "Preencher dias". */
+  /** Supervisor: a agenda é só leitura — sem "Usar este dia como padrão". */
   somenteLeitura?: boolean;
 }) {
   return (
@@ -118,16 +118,15 @@ export default function FiltersBar({
       </label>
 
       {/* Vale nos dois modos: quem monta um evento monta no DIA e precisa salvar
-          a rota ali mesmo — exigir trocar para a semana escondia o caminho.
-          O rótulo é o verbo, não o mecanismo: a pessoa quer encher os dias. */}
+          ali mesmo — exigir trocar para a semana escondia o caminho. */}
       {!somenteLeitura && (
         <button
           className="btn"
           data-tour="duplicar-modelos"
           onClick={aoPlanejarPeriodo}
-          title="Copiar este dia (ou uma rota salva) para um período; e a biblioteca de rotas salvas"
+          title="Este dia vira a rota padrão dos dias da semana que você marcar, ou um evento guardado"
         >
-          ⧉ Preencher dias
+          ★ Usar este dia como padrão
         </button>
       )}
     </div>

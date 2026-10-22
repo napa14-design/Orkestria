@@ -1,37 +1,24 @@
 "use client";
 
 /**
- * Planejamento em lote, em DUAS telas — uma por vez.
+ * "Usar este dia como padrão" — o dia montado na tela vira modelo, de dois jeitos:
  *
- * Antes era uma caixa só, "Duplicar dia e modelos de rotina", com três passos
- * numerados. O "e" do título era a confissão: o "1 · Período de destino" valia
- * para duplicar e para aplicar, mas **não** para salvar (que sempre salva o dia
- * atual); salvar e aplicar são operações inversas e dividiam a mesma seção; e o
- * ✕ de excluir ficava pendurado no seletor do aplicar. Relato de 31/08: *"acho
- * muito confuso"*.
+ *  · **Rota padrão** — marca os dias da semana e este dia passa a ser a rota
+ *    padrão deles, SUBSTITUINDO a anterior. Sem "acrescenta × substitui": cada
+ *    dia da semana tem uma rota só.
+ *  · **Evento** — guarda o dia com nome (formatura, feira…) e aplica depois,
+ *    numa data, por cima da rota padrão.
  *
- * A divisão é por intenção, e nasce de uma percepção: **duplicar o dia e aplicar
- * um modelo são a MESMA operação com origens diferentes** — copiar tarefas para
- * um período. Então:
- *
- *  · **Preencher dias** — de onde (este dia | uma rota salva) → para quando → um
- *    botão. É o uso frequente.
- *  · **Rotas salvas** — a biblioteca: salvar este dia com nome, marcar se é a
- *    rota padrão da sede (e em que dias vale) ou um evento, e apagar. Aqui não
- *    existe período, porque período não se aplica a guardar.
- *
- * Uma tela por vez, com link entre elas: a barra continua com um botão só.
+ * Era "Preencher dias" (copiar o dia para um período) com a biblioteca de rotas
+ * numa segunda tela. Pedido do dono em 21/10/2026: *"temos que deixar mais fácil
+ * a rota padrão"*. A cópia saiu: com o dia virando padrão, o "⚡ Gerar" já monta
+ * os outros dias.
  */
 import { useState } from "react";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { apiDelete, apiPost, ErroApi, fetcher } from "@/lib/clientApi";
-import {
-  formatarDataBR,
-  proximoDiaMarcado,
-  rotularDiasSemana,
-  serializarDiasSemana,
-} from "@/lib/dateUtils";
+import { formatarDataBR, parseDiasSemana, rotularDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import type { ResumoModelo, ResultadoAplicacao } from "@/services/modelosService";
 
 const DIAS_SEMANA = [
@@ -43,115 +30,54 @@ const DIAS_SEMANA = [
   { idx: 6, rotulo: "Sáb" },
   { idx: 0, rotulo: "Dom" },
 ];
+const TODOS = [0, 1, 2, 3, 4, 5, 6];
 
-/** Valor da origem que significa "as tarefas que já estão na tela". */
-const ORIGEM_DIA = "__dia__";
-
-/** ISO do dia, no fuso local (meio-dia evita a virada por UTC). */
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Dias já marcados ao abrir: dia útil → Seg–Sex; fim de semana → só ele. */
+function diasIniciais(data: string): Set<number> {
+  const dow = new Date(`${data}T12:00:00`).getDay();
+  return new Set(dow >= 1 && dow <= 5 ? [1, 2, 3, 4, 5] : [dow]);
 }
 
-/** Lista de datas YYYY-MM-DD entre de/até, filtrada pelos dias da semana. */
-function datasDoPeriodo(de: string, ate: string, diasAtivos: Set<number>): string[] {
-  if (!de || !ate || de > ate) return [];
-  const datas: string[] = [];
-  const cursor = new Date(`${de}T12:00:00`);
-  const fim = new Date(`${ate}T12:00:00`);
-  while (cursor <= fim && datas.length < 62) {
-    if (diasAtivos.has(cursor.getDay())) datas.push(iso(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return datas;
+/** O que acontece com uma rota padrão que já existe, se estes dias forem trocados. */
+function efeitoNaRota(rota: ResumoModelo, marcados: Set<number>): string {
+  const valia = parseDiasSemana(rota.dias_semana);
+  const dias = valia.length ? valia : TODOS;
+  const restam = dias.filter((d) => !marcados.has(d));
+  if (restam.length === dias.length) return "continua igual";
+  if (restam.length === 0) return "sai";
+  return `fica só em ${rotularDiasSemana(serializarDiasSemana(restam))}`;
 }
 
-function SeletorPeriodo({
-  de,
-  ate,
-  dias,
-  aoMudar,
-}: {
-  de: string;
-  ate: string;
-  dias: Set<number>;
-  aoMudar: (de: string, ate: string, dias: Set<number>) => void;
-}) {
-  return (
-    <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <label className="campo">
-          <span className="rotulo">De</span>
-          <input type="date" value={de} onChange={(e) => aoMudar(e.target.value, ate, dias)} />
-        </label>
-        <label className="campo">
-          <span className="rotulo">Até</span>
-          <input type="date" value={ate} onChange={(e) => aoMudar(de, e.target.value, dias)} />
-        </label>
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {DIAS_SEMANA.map((d) => {
-          const ativo = dias.has(d.idx);
-          return (
-            <button
-              key={d.idx}
-              type="button"
-              className="btn btn-mini"
-              style={{
-                background: ativo ? "var(--tinta)" : "var(--cartao)",
-                color: ativo ? "var(--papel)" : "var(--tinta)",
-              }}
-              onClick={() => {
-                const novo = new Set(dias);
-                if (ativo) novo.delete(d.idx);
-                else novo.add(d.idx);
-                aoMudar(de, ate, novo);
-              }}
-            >
-              {d.rotulo}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Uma linha da biblioteca: o que é a rota e o ✕ que apaga ELA. */
-function LinhaRota({
+/** Um evento (ou rota antiga guardada): aplicar numa data, ou apagar. */
+function LinhaEvento({
   modelo,
+  dataAtual,
   confirmando,
   ocupado,
+  aoAplicar,
   aoExcluir,
 }: {
   modelo: ResumoModelo;
+  dataAtual: string;
   confirmando: boolean;
   ocupado: boolean;
+  aoAplicar: (data: string) => void;
   aoExcluir: () => void;
 }) {
-  const marcas = [
-    modelo.padrao ? "★ rota padrão" : "",
-    modelo.evento ? "evento" : "",
-    modelo.dias_semana ? rotularDiasSemana(modelo.dias_semana) : modelo.padrao ? "todo dia" : "",
-    modelo.substitui ? "substitui o dia" : "",
-    modelo.inicio ? `${modelo.inicio}–${modelo.fim}` : "",
-  ].filter(Boolean);
+  const [data, setData] = useState(dataAtual);
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "6px 0",
-        borderTop: "1px solid var(--linha)",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--linha)", flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 140 }}>
         <div style={{ fontSize: 13, color: "var(--tinta)" }}>{modelo.nome_modelo}</div>
         <div style={{ fontSize: 11, color: "var(--tinta-3)" }}>
           {modelo.itens} tarefa{modelo.itens === 1 ? "" : "s"}
-          {marcas.length > 0 && ` · ${marcas.join(" · ")}`}
+          {modelo.inicio ? ` · ${modelo.inicio}–${modelo.fim}` : ""}
         </div>
       </div>
+      <input type="date" value={data} onChange={(e) => setData(e.target.value)} aria-label={`Data para aplicar ${modelo.nome_modelo}`} />
+      <button className="btn btn-mini" onClick={() => aoAplicar(data)} disabled={ocupado || !data}>
+        Aplicar
+      </button>
       <button
         className="btn btn-fantasma btn-mini"
         style={{ color: "var(--vermelho)" }}
@@ -183,59 +109,45 @@ export default function ModalPlanejamento({
     fetcher,
   );
 
-  const [tela, setTela] = useState<"preencher" | "salvas">("preencher");
-  const [origem, setOrigem] = useState(ORIGEM_DIA);
-  const [de, setDe] = useState("");
-  const [ate, setAte] = useState("");
-  const [dias, setDias] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
-  const [nomeNovoModelo, setNomeNovoModelo] = useState("");
-  const [padraoNovo, setPadraoNovo] = useState(false);
-  /** Dias em que a rota padrão sendo salva vale. Vazio = todo dia. */
-  const [diasPadrao, setDiasPadrao] = useState<Set<number>>(new Set());
-  /**
-   * Como a camada entra no dia. Começa **vazio de propósito**: escolher dias sem
-   * dizer a intenção era o caminho para duplicar o dia em silêncio.
-   */
-  const [modoCamada, setModoCamada] = useState<"" | "acrescenta" | "substitui">("");
-  const [eventoNovo, setEventoNovo] = useState(false);
-  /** Nome da rota aguardando o segundo clique do excluir (dois toques). */
+  const [modo, setModo] = useState<"padrao" | "evento">("padrao");
+  const [dias, setDias] = useState<Set<number>>(() => diasIniciais(dataAtual));
+  const [diasDoDia, setDiasDoDia] = useState(dataAtual);
+  const [nomeEvento, setNomeEvento] = useState("");
+  /** Nome aguardando o segundo clique do excluir (dois toques). */
   const [confirmandoExclusao, setConfirmandoExclusao] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
-  const rotas = (modelos ?? []).filter((m) => !m.evento);
-  const eventos = (modelos ?? []).filter((m) => m.evento);
+  // Trocou de dia com o modal montado: os dias marcados acompanham o dia novo.
+  if (diasDoDia !== dataAtual) {
+    setDiasDoDia(dataAtual);
+    setDias(diasIniciais(dataAtual));
+  }
 
-  const copiandoODia = origem === ORIGEM_DIA;
-  /**
-   * O período é **opcional**. Preencher só uma das duas datas vale por um dia
-   * só; não preencher nenhuma tem um destino padrão, e o botão sempre diz qual
-   * é — copiar o dia vai para o próximo dia marcado, aplicar uma rota entra no
-   * dia que está na tela (o comportamento de sempre).
-   */
-  const periodoInformado = Boolean(de || ate);
-  const datas = periodoInformado ? datasDoPeriodo(de || ate, ate || de, dias) : [];
-  const destinoPadrao = copiandoODia ? proximoDiaMarcado(dataAtual, dias) : dataAtual;
-  // O destino padrão vale SÓ para quem não informou período. Quem informou um
-  // período que não rende data nenhuma fica sem destino de propósito: cair no
-  // padrão aqui mandaria o dia para uma data que a pessoa não pediu, e o botão
-  // diria isso em letra pequena enquanto o aviso vermelho dizia o contrário.
-  const alvos = periodoInformado ? datas : destinoPadrao ? [destinoPadrao] : [];
+  const rotasPadrao = (modelos ?? []).filter((m) => m.padrao && !m.evento);
+  // Rotas antigas guardadas sem ser padrão continuam aplicáveis, junto dos
+  // eventos (e o dado antigo marcado padrão E evento, que o Gerar ignora).
+  const guardados = (modelos ?? []).filter((m) => m.evento || !m.padrao);
+  const diasCsv = serializarDiasSemana([...dias]);
 
+  // O modal fica montado entre aberturas: fechar volta ao começo, senão o
+  // "Evento" e o nome digitado reapareciam na próxima vez (auditoria).
   function fechar() {
     setErro("");
     setConfirmandoExclusao("");
-    setTela("preencher");
+    setModo("padrao");
+    setNomeEvento("");
+    setDias(diasIniciais(dataAtual));
     aoFechar();
   }
 
-  async function executar(fn: () => Promise<string>) {
+  async function executar(fn: () => Promise<string>, fecharDepois = true) {
     setErro("");
     setOcupado(true);
     try {
       const mensagem = await fn();
       aoConcluir(mensagem);
-      fechar();
+      if (fecharDepois) fechar();
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Erro inesperado.");
     } finally {
@@ -243,76 +155,47 @@ export default function ModalPlanejamento({
     }
   }
 
-  /**
-   * Um botão, dois caminhos: copiar o dia da tela ou aplicar uma rota salva.
-   * Para quem usa é a mesma frase — "põe estas tarefas nestes dias".
-   */
-  function preencher() {
-    if (alvos.length === 0) {
-      setErro("Marque ao menos um dia da semana, ou escolha um período.");
-      return;
-    }
-    if (copiandoODia) {
-      executar(async () => {
-        const r = await apiPost<{ copiadas: number; puladas: number }>("/api/rotinas/duplicar", {
-          data_origem: dataAtual,
-          datas_destino: alvos,
-          sede_id: sedeId,
-        });
-        return `${r.copiadas} tarefa(s) copiada(s)${r.puladas > 0 ? `, ${r.puladas} pulada(s) por conflito` : ""}.`;
-      });
+  function salvarPadrao() {
+    if (dias.size === 0) {
+      setErro("Marque ao menos um dia da semana.");
       return;
     }
     executar(async () => {
-      const r = await apiPost<ResultadoAplicacao>("/api/modelos/aplicar", {
-        nome: origem,
-        sede_id: sedeId,
-        datas: alvos,
-      });
-      const extra = r.detalhes.length > 0 ? ` Ex.: ${r.detalhes[0]}` : "";
-      return `Rota aplicada: ${r.criadas} criada(s), ${r.puladas} pulada(s) por conflito.${extra}`;
-    });
-  }
-
-  function salvarRota() {
-    if (padraoNovo && diasPadrao.size > 0 && !modoCamada) {
-      setErro("Diga se esta rota acrescenta ao dia ou substitui o dia nesses dias.");
-      return;
-    }
-    executar(async () => {
-      const r = await apiPost<{ itens: number }>("/api/modelos", {
-        nome: nomeNovoModelo,
+      const r = await apiPost<{ itens: number; encolhidas: string[]; removidas: string[] }>("/api/modelos/padrao", {
         data_origem: dataAtual,
         sede_id: sedeId,
-        padrao: padraoNovo,
-        com_duracao: true,
-        evento: eventoNovo,
-        dias_semana: padraoNovo ? serializarDiasSemana([...diasPadrao]) : "",
-        substitui: padraoNovo && modoCamada === "substitui",
+        dias: [...dias],
       });
       await mutateModelos();
-      const nome = nomeNovoModelo;
-      const eraEvento = eventoNovo;
-      const diasSalvos = padraoNovo ? serializarDiasSemana([...diasPadrao]) : "";
-      // Zera os flags: o modal fica montado, e um "padrão" esquecido faria a
-      // PRÓXIMA rota salva roubar a rota padrão da sede sem ninguém notar.
-      setNomeNovoModelo("");
-      setPadraoNovo(false);
-      setEventoNovo(false);
-      setDiasPadrao(new Set());
-      const modoSalvo = modoCamada;
-      setModoCamada("");
-      return `Rota "${nome}" salva com ${r.itens} tarefa(s)${
-        padraoNovo
-          ? ` (rota padrão da sede${diasSalvos ? `, ${rotularDiasSemana(diasSalvos)}${modoSalvo === "substitui" ? ", substituindo o dia" : ""}` : ", todo dia"})`
-          : eraEvento
-            ? " (modelo de evento)"
-            : ""
-      }.`;
+      return `${formatarDataBR(dataAtual)} agora é a rota padrão de ${rotularDiasSemana(diasCsv)} (${r.itens} tarefa${r.itens === 1 ? "" : "s"}). Os próximos dias gerados seguem essa rota.`;
     });
   }
 
-  async function excluirRota(nome: string) {
+  function guardarEvento() {
+    executar(async () => {
+      const r = await apiPost<{ itens: number }>("/api/modelos", {
+        nome: nomeEvento,
+        data_origem: dataAtual,
+        sede_id: sedeId,
+        evento: true,
+        com_duracao: true,
+      });
+      await mutateModelos();
+      const nome = nomeEvento.trim();
+      setNomeEvento("");
+      return `Evento "${nome}" guardado com ${r.itens} tarefa(s). Aplique na data dele, aqui mesmo.`;
+    }, false);
+  }
+
+  function aplicar(nome: string, data: string) {
+    executar(async () => {
+      const r = await apiPost<ResultadoAplicacao>("/api/modelos/aplicar", { nome, sede_id: sedeId, datas: [data] });
+      const extra = r.detalhes.length > 0 ? ` Ex.: ${r.detalhes[0]}` : "";
+      return `"${nome}" aplicado em ${formatarDataBR(data)}: ${r.criadas} criada(s), ${r.puladas} pulada(s) por conflito de horário.${extra}`;
+    });
+  }
+
+  async function excluir(nome: string) {
     // Sem `window.confirm`: marcado o "não mostrar mensagens assim novamente"
     // do navegador, ele passa a devolver false e a exclusão morre em silêncio.
     if (confirmandoExclusao !== nome) {
@@ -323,261 +206,156 @@ export default function ModalPlanejamento({
     executar(async () => {
       await apiDelete(`/api/modelos?nome=${encodeURIComponent(nome)}&sede=${sedeId}`);
       await mutateModelos();
-      if (origem === nome) setOrigem(ORIGEM_DIA);
-      return "Rota excluída.";
-    });
+      return `"${nome}" excluído.`;
+    }, false);
   }
 
-  // O botão nomeia o destino: uma data quando é uma só, a contagem quando são
-  // várias. Assim ninguém clica sem saber onde as tarefas vão cair.
-  const rotuloDestino =
-    alvos.length === 0
-      ? "…"
-      : alvos.length === 1
-        ? formatarDataBR(alvos[0])
-        : `${alvos.length} dias`;
-  const rotuloBotao = copiandoODia ? `⧉ Copiar para ${rotuloDestino}` : `Aplicar em ${rotuloDestino}`;
+  const opcao = (valor: "padrao" | "evento", titulo: string, texto: string) => (
+    <label
+      style={{
+        flex: 1,
+        display: "flex",
+        gap: 8,
+        padding: "10px 12px",
+        border: `2px solid ${modo === valor ? "var(--tinta)" : "var(--linha)"}`,
+        background: modo === valor ? "var(--cartao)" : "transparent",
+        cursor: "pointer",
+      }}
+    >
+      <input type="radio" name="modo-padrao" checked={modo === valor} onChange={() => setModo(valor)} />
+      <span>
+        <strong style={{ display: "block", fontSize: 14 }}>{titulo}</strong>
+        <span style={{ fontSize: 12, color: "var(--tinta-2)" }}>{texto}</span>
+      </span>
+    </label>
+  );
 
   return (
-    <Modal
-      titulo={tela === "preencher" ? "Preencher dias" : "Rotas salvas"}
-      aberto={aberto}
-      aoFechar={fechar}
-      larguraMax={560}
-    >
-      {tela === "preencher" ? (
-        <div style={{ display: "grid", gap: 18 }}>
-          <section style={{ display: "grid", gap: 6 }}>
-            <label className="campo">
-              <span className="rotulo">De onde vêm as tarefas</span>
-              <select value={origem} onChange={(e) => setOrigem(e.target.value)}>
-                <option value={ORIGEM_DIA}>Deste dia ({formatarDataBR(dataAtual)})</option>
-                {rotas.length > 0 && (
-                  <optgroup label="Rotas salvas">
-                    {rotas.map((m) => (
-                      <option key={m.nome_modelo} value={m.nome_modelo}>
-                        {m.padrao ? "★ " : ""}
-                        {m.nome_modelo} ({m.itens} tarefas)
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {eventos.length > 0 && (
-                  <optgroup label="Eventos">
-                    {eventos.map((m) => (
-                      <option key={m.nome_modelo} value={m.nome_modelo}>
-                        {m.nome_modelo} ({m.itens} tarefas)
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </label>
+    <Modal titulo={`Usar ${formatarDataBR(dataAtual)} como padrão`} aberto={aberto} aoFechar={fechar} larguraMax={560}>
+      <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {opcao("padrao", "Rota padrão", "Este dia monta os dias da semana que você marcar.")}
+          {opcao("evento", "Evento", "Guarda o dia com nome, para aplicar numa data.")}
+        </div>
+
+        {modo === "padrao" ? (
+          <section style={{ display: "grid", gap: 10 }}>
+            <span className="rotulo">Vale em</span>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {DIAS_SEMANA.map((d) => {
+                const marcado = dias.has(d.idx);
+                return (
+                  <button
+                    key={d.idx}
+                    type="button"
+                    className={`btn btn-mini ${marcado ? "btn-primario" : ""}`}
+                    aria-pressed={marcado}
+                    onClick={() => {
+                      const novo = new Set(dias);
+                      if (marcado) novo.delete(d.idx);
+                      else novo.add(d.idx);
+                      setDias(novo);
+                    }}
+                  >
+                    {d.rotulo}
+                  </button>
+                );
+              })}
+            </div>
             <p style={{ fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
-              {copiandoODia
-                ? "Copia as tarefas que estão na tela hoje. Conflito de horário no destino é pulado."
-                : "Aplica as tarefas guardadas nesta rota. Conflito de horário no destino é pulado."}
+              {dias.size === 0
+                ? "Marque ao menos um dia."
+                : `Substitui a rota padrão de ${rotularDiasSemana(diasCsv)}. Os próximos dias gerados nesses dias seguem este.`}
             </p>
-          </section>
-
-          <section style={{ borderTop: "1px solid var(--linha)", paddingTop: 14, display: "grid", gap: 8 }}>
-            <span className="rotulo">
-              Para quais dias{" "}
-              <span style={{ fontWeight: 400 }}>
-                {periodoInformado
-                  ? `(${datas.length} data${datas.length === 1 ? "" : "s"})`
-                  : "(opcional)"}
-              </span>
-            </span>
-            <SeletorPeriodo
-              de={de}
-              ate={ate}
-              dias={dias}
-              aoMudar={(d, a, ds) => {
-                setDe(d);
-                setAte(a);
-                setDias(ds);
-              }}
-            />
-            {/* Nunca ficar em silêncio: ou explica o destino padrão, ou diz por
-                que não há destino nenhum. */}
-            {periodoInformado && datas.length === 0 ? (
-              <p style={{ fontSize: 11, color: "var(--vermelho)", margin: 0 }}>
-                Nenhuma data no período: os dias da semana marcados não caem entre essas datas.
-              </p>
-            ) : !periodoInformado ? (
-              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
-                {alvos.length === 0
-                  ? "Marque ao menos um dia da semana."
-                  : copiandoODia
-                    ? `Sem período, copia para o próximo dia marcado: ${formatarDataBR(alvos[0])}.`
-                    : `Sem período, a rota entra só em ${formatarDataBR(alvos[0])}.`}
-              </p>
-            ) : null}
-          </section>
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <button className="btn btn-fantasma" type="button" onClick={() => setTela("salvas")}>
-              Rotas salvas →
-            </button>
+            {rotasPadrao.length > 0 && (
+              <div style={{ fontSize: 12, color: "var(--tinta-2)", borderTop: "1px solid var(--linha)", paddingTop: 8 }}>
+                <span className="rotulo">Rota padrão de hoje</span>
+                {rotasPadrao.map((m) => {
+                  const efeito = dias.size > 0 ? efeitoNaRota(m, dias) : "";
+                  return (
+                    <div key={m.nome_modelo} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
+                      {/* Os dias, não o nome: "Rota padrão" salva à mão pode ter
+                          encolhido, e o nome não diz mais em que dias vale. */}
+                      <span style={{ flex: 1 }}>
+                        {m.dias_semana ? rotularDiasSemana(m.dias_semana) : "todo dia"} · {m.itens} tarefa
+                        {m.itens === 1 ? "" : "s"}
+                      </span>
+                      {efeito && (
+                        <span style={{ color: efeito === "continua igual" ? "var(--tinta-3)" : "var(--acento)" }}>{efeito}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-fantasma btn-mini"
+                        style={{ color: "var(--vermelho)" }}
+                        onClick={() => excluir(m.nome_modelo)}
+                        disabled={ocupado}
+                        title={confirmandoExclusao === m.nome_modelo ? "Clique de novo para confirmar" : "Apagar esta rota padrão"}
+                      >
+                        {confirmandoExclusao === m.nome_modelo ? "Confirmar" : "✕"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
+              Dias que já foram gerados não mudam sozinhos. Para refazer um, abra o dia, use “↺ Desfazer a geração” e
+              gere de novo.
+            </p>
             <button
               className="btn btn-primario"
-              onClick={preencher}
-              disabled={ocupado || alvos.length === 0}
+              style={{ justifySelf: "end" }}
+              onClick={salvarPadrao}
+              disabled={ocupado || dias.size === 0}
             >
-              {rotuloBotao}
+              {ocupado ? "Salvando…" : "★ Salvar como padrão"}
             </button>
-          </div>
-
-          {erro && <div className="alerta alerta-erro">{erro}</div>}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 18 }}>
-          <section>
-            <span className="rotulo">Guardadas nesta sede</span>
-            {(modelos ?? []).length === 0 ? (
-              <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 6 }}>
-                Nenhuma rota salva ainda. Monte um dia como ele deve ser e salve abaixo.
-              </p>
-            ) : (
-              <div style={{ marginTop: 6 }}>
-                {[...rotas, ...eventos].map((m) => (
-                  <LinhaRota
-                    key={m.nome_modelo}
-                    modelo={m}
-                    ocupado={ocupado}
-                    confirmando={confirmandoExclusao === m.nome_modelo}
-                    aoExcluir={() => excluirRota(m.nome_modelo)}
-                  />
-                ))}
-              </div>
-            )}
           </section>
-
-          <section style={{ borderTop: "1px solid var(--linha)", paddingTop: 14, display: "grid", gap: 10 }}>
+        ) : (
+          <section style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
               <label className="campo" style={{ flex: 1 }}>
-                <span className="rotulo">Salvar {formatarDataBR(dataAtual)} como rota</span>
+                <span className="rotulo">Nome do evento</span>
                 <input
-                  placeholder='Ex.: "Padrão segunda a sexta"'
-                  value={nomeNovoModelo}
-                  onChange={(e) => setNomeNovoModelo(e.target.value)}
+                  placeholder='Ex.: "Formatura", "Feira de ciências"'
+                  value={nomeEvento}
+                  onChange={(e) => setNomeEvento(e.target.value)}
                 />
               </label>
-              <button className="btn" onClick={salvarRota} disabled={ocupado || !nomeNovoModelo.trim()}>
-                Salvar
+              <button className="btn btn-primario" onClick={guardarEvento} disabled={ocupado || !nomeEvento.trim()}>
+                Guardar evento
               </button>
             </div>
-            {/* Rota padrão e evento se excluem: a rota padrão alimenta o "Gerar o
-                dia"; o evento é aplicado sob demanda, na véspera. */}
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
-              <input
-                type="checkbox"
-                checked={padraoNovo}
-                disabled={eventoNovo}
-                onChange={(e) => setPadraoNovo(e.target.checked)}
-              />
-              Marcar como <strong>rota padrão</strong> da sede (usada no "Gerar o dia")
-            </label>
-            {/* A rota padrão da sede é a UNIÃO das camadas marcadas como padrão. Dá
-                para ter a de todo dia + a de segunda + a de sábado, e o "Gerar o
-                dia" monta o que vale na data. Nenhum dia marcado = todo dia. */}
-            {padraoNovo && (
-              <div style={{ paddingLeft: 22, display: "grid", gap: 6 }}>
-                <span className="rotulo">Esta rota vale em</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {DIAS_SEMANA.map((d) => {
-                    const marcado = diasPadrao.has(d.idx);
-                    return (
-                      <button
-                        key={d.idx}
-                        type="button"
-                        className={`btn ${marcado ? "btn-primario" : ""}`}
-                        style={{ padding: "4px 10px" }}
-                        aria-pressed={marcado}
-                        onClick={() => {
-                          const proximo = new Set(diasPadrao);
-                          if (marcado) proximo.delete(d.idx);
-                          else proximo.add(d.idx);
-                          setDiasPadrao(proximo);
-                        }}
-                      >
-                        {d.rotulo}
-                      </button>
-                    );
-                  })}
+            <div>
+              <span className="rotulo">Guardados nesta sede</span>
+              {guardados.length === 0 ? (
+                <p style={{ fontSize: 12, color: "var(--tinta-3)", margin: "6px 0 0" }}>
+                  Nenhum evento guardado ainda. Monte o dia do evento e guarde acima.
+                </p>
+              ) : (
+                <div style={{ marginTop: 4 }}>
+                  {guardados.map((m) => (
+                    <LinhaEvento
+                      key={m.nome_modelo}
+                      modelo={m}
+                      dataAtual={dataAtual}
+                      ocupado={ocupado}
+                      confirmando={confirmandoExclusao === m.nome_modelo}
+                      aoAplicar={(data) => aplicar(m.nome_modelo, data)}
+                      aoExcluir={() => excluir(m.nome_modelo)}
+                    />
+                  ))}
                 </div>
-                {diasPadrao.size === 0 ? (
-                  <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
-                    Nenhum dia marcado = vale todo dia. É a rota base da sede.
-                  </p>
-                ) : (
-                  <div style={{ display: "grid", gap: 4 }}>
-                    <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0 }}>
-                      Vale só em <strong>{rotularDiasSemana(serializarDiasSemana([...diasPadrao]))}</strong>. E
-                      nesses dias ela:
-                    </p>
-                    {/* Sem opção pré-marcada de propósito: escolher os dias sem dizer a
-                        intenção fazia o dia duplicar em silêncio quando alguém salvava o
-                        dia INTEIRO como camada em vez de só os extras. */}
-                    <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
-                      <input
-                        type="radio"
-                        name="modo-camada"
-                        checked={modoCamada === "acrescenta"}
-                        onChange={() => setModoCamada("acrescenta")}
-                      />
-                      <span>
-                        <strong>acrescenta</strong> ao dia — some com a rota de todo dia (use para o
-                        serviço extra da segunda)
-                      </span>
-                    </label>
-                    <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
-                      <input
-                        type="radio"
-                        name="modo-camada"
-                        checked={modoCamada === "substitui"}
-                        onChange={() => setModoCamada("substitui")}
-                      />
-                      <span>
-                        <strong>substitui</strong> o dia — só ela monta esses dias (use quando o dia
-                        tem programação própria)
-                      </span>
-                    </label>
-                  </div>
-                )}
-              </div>
-            )}
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tinta-2)" }}>
-              <input
-                type="checkbox"
-                checked={eventoNovo}
-                disabled={padraoNovo}
-                onChange={(e) => setEventoNovo(e.target.checked)}
-              />
-              É um <strong>modelo de evento</strong> (formatura, feira, prova…)
-            </label>
-            {eventoNovo && (
-              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: 0, paddingLeft: 22 }}>
-                Programe o evento <strong>com antecedência</strong> (ex.: na sexta, para o fim de
-                semana). No dia, gere a rota padrão normalmente e aplique o evento por cima — o que
-                conflitar de horário é pulado e informado.
+              )}
+              <p style={{ fontSize: 11, color: "var(--tinta-3)", margin: "8px 0 0" }}>
+                Aplicar entra por cima do que já está no dia; o que bater de horário é pulado e avisado.
               </p>
-            )}
+            </div>
           </section>
+        )}
 
-          <button
-            className="btn btn-fantasma"
-            type="button"
-            style={{ justifySelf: "start" }}
-            onClick={() => setTela("preencher")}
-          >
-            ← Preencher dias
-          </button>
-
-          {erro && <div className="alerta alerta-erro">{erro}</div>}
-        </div>
-      )}
+        {erro && <div className="alerta alerta-erro">{erro}</div>}
+      </div>
     </Modal>
   );
 }

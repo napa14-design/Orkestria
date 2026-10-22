@@ -150,6 +150,15 @@ export async function salvarModelo(
     evento?: boolean;
     diasSemana?: string;
     substitui?: boolean;
+    /**
+     * De onde sai o id dos itens, quando não deve ser o nome. O id corta o nome
+     * em 24 letras: "Rota padrão · seg, ter, qua, qui, sex" e "… seg, ter, qua,
+     * qui" davam o MESMO id, e uma camada sobrescrevia a outra (auditoria e
+     * segurança, 21/10/2026). `usarDiaComoPadrao` passa uma chave curta e única.
+     */
+    chaveId?: string;
+    /** Camadas que serão substituídas por inteiro logo depois: podem ceder ids. */
+    podeSobrescrever?: ReadonlySet<string>;
   } = {},
 ): Promise<{ itens: number }> {
   const nomeLimpo = nome.trim();
@@ -260,7 +269,7 @@ export async function salvarModelo(
   }
 
   const novos: ModeloRotinaItem[] = rotinas.map((r) => ({
-    id: idItemDeRota(nomeLimpo, r.funcionario_id, r.tarefa_id, numeroDaOcorrencia.get(r.id) ?? 1),
+    id: idItemDeRota(opts.chaveId ?? nomeLimpo, r.funcionario_id, r.tarefa_id, numeroDaOcorrencia.get(r.id) ?? 1),
     nome_modelo: nomeLimpo,
     sede_id: sedeId,
     funcionario_id: r.funcionario_id,
@@ -278,6 +287,24 @@ export async function salvarModelo(
     criado_em: agora,
   }));
 
+  // Fecha em vez de sobrescrever: um id novo que já pertence a OUTRA camada
+  // apagaria itens dela em silêncio (o `criar` é upsert).
+  // Exceção: camada que quem chama vai substituir INTEIRA (`podeSobrescrever`)
+  // — tomar os ids dela não apaga nada que fosse continuar valendo.
+  const donoDoId = new Map(todos.map((m) => [m.id, m.nome_modelo]));
+  const colide = novos.find((n) => {
+    const dono = donoDoId.get(n.id);
+    return dono !== undefined && dono !== nomeLimpo && !opts.podeSobrescrever?.has(dono);
+  });
+  if (colide)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "MODELO_ID_COLIDE",
+        mensagem: `Salvar "${nomeLimpo}" apagaria tarefas da rota "${donoDoId.get(colide.id)}". Use outro nome — nada foi gravado.`,
+      },
+    ]);
+
   // 1) cria os novos; 2) remove os antigos do mesmo nome — em lotes paralelos.
   //
   // **Não desmarca mais as outras camadas padrão.** A rota padrão da sede passou a
@@ -293,6 +320,127 @@ export async function salvarModelo(
     (m) => ds.excluir("modelos_rotina", m.id),
   );
   return { itens: rotinas.length };
+}
+
+/**
+ * "Usar este dia como padrão" nos dias da semana marcados — e SÓ nesses dias.
+ *
+ * Substitui, não soma: o dia salvo passa a ser a rota padrão daqueles dias, e
+ * eles saem das camadas padrão antigas (que encolhem, ou somem se ficarem sem
+ * dia). Assim cada dia da semana tem uma camada só, e ninguém precisa entender
+ * "acrescenta × substitui" (pedido do dono, 21/10/2026: "temos que deixar mais
+ * fácil a rota padrão").
+ *
+ * O nome sai dos dias ("Rota padrão · Seg, Ter, Qua, Qui, Sex"): usar de novo
+ * nos mesmos dias regrava a mesma camada, com os mesmos ids de item, e os dias já
+ * gerados se alinham em vez de duplicar. A camada que encolhe é renomeada pelos
+ * dias que sobram, sem trocar os ids — o vínculo dos blocos já gerados continua.
+ *
+ * Ordem: grava a camada nova primeiro (com as validações de `salvarModelo`) e só
+ * então encolhe as antigas. Se algo falhar no meio, a sede fica com rota a mais
+ * naqueles dias, não sem rota — e a mensagem pede para repetir.
+ */
+/** Nome das camadas que "Usar este dia como padrão" cria: o prefixo + os dias. */
+const PREFIXO_PADRAO = "Rota padrão · ";
+
+/** Dias em que um item da rota vale; sem dias = todo dia (como na projeção). */
+function diasDoItem(m: ModeloRotinaItem): number[] {
+  const d = parseDiasSemana(m.dias_semana);
+  return d.length ? d : [0, 1, 2, 3, 4, 5, 6];
+}
+
+export async function usarDiaComoPadrao(
+  dataOrigem: string,
+  sedeId: string,
+  dias: number[],
+  autor: string,
+): Promise<{ itens: number; nome: string; encolhidas: string[]; removidas: string[] }> {
+  const marcados = parseDiasSemana(serializarDiasSemana(dias));
+  if (marcados.length === 0)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "PADRAO_SEM_DIAS", mensagem: "Marque em quais dias da semana este dia vale como padrão." },
+    ]);
+  const diasCsv = serializarDiasSemana(marcados);
+  const nome = `${PREFIXO_PADRAO}${rotularDiasSemana(diasCsv)}`;
+  const ds = await getDataSource();
+
+  // Camadas padrão que vão sair INTEIRAS (todo item delas só vale em dias
+  // marcados): podem ceder ids à nova. Sem isso, Seg–Sex → Seg → Seg–Sex batia
+  // na trava de colisão — a camada que encolheu para ter–sex guardava os ids de
+  // "padrao-12345" — e o botão, que não tem campo de nome, ficava sem saída
+  // (auditoria e segurança, 21/10/2026).
+  const antes = await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }]);
+  const porCamada = new Map<string, ModeloRotinaItem[]>();
+  for (const m of antes) if (m.padrao && !m.evento) porCamada.set(m.nome_modelo, [...(porCamada.get(m.nome_modelo) ?? []), m]);
+  const saemInteiras = new Set(
+    [...porCamada].filter(([, its]) => its.every((m) => diasDoItem(m).every((d) => marcados.includes(d)))).map(([n]) => n),
+  );
+
+  const { itens } = await salvarModelo(nome, dataOrigem, sedeId, autor, {
+    padrao: true,
+    comDuracao: true,
+    diasSemana: diasCsv,
+    // Uma chave por conjunto de dias ("padrao-12345"): curta, nunca colide no
+    // corte de 24 letras do id, e a mesma para os mesmos dias — o que mantém o
+    // alinhamento dos dias já gerados ao usar de novo.
+    chaveId: `padrao-${marcados.join("")}`,
+    podeSobrescrever: saemInteiras,
+  });
+
+  // Relê depois de gravar: os itens cujos ids a camada nova tomou já têm o nome
+  // dela e saem da conta abaixo.
+  const camadas = new Map<string, ModeloRotinaItem[]>();
+  const todosDaSede = await ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }]);
+  for (const m of todosDaSede) {
+    if (!m.padrao || m.evento || m.nome_modelo === nome) continue;
+    camadas.set(m.nome_modelo, [...(camadas.get(m.nome_modelo) ?? []), m]);
+  }
+  const encolhidas: string[] = [];
+  const removidas: string[] = [];
+  // Todo nome em uso na sede (inclusive evento e a camada recém-gravada).
+  const nomesOcupados = new Set(todosDaSede.map((m) => m.nome_modelo));
+  try {
+    for (const [nomeCamada, itensCamada] of camadas) {
+      // Item a item, pelos dias DELE (como a projeção): se uma rodada anterior
+      // falhou no meio, os itens da camada podem estar com dias diferentes, e
+      // decidir pela camada inteira deixava um item velho que repetir não tirava.
+      const sairam: ModeloRotinaItem[] = [];
+      const ficam: Array<{ item: ModeloRotinaItem; csv: string }> = [];
+      for (const m of itensCamada) {
+        const valia = diasDoItem(m);
+        const restam = valia.filter((d) => !marcados.includes(d));
+        if (restam.length === valia.length) continue;
+        if (restam.length === 0) sairam.push(m);
+        else ficam.push({ item: m, csv: serializarDiasSemana(restam) });
+      }
+      if (!sairam.length && !ficam.length) continue;
+      await emLotes(sairam, (m) => ds.excluir("modelos_rotina", m.id));
+      // Renomeia pelos dias que sobram só a camada que este botão criou, só se
+      // todos os itens ficaram com os mesmos dias e o nome novo estiver livre:
+      // dar a duas camadas o mesmo nome as FUNDIA (a projeção agrupa por nome),
+      // e uma que substituía passava a somar (auditoria, 21/10/2026). Nome de
+      // quem salvou à mão fica — a tela mostra os dias pelo `dias_semana`.
+      const csvs = new Set(ficam.map((f) => f.csv));
+      const restamCsv = csvs.size === 1 ? [...csvs][0] : "";
+      const novoNome = restamCsv ? `${PREFIXO_PADRAO}${rotularDiasSemana(restamCsv)}` : "";
+      const renomear =
+        !!novoNome && sairam.length + ficam.length === itensCamada.length && nomeCamada.startsWith(PREFIXO_PADRAO) && !nomesOcupados.has(novoNome);
+      await emLotes(ficam, ({ item, csv }) =>
+        ds.atualizar("modelos_rotina", item.id, { dias_semana: csv, ...(renomear ? { nome_modelo: novoNome } : {}) }),
+      );
+      if (renomear) {
+        nomesOcupados.delete(nomeCamada);
+        nomesOcupados.add(novoNome);
+      }
+      if (ficam.length) encolhidas.push(`${nomeCamada} → ${restamCsv ? rotularDiasSemana(restamCsv) : "dias variados"}`);
+      else if (sairam.length === itensCamada.length) removidas.push(nomeCamada);
+    }
+  } catch (e) {
+    throw new Error(
+      `O dia foi salvo como padrão, mas a rota antiga ainda não saiu de todos os dias marcados. Repita a operação. (${e instanceof Error ? e.message : String(e)})`,
+    );
+  }
+  return { itens, nome, encolhidas, removidas };
 }
 
 export interface ResultadoAplicacao {

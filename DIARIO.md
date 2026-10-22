@@ -7,6 +7,76 @@
 
 ---
 
+## 2026-10-21 — "Usar este dia como padrão" no lugar de "Preencher dias"
+
+Pedido do dono: *"temos que deixar mais fácil a rota padrão"*. O "⧉ Preencher
+dias" abria na cópia de dias, e salvar como rota padrão ficava na segunda tela
+("Rotas salvas →"), com caixinhas, dias da semana e a escolha "acrescenta ×
+substitui" — que é justamente onde se erra.
+
+Agora o botão é **"★ Usar este dia como padrão"**, com dois caminhos:
+- **Rota padrão** — marca os dias da semana (abre com Seg–Sex num dia útil, ou
+  só o próprio dia no fim de semana) e este dia passa a ser a rota padrão
+  desses dias, **substituindo** a anterior. Sem "acrescenta": cada dia da
+  semana tem uma rota só. A tela mostra o que acontece com a rota de hoje
+  ("continua igual", "fica só em seg", "sai") antes de salvar.
+- **Evento** — guarda o dia com nome; na lista, cada evento tem data e
+  "Aplicar". Rotas antigas guardadas sem ser padrão aparecem ali também.
+- **A cópia de dias saiu** (decisão do dono): com o dia virando padrão, o
+  "⚡ Gerar" monta os outros. (`POST /api/rotinas/duplicar` continua em uso
+  pelo "↺ Repetir o dia anterior" — não apagar.)
+
+Por baixo: `usarDiaComoPadrao` grava a camada `Rota padrão · <dias>` e tira
+esses dias das camadas padrão antigas — encolhe (mesmos ids, para os dias já
+gerados continuarem alinhando) ou apaga a que fica sem dia. Usar de novo nos
+mesmos dias regrava a mesma camada com os mesmos ids. Grava a nova antes de
+encolher as antigas: se falhar no meio, sobra rota, não falta. Evento e dado
+antigo padrão+evento não são tocados. Rota nova: `POST /api/modelos/padrao`
+(mesmas travas do `POST /api/modelos`; `dias` só inteiros de 0 a 6).
+
+**Reprovado na 1ª rodada (auditor e segurança), corrigido:**
+- **Uma camada apagava a outra.** O id do item corta o nome em 24 letras:
+  "Rota padrão · seg, ter, qua, qui, sex" e "… seg, ter, qua, qui" davam o
+  mesmo id, e salvar Seg–Sex depois de Seg–Sáb deixava o sábado sem rota.
+  Agora a camada usa uma chave curta por conjunto de dias (`padrao-12345`,
+  opção `chaveId` do `salvarModelo`), e o `salvarModelo` **recusa** qualquer
+  id novo que já pertença a outra camada (`MODELO_ID_COLIDE`) — o furo
+  existia também para nomes digitados à mão.
+- **Camadas se fundiam ao renomear.** Só a camada criada por este botão é
+  renomeada pelos dias que sobram, e só se o nome estiver livre; a salva à mão
+  mantém o nome (a tela mostra os dias, não o nome).
+- `dias: [null]` virava domingo — a rota recusa o que não for 0–6.
+
+**2ª rodada (auditor e segurança), corrigido:**
+- **Beco sem saída:** Seg–Sex → só Seg → Seg–Sex batia na trava de colisão
+  (a camada que encolheu para ter–sex guardava os ids de `padrao-12345`), e a
+  mensagem pedia "outro nome" num botão sem nome. Camada padrão que vai sair
+  inteira (todo item dela só vale em dias marcados) agora pode ceder os ids
+  (`podeSobrescrever` do `salvarModelo`); a trava segue para o resto.
+- **Falha no meio:** o encolhimento decidia pela camada inteira (dias do 1º
+  item); depois de uma falha parcial, um item velho ficava e repetir não o
+  tirava. Agora decide item a item, pelos dias de cada um, como a projeção.
+- Tela: a rota padrão volta a poder ser apagada (✕ em dois toques); fechar
+  volta ao começo; aviso de que dias já gerados não mudam sozinhos (refazer =
+  "↺ Desfazer a geração" e gerar de novo).
+
+O "★ Ensinar esta rota" (primeira rota, quando a sede não tem nenhuma)
+continua como estava. Passo a passo atualizado (quatro textos citavam o fluxo
+antigo; o passo da semana deixou de apontar para o botão, que não é mais dele).
+
+Doutrina: diminui superfície — uma tela no lugar de duas, sai a cópia e sai a
+escolha acrescenta × substitui.
+
+Verificado: 14 testes de serviço e rota (efeito no dia gerado, não só o
+retorno — inclusive Seg–Sáb→Seg–Sex e Seg–Sex→Seg–Qui), mutações mortas;
+tela exercitada no modo demonstração.
+
+Arquivos: `components/agenda/ModalPlanejamento.tsx`, `components/agenda/FiltersBar.tsx`,
+`services/modelosService.ts` (`usarDiaComoPadrao`), `app/api/modelos/padrao/route.ts`,
+`lib/tutorial/trilha.ts`, `testes/usar-dia-padrao.test.ts`.
+
+---
+
 ## 2026-10-21 — Aviso "O Orkestria foi atualizado"
 
 Pedido do dono, no dia dos consertos em produção: quem deixava a aba aberta
