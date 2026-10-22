@@ -89,6 +89,37 @@ export function somarDias(iso: string, dias: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** YYYY-MM-DD que existe no calendário: 2026-02-30 tem o formato, mas não é data. */
+export function dataReal(iso: string): boolean {
+  return DATA_ISO.test(iso) && somarDias(iso, 0) === iso;
+}
+
+/**
+ * Período máximo de `/api/rotinas?de=&ate=`. O maior uso legítimo é o mês dos
+ * Relatórios e os 31 dias de histórico da Agenda; 62 deixa ver dois meses no
+ * Painel. Sem teto, `?de=0000&ate=9999` lia o histórico inteiro — no Firestore
+ * (Blaze), leitura é custo (revisão de segurança, 22/10/2026).
+ */
+export const MAX_DIAS_PERIODO = 62;
+
+/**
+ * Dias de `de` a `ate` (inclusive), ou `null` se não são datas reais, se o
+ * período está invertido ou se passa de `maxDias`.
+ *
+ * ⚠️ O laço compara TEXTO, como as consultas (`data >= de`). 9999-12-31 + 1 vira
+ * "10000-01-01", que ordena ANTES de "9999-…": o laço não para em `ate`, estoura
+ * o teto e o período é recusado — o truque que fazia 4 dias virarem o histórico
+ * inteiro na ficha da semana.
+ */
+export function diasDoPeriodo(de: string, ate: string, maxDias: number): string[] | null {
+  if (!dataReal(de) || !dataReal(ate) || ate < de) return null;
+  const dias: string[] = [];
+  for (let d = de; d <= ate && dias.length <= maxDias; d = somarDias(d, 1)) dias.push(d);
+  return dias.length <= maxDias && dias.every(dataReal) && dias[dias.length - 1] === ate ? dias : null;
+}
+
 /** "2026-06-12" → "12/06/2026" */
 export function formatarDataBR(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;

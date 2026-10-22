@@ -17,7 +17,7 @@ import {
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
-import { formatarDuracao, hojeISO, somarDias } from "@/lib/dateUtils";
+import { MAX_DIAS_PERIODO, diasDoPeriodo, formatarDuracao, hojeISO, somarDias } from "@/lib/dateUtils";
 import type {
   ExecucaoRealizada,
   Funcionario,
@@ -32,6 +32,10 @@ const REALIZADAS = ["conforme_planejado", "com_atraso", "parcial"];
 export default function PaginaProdutividade() {
   const [de, setDe] = useState(somarDias(hojeISO(), -29));
   const [ate, setAte] = useState(hojeISO());
+  // Período fora do teto: a tela nem pede (a API recusaria) e mostra um aviso no
+  // lugar dos números — com `keepPreviousData`, seguiriam os do período ANTERIOR
+  // sob as datas novas.
+  const periodoOk = diasDoPeriodo(de, ate, MAX_DIAS_PERIODO) !== null;
   const [sedeFiltro, setSedeFiltro] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
@@ -41,9 +45,9 @@ export default function PaginaProdutividade() {
   const daSede = sedeFiltro ? `sede=${encodeURIComponent(sedeFiltro)}` : "";
   const { data: funcionarios } = useSWR<Funcionario[]>(`/api/funcionarios${daSede ? `?${daSede}` : ""}`, fetcher);
   const { data: tarefas } = useSWR<Tarefa[]>(`/api/tarefas${daSede ? `?${daSede}` : ""}`, fetcher);
-  const { data: rotinas } = useSWR<RotinaPlanejada[]>(`/api/rotinas?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`, fetcher);
+  const { data: rotinas } = useSWR<RotinaPlanejada[]>(periodoOk && `/api/rotinas?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`, fetcher);
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
-    `/api/execucoes?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`,
+    periodoOk && `/api/execucoes?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`,
     fetcher,
   );
   const { data: parametros } = useSWR<ParametrosResolvidos>(`/api/parametros?resolvidos=1${daSede ? `&${daSede}` : ""}`, fetcher);
@@ -144,7 +148,7 @@ export default function PaginaProdutividade() {
                 <option key={s.id} value={s.id}>{s.nome_sede}</option>
               ))}
             </select></label>
-          <button className="btn" onClick={exportar} disabled={carregando}>⭳ CSV</button>
+          <button className="btn" onClick={exportar} disabled={carregando || !periodoOk}>⭳ CSV</button>
         </div>
       </div>
 
@@ -155,7 +159,9 @@ export default function PaginaProdutividade() {
         equipe. Tarefas de “tempo é referência” e de presença/plantão ficam de fora.
       </div>
 
-      {carregando ? (
+      {!periodoOk ? (
+        <div className="alerta alerta-erro">Escolha um período de até {MAX_DIAS_PERIODO} dias, com “De” antes de “Até”.</div>
+      ) : carregando ? (
         <div className="painel"><Carregando texto="Calculando…" style={{ padding: 48 }} /></div>
       ) : (
         <div className="painel" style={{ overflowX: "auto" }}>

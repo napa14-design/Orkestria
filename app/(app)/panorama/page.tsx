@@ -18,7 +18,7 @@ import {
   ocupaHorario,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
-import { formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { MAX_DIAS_PERIODO, diasDoPeriodo, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede } from "@/types";
 
@@ -60,13 +60,17 @@ type MetricaSede = {
 export default function PaginaPanorama() {
   const [de, setDe] = useState(diasAtras(6));
   const [ate, setAte] = useState(hojeISO());
+  // Período fora do teto: a tela nem pede (a API recusaria) e mostra um aviso no
+  // lugar dos números — com `keepPreviousData`, seguiriam os do período ANTERIOR
+  // sob as datas novas.
+  const periodoOk = diasDoPeriodo(de, ate, MAX_DIAS_PERIODO) !== null;
   const [dim, setDim] = useState<"grupo" | "tipo">("grupo");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   // Todas as sedes da pessoa: sem `?sede` a API só devolve a principal, e a
   // sede extra do coordenador aparecia zerada.
   const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
-  const { data: rotinas } = useDasSedes<RotinaPlanejada>("rotinas", `de=${de}&ate=${ate}`);
+  const { data: rotinas } = useDasSedes<RotinaPlanejada>("rotinas", periodoOk ? `de=${de}&ate=${ate}` : null);
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
   // Cada sede medida com os parâmetros DELA: sem `&sede`, todas usavam os da
@@ -184,7 +188,9 @@ export default function PaginaPanorama() {
         </label>
       </div>
 
-      {carregando ? (
+      {!periodoOk ? (
+        <div className="alerta alerta-erro">Escolha um período de até {MAX_DIAS_PERIODO} dias, com “De” antes de “Até”.</div>
+      ) : carregando ? (
         <div className="painel">
           <Carregando texto="Carregando panorama…" style={{ padding: 64 }} />
         </div>

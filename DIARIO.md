@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-10-22 — Rotinas e execuções: período obrigatório, até 62 dias
+
+Achado pré-existente da revisão de segurança de hoje: `GET /api/rotinas`
+aceitava qualquer `de`/`ate`, de qualquer perfil — inclusive o supervisor.
+`?de=0000&ate=9999` devolvia o histórico inteiro da sede (o administrador sem
+`?sede`, de todas); no Firestore, cada documento é leitura paga. `GET
+/api/execucoes` era pior: `de`/`ate` opcionais, e sem os dois a consulta caía
+em `listar` — a coleção inteira. Painel e Produtividade com o "De" apagado
+mandavam `?de=&ate=X`, que lia tudo até hoje.
+
+Agora as duas rotas exigem o período, de **datas reais** (2026-02-30 não
+passa), com `de` ≤ `ate` e **no máximo 62 dias**; fora disso, 400 antes de
+tocar o banco. A virada `9999-12-31 + 1 = "10000-01-01"` (que ordena antes
+como texto) também é recusada. 62 porque o maior uso legítimo é o mês dos
+Relatórios e os 31 dias de histórico da Agenda; sobra folga para dois meses no
+Painel. Todos os chamadores já mandavam `de` e `ate`.
+
+- `lib/dateUtils.ts`: `dataReal`, `diasDoPeriodo` e `MAX_DIAS_PERIODO` — a
+  ideia da ficha da semana (cada dia real, o laço termina em `ate`), extraída.
+  A rota das fichas ainda tem a versão própria, fora deste ramo.
+- **Painel, Produtividade e Panorama** (datas livres): com período inválido a
+  tela nem pede (chave nula no SWR; `useDasSedes` aceita `query` nulo) e mostra
+  o aviso no lugar dos números. Antes, o SWR repetia o pedido recusado a cada
+  nova tentativa, e com o `keepPreviousData` a tela seguiria exibindo o período
+  anterior sob as datas novas. Os filtros ficam; Imprimir/CSV desabilitam.
+
+Conferido na tela (modo memória): o aviso no Painel, na Produtividade
+(invertida) e no Panorama; apagar o "De" do Painel não dispara requisição
+nenhuma. Testes das duas rotas vermelhos sem a correção. Revisão de segurança
+pedida para cada etapa.
+
+Arquivos: `app/api/{rotinas,execucoes}/route.ts`, `lib/dateUtils.ts`,
+`lib/useDasSedes.ts`, `app/(app)/{dashboard,produtividade,panorama}/page.tsx`,
+`testes/periodo-consultas.test.ts`.
+
+---
+
 ## 2026-10-22 — Sede extra: o que ainda caía na sede principal
 
 Um coordenador registrou o mesmo eventual **três vezes** na sede extra dele:

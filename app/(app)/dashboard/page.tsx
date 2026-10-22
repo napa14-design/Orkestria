@@ -19,7 +19,7 @@ import {
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
-import { formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
+import { MAX_DIAS_PERIODO, diasDoPeriodo, formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
   TipoLocalCatalogo,
   ExecucaoRealizada,
@@ -58,6 +58,10 @@ const COR_STATUS: Record<string, string> = {
 export default function PaginaDashboard() {
   const [de, setDe] = useState(diasAtras(6));
   const [ate, setAte] = useState(hojeISO());
+  // Período fora do teto: a tela nem pede (a API recusaria) e mostra um aviso no
+  // lugar dos números — com `keepPreviousData`, seguiriam os do período ANTERIOR
+  // sob as datas novas.
+  const periodoOk = diasDoPeriodo(de, ate, MAX_DIAS_PERIODO) !== null;
   const [sedeFiltro, setSedeFiltro] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
@@ -91,11 +95,11 @@ export default function PaginaDashboard() {
     fetcher,
   );
   const { data: rotinas } = useSWR<RotinaPlanejada[]>(
-    `/api/rotinas?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
+    periodoOk && `/api/rotinas?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
-    `/api/execucoes?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
+    periodoOk && `/api/execucoes?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
 
@@ -279,7 +283,7 @@ export default function PaginaDashboard() {
         : "var(--laranja)",
   }));
 
-  if (!rotinas || !funcionarios || !tarefas) {
+  if (periodoOk && (!rotinas || !funcionarios || !tarefas)) {
     return (
       <div className="painel entra" style={{ marginTop: 24 }}>
         <Carregando texto="Carregando indicadores…" style={{ padding: 64 }} />
@@ -311,10 +315,10 @@ export default function PaginaDashboard() {
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn" onClick={() => window.print()} disabled={(rotinas ?? []).length === 0}>
+        <button className="btn" onClick={() => window.print()} disabled={!periodoOk || (rotinas ?? []).length === 0}>
           🖨 Imprimir / PDF
         </button>
-        <button className="btn" onClick={exportarCSV} disabled={(rotinas ?? []).length === 0}>
+        <button className="btn" onClick={exportarCSV} disabled={!periodoOk || (rotinas ?? []).length === 0}>
           ⬇ Exportar CSV
         </button>
         <label className="campo">
@@ -338,92 +342,98 @@ export default function PaginaDashboard() {
         </label>
       </div>
 
-      {/* KPIs */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <CartaoKpi rotulo="Funcionários ativos" valor={String(indicadores.funcsAtivos)} />
-        <CartaoKpi rotulo="Tarefas planejadas" valor={String(indicadores.totalRotinas)} detalhe="no período" />
-        <CartaoKpi
-          rotulo="Tempo planejado"
-          valor={formatarDuracao(indicadores.tempoPlanejadoTotal)}
-          cor="var(--azul)"
-        />
-        <CartaoKpi
-          rotulo="Tempo realizado"
-          valor={formatarDuracao(indicadores.tempoRealizadoTotal)}
-          detalhe={`${indicadores.tarefasRealizadas} realizadas · ${indicadores.tarefasNaoRealizadas} não realizadas`}
-          cor="var(--verde)"
-        />
-        <CartaoKpi
-          rotulo="Ociosidade prevista"
-          valor={formatarDuracao(indicadores.ociosidadeTotal)}
-          detalhe="nos dias com planejamento"
-          cor="var(--laranja)"
-        />
-        <CartaoKpi
-          rotulo="Ocupação média"
-          valor={`${indicadores.ocupacaoMedia.toFixed(0)}%`}
-          cor="var(--verde)"
-        />
-        <CartaoKpi
-          rotulo="Sobrecarga"
-          valor={String(indicadores.sobrecarregados)}
-          detalhe="funcionários acima de 100%"
-          cor="var(--vermelho)"
-        />
-        <CartaoKpi
-          rotulo="Subutilizados"
-          valor={String(indicadores.subutilizados)}
-          detalhe={`abaixo de ${params.ocupacao_baixa}%`}
-          cor="var(--cinza-bloco)"
-        />
-        <CartaoKpi
-          rotulo="Apoio a outro setor"
-          valor={indicadores.apoioOutroSetorPct === null ? "—" : `${indicadores.apoioOutroSetorPct.toFixed(1)}%`}
-          detalhe="do tempo planejado · plantão, cantina, portaria, eventos"
-          cor="var(--acento)"
-        />
-      </div>
+      {!periodoOk ? (
+        <div className="alerta alerta-erro">Escolha um período de até {MAX_DIAS_PERIODO} dias, com “De” antes de “Até”.</div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <CartaoKpi rotulo="Funcionários ativos" valor={String(indicadores.funcsAtivos)} />
+            <CartaoKpi rotulo="Tarefas planejadas" valor={String(indicadores.totalRotinas)} detalhe="no período" />
+            <CartaoKpi
+              rotulo="Tempo planejado"
+              valor={formatarDuracao(indicadores.tempoPlanejadoTotal)}
+              cor="var(--azul)"
+            />
+            <CartaoKpi
+              rotulo="Tempo realizado"
+              valor={formatarDuracao(indicadores.tempoRealizadoTotal)}
+              detalhe={`${indicadores.tarefasRealizadas} realizadas · ${indicadores.tarefasNaoRealizadas} não realizadas`}
+              cor="var(--verde)"
+            />
+            <CartaoKpi
+              rotulo="Ociosidade prevista"
+              valor={formatarDuracao(indicadores.ociosidadeTotal)}
+              detalhe="nos dias com planejamento"
+              cor="var(--laranja)"
+            />
+            <CartaoKpi
+              rotulo="Ocupação média"
+              valor={`${indicadores.ocupacaoMedia.toFixed(0)}%`}
+              cor="var(--verde)"
+            />
+            <CartaoKpi
+              rotulo="Sobrecarga"
+              valor={String(indicadores.sobrecarregados)}
+              detalhe="funcionários acima de 100%"
+              cor="var(--vermelho)"
+            />
+            <CartaoKpi
+              rotulo="Subutilizados"
+              valor={String(indicadores.subutilizados)}
+              detalhe={`abaixo de ${params.ocupacao_baixa}%`}
+              cor="var(--cinza-bloco)"
+            />
+            <CartaoKpi
+              rotulo="Apoio a outro setor"
+              valor={indicadores.apoioOutroSetorPct === null ? "—" : `${indicadores.apoioOutroSetorPct.toFixed(1)}%`}
+              detalhe="do tempo planejado · plantão, cantina, portaria, eventos"
+              cor="var(--acento)"
+            />
+          </div>
 
-      {/* ferramentas interativas — não fazem parte do relatório impresso */}
-      <div className="nao-imprimir">
+          {/* ferramentas interativas — não fazem parte do relatório impresso */}
+          <div className="nao-imprimir">
 
-        {/* tempos padrão para revisar (previsto × realidade) */}
-        <SugestoesAjuste
-          rotinas={rotinas ?? []}
-          execucoes={execucoes ?? []}
-          tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
-          locais={locais ?? []}
-          fatorDoTipo={fatorDoTipo}
-          parametros={params}
-          aoAplicado={() => void mutateTarefas()}
-        />
-      </div>
+            {/* tempos padrão para revisar (previsto × realidade) */}
+            <SugestoesAjuste
+              rotinas={rotinas ?? []}
+              execucoes={execucoes ?? []}
+              tarefas={(tarefas ?? []).filter((t) => !sedeFiltro || t.sede_id === sedeFiltro)}
+              locais={locais ?? []}
+              fatorDoTipo={fatorDoTipo}
+              parametros={params}
+              aoAplicado={() => void mutateTarefas()}
+            />
+          </div>
 
-      {/* gráficos */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: 14,
-        }}
-      >
-        <ListaBarras titulo="Ocupação por funcionário" itens={barrasOcupacao} />
-        <ListaBarras titulo="Top 10 locais por tempo consumido" itens={barrasLocais} />
-        <ListaBarras titulo="Tempo planejado por sede" itens={barrasSedes} />
-        <ListaBarras titulo="Tarefas por status" itens={barrasStatus} />
-        <ListaBarras
-          titulo="Top 10 desvios previsto × realizado"
-          itens={barrasDesvio}
-          vazio="Nenhuma execução com tempo real registrada no período."
-        />
-      </div>
+          {/* gráficos */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: 14,
+            }}
+          >
+            <ListaBarras titulo="Ocupação por funcionário" itens={barrasOcupacao} />
+            <ListaBarras titulo="Top 10 locais por tempo consumido" itens={barrasLocais} />
+            <ListaBarras titulo="Tempo planejado por sede" itens={barrasSedes} />
+            <ListaBarras titulo="Tarefas por status" itens={barrasStatus} />
+            <ListaBarras
+              titulo="Top 10 desvios previsto × realizado"
+              itens={barrasDesvio}
+              vazio="Nenhuma execução com tempo real registrada no período."
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
