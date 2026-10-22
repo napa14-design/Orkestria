@@ -9,6 +9,7 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import { getDataSource } from "@/lib/datasource";
+import { getRotinasPeriodo } from "./rotinasService";
 import { CAPACIDADE_TAREFAS, CARD, cabeNaFicha, fatiarEmPaginas, declaracaoPos, epiTopo, FID_LADO, fidRects, CAIXA_LADO, PAGINA, TAREFA, tarefaY, deltaTarefas, codigoLinha } from "@/lib/fichaGeometria";
 import { formatarDataBR, formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 
@@ -215,93 +216,109 @@ async function desenhaFicha(
   page.drawText("Assinatura do supervisor", { x: x1 - 130 - reg.widthOfTextAtSize("Assinatura do supervisor", 8) / 2, y: sy - 12, size: 8, font: reg, color: CINZA });
 }
 
-/** Monta o PDF (uma página por funcionário com rotina no dia). */
-export async function gerarFichasPdf(
-  sedeId: string,
-  data: string,
-  opts: { marcarTodas?: boolean } = {},
-): Promise<{ bytes: Uint8Array; fichas: number }> {
+/**
+ * As fichas de um ou mais dias, em ordem de DIA (todas as de segunda, depois as
+ * de terça…): é o maço que o supervisor entrega a cada manhã (pedido do dono,
+ * 22/10/2026: imprimir a semana de uma vez, em vez de dia por dia). Dia sem
+ * nada planejado não gera folha. Lê o período uma vez só, não um dia por vez.
+ */
+export async function montarEntradas(sedeId: string, datas: string[]): Promise<FichaInput[]> {
+  if (datas.length === 0) return [];
   const ds = await getDataSource();
-  const [sede, funcs, rotinasTodas, tarefas, locais, requisitos, ausenciasTodas] = await Promise.all([
+  const [sede, funcs, rotinasDoPeriodo, tarefas, locais, requisitos, ausenciasTodas] = await Promise.all([
     ds.obter("sedes", sedeId),
     ds.consultar("funcionarios", [{ campo: "sede_id", op: "==", valor: sedeId }]),
-    ds.consultar("rotinas_planejadas", [{ campo: "data", op: "==", valor: data }]),
+    // Composta (sede + intervalo de data), já indexada: antes lia o dia de todas
+    // as sedes e filtrava em memória.
+    getRotinasPeriodo(datas[0], datas[datas.length - 1], sedeId),
     ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.consultar("locais", [{ campo: "sede_id", op: "==", valor: sedeId }]),
     ds.listar("requisitos"),
     ds.consultar("ausencias", [{ campo: "sede_id", op: "==", valor: sedeId }]),
   ]);
-
-  const rotinas = rotinasTodas.filter((r) => r.sede_id === sedeId);
-  const ausentes = new Set(
-    ausenciasTodas.filter((a) => a.data_inicio <= data && data <= a.data_fim).map((a) => a.funcionario_id),
-  );
   const tPorId = new Map(tarefas.map((t) => [t.id, t]));
   const lPorId = new Map(locais.map((l) => [l.id, l]));
   const reqPorId = new Map(requisitos.map((r) => [r.id, r]));
-  const dataBR = formatarDataBR(data);
   const sedeNome = sede?.nome_sede ?? sedeId;
 
   const entradas: FichaInput[] = [];
-  for (const f of funcs.filter((x) => x.ativo && !ausentes.has(x.id))) {
-    const doFunc = rotinas
-      .filter((r) => r.funcionario_id === f.id && ocupaHorario(r))
-      .sort((a, b) => hhmmParaMin(a.inicio_planejado) - hhmmParaMin(b.inicio_planejado));
-    if (!doFunc.length) continue;
+  for (const data of datas) {
+    const rotinas = rotinasDoPeriodo.filter((r) => r.data === data);
+    const ausentes = new Set(
+      ausenciasTodas.filter((a) => a.data_inicio <= data && data <= a.data_fim).map((a) => a.funcionario_id),
+    );
+    const dataBR = formatarDataBR(data);
+    for (const f of funcs.filter((x) => x.ativo && !ausentes.has(x.id))) {
+      const doFunc = rotinas
+        .filter((r) => r.funcionario_id === f.id && ocupaHorario(r))
+        .sort((a, b) => hhmmParaMin(a.inicio_planejado) - hhmmParaMin(b.inicio_planejado));
+      if (!doFunc.length) continue;
 
-    const tarefasFicha: LinhaFicha[] = doFunc.map((r) => {
-      const t = tPorId.get(r.tarefa_id);
-      const l = lPorId.get(r.local_id);
-      return {
-        ini: r.inicio_planejado,
-        fim: r.fim_planejado,
-        nome: t?.nome_tarefa ?? "Tarefa",
-        servico: t?.tipo_servico,
-        local: l ? `${l.nome_local} (${l.andar})` : "",
-        dur: formatarDuracao(r.tempo_previsto_min),
-      };
-    });
-    // Uma ENTRADA POR PÁGINA. Quem tem mais tarefas do que cabe numa folha ganha
-    // quantas folhas precisar — antes disto a ficha saía com as marcas por cima
-    // da declaração de EPI e as últimas caixas fora da página (a CESIU tem
-    // pessoas com 54 blocos no dia).
-    const paginasRotinas = fatiarEmPaginas(doFunc);
-    const paginasTarefas = fatiarEmPaginas(tarefasFicha);
-    paginasRotinas.forEach((rotinasDaPagina, i) => {
-      // Códigos e nº de tarefas do QR são os DESTA página: cada folha é lida
-      // sozinha, e o leitor usa esse `n` para a geometria.
-      const codigos = rotinasDaPagina.map((r) =>
-        codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado),
-      );
-      // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A
-      // versão no QR é o que faz o leitor escolher a geometria certa — fichas
-      // ORK2 já impressas continuam sendo lidas pelo layout antigo.
-      const qr = `ORK3|${sedeId}|${data}|${f.id}|${rotinasDaPagina.length}|${codigos.join(",")}`;
-      // EPIs DESTA página: declarar os do dia inteiro numa folha que só cobre a
-      // manhã faria a pessoa afirmar mais do que a folha registra.
-      const episDaPagina: string[] = [];
-      const jaNaPagina = new Set<string>();
-      for (const r of rotinasDaPagina) {
-        for (const id of (tPorId.get(r.tarefa_id)?.requisitos ?? "").split(",").filter(Boolean)) {
-          const req = reqPorId.get(id);
-          if (req?.tipo === "epi" && !jaNaPagina.has(req.nome)) {
-            jaNaPagina.add(req.nome);
-            episDaPagina.push(req.nome);
+      const tarefasFicha: LinhaFicha[] = doFunc.map((r) => {
+        const t = tPorId.get(r.tarefa_id);
+        const l = lPorId.get(r.local_id);
+        return {
+          ini: r.inicio_planejado,
+          fim: r.fim_planejado,
+          nome: t?.nome_tarefa ?? "Tarefa",
+          servico: t?.tipo_servico,
+          local: l ? `${l.nome_local} (${l.andar})` : "",
+          dur: formatarDuracao(r.tempo_previsto_min),
+        };
+      });
+      // Uma ENTRADA POR PÁGINA. Quem tem mais tarefas do que cabe numa folha ganha
+      // quantas folhas precisar — antes disto a ficha saía com as marcas por cima
+      // da declaração de EPI e as últimas caixas fora da página (a CESIU tem
+      // pessoas com 54 blocos no dia).
+      const paginasRotinas = fatiarEmPaginas(doFunc);
+      const paginasTarefas = fatiarEmPaginas(tarefasFicha);
+      paginasRotinas.forEach((rotinasDaPagina, i) => {
+        // Códigos e nº de tarefas do QR são os DESTA página: cada folha é lida
+        // sozinha, e o leitor usa esse `n` para a geometria.
+        const codigos = rotinasDaPagina.map((r) =>
+          codigoLinha(r.funcionario_id, r.tarefa_id, r.inicio_planejado),
+        );
+        // ORK3 = mesmo formato do ORK2, mas o bloco de EPI é UMA declaração. A
+        // versão no QR é o que faz o leitor escolher a geometria certa — fichas
+        // ORK2 já impressas continuam sendo lidas pelo layout antigo.
+        const qr = `ORK3|${sedeId}|${data}|${f.id}|${rotinasDaPagina.length}|${codigos.join(",")}`;
+        // EPIs DESTA página: declarar os do dia inteiro numa folha que só cobre a
+        // manhã faria a pessoa afirmar mais do que a folha registra.
+        const episDaPagina: string[] = [];
+        const jaNaPagina = new Set<string>();
+        for (const r of rotinasDaPagina) {
+          for (const id of (tPorId.get(r.tarefa_id)?.requisitos ?? "").split(",").filter(Boolean)) {
+            const req = reqPorId.get(id);
+            if (req?.tipo === "epi" && !jaNaPagina.has(req.nome)) {
+              jaNaPagina.add(req.nome);
+              episDaPagina.push(req.nome);
+            }
           }
         }
-      }
-      entradas.push({
-        nome: f.nome,
-        sedeNome,
-        dataBR,
-        qr,
-        tarefas: paginasTarefas[i],
-        epis: episDaPagina,
-        pagina: i + 1,
-        paginas: paginasRotinas.length,
+        entradas.push({
+          nome: f.nome,
+          sedeNome,
+          dataBR,
+          qr,
+          tarefas: paginasTarefas[i],
+          epis: episDaPagina,
+          pagina: i + 1,
+          paginas: paginasRotinas.length,
+        });
       });
-    });
+    }
   }
+  return entradas;
+}
+
+/** Monta o PDF: uma página (ou mais) por funcionário com rotina, dia a dia. */
+export async function gerarFichasPdf(
+  sedeId: string,
+  datas: string | string[],
+  opts: { marcarTodas?: boolean } = {},
+): Promise<{ bytes: Uint8Array; fichas: number }> {
+  const lista = [...new Set(typeof datas === "string" ? [datas] : datas)].sort();
+  const entradas = await montarEntradas(sedeId, lista);
 
   const doc = await PDFDocument.create();
   const fonts = {
@@ -321,7 +338,11 @@ export async function gerarFichasPdf(
   if (!entradas.length) {
     // página única avisando que não há fichas
     const page = doc.addPage([PAGINA.W, PAGINA.H]);
-    page.drawText(`Sem rotinas planejadas para ${dataBR} nesta sede.`, { x: 60, y: PAGINA.H - 80, size: 12, font: fonts.reg, color: TINTA });
+    const periodo =
+      lista.length > 1
+        ? `de ${formatarDataBR(lista[0])} a ${formatarDataBR(lista[lista.length - 1])}`
+        : `para ${formatarDataBR(lista[0] ?? "")}`;
+    page.drawText(`Sem rotinas planejadas ${periodo} nesta sede.`, { x: 60, y: PAGINA.H - 80, size: 12, font: fonts.reg, color: TINTA });
   } else {
     for (const e of entradas) await desenhaFicha(doc, fonts, logo, e, !!opts.marcarTodas);
   }

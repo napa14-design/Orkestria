@@ -33,6 +33,7 @@ import {
   tempoPrevistoMin,
   fimPlanejadoMin,
   tempoVisualMin,
+  ocupaHorario,
 } from "@/lib/calculations";
 import { apiDelete, apiPost, apiPut, ErroApi } from "@/lib/clientApi";
 import { formatarDataBR, hhmmParaMin, hojeISO, minParaHHMM } from "@/lib/dateUtils";
@@ -901,6 +902,18 @@ export default function PaginaRotinas() {
               {limpandoSemana ? "Limpando…" : "↺ Desfazer a semana"}
             </button>
           )}
+          {/* A semana inteira num PDF, dia a dia — em vez de imprimir sete vezes
+              (pedido do dono, 22/10/2026). Mesma regra do "Imprimir fichas" do dia. */}
+          {!somenteLeitura && sedeId && (rotinasSemana ?? []).some(ocupaHorario) && (
+            <a
+              href={`/api/fichas/pdf?de=${datasSemana[0]}&ate=${datasSemana[datasSemana.length - 1]}&sede=${sedeId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-fantasma"
+            >
+              Imprimir fichas da semana
+            </a>
+          )}
           <AjudaAgenda aoComecarTutorial={() => setModo("dia")} somenteLeitura={somenteLeitura} />
         </div>
       ) : null}
@@ -910,6 +923,7 @@ export default function PaginaRotinas() {
           funcionarios={funcionariosVisiveis}
           rotinas={rotinasSemana ?? []}
           ausencias={ausenciasSemana ?? []}
+          tarefas={tarefas ?? []}
           parametros={params}
           datas={datasSemana}
           dataSelecionada={data}

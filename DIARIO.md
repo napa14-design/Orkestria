@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-10-22 — Visão semanal com totais e as fichas da semana num PDF só
+
+Pedido do dono: melhorar a visão semanal e imprimir as fichas da semana de uma
+vez, em vez de dia por dia. Escolhas dele: totais da semana, tarefas na
+célula; fichas por dia, só os dias com agenda.
+
+- **Fichas da semana:** botão "Imprimir fichas da semana" na barra da visão
+  semanal (mesma regra do "Imprimir fichas" do dia: o supervisor não imprime).
+  `GET /api/fichas/pdf?de=&ate=&sede=` (no máximo 7 dias; `?data=` continua) →
+  `gerarFichasPdf` com várias datas. As folhas saem por DIA — todas as de
+  segunda, depois as de terça —, dia sem nada planejado não gera folha e quem
+  está ausente no dia não ganha a folha daquele dia. `montarEntradas` lê o
+  período UMA vez, pela consulta composta sede + data (antes, o dia lia as
+  rotinas de todas as sedes e filtrava em memória). Cada data tem de ser real
+  e o período tem de terminar exatamente em `ate`: 9999-12-31 + 1 dia vira
+  "10000-01-01", que ordena antes, e 4 dias viravam uma leitura do histórico
+  inteiro da sede (bloqueio da segurança); 2099-02-30 passava no formato.
+- **Visão semanal:** coluna "Semana" (dias com tarefa, horas, ocupação média
+  da pessoa) e linha "Total do dia" (tarefas, horas, ocupação média de quem tem
+  tarefa, quantos em sobrecarga) — as mesmas funções do Painel
+  (`ocupacaoPorPessoa`, `resumoDeOcupacao`), respeitando o filtro de turno e
+  **sem o dia de quem está ausente** (a ausência não apaga os blocos, e o total
+  contava 8 h de quem tinha a célula "Falta" — auditoria). Passar o mouse numa
+  célula mostra as tarefas do dia, em ordem de horário. O botão de imprimir só
+  aparece se a semana tem bloco que conta (não só cancelados).
+
+Conferido na tela (modo memória): três dias com agenda numa semana de quatro
+pessoas → PDF de 12 páginas (o dia vazio ficou de fora); o de um dia, 4. A
+auditoria comparou a ficha de um dia antes × depois: idêntica byte a byte.
+9 testes novos (`testes/fichas-semana.test.ts`, `testes/semana-grid.test.ts`).
+
+Fica de fora: no celular não há "passar o mouse" — tocar na célula abre o dia,
+que já lista as tarefas. Fim de semana de quem não trabalha continua aparecendo
+como "— vazio —", e o sábado é medido com a jornada de segunda a sexta (não
+pedido agora).
+
+Arquivos: `services/fichaPdf.ts`, `app/api/fichas/pdf/route.ts`,
+`components/agenda/SemanaGrid.tsx`, `app/(app)/rotinas/page.tsx`,
+`testes/fichas-semana.test.ts`, `testes/semana-grid.test.ts`.
+
+---
+
 ## 2026-10-22 — Sede extra: o que ainda caía na sede principal
 
 Um coordenador registrou o mesmo eventual **três vezes** na sede extra dele:
