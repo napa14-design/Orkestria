@@ -7,6 +7,7 @@
 import {
   blocosOcupados,
   feriadoDoDia,
+  semCoberturas,
   statusPeriodoLetivo,
   tempoPrevistoMin,
   tempoVisualMin,
@@ -175,7 +176,10 @@ export async function salvarModelo(
           "Um modelo de evento não pode ser a rota padrão da sede: o \"Gerar o dia\" passaria a montar a programação do evento todo dia.",
       },
     ]);
-  const doDia = await getRotinasByData(dataOrigem, sedeId);
+  // O dia coberto pelo "Feita por" vira a ROTINA, não a cobertura: sem isto, a
+  // tarefa de quem faltou entrava no modelo no nome de quem cobriu — e o "Gerar"
+  // a montaria assim todo dia (auditoria, 22/10/2026).
+  const doDia = semCoberturas(await getRotinasByData(dataOrigem, sedeId));
   // Dia com remanejamento (uma troca por prioridade, por exemplo) é exceção: a
   // rota levaria a tarefa movida para quem cobriu e perderia a cedida.
   if (doDia.some((r) => r.status === "remanejada"))

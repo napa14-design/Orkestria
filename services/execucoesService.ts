@@ -4,13 +4,16 @@
  * A estrutura completa (tipos, aba no Sheets, API) já existe no MVP para que
  * a Fase 2 seja apenas a construção da tela de acompanhamento.
  */
-import { cobraDesvio, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
+import { cedidasNaCobertura, cobraDesvio, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem } from "@/lib/dateUtils";
-import type { ExecucaoRealizada, Perfil, StatusRealizado, StatusRotina } from "@/types";
+import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, somarDias } from "@/lib/dateUtils";
+import type { ExecucaoRealizada, Perfil, RotinaPlanejada, StatusRealizado, StatusRotina } from "@/types";
+import { noQuadro } from "@/lib/desligamento";
+import { podeAlterarSede, podeRegistrarRealizado, type SessaoUsuario } from "@/lib/permissions";
+import { ausenteEm } from "./ausenciasService";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
-import { getRotinasByData } from "./rotinasService";
+import { getRotinasByData, updateRotina } from "./rotinasService";
 
 /** O que o supervisor (perfil de chão) registra: feita ou não, e como foi feita. */
 export const STATUS_DO_SUPERVISOR: readonly StatusRealizado[] = [
@@ -55,6 +58,11 @@ export interface ResultadoFechamentoDia {
   aguardando_horario: number;
   /** Exigem EPI e a declaração não foi feita. */
   sem_declaracao: number;
+  /**
+   * O titular está ausente no dia: confirmar seria creditar a quem faltou. Fica
+   * para o "Feita por…" ou o "Não feita".
+   */
+  de_ausentes: number;
   /** EPIs que a declaração cobriu, por nome, para ecoar na tela. */
   epis_declarados: string[];
 }
@@ -90,6 +98,11 @@ export async function confirmarDiaComoPlanejado(
     ds.listar("requisitos"),
     ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: opts.sedeId }]),
   ]);
+  // Por funcionário, como o `ausenteEm`: pela sede gravada na ausência, quem foi
+  // transferido depois dela escapava e voltava a ser creditado (revisão de segurança).
+  const funcsDoDia = [...new Set(rotinas.map((r) => r.funcionario_id))];
+  const ausenciasDoDia = await Promise.all(funcsDoDia.map((id) => ausenteEm(id, opts.data)));
+  const ausentes = new Set(funcsDoDia.filter((_, i) => ausenciasDoDia[i]));
 
   const jaRegistrada = new Set(execucoes.map((e) => e.rotina_id));
   const nomeDoEpi = new Map(requisitos.filter((r) => r.tipo === "epi").map((r) => [r.id, r.nome]));
@@ -112,6 +125,7 @@ export async function confirmarDiaComoPlanejado(
     ja_registradas: 0,
     aguardando_horario: 0,
     sem_declaracao: 0,
+    de_ausentes: 0,
     epis_declarados: [],
   };
   const declarados = new Set<string>();
@@ -123,6 +137,10 @@ export async function confirmarDiaComoPlanejado(
     // não fechavam com o total do dia e ninguém saberia dizer por quê.
     if (jaRegistrada.has(rotina.id) || (rotina.status !== "planejada" && rotina.status !== "pendente")) {
       res.ja_registradas++;
+      continue;
+    }
+    if (ausentes.has(rotina.funcionario_id)) {
+      res.de_ausentes++;
       continue;
     }
     if (rotina.fim_planejado > limite) {
@@ -211,6 +229,10 @@ export async function registrarExecucao(
   // de execução — o coordenador também cancela direto na rotina (auditoria).
   if (restrito && (rotina.status === "cancelada" || rotina.status === "remanejada"))
     throw new ErroPermissao("Esta tarefa foi cancelada ou remanejada pelo coordenador — só ele altera.");
+  // Coberta por colega ("Feita por"): o supervisor não a troca para "não feita"
+  // — seria jogar uma falha em quem cobriu (revisão de segurança, 21/10/2026).
+  if (restrito && rotina.titular_id && STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] !== "realizada")
+    throw new ErroPermissao("Esta tarefa foi coberta por um colega — só o coordenador muda o registro.");
   // "Foi feita" antes de a tarefa terminar é afirmação sem lastro — mesma régua
   // do "fechar o dia" (`limite` em confirmarDiaComoPlanejado). Para o
   // coordenador, só o que afirma realização: cancelar, remanejar ou "não vai
@@ -221,6 +243,22 @@ export async function registrarExecucao(
   if ((restrito || STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] === "realizada") && rotina.fim_planejado > limite)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "AINDA_NAO_TERMINOU", mensagem: "Esta tarefa ainda não terminou — registre depois do horário dela." },
+    ]);
+  // "Feita" na tarefa de quem tem ausência no dia creditaria a quem faltou: o
+  // supervisor usa o "Feita por…". A tela já escondia o botão; isto fecha a
+  // chamada direta (auditoria, 21/10/2026). O coordenador passa — dia parcial
+  // (saiu mais cedo) é decisão dele, e a tela dele abre em "não feita".
+  if (
+    restrito &&
+    STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] === "realizada" &&
+    (await ausenteEm(rotina.funcionario_id, rotina.data))
+  )
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "TITULAR_AUSENTE",
+        mensagem: "Quem está nesta tarefa está ausente no dia — use “Feita por…” ou “Não feita”.",
+      },
     ]);
   // Campo a campo, e não `...dados`: o corpo do pedido não escolhe id, data nem
   // sede. A data é a da rotina — outra data criava um registro paralelo.
@@ -348,4 +386,199 @@ export async function registrarExecucao(
   });
 
   return execucao;
+}
+
+/**
+ * "Feita por <colega>" — a tarefa de quem está ausente foi feita por outra
+ * pessoa. Antes, o "Feita" creditava a quem faltou, e só o coordenador, pela
+ * Central, conseguia passar a tarefa para quem cobriu (pedido do dono,
+ * 21/10/2026: supervisor e coordenador marcam no Acompanhamento).
+ *
+ * O poder novo do supervisor — mudar de quem é a tarefa — fica preso aqui:
+ * só tarefa de quem tem ausência lançada no dia, ainda sem registro, já
+ * terminada (e, para o supervisor, de no máximo 7 dias atrás); só para colega
+ * da mesma sede, no quadro e presente. A troca passa por `updateRotina`, com
+ * as checagens da agenda (gênero, requisito, escala, intervalo, sobreposição)
+ * e sem autorização manual. Tudo o que dá para conferir é conferido ANTES da
+ * primeira escrita (revisão de segurança, 21/10/2026).
+ */
+export async function registrarFeitaPor(
+  rotinaId: string,
+  colegaId: string,
+  sessao: SessaoUsuario,
+  declaroEpi: boolean,
+): Promise<ExecucaoRealizada> {
+  const ds = await getDataSource();
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  const rotina = await ds.obter("rotinas_planejadas", rotinaId);
+  // Escopo antes de qualquer regra, e a MESMA resposta para "não existe" e "é de
+  // outra sede": 403 × 422 dizia quais ids existem fora dela (revisão de segurança).
+  if (!rotina || !podeRegistrarRealizado(sessao) || !podeAlterarSede(sessao, rotina.sede_id))
+    throw new ErroPermissao("Tarefa não encontrada nas sedes que você opera.");
+
+  if (rotina.status !== "planejada" && rotina.status !== "pendente")
+    throw recusa("FEITA_POR_JA_DECIDIDA", "Esta tarefa já foi registrada, cancelada ou remanejada.");
+  const registros = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: rotina.id }]);
+  if (registros.some((e) => e.data_execucao === rotina.data))
+    throw recusa("FEITA_POR_JA_DECIDIDA", "Esta tarefa já tem registro — reabra pelo coordenador.");
+  const hoje = hojeISO();
+  const limite = rotina.data > hoje ? "00:00" : rotina.data === hoje ? agoraHHMM() : "23:59";
+  if (rotina.fim_planejado > limite)
+    throw recusa("AINDA_NAO_TERMINOU", "Esta tarefa ainda não terminou — registre depois do horário dela.");
+  // O supervisor não reescreve o planejado de meses atrás: a semana que a tela
+  // mostra como pendente. O coordenador corrige o resto.
+  if (sessao.perfil === "supervisor" && rotina.data < somarDias(hoje, -7))
+    throw recusa("FEITA_POR_ANTIGA", "Tarefa de mais de 7 dias — peça ao coordenador.");
+  // EPI antes de mexer: a falta da declaração era descoberta só DEPOIS da troca.
+  const epis = await episDaTarefa(rotina.tarefa_id);
+  if (epis.length > 0 && !declaroEpi)
+    throw recusa("EPI_EXIGE_CONFIRMACAO", `Esta tarefa exige EPI: confirme a declaração (${epis.join(", ")}).`);
+  if (!(await ausenteEm(rotina.funcionario_id, rotina.data)))
+    throw recusa("FEITA_POR_SEM_AUSENCIA", "Só a tarefa de quem está ausente no dia pode ser marcada como feita por outra pessoa.");
+
+  const colega = await ds.obter("funcionarios", colegaId);
+  // Uma mensagem só para "não existe" e "é de outra sede": não revela ids alheios.
+  if (!colega || colega.sede_id !== rotina.sede_id || colega.id === rotina.funcionario_id || !noQuadro(colega, rotina.data))
+    throw recusa("FEITA_POR_COLEGA_INVALIDO", "Escolha um colega da mesma sede, em atividade.");
+  // Antes do `updateRotina`: a mensagem de ausência dele cita o TIPO (atestado…).
+  if (await ausenteEm(colega.id, rotina.data))
+    throw recusa("FEITA_POR_COLEGA_AUSENTE", `${colega.nome} também está ausente neste dia.`);
+
+  const titular = await ds.obter("funcionarios", rotina.funcionario_id);
+  const observacaoAntes = rotina.observacao ?? "";
+  // Tarefas do colega que encostam na faixa: ele trocou uma pela outra (decisão
+  // do dono, 21/10/2026 — quase sempre há, a DT roda a 96%). Só a que cabe
+  // INTEIRA na faixa vira remanejada (`cedidasNaCobertura`); a que só encosta
+  // fica com ele, e a troca aceita o choque com ela — e só com ela.
+  const ini = hhmmParaMin(rotina.inicio_planejado);
+  const fim = hhmmParaMin(rotina.fim_planejado);
+  const naFaixa = (await getRotinasByData(rotina.data, rotina.sede_id)).filter(
+    (r) =>
+      r.funcionario_id === colega.id &&
+      r.id !== rotina.id &&
+      ocupaHorario(r) &&
+      intervalosSobrepoem(ini, fim, hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)),
+  );
+  const tarefasDaFaixa = new Map(
+    await Promise.all(
+      [...new Set(naFaixa.map((r) => r.tarefa_id))].map(async (id) => [id, await ds.obter("tarefas", id)] as const),
+    ),
+  );
+  // Crítica do colega inteira na faixa: não sai da medição e, ficando, o
+  // "Fechar o dia" confirmaria as duas no mesmo horário. Quem sabe se ela foi
+  // feita é o coordenador (decisão do dono, 21/10/2026).
+  const critica = naFaixa.find(
+    (r) =>
+      tarefasDaFaixa.get(r.tarefa_id)?.critica &&
+      !tarefasDaFaixa.get(r.tarefa_id)?.espera &&
+      hhmmParaMin(r.inicio_planejado) >= ini &&
+      hhmmParaMin(r.fim_planejado) <= fim,
+  );
+  if (critica)
+    throw recusa(
+      "FEITA_POR_CRITICA",
+      `${colega.nome} tem tarefa crítica entre ${critica.inicio_planejado} e ${critica.fim_planejado} — o coordenador decide pela Central do dia.`,
+    );
+  const cedidas = cedidasNaCobertura(rotina, naFaixa, (id) => tarefasDaFaixa.get(id) ?? undefined);
+  // Cedida com decisão (status ou registro) não se mexe: remanejá-la sobrescrevia
+  // o registro de outra pessoa — e o desfazer o apagaria.
+  const registrosDoDia = new Set(
+    (await getExecucoes(rotina.data, rotina.data, rotina.sede_id)).map((e) => e.rotina_id),
+  );
+  for (const r of cedidas)
+    if ((r.status !== "planejada" && r.status !== "pendente") || registrosDoDia.has(r.id))
+      throw recusa(
+        "FEITA_POR_SOBREPOSICAO_REGISTRADA",
+        `${colega.nome} já tem tarefa registrada entre ${r.inicio_planejado} e ${r.fim_planejado} — ajuste pelo coordenador.`,
+      );
+  const tarefaNome = (await ds.obter("tarefas", rotina.tarefa_id))?.nome_tarefa ?? "a tarefa";
+
+  // Primeiro libera o horário (cedidas remanejadas, com o motivo), depois move:
+  // ao contrário, o `updateRotina` veria o choque e recusaria. Qualquer falha
+  // daqui em diante desfaz tudo o que este pedido gravou.
+  let moveu = false;
+  try {
+    for (const cedida of cedidas) {
+      await registrarExecucao(
+        {
+          rotina_id: cedida.id,
+          data_execucao: cedida.data,
+          status_realizado: "remanejada",
+          inicio_real: "",
+          fim_real: "",
+          tempo_real_min: 0,
+          justificativa: `${colega.nome} cobriu “${tarefaNome}” de ${titular?.nome ?? "titular"} (ausente) neste horário.`,
+          observacao: "Feita por colega no Acompanhamento.",
+          supervisor_id: sessao.id,
+          epis_confirmados: "",
+        },
+        // Perfil de quem PLANEJA de propósito: "remanejada" é consequência que o
+        // servidor decidiu (a pessoa estava na outra tarefa), não uma escolha
+        // livre do supervisor — ele continua sem remanejar pela porta comum. E só
+        // entra o que cabe inteiro na faixa coberta, nunca crítica.
+        { perfil: "coordenador" },
+      );
+    }
+    // A porta da agenda, sem `forcar`: gênero, requisito, escala, intervalo e
+    // sobreposição recusam (menos o choque com as tarefas dele que só encostam);
+    // o alerta de sobrecarga passa. Recusa aqui não grava.
+    await updateRotina(rotina.id, {
+      funcionario_id: colega.id,
+      observacao: [observacaoAntes, `Coberta por ${colega.nome} — ${titular?.nome ?? "titular"} ausente`].filter(Boolean).join(" · "),
+    }, { ignorarChoqueCom: naFaixa.map((r) => r.id) });
+    moveu = true;
+    await ds.atualizar("rotinas_planejadas", rotina.id, { titular_id: rotina.funcionario_id, atualizado_em: agoraISO() });
+    return await registrarExecucao(
+      {
+        rotina_id: rotina.id,
+        data_execucao: rotina.data,
+        status_realizado: "conforme_planejado",
+        inicio_real: rotina.inicio_planejado,
+        fim_real: rotina.fim_planejado,
+        tempo_real_min: rotina.tempo_previsto_min,
+        justificativa: "",
+        observacao: `Feita por ${colega.nome}, cobrindo a ausência de ${titular?.nome ?? "titular"}.`,
+        supervisor_id: sessao.id,
+        // Nomes do CADASTRO da tarefa, nunca do cliente (como no "✓ Feita · EPI").
+        epis_confirmados: epis.join(", "),
+      },
+      { perfil: sessao.perfil, confirmacaoRapida: epis.length === 0 },
+    );
+  } catch (e) {
+    // Nenhuma destas tinha registro no dia (conferido acima), então todo
+    // registro delas na data é deste pedido — inclusive o que o
+    // `registrarExecucao` grava antes de falhar ao mudar o status, que a versão
+    // anterior deixava: quem faltou ficava com um "conforme" (auditoria).
+    const apagarRegistros = async (rotinaId: string) => {
+      const doRotina = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: rotinaId }]);
+      for (const ex of doRotina) if (ex.data_execucao === rotina.data) await ds.excluir("execucoes_realizadas", ex.id);
+    };
+    try {
+      // A tarefa não fica no nome do colega sem o realizado que justifica a troca
+      // — mas só desfaz se ainda for o colega DESTE pedido: outro pedido em
+      // paralelo pode ter gravado depois, e voltar ao titular creditaria a quem faltou.
+      // Sem a troca, este pedido não gravou registro da coberta: apagar ali só
+      // acharia o de OUTRO pedido, que passou no meio (auditoria).
+      const agora = moveu ? await ds.obter("rotinas_planejadas", rotina.id) : null;
+      if (moveu && agora?.funcionario_id === colega.id && agora.status !== "realizada") {
+        await ds.atualizar("rotinas_planejadas", rotina.id, {
+          funcionario_id: rotina.funcionario_id,
+          observacao: observacaoAntes,
+          titular_id: "",
+          status: rotina.status,
+          atualizado_em: agoraISO(),
+        });
+        await apagarRegistros(rotina.id);
+      }
+      // As cedidas voltam: ninguém perde a tarefa numa cobertura que não aconteceu.
+      for (const cedida of cedidas) {
+        await apagarRegistros(cedida.id);
+        if ((await ds.obter("rotinas_planejadas", cedida.id))?.status === "remanejada")
+          await ds.atualizar("rotinas_planejadas", cedida.id, { status: cedida.status, atualizado_em: agoraISO() });
+      }
+    } catch (desfazer) {
+      console.error("[feita-por] não consegui desfazer a cobertura", rotina.id, desfazer);
+    }
+    throw e;
+  }
 }

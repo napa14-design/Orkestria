@@ -11,6 +11,7 @@ import useSWR from "swr";
 import Modal from "@/components/Modal";
 import { useSessao } from "@/components/SessaoContexto";
 import {
+  cedidasNaCobertura,
   cobraDesvio,
   desvioPercentual,
   exigeJustificativa,
@@ -27,6 +28,7 @@ import {
   hojeISO,
 } from "@/lib/dateUtils";
 import type {
+  Ausencia,
   ExecucaoRealizada,
   Funcionario,
   Local,
@@ -123,6 +125,14 @@ export default function PaginaAcompanhamento() {
     fetcher,
   );
   const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  // Quem está ausente no dia: a tarefa dela não leva "✓ Feita" (creditaria a
+  // quem faltou), e sim "Feita por…" — passa para quem cobriu (21/10/2026).
+  const { data: ausenciasDoDia } = useSWR<Ausencia[]>(
+    sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null,
+    fetcher,
+  );
+  const ausentes = useMemo(() => new Set((ausenciasDoDia ?? []).map((a) => a.funcionario_id)), [ausenciasDoDia]);
+  const [feitaPor, setFeitaPor] = useState<RotinaPlanejada | null>(null);
   const params = parametros ?? PARAMETROS_PADRAO;
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
@@ -217,12 +227,14 @@ export default function PaginaAcompanhamento() {
    */
   const fechamento = useMemo(() => {
     // Futuro ≠ hoje: num dia futuro nada terminou, seja que hora for.
-    const alvos = linhas.filter(
+    const passadas = linhas.filter(
       (r) =>
         !execucaoPorRotina.has(r.id) &&
         (r.status === "planejada" || r.status === "pendente") &&
         r.fim_planejado <= limiteDoDia,
     );
+    // O servidor não fecha a tarefa de quem faltou (creditaria a ela): a conta também não.
+    const alvos = passadas.filter((r) => !ausentes.has(r.funcionario_id));
     const epis = new Set<string>();
     let comEpi = 0;
     for (const r of alvos) {
@@ -235,8 +247,8 @@ export default function PaginaAcompanhamento() {
       if (nomes.length > 0) comEpi++;
       for (const n of nomes) epis.add(n);
     }
-    return { total: alvos.length, comEpi, epis: [...epis].sort() };
-  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia]);
+    return { total: alvos.length, deAusentes: passadas.length - alvos.length, comEpi, epis: [...epis].sort() };
+  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia, ausentes]);
 
   async function fecharDia() {
     if (!confirmandoFechamento) {
@@ -252,6 +264,7 @@ export default function PaginaAcompanhamento() {
         ja_registradas: number;
         aguardando_horario: number;
         sem_declaracao: number;
+        de_ausentes: number;
         epis_declarados: string[];
       }>("/api/execucoes/confirmar-dia", { sede: sedeId, data, declarar_epi: declararEpi });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
@@ -262,6 +275,9 @@ export default function PaginaAcompanhamento() {
           (r.epis_declarados.length > 0 ? ` (EPIs declarados: ${r.epis_declarados.join(", ")})` : "") +
           (r.sem_declaracao > 0
             ? ` · ${r.sem_declaracao} exigem EPI e ficaram de fora — registre uma a uma ou marque a declaração`
+            : "") +
+          (r.de_ausentes > 0
+            ? ` · ${r.de_ausentes} são de quem faltou — use "Feita por…" ou "Não feita"`
             : "") +
           (r.aguardando_horario > 0 ? ` · ${r.aguardando_horario} ainda não terminaram` : "") +
           ".",
@@ -361,6 +377,46 @@ export default function PaginaAcompanhamento() {
     }
   }
 
+  /** "Feita por <colega>": a tarefa de quem está ausente passa para quem cobriu, já feita. */
+  async function registrarFeitaPor(rotina: RotinaPlanejada, colegaId: string) {
+    setProcessandoRapido((atuais) => new Set(atuais).add(rotina.id));
+    try {
+      await apiPost("/api/execucoes/feita-por", {
+        rotina_id: rotina.id,
+        funcionario_id: colegaId,
+        declaro_epi: tarefaExigeEpi(rotina.tarefa_id),
+      });
+      lembrarMarcada(rotina.id);
+      setFeitaPor(null);
+      setMensagem({ texto: `Marcada como feita por ${funcPorId.get(colegaId)?.nome ?? "colega"}.`, efemera: true });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+    } catch (err) {
+      throw err instanceof ErroApi ? err : new Error("Não foi possível registrar.");
+    } finally {
+      setProcessandoRapido((atuais) => {
+        const proximos = new Set(atuais);
+        proximos.delete(rotina.id);
+        return proximos;
+      });
+    }
+  }
+
+  /** Botão "Feita por…" — só para tarefa de quem está ausente, ainda sem registro. */
+  function botaoFeitaPor(r: RotinaPlanejada) {
+    const cedo = r.fim_planejado > limiteDoDia;
+    return (
+      <button
+        type="button"
+        className="btn btn-mini btn-conforme"
+        disabled={processandoRapido.has(r.id) || cedo}
+        title={cedo ? "Ainda não terminou — marque depois do horário" : "Escolha quem fez no lugar de quem faltou"}
+        onClick={() => setFeitaPor(r)}
+      >
+        {processandoRapido.has(r.id) ? "…" : "Feita por…"}
+      </button>
+    );
+  }
+
   /** Os dois botões do supervisor — no cartão do celular e na tabela. */
   function acoesDoSupervisor(r: RotinaPlanejada) {
     const exec = execucaoPorRotina.get(r.id);
@@ -381,7 +437,9 @@ export default function PaginaAcompanhamento() {
             ✓ Feita · EPI
           </span>
         )}
-        {!feita && (
+        {/* Quem está ausente não fez: "✓ Feita" creditaria a ela. */}
+        {!feita && !exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
+        {!feita && !ausentes.has(r.funcionario_id) && (
           <button
             type="button"
             className="btn btn-mini btn-conforme"
@@ -617,6 +675,9 @@ export default function PaginaAcompanhamento() {
                 registro. Registre acima o que fugiu do plano — depois feche o resto de uma vez.
               </>
             )}
+            {fechamento.deAusentes > 0 && (
+              <> As {fechamento.deAusentes} de quem está ausente ficam de fora: use “Feita por…” ou “Não feita”.</>
+            )}
           </span>
           {fechamento.epis.length > 0 && (
             <label style={{ display: "flex", gap: 6, fontSize: 12, color: "var(--tinta-2)", alignItems: "flex-start" }}>
@@ -721,6 +782,7 @@ export default function PaginaAcompanhamento() {
                   </span>
                   {/* Com o filtro numa pessoa, repetir o nome em cada linha é ruído. */}
                   {!(ehSupervisor && filtroEfetivo) && <strong>{funcPorId.get(r.funcionario_id)?.nome ?? "?"}</strong>}
+                  {ausentes.has(r.funcionario_id) && <span className="selo selo-laranja">Ausente</span>}
                   {r.status !== "planejada" && <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>}
                 </div>
                 <div className="acomp-cartao-tarefa">
@@ -763,7 +825,8 @@ export default function PaginaAcompanhamento() {
                 <div className="acomp-cartao-acoes">{acoesDoSupervisor(r)}</div>
               ) : !decididaPeloCoordenador(r) && (
               <div className="acomp-cartao-acoes">
-                {!exec && !exigeEpi && (
+                {!exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
+                {!exec && !exigeEpi && !ausentes.has(r.funcionario_id) && (
                   <button
                     type="button"
                     className="btn btn-mini btn-conforme"
@@ -774,6 +837,12 @@ export default function PaginaAcompanhamento() {
                     {confirmando ? "Confirmando…" : "✓ Conforme"}
                   </button>
                 )}
+                {/* Quem faltou: o formulário completo abriria em "conforme" e creditaria a ela. */}
+                {!exec && ausentes.has(r.funcionario_id) ? (
+                  <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setNaoFeita(r)}>
+                    ✗ Não feita
+                  </button>
+                ) : (
                 <button
                   type="button"
                   className={`btn btn-mini ${exec ? "btn-fantasma" : exigeEpi ? "btn-primario" : "btn-fantasma"}`}
@@ -788,6 +857,7 @@ export default function PaginaAcompanhamento() {
                         ? "Confirmar + EPI"
                         : "Houve desvio"}
                 </button>
+                )}
               </div>
               )}
             </div>
@@ -832,7 +902,14 @@ export default function PaginaAcompanhamento() {
                   : null;
               return (
                 <tr key={r.id}>
-                  <td style={{ fontWeight: 600 }}>{funcPorId.get(r.funcionario_id)?.nome ?? "?"}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {funcPorId.get(r.funcionario_id)?.nome ?? "?"}
+                    {ausentes.has(r.funcionario_id) && (
+                      <span className="selo selo-laranja" style={{ marginLeft: 6 }}>
+                        Ausente
+                      </span>
+                    )}
+                  </td>
                   <td>
                     {tarefa?.nome_tarefa ?? "Tarefa"}
                     <div style={{ fontSize: 11, color: "var(--tinta-3)" }}>
@@ -876,7 +953,8 @@ export default function PaginaAcompanhamento() {
                       <div className="acompanhamento-acoes-tabela">{acoesDoSupervisor(r)}</div>
                     ) : !decididaPeloCoordenador(r) && (
                     <div className="acompanhamento-acoes-tabela">
-                      {!exec && !exigeEpi && (
+                      {!exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
+                      {!exec && !exigeEpi && !ausentes.has(r.funcionario_id) && (
                         <button
                           type="button"
                           className="btn btn-mini btn-conforme"
@@ -887,6 +965,11 @@ export default function PaginaAcompanhamento() {
                           {confirmando ? "Confirmando…" : "✓ Conforme"}
                         </button>
                       )}
+                      {!exec && ausentes.has(r.funcionario_id) ? (
+                        <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setNaoFeita(r)}>
+                          ✗ Não feita
+                        </button>
+                      ) : (
                       <button
                         type="button"
                         className={`btn btn-mini ${exec ? "btn-fantasma" : exigeEpi ? "btn-primario" : "btn-fantasma"}`}
@@ -901,6 +984,7 @@ export default function PaginaAcompanhamento() {
                               ? "Confirmar + EPI"
                               : "Desvio"}
                       </button>
+                      )}
                     </div>
                     )}
                   </td>
@@ -1081,11 +1165,123 @@ export default function PaginaAcompanhamento() {
       {naoFeita && (
         <NaoFeitaModal
           titulo={tarefaPorId.get(naoFeita.tarefa_id)?.nome_tarefa ?? "Tarefa"}
+          motivoInicial={ausentes.has(naoFeita.funcionario_id) ? "Funcionário faltou" : ""}
           aoFechar={() => setNaoFeita(null)}
           aoConfirmar={(motivo) => registrarNaoFeita(naoFeita, motivo)}
         />
       )}
+
+      {feitaPor && (
+        <FeitaPorModal
+          titulo={tarefaPorId.get(feitaPor.tarefa_id)?.nome_tarefa ?? "Tarefa"}
+          ausente={funcPorId.get(feitaPor.funcionario_id)?.nome ?? "quem faltou"}
+          epis={episDe(feitaPor.tarefa_id)}
+          // Colegas da sede, em atividade e presentes no dia (o servidor confere de novo).
+          colegas={(funcionarios ?? [])
+            .filter((f) => f.ativo !== false && f.id !== feitaPor.funcionario_id && !ausentes.has(f.id))
+            .sort((a, b) => a.nome.localeCompare(b.nome))}
+          // A mesma regra do servidor: o supervisor vê o que sai da medição antes de confirmar.
+          remanejadas={(colegaId) =>
+            cedidasNaCobertura(
+              feitaPor,
+              (rotinas ?? []).filter((x) => x.funcionario_id === colegaId && x.id !== feitaPor.id),
+              (id) => tarefaPorId.get(id),
+            ).map((x) => `${x.inicio_planejado}–${x.fim_planejado} ${tarefaPorId.get(x.tarefa_id)?.nome_tarefa ?? "tarefa"}`)
+          }
+          aoFechar={() => setFeitaPor(null)}
+          aoConfirmar={(colegaId) => registrarFeitaPor(feitaPor, colegaId)}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * "Feita por…" — quem fez a tarefa de quem está ausente. Um toque no colega e
+ * confirmar; nas tarefas com EPI, confirmar é a declaração de uso (como o
+ * "✓ Feita · EPI"), e os EPIs ficam escritos à vista.
+ */
+function FeitaPorModal({
+  titulo,
+  ausente,
+  epis,
+  colegas,
+  remanejadas,
+  aoFechar,
+  aoConfirmar,
+}: {
+  titulo: string;
+  ausente: string;
+  epis: string[];
+  colegas: Funcionario[];
+  /** Tarefas do colega que viram remanejadas ("HH:MM–HH:MM nome"). */
+  remanejadas: (colegaId: string) => string[];
+  aoFechar: () => void;
+  aoConfirmar: (colegaId: string) => Promise<void>;
+}) {
+  const [colegaId, setColegaId] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const escolhido = colegas.find((c) => c.id === colegaId);
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!colegaId) return setErro("Escolha quem fez.");
+    setEnviando(true);
+    setErro("");
+    try {
+      await aoConfirmar(colegaId);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível registrar.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal titulo={`Feita por — ${titulo}`} aberto aoFechar={aoFechar} larguraMax={440}>
+      <form onSubmit={enviar} style={{ display: "grid", gap: 10 }}>
+        <span style={{ fontSize: 13, color: "var(--tinta-2)" }}>
+          {ausente} está ausente. Quem fez esta tarefa? Ela passa para o nome dessa pessoa, já como feita.
+        </span>
+        {colegas.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--tinta-3)", margin: 0 }}>Nenhum colega presente nesta sede hoje.</p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {colegas.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`btn btn-mini${colegaId === c.id ? " btn-primario" : ""}`}
+                aria-pressed={colegaId === c.id}
+                onClick={() => setColegaId(c.id)}
+              >
+                {c.nome}
+              </button>
+            ))}
+          </div>
+        )}
+        {escolhido && remanejadas(escolhido.id).length > 0 && (
+          <p style={{ fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
+            {escolhido.nome} deixou de fazer — fica como remanejada:{" "}
+            <strong>{remanejadas(escolhido.id).join(" · ")}</strong>
+          </p>
+        )}
+        {epis.length > 0 && (
+          <p style={{ fontSize: 12, color: "var(--acento)", margin: 0 }}>
+            Ao confirmar, você declara que os EPIs foram usados: <strong>{epis.join(", ")}</strong>.
+          </p>
+        )}
+        {erro && <div className="alerta alerta-erro">{erro}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button type="button" className="btn" onClick={aoFechar}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primario" disabled={enviando || !colegaId}>
+            {enviando ? "Registrando…" : escolhido ? `Feita por ${escolhido.nome}` : "Confirmar"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -1095,14 +1291,17 @@ const MOTIVOS_NAO_FEITA = ["Funcionário faltou", "Cobriu outra tarefa", "Faltou
 /** "✗ Não feita" do supervisor: o motivo e nada mais. */
 function NaoFeitaModal({
   titulo,
+  motivoInicial = "",
   aoFechar,
   aoConfirmar,
 }: {
   titulo: string;
+  /** Já escolhido ao abrir — "Funcionário faltou" quando a pessoa está ausente. */
+  motivoInicial?: string;
   aoFechar: () => void;
   aoConfirmar: (motivo: string) => Promise<void>;
 }) {
-  const [motivo, setMotivo] = useState("");
+  const [motivo, setMotivo] = useState(motivoInicial);
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);

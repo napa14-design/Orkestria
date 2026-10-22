@@ -7,6 +7,93 @@
 
 ---
 
+## 2026-10-21 — "Feita por…": a tarefa de quem faltou fica no nome de quem fez
+
+Pergunta do dono: as tarefas de quem faltou aparecem no Acompanhamento? Elas
+apareciam — no nome de quem faltou, sem marca nenhuma — e o "✓ Feita"
+creditava a ela. Só o coordenador, pela Central, passava a tarefa para quem
+cobriu. Decisão: supervisor **e** coordenador marcam no Acompanhamento.
+
+- **Tela:** cartão e linha de quem tem ausência no dia ganham a marca
+  **"Ausente"** (não "Faltou": o supervisor não vê o tipo — LGPD). No lugar do
+  "✓ Feita"/"✓ Conforme" (que creditaria a quem faltou) vem **"Feita por…"**:
+  um toque no colega e confirmar; nas tarefas com EPI, confirmar é a
+  declaração, com os EPIs escritos. O "✗ Não feita" já abre com "Funcionário
+  faltou". O coordenador também não vê mais o "Confirmar + EPI"/"Desvio"
+  nessas tarefas (o formulário abria em "conforme"): no lugar, "✗ Não feita".
+- **Servidor:** `POST /api/execucoes/feita-por` → `registrarFeitaPor`
+  (`services/execucoesService.ts`). Só tarefa de quem tem ausência na data,
+  planejada, sem registro e já terminada (supervisor: até 7 dias atrás); só
+  colega da mesma sede, no quadro e presente. A troca passa por
+  `updateRotina` **sem** autorização manual — gênero, requisito, escala e
+  intervalo recusam; sobrecarga passa. Tudo o que dá para conferir é conferido
+  antes da primeira escrita (EPI inclusive).
+- **Colega com tarefa no mesmo horário** (quase sempre — a DT roda a 96%):
+  decisão do dono, ele trocou uma pela outra. Vira **remanejada** só a tarefa
+  dele que cabe **inteira** na faixa coberta e não é crítica
+  (`cedidasNaCobertura`, `lib/calculations.ts` — a mesma regra mostra a lista
+  no modal antes de confirmar). A que só encosta fica com ele, planejada, e a
+  troca aceita o choque só com ela (`updateRotina` ganhou `ignorarChoqueCom`,
+  mais estreito que o `forcar`, num parâmetro interno à parte — no corpo do PUT
+  da agenda cai em `CAMPO_NAO_EDITAVEL`). Medido na rota real da DT: 86% das
+  coberturas só encostam — o bloco de 06:05–09:00 inteiro virava remanejado por
+  20 min cobertos, e dava para o supervisor esconder tarefa longa não feita
+  (bloqueio da segurança). Tarefa dele com registro — ou status — recusa.
+  **Crítica dele inteira na faixa recusa** (`FEITA_POR_CRITICA`, decisão do
+  dono): ficando, o "Fechar o dia" confirmaria as duas no mesmo horário; o
+  coordenador decide pela Central.
+- **Se algo falhar, tudo volta:** a tarefa ao titular (só se ainda for do
+  colega deste pedido), os registros que o pedido gravou (inclusive o que
+  ficava quando a falha era ao mudar o status — sobrava um "conforme" no nome
+  de quem faltou) e as do colega a planejadas. Se a falha vem antes da troca,
+  não apaga registro da coberta (só acharia o de outro pedido).
+- **Campo novo `titular_id`** na rotina (fim do schema; docs/02): o dono
+  original. Com ele, o supervisor não troca o registro para "não feita" — não
+  dá para jogar uma falha no colega que cobriu. O PUT da agenda não o edita.
+- **Copiar o dia copia a rotina, não a cobertura:** `semCoberturas`
+  (`lib/calculations.ts`) devolve a coberta ao titular, sem o campo nem a nota
+  da ausência, e a tarefa que o colega cedeu (remanejada inteira dentro da
+  coberta dele) a planejada. Uma função para os dois caminhos de cópia —
+  "Repetir o dia" (`duplicarDia`) e salvar como modelo/rota padrão
+  (`salvarModelo`, e com ele o "Usar este dia como padrão"). Sem isto, a rota
+  padrão gravava a tarefa de quem faltou no nome de quem cobriu, e o "Gerar" a
+  montaria assim todo dia. As outras remanejadas seguem fora, como em 20/10.
+- **Ninguém credita a quem faltou por outra porta:** o "Fechar o dia"
+  confirmava como feitas as tarefas de quem tinha ausência — agora pula e conta
+  à parte (`de_ausentes`), conferindo a ausência por funcionário, e a caixa da
+  tela já conta sem elas, com o aviso. O supervisor,
+  pela porta comum (`/api/execucoes`, `/conforme`), recebe `TITULAR_AUSENTE`;
+  o coordenador passa (dia parcial é decisão dele).
+- Rotina inexistente e de outra sede dão a mesma resposta (403); corpo que não
+  é JSON dá 400.
+
+Desenho revisto ANTES de codar pela segurança (quatro bloqueios: troca sem as
+regras da agenda; sobreposição aceita; desfazer sobrescrevendo outro pedido e
+EPI descoberto depois; supervisor podendo prejudicar o colega) — todos
+incorporados. Na revisão final, segurança bloqueou (o remanejamento sem
+limite) e a auditoria reprovou (desfazer incompleto, cópia levando o
+`titular_id`, sete mutações sobrevivendo); na segunda volta, a auditoria
+achou a cedida sumindo do "Repetir o dia" e as duas a opção interna exposta
+no PUT; na terceira, o modelo/rota padrão copiando a cobertura — tudo
+corrigido nesta entrega. 33 testes pela rota com o efeito lido do banco; 36
+mutações, 35 mortas (a que sobra é a trava de crítica dentro de
+`cedidasNaCobertura`, que o servidor recusa antes — ela serve ao modal).
+
+Fica de fora (documentado): se o colega fez de fato (quem afirma é o
+supervisor); ausência parcial (a ausência é por dia); dois POSTs simultâneos
+ainda podem criar dois registros — e, com colegas diferentes, remanejar as
+tarefas dos dois (corrida que já existia; pede id determinístico na execução).
+A marca "Ausente" da tela vem de `/api/ausencias?sede=` (sede gravada na
+ausência); para quem foi transferido depois dela, a tela não marca — o servidor
+ainda recusa o "Feita" do supervisor.
+
+Arquivos: `services/execucoesService.ts`, `app/api/execucoes/feita-por/route.ts`,
+`app/(app)/acompanhamento/page.tsx`, `types/RotinaPlanejada.ts`, `lib/schema.ts`,
+`docs/02-modelo-de-dados.md`, `lib/calculations.ts`, `services/rotinasService.ts`,
+`testes/feita-por.test.ts`, `testes/fechamento-dia.test.ts`.
+
+---
+
 ## 2026-10-21 — "Usar este dia como padrão" no lugar de "Preencher dias"
 
 Pedido do dono: *"temos que deixar mais fácil a rota padrão"*. O "⧉ Preencher

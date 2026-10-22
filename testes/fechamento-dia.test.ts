@@ -60,7 +60,7 @@ async function bloco(
 /** A soma das quatro contas tem de bater com os blocos do dia. */
 function somaFecha(res: Awaited<ReturnType<typeof confirmarDiaComoPlanejado>>, total: number) {
   expect(
-    res.confirmadas + res.ja_registradas + res.aguardando_horario + res.sem_declaracao,
+    res.confirmadas + res.ja_registradas + res.aguardando_horario + res.sem_declaracao + res.de_ausentes,
     `${JSON.stringify(res)} deveria somar ${total}`,
   ).toBe(total);
 }
@@ -185,6 +185,37 @@ describe("confirmarDiaComoPlanejado", () => {
     expect(res.ja_registradas).toBe(1);
     expect(res.sem_declaracao).toBe(1);
     somaFecha(res, 3);
+  });
+
+  it("não credita a quem faltou: o bloco do ausente fica para o \"Feita por…\"", async () => {
+    const t = await tarefaSemEpi("t-sem-epi");
+    await bloco("a1", ONTEM, "07:00", "07:10", t); // titular ausente no dia
+    await bloco("a2", ONTEM, "07:00", "07:10", t, { funcionario_id: "christus_f2" }); // colega presente
+    await ds.criar("ausencias", {
+      id: "aus1", funcionario_id: FUNC, sede_id: SEDE, tipo: "falta",
+      data_inicio: ONTEM, data_fim: ONTEM, observacao: "", criado_por: "t", atualizado_por: "t", ...aud,
+    });
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
+    expect(res.de_ausentes).toBe(1);
+    expect(res.confirmadas).toBe(1);
+    const execs = await getExecucoes(ONTEM, ONTEM, SEDE);
+    expect(execs.map((e) => e.rotina_id)).toEqual(["a2"]);
+    expect((await ds.obter("rotinas_planejadas", "a1"))?.status).toBe("planejada");
+    somaFecha(res, 2);
+  });
+
+  it("ausência lançada quando a pessoa era de OUTRA sede (transferida depois) também conta", async () => {
+    // A conferência é por funcionário: pela sede gravada na ausência, ela escapava.
+    const t = await tarefaSemEpi("t-sem-epi");
+    await bloco("tr1", ONTEM, "07:00", "07:10", t);
+    await ds.criar("ausencias", {
+      id: "aus-outra", funcionario_id: FUNC, sede_id: "christus_ald", tipo: "falta",
+      data_inicio: ONTEM, data_fim: ONTEM, observacao: "", criado_por: "t", atualizado_por: "t", ...aud,
+    });
+    const res = await confirmarDiaComoPlanejado({ sedeId: SEDE, data: ONTEM }, "sup", "coordenador");
+    expect(res.de_ausentes).toBe(1);
+    expect(res.confirmadas).toBe(0);
+    somaFecha(res, 1);
   });
 
   it("dia sem bloco nenhum devolve tudo zerado, sem quebrar", async () => {

@@ -41,4 +41,12 @@ export interface RotinaPlanejada {
    * mexe.
    */
   origem_inicio?: string;
+  /**
+   * Dono original quando a tarefa foi marcada "Feita por <colega>" no lugar de
+   * quem estava ausente (21/10/2026). Vazio = não houve cobertura. Com ele, o
+   * supervisor não troca o registro para "não feita" — não dá para jogar uma
+   * falha no colega que cobriu. Só se grava por `registrarFeitaPor`; o PUT da
+   * agenda não edita este campo.
+   */
+  titular_id?: string;
 }

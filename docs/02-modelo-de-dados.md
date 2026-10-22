@@ -131,6 +131,8 @@ local → fator do tipo no catálogo → `FATOR_POR_TIPO_LOCAL` (rede dos 12 ant
 | blocos_ocupados | número | teto(previsto / bloco) |
 | status | enum | planejada · realizada · nao_realizada · remanejada · cancelada · pendente |
 | observacao, supervisor_id, criado_em, atualizado_em | | |
+| origem_item_id, origem_inicio | string | item da rota padrão que gerou o bloco, e o início que ela mandava (alinhamento da geração) |
+| titular_id | string | dono original quando a tarefa foi marcada "Feita por <colega>" no lugar de quem estava ausente; vazio = sem cobertura. Com ele, o supervisor só registra "feita". Só `registrarFeitaPor` grava; o PUT da agenda não edita |
 
 ### execucoes_realizadas (Fase 2)
 | Campo | Tipo | Observação |

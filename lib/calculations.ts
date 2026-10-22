@@ -148,6 +148,73 @@ export function ocupaHorario(r: { status?: StatusRotina }): boolean {
 }
 
 /**
+ * O dia sem as exceções do "Feita por" — quem copia o dia ("Repetir o dia",
+ * salvar como modelo ou rota padrão) copia a ROTINA, não a cobertura. A coberta
+ * volta ao titular, sem o `titular_id` nem a nota da ausência; a tarefa que o
+ * colega cedeu para cobrir (remanejada, inteira dentro da coberta dele) volta a
+ * ser planejada. Uma função só para todo caminho de cópia: consertado um por
+ * vez, cada volta de auditoria achava o próximo (21–22/10/2026).
+ */
+export function semCoberturas<
+  R extends {
+    funcionario_id: string;
+    titular_id?: string;
+    observacao?: string;
+    status?: StatusRotina;
+    inicio_planejado: string;
+    fim_planejado: string;
+  },
+>(doDia: R[]): R[] {
+  const cobertas = doDia.filter((r) => r.titular_id && ocupaHorario(r));
+  const cedidaNumaCobertura = (r: R) =>
+    r.status === "remanejada" &&
+    cobertas.some(
+      (c) =>
+        c.funcionario_id === r.funcionario_id &&
+        c.inicio_planejado <= r.inicio_planejado &&
+        r.fim_planejado <= c.fim_planejado,
+    );
+  return doDia.map((r) => {
+    if (r.titular_id)
+      return {
+        ...r,
+        funcionario_id: r.titular_id,
+        titular_id: "",
+        observacao: (r.observacao ?? "")
+          .split(" · ")
+          .filter((p) => !p.startsWith("Coberta por "))
+          .join(" · "),
+      };
+    if (cedidaNumaCobertura(r)) return { ...r, status: "planejada" as StatusRotina };
+    return r;
+  });
+}
+
+/**
+ * "Feita por": das tarefas do colega que encostam na faixa coberta, as que ele
+ * deixou de fazer — e viram remanejadas. Só a que cabe INTEIRA na faixa e não é
+ * crítica: a que só encosta (o bloco de 3h das 06:05) ele fez quase toda, e
+ * remanejá-la escondia trabalho da medição (revisão de segurança e decisão do
+ * dono, 21/10/2026). A que só encosta fica com ele, sobreposta. Espera não disputa.
+ */
+export function cedidasNaCobertura<
+  R extends { inicio_planejado: string; fim_planejado: string; tarefa_id: string; status?: StatusRotina },
+>(coberta: { inicio_planejado: string; fim_planejado: string }, doColega: R[], tarefa: (id: string) => { espera?: boolean; critica?: boolean } | undefined): R[] {
+  const ini = hhmmParaMin(coberta.inicio_planejado);
+  const fim = hhmmParaMin(coberta.fim_planejado);
+  return doColega.filter((r) => {
+    const t = tarefa(r.tarefa_id);
+    return (
+      ocupaHorario(r) &&
+      !t?.espera &&
+      !t?.critica &&
+      hhmmParaMin(r.inicio_planejado) >= ini &&
+      hhmmParaMin(r.fim_planejado) <= fim
+    );
+  });
+}
+
+/**
  * Prioridade sugerida pelo TIPO do local, quando a tarefa não diz outra —
  * "derivado por padrão, configurável por exceção", como o fator acima.
  * Banheiro, copa e consultório não esperam; escada, área externa, almoxarifado

@@ -11,6 +11,7 @@ import {
   funcionarioNoDia,
   jornadaDoDia,
   ocupaHorario,
+  semCoberturas,
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
@@ -425,8 +426,23 @@ export async function updateRotina(
       | "tempo_previsto_min"
     >
   > & { forcar?: boolean; bloquearAlertas?: boolean },
+  /**
+   * Só para chamada INTERNA — parâmetro à parte de propósito: o PUT da agenda
+   * repassa o corpo inteiro em `mudancas`, e lá esta opção virava atalho para
+   * soltar a sobreposição sem o "(autorizado manualmente)" (revisão de
+   * segurança, 21/10/2026). No corpo, ela cai em CAMPO_NAO_EDITAVEL.
+   */
+  interno: {
+    /**
+     * Blocos do destino cujo choque de horário é aceito — e SÓ esses, ao
+     * contrário do `forcar`, que solta intervalo e expediente também. É o
+     * "Feita por": o colega cobriu no meio de uma tarefa dele que só encosta.
+     */
+    ignorarChoqueCom?: string[];
+  } = {},
 ): Promise<ResultadoRotina> {
   const { forcar, bloquearAlertas, ...dados } = mudancas;
+  const { ignorarChoqueCom } = interno;
   // O `Pick` acima só existe no TypeScript: o corpo do PUT chega inteiro. Sem esta
   // lista, `{ sede_id: "<outra sede>" }` passava direto para o banco — a rota
   // confere a sede ATUAL da rotina, não a de destino (auditoria de 14/10/2026).
@@ -515,11 +531,13 @@ export async function updateRotina(
   if (mudouPosicao) {
     await exigirPresenca(funcionario.id, funcionario.nome, destinoData);
     exigirEscala(funcionario, destinoData);
+    const ignorar = new Set(ignorarChoqueCom ?? []);
+    const doDestino = rotinasDoDia.filter(
+      (r) => r.funcionario_id === destinoFuncId && r.id !== id && !ignorar.has(r.id),
+    );
     const brutos = validarAlocacao({
       funcionario: funcionarioNoDia(funcionario, destinoData),
-      rotinasExistentes: rotinasDoDia.filter(
-        (r) => r.funcionario_id === destinoFuncId && r.id !== id,
-      ),
+      rotinasExistentes: doDestino,
       inicioMin,
       fimMin,
       tarefa: tarefa ?? undefined,
@@ -529,11 +547,7 @@ export async function updateRotina(
       requisitosCatalogo,
       qualificacoesFuncionario,
       data: destinoData,
-      tarefasEspera: await esperaEntreOsChoques(
-        rotinasDoDia.filter((r) => r.funcionario_id === destinoFuncId && r.id !== id),
-        inicioMin,
-        fimMin,
-      ),
+      tarefasEspera: await esperaEntreOsChoques(doDestino, inicioMin, fimMin),
     });
     const resultado = aplicarAutorizacaoManual(brutos, forcar);
     alertas = resultado.alertas;
@@ -571,7 +585,10 @@ export async function duplicarDia(
   const ds = await getDataSource();
   // Cancelada e remanejada não vão para o outro dia: a cedida numa troca é
   // exceção daquele dia, não rotina (auditoria, 20/10/2026).
-  const origem = (await getRotinasByData(dataOrigem, sedeId)).filter(ocupaHorario);
+  // Cobertura ("Feita por") também é exceção do dia: `semCoberturas` devolve a
+  // coberta ao titular e a cedida ao colega — com o `titular_id` na cópia, a
+  // trava do supervisor valia numa tarefa que ninguém cobriu (auditoria, 21/10/2026).
+  const origem = semCoberturas(await getRotinasByData(dataOrigem, sedeId)).filter(ocupaHorario);
   const agora = agoraISO();
   let copiadas = 0;
   let puladas = 0;
