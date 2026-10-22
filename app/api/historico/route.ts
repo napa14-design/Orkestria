@@ -34,9 +34,17 @@ export async function GET(req: Request) {
     const maisRecentes = { ordenarPor: "criado_em", decrescente: true, limite };
     let base;
     if (tabela) {
-      // Filtrar por tabela E ordenar exigiria índice composto (tabela +
-      // criado_em) publicado no Firestore — fica como estava até lá.
-      base = await ds.consultar("historico", [{ campo: "tabela", op: "==", valor: tabela }]);
+      // Só os mais recentes, ordenados no banco — a tabela de rotinas sozinha
+      // passa de 20 mil linhas de histórico, e cada uma é leitura cobrada
+      // (levantamento, 22/10/2026). Pede o índice composto (tabela + criado_em)
+      // de firestore.indexes.json: ⚠️ enquanto ele não estiver publicado, o
+      // Firestore recusa a consulta e cai no jeito antigo (lê a tabela toda).
+      try {
+        base = await ds.consultar("historico", [{ campo: "tabela", op: "==", valor: tabela }], maisRecentes);
+      } catch (e) {
+        console.warn("[historico] índice tabela+criado_em indisponível, lendo sem ordenar", e);
+        base = await ds.consultar("historico", [{ campo: "tabela", op: "==", valor: tabela }]);
+      }
     } else if (dias > 0) {
       // janela de tempo: criado_em >= (hoje − dias) — ISO compara como string
       const desde = `${somarDias(hojeISO(), -dias)}T00:00:00.000Z`;

@@ -15,6 +15,13 @@ import { usuarioAtual } from "./contextoUsuario";
 import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
 import type { MapaTabelas, NomeTabela } from "./schema";
 
+/**
+ * Tabelas que NÃO entram no histórico: o próprio histórico (recursão) e dado
+ * derivado que o sistema regrava sozinho — o cache do resumo do Chromos
+ * encheria o log de linhas que ninguém fez (22/10/2026).
+ */
+const SEM_HISTORICO: ReadonlySet<NomeTabela> = new Set<NomeTabela>(["historico", "cache_resumo"]);
+
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
 const CAMPOS_NOME = [
   "nome",
@@ -100,7 +107,7 @@ export class HistoricoDataSource implements DataSource {
     const usuario = usuarioAtual();
     const logs: OperacaoLote[] = [];
     for (const op of operacoes) {
-      if (op.tabela === "historico") continue; // sem recursão
+      if (SEM_HISTORICO.has(op.tabela)) continue; // sem recursão, sem dado derivado
       const registroId = op.tipo === "criar" ? (op.registro as { id: string }).id : op.id;
       const resumo =
         op.tipo === "criar"
@@ -133,7 +140,7 @@ export class HistoricoDataSource implements DataSource {
     acao: "criar" | "atualizar" | "excluir",
     resumo: string,
   ): Promise<void> {
-    if (tabela === "historico") return; // sem recursão
+    if (SEM_HISTORICO.has(tabela)) return; // sem recursão, sem dado derivado
     const registro = {
       id: crypto.randomUUID(),
       tabela,

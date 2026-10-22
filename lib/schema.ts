@@ -17,6 +17,7 @@ import type {
   PeriodoLetivo,
   QualificacaoFuncionario,
   RegistroHistorico,
+  CacheResumo,
   Requisito,
   RotinaPlanejada,
   Sede,
@@ -46,6 +47,7 @@ export interface MapaTabelas {
   periodos_letivos: PeriodoLetivo;
   feriados: Feriado;
   historico: RegistroHistorico;
+  cache_resumo: CacheResumo;
 }
 
 export type NomeTabela = keyof MapaTabelas;
@@ -332,6 +334,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("usuario"),
     col("criado_em"),
   ],
+  cache_resumo: [col("id"), col("corpo"), col("expira_em"), col("criado_em")],
 };
 
 /** Converte uma linha crua do Sheets (strings) no objeto tipado da tabela. */

@@ -4,7 +4,7 @@
  */
 import { CATEGORIA_APOIO_OUTRO_SETOR } from "@/lib/calculations";
 import { getDataSource } from "@/lib/datasource";
-import { limitesDeDatas, montarResumo } from "@/lib/resumoExecutivo";
+import { limitesDeDatas, mesCorrenteEmFortaleza, montarResumo } from "@/lib/resumoExecutivo";
 import { resolverParametros } from "./parametrosService";
 
 type Resumo = ReturnType<typeof montarResumo>;
@@ -14,12 +14,41 @@ type Resumo = ReturnType<typeof montarResumo>;
 const CACHE_MS = 5 * 60 * 1000;
 const cache = new Map<string, { corpo: Resumo; expiraEm: number }>();
 
+/**
+ * O cache em memória não passa de uma instância da Vercel para outra: cada
+ * período trocado no painel do Chromos voltava a ler o mês inteiro de todas as
+ * sedes (~9,5 mil leituras em outubro; os picos de 40 mil numa hora de 21/10).
+ * No banco (`cache_resumo`), a releitura custa UMA leitura. Período que já
+ * fechou quase não muda (só realizado lançado atrasado): guarda por um dia.
+ */
+const CACHE_BANCO_MS = 30 * 60 * 1000;
+const CACHE_BANCO_FECHADO_MS = 24 * 60 * 60 * 1000;
+
+function lembrar(chave: string, corpo: Resumo, agora: Date) {
+  // Com período, as chaves possíveis se multiplicam: o vencido sai ao guardar.
+  for (const [k, v] of cache) if (v.expiraEm <= agora.getTime()) cache.delete(k);
+  cache.set(chave, { corpo, expiraEm: agora.getTime() + CACHE_MS });
+}
+
 export async function resumoExecutivo(de: string, ate: string, agora = new Date()): Promise<Resumo> {
   const chave = `${de}..${ate}`;
   const guardado = cache.get(chave);
   if (guardado && guardado.expiraEm > agora.getTime()) return guardado.corpo;
 
   const ds = await getDataSource();
+  const idBanco = `${de}_${ate}`;
+  // Cache ilegível ou banco instável não derruba o resumo: segue para o cálculo.
+  try {
+    const noBanco = await ds.obter("cache_resumo", idBanco);
+    if (noBanco && Date.parse(noBanco.expira_em) > agora.getTime()) {
+      const corpo = JSON.parse(noBanco.corpo) as Resumo;
+      lembrar(chave, corpo, agora);
+      return corpo;
+    }
+  } catch (e) {
+    console.warn("[resumo] cache do banco não serviu", e);
+  }
+
   const { inicio, fim } = limitesDeDatas(de, ate);
   const [sedes, funcionarios, rotinas, execucoes, params, tarefasDeApoio] = await Promise.all([
     ds.listar("sedes"),
@@ -49,8 +78,17 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
     agora,
     tarefasDeApoio: new Set(tarefasDeApoio.map((t) => t.id)),
   });
-  // Com período, as chaves possíveis se multiplicam: o vencido sai ao guardar.
-  for (const [k, v] of cache) if (v.expiraEm <= agora.getTime()) cache.delete(k);
-  cache.set(chave, { corpo, expiraEm: agora.getTime() + CACHE_MS });
+  const fechado = ate < mesCorrenteEmFortaleza(agora);
+  try {
+    await ds.criar("cache_resumo", {
+      id: idBanco,
+      corpo: JSON.stringify(corpo),
+      expira_em: new Date(agora.getTime() + (fechado ? CACHE_BANCO_FECHADO_MS : CACHE_BANCO_MS)).toISOString(),
+      criado_em: agora.toISOString(),
+    });
+  } catch (e) {
+    console.warn("[resumo] não consegui guardar o cache no banco", e);
+  }
+  lembrar(chave, corpo, agora);
   return corpo;
 }

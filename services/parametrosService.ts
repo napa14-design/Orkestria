@@ -12,7 +12,21 @@ export async function getParametros(): Promise<Parametro[]> {
  * padrão do sistema ← sobrescrito por "geral" ← sobrescrito pela sede.
  */
 export async function resolverParametros(sedeId?: string): Promise<ParametrosResolvidos> {
-  const todos = (await getParametros()).filter((p) => p.ativo);
+  return resolverDaLista(await getParametros(), sedeId);
+}
+
+/**
+ * Várias sedes com UMA leitura da tabela: o Panorama pedia uma vez por sede, e
+ * cada pedido relia a tabela inteira (~11 leituras × 22 sedes; levantamento de
+ * leituras, 22/10/2026).
+ */
+export async function resolverParametrosDasSedes(sedeIds: string[]): Promise<Record<string, ParametrosResolvidos>> {
+  const todos = await getParametros();
+  return Object.fromEntries(sedeIds.map((id) => [id, resolverDaLista(todos, id)]));
+}
+
+function resolverDaLista(lista: Parametro[], sedeId?: string): ParametrosResolvidos {
+  const todos = lista.filter((p) => p.ativo);
   const resolvidos: ParametrosResolvidos = { ...PARAMETROS_PADRAO };
   const aplicar = (escopo: string) => {
     for (const p of todos.filter((x) => x.sede_id === escopo)) {

@@ -296,6 +296,21 @@ precisa logar manualmente.
 | usuario | string | e-mail da sessão ("sistema" quando automático) |
 | criado_em | ISO 8601 | |
 
+Não registra as próprias linhas nem as de `cache_resumo` (dado derivado que o
+sistema regrava sozinho).
+
+### cache_resumo
+Resumo do Chromos (`/api/chromos/resumo`) já calculado, para não reler o mês
+inteiro de todas as sedes a cada pedido (~9,5 mil leituras em outubro/2026).
+Uma releitura custa uma leitura. Dado **derivado**: fica fora do histórico.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| id | string | `<de>_<ate>`, ex.: `2026-10_2026-10` |
+| corpo | string | a resposta, em JSON |
+| expira_em | ISO 8601 | mês aberto: 30 min; período já fechado: 1 dia |
+| criado_em | ISO 8601 | |
+
 ### parametros
 | Campo | Tipo | Observação |
 |---|---|---|

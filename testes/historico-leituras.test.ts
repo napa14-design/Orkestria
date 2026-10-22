@@ -132,6 +132,35 @@ it("pede ao banco os mais recentes já ordenados e limitados, e devolve esses", 
   espiao.mockRestore();
 });
 
+it("com filtro de tabela também pede só os mais recentes; sem o índice publicado, cai no jeito antigo", async () => {
+  // Levantamento de 22/10/2026: o histórico de rotinas passa de 20 mil linhas.
+  const ds = await getDataSource();
+  const agora = Date.now();
+  for (let i = 0; i < 5; i++) {
+    await ds.criar("historico", {
+      id: `r${i}`, tabela: "rotinas_planejadas", registro_id: "x", acao: "atualizar", usuario: "a@x.com",
+      resumo: "", criado_em: new Date(agora - i * 60_000).toISOString(),
+    } as never);
+  }
+  await ds.criar("historico", {
+    id: "outra", tabela: "sedes", registro_id: "x", acao: "atualizar", usuario: "a@x.com", resumo: "", criado_em: new Date(agora).toISOString(),
+  } as never);
+  const original = ds.consultar.bind(ds); // ANTES do espião, senão ele chama a si mesmo
+  const espiao = vi.spyOn(ds, "consultar");
+  const pedir = async () =>
+    ((await (await GET(new Request("http://x/api/historico?tabela=rotinas_planejadas&limite=2"))).json()) as { id: string }[]).map((h) => h.id);
+  expect(await pedir()).toEqual(["r0", "r1"]);
+  expect(espiao.mock.calls.find(([t]) => t === "historico")?.[2]).toEqual({ ordenarPor: "criado_em", decrescente: true, limite: 2 });
+
+  // Firestore sem o índice composto: recusa a consulta ordenada → lê sem ordenar e corta aqui.
+  espiao.mockImplementation((async (tabela: string, cond: never, opcoes?: { ordenarPor?: string }) => {
+    if (tabela === "historico" && opcoes?.ordenarPor) throw new Error("FAILED_PRECONDITION: The query requires an index");
+    return original(tabela as never, cond, opcoes as never);
+  }) as never);
+  expect(await pedir()).toEqual(["r0", "r1"]);
+  espiao.mockRestore();
+});
+
 it("limite inválido na URL vira o padrão, nunca negativo ou fracionário", async () => {
   const ds = await getDataSource();
   const espiao = vi.spyOn(ds, "consultar");

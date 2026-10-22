@@ -81,12 +81,10 @@ export default function PaginaPanorama() {
   // Cada sede medida com os parâmetros DELA: sem `&sede`, todas usavam os da
   // principal (ou os globais, para o administrador) — 22/10/2026.
   const idsSedes = (sedes ?? []).filter((s) => s.ativo).map((s) => s.id);
+  // Uma chamada e uma leitura da tabela para todas as sedes (era uma por sede).
   const { data: paramsDaSede } = useSWR<Record<string, ParametrosResolvidos>>(
-    idsSedes.length ? `parametros-das-sedes:${idsSedes.join(",")}` : null,
-    () =>
-      Promise.all(
-        idsSedes.map((id) => fetcher(`/api/parametros?resolvidos=1&sede=${encodeURIComponent(id)}`) as Promise<ParametrosResolvidos>),
-      ).then((lista) => Object.fromEntries(idsSedes.map((id, i) => [id, lista[i]]))),
+    idsSedes.length ? `/api/parametros?resolvidos=1&sedes=${idsSedes.map(encodeURIComponent).join(",")}` : null,
+    fetcher,
   );
 
   // Métricas por sede (mesma lógica do Dashboard, mas para todas as sedes).

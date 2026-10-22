@@ -16,6 +16,14 @@
         { "fieldPath": "sede_id", "order": "ASCENDING" },
         { "fieldPath": "data_execucao", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "historico",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tabela", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

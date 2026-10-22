@@ -157,4 +157,6 @@ verificação do token por algo sem `jwks-rsa` (a API REST do Identity Toolkit,
   17 (≈17× leituras). **Deploy dos índices**: `firebase deploy --only
   firestore:indexes` (ou colar os campos no Console → Firestore → Índices) —
   necessário uma vez em produção. Ao criar nova consulta multi-campo, adicione o
-  índice lá. A tela de Histórico sem filtro de tabela ainda lê a coleção inteira.
+  índice lá. O Histórico **por tabela** (tabela + criado_em, 22/10/2026) também
+  depende de índice: até ele ser publicado, cai no jeito antigo e lê o histórico
+  inteiro daquela tabela.

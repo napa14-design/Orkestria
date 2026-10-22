@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-10-22 — Leituras: cache do resumo do Chromos, Histórico por tabela e Panorama
+
+Levantamento no console do Firebase (Firestore › Uso): 172 mil leituras em 24 h
+(≈ US$ 0,10/dia no Blaze), com picos de ~40 mil numa hora — um deles às 23 h,
+fora do expediente. O tamanho bate com o resumo que o Chromos pede ao abrir e a
+cada período trocado: **~9,5 mil leituras por pedido** (as 8.518 rotinas do mês
+de todas as sedes, 879 execuções, 149 funcionários), e o cache em memória de 5
+min não passa de uma instância da Vercel para outra. Sem o log da Vercel não
+dá para provar a hora a hora; o padrão bate.
+
+- **Cache do resumo no banco** (`cache_resumo`, tabela nova; docs/02): a
+  primeira geração calcula e guarda; as seguintes custam **1 leitura** — 30 min
+  no mês aberto, 1 dia em período já fechado. Dado derivado: fica fora do
+  histórico de alterações (`lib/historico.ts`, `SEM_HISTORICO`). Cache ilegível
+  ou banco instável não derrubam o resumo: recalcula.
+- **Histórico por tabela**: pede ao banco só os mais recentes, como já fazia
+  sem filtro (o histórico de rotinas passa de 20 mil linhas). Índice composto
+  novo em `firestore.indexes.json` (`historico`: tabela + criado_em); **até ser
+  publicado**, a consulta é recusada pelo Firestore e a rota cai no jeito
+  antigo — nada quebra.
+- **Panorama**: os parâmetros de todas as sedes numa chamada
+  (`/api/parametros?resolvidos=1&sedes=…`), com uma leitura da tabela em vez de
+  uma por sede (~240 → ~11 por abertura para quem vê as 22). Só as sedes que a
+  sessão alcança.
+
+Testes: `cache-resumo.test.ts`, `parametros-sedes.test.ts` e um caso novo em
+`historico-leituras.test.ts`; 9 mutações, todas mortas. Regras do Firestore
+bloqueiam todo acesso de cliente (só o servidor lê), então o cache não fica
+exposto.
+
+Para fazer uma vez: `firebase deploy --only firestore:indexes` (ou criar o
+índice no Console). Arquivos: `services/resumoExecutivoService.ts`,
+`types/CacheResumo.ts`, `lib/{schema,memoryStore,historico}.ts`,
+`app/api/historico/route.ts`, `firestore.indexes.json`,
+`services/parametrosService.ts`, `app/api/parametros/route.ts`,
+`app/(app)/panorama/page.tsx`, `docs/02-modelo-de-dados.md`, `CLAUDE.md`.
+
+---
+
 ## 2026-10-22 — Rotinas e execuções: período obrigatório, até 62 dias
 
 Achado pré-existente da revisão de segurança de hoje: `GET /api/rotinas`

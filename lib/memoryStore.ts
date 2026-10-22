@@ -210,6 +210,7 @@ function seed(): Banco {
     qualificacoes_funcionario: [],
     modelos_rotina: [],
     historico: [],
+    cache_resumo: [],
     ausencias: [],
     periodos_letivos: [],
     feriados: [],

@@ -4,12 +4,14 @@ import {
   limitarSedeConsulta,
   podeAlterarSede,
   podeEscrever,
+  sedesPermitidas,
 } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import {
   createParametro,
   getParametros,
   resolverParametros,
+  resolverParametrosDasSedes,
 } from "@/services/parametrosService";
 
 export async function GET(req: Request) {
@@ -19,6 +21,14 @@ export async function GET(req: Request) {
       sessao,
       url.searchParams.get("sede") ?? undefined,
     );
+    // ?resolvidos=1&sedes=A,B → { A: …, B: … } com uma leitura da tabela; só as
+    // sedes que a sessão alcança (as outras ficam de fora, sem erro).
+    const sedes = url.searchParams.get("sedes");
+    if (url.searchParams.get("resolvidos") && sedes !== null) {
+      const permitidas = sedesPermitidas(sessao);
+      const pedidas = [...new Set(sedes.split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 100);
+      return ok(await resolverParametrosDasSedes(pedidas.filter((s) => !permitidas || permitidas.includes(s))));
+    }
     // ?resolvidos=1&sede=X → parâmetros já mesclados (global + sede)
     if (url.searchParams.get("resolvidos")) {
       return ok(await resolverParametros(sede));
