@@ -7,6 +7,7 @@ import {
   getRotinasPeriodo,
 } from "@/services/rotinasService";
 import { getDataSource } from "@/lib/datasource";
+import { diasDoPeriodo, tetoDoPeriodo } from "@/lib/dateUtils";
 
 /**
  * GET /api/rotinas?data=YYYY-MM-DD[&sede=X]      → rotinas de um dia
@@ -23,7 +24,12 @@ export async function GET(req: Request) {
     if (data) return ok(await getRotinasByData(data, sede));
     const de = url.searchParams.get("de");
     const ate = url.searchParams.get("ate");
-    if (de && ate) return ok(await getRotinasPeriodo(de, ate, sede));
+    if (de && ate) {
+      const teto = tetoDoPeriodo(sede);
+      if (!diasDoPeriodo(de, ate, teto))
+        return ok({ erro: `Período inválido: use datas reais, com "de" antes de "até" e no máximo ${teto} dias.` }, 400);
+      return ok(await getRotinasPeriodo(de, ate, sede));
+    }
     return ok({ erro: "Informe ?data= ou ?de=&ate=." }, 400);
   });
 }

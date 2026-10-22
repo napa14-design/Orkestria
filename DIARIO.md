@@ -7,6 +7,60 @@
 
 ---
 
+## 2026-10-22 — Rotinas e execuções: período obrigatório, até 62 dias
+
+Achado pré-existente da revisão de segurança de hoje: `GET /api/rotinas`
+aceitava qualquer `de`/`ate`, de qualquer perfil — inclusive o supervisor.
+`?de=0000&ate=9999` devolvia o histórico inteiro da sede (o administrador sem
+`?sede`, de todas); no Firestore, cada documento é leitura paga. `GET
+/api/execucoes` era pior: `de`/`ate` opcionais, e sem os dois a consulta caía
+em `listar` — a coleção inteira. Painel e Produtividade com o "De" apagado
+mandavam `?de=&ate=X`, que lia tudo até hoje.
+
+Agora as duas rotas exigem o período, de **datas reais** (2026-02-30 não
+passa), com `de` ≤ `ate` e **no máximo 62 dias**; fora disso, 400 antes de
+tocar o banco. A virada `9999-12-31 + 1 = "10000-01-01"` (que ordena antes
+como texto) também é recusada. 62 porque o maior uso legítimo é o mês dos
+Relatórios e os 31 dias de histórico da Agenda; sobra folga para dois meses no
+Painel. Todos os chamadores já mandavam `de` e `ate`.
+
+- `lib/dateUtils.ts`: `dataReal`, `diasDoPeriodo` e `MAX_DIAS_PERIODO` — a
+  ideia da ficha da semana (cada dia real, o laço termina em `ate`), extraída.
+  A rota das fichas ainda tem a versão própria, fora deste ramo.
+- **Painel, Produtividade e Panorama** (datas livres): com período inválido a
+  tela nem pede (chave nula no SWR; `useDasSedes` aceita `query` nulo) e mostra
+  o aviso no lugar dos números. Antes, o SWR repetia o pedido recusado a cada
+  nova tentativa, e com o `keepPreviousData` a tela seguiria exibindo o período
+  anterior sob as datas novas. Os filtros ficam; Imprimir/CSV desabilitam.
+
+Conferido na tela (modo memória): o aviso no Painel, na Produtividade
+(invertida) e no Panorama; apagar o "De" do Painel não dispara requisição
+nenhuma. Testes das duas rotas vermelhos sem a correção. Revisão de segurança
+pedida para cada etapa.
+
+Arquivos: `app/api/{rotinas,execucoes}/route.ts`, `lib/dateUtils.ts`,
+`lib/useDasSedes.ts`, `app/(app)/{dashboard,produtividade,panorama}/page.tsx`,
+`testes/periodo-consultas.test.ts`.
+
+Na revisão da versão integrada (segurança: libera com ressalvas), duas
+ressalvas corrigidas antes de subir, a pedido do dono:
+
+- **Teto de 31 dias sem sede** (`MAX_DIAS_SEM_SEDE`, `tetoDoPeriodo`): quem vê
+  todas as sedes e não escolhe uma lê as 17 de uma vez — 62 dias davam dezenas
+  de milhares de leituras num pedido. Com sede, continua 62. Painel,
+  Produtividade e Panorama usam o mesmo teto e avisam antes de pedir.
+- **Relatórios com o mês apagado**: gerava `-01`/`-NaN`, as rotas recusavam e a
+  tela ficava sem aviso; agora não pede e diz "Escolha o mês do relatório.".
+
+Conferido na tela (modo memória): os dois avisos, sem nenhum pedido disparado.
+
+Integrado ao `main` junto com a sessão de 7 dias e a visão semanal (o
+DIARIO foi o único conflito; as telas mantêm os parâmetros por sede). Veio
+junto `testes/sede-extra-telas.test.ts`, de um ramo de 20/10 cuja correção já
+tinha entrado por outro caminho — o teste passa contra o código atual.
+
+---
+
 ## 2026-10-22 — Login de 7 dias, relendo o cadastro a cada hora
 
 Pergunta do dono: "o Orkestria não mantém conectado?". O login durava 12 h

@@ -41,29 +41,33 @@ export default function PaginaRelatorios() {
   const [sedeEscolhida, setSedeEscolhida] = useState("");
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
+  // Campo de mês apagado dava "-01"/"-NaN": as rotas recusavam (400) e a tela
+  // ficava sem aviso. Sem mês válido, não pede nada (revisão de segurança, 22/10/2026).
+  const mesOk = /^\d{4}-(0[1-9]|1[0-2])$/u.test(mes);
   const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
-  const [de, ate] = intervaloDoMes(mes);
+  const pedir = mesOk && !!sedeId;
+  const [de, ate] = mesOk ? intervaloDoMes(mes) : ["", ""];
 
   const { data: funcionarios } = useSWR<Funcionario[]>(
-    sedeId ? `/api/funcionarios?sede=${sedeId}` : null,
+    pedir ? `/api/funcionarios?sede=${sedeId}` : null,
     fetcher,
   );
   const { data: tarefas } = useSWR<Tarefa[]>(
-    sedeId ? `/api/tarefas?sede=${sedeId}` : null,
+    pedir ? `/api/tarefas?sede=${sedeId}` : null,
     fetcher,
   );
   const { data: locais } = useSWR<Local[]>(
-    sedeId ? `/api/locais?sede=${sedeId}` : null,
+    pedir ? `/api/locais?sede=${sedeId}` : null,
     fetcher,
   );
   const { data: rotinas } = useSWR<RotinaPlanejada[]>(
-    sedeId ? `/api/rotinas?de=${de}&ate=${ate}&sede=${sedeId}` : null,
+    pedir ? `/api/rotinas?de=${de}&ate=${ate}&sede=${sedeId}` : null,
     fetcher,
   );
   // Mesma sede das rotinas: sem `?sede` o coordenador recebia o realizado só da
   // principal, e na sede extra o relatório saía sem nada feito (22/10/2026).
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
-    sedeId ? `/api/execucoes?de=${de}&ate=${ate}&sede=${sedeId}` : null,
+    pedir ? `/api/execucoes?de=${de}&ate=${ate}&sede=${sedeId}` : null,
     fetcher,
   );
 
@@ -72,7 +76,7 @@ export default function PaginaRelatorios() {
   const localPorId = useMemo(() => new Map((locais ?? []).map((l) => [l.id, l])), [locais]);
   const rotinaPorId = useMemo(() => new Map((rotinas ?? []).map((r) => [r.id, r])), [rotinas]);
 
-  const carregando = !sedes || !funcionarios || !rotinas || !execucoes;
+  const carregando = mesOk && (!sedes || !funcionarios || !rotinas || !execucoes);
 
   // Execuções do mês cujas rotinas são desta sede, agrupadas por funcionário.
   const porFuncionario = useMemo(() => {
@@ -142,7 +146,9 @@ export default function PaginaRelatorios() {
         </div>
       )}
 
-      {!carregando && porFuncionario.length === 0 && (
+      {!mesOk && <div className="alerta alerta-erro nao-imprimir">Escolha o mês do relatório.</div>}
+
+      {mesOk && !carregando && porFuncionario.length === 0 && (
         <div className="painel nao-imprimir" style={{ padding: 32, textAlign: "center", color: "var(--tinta-3)" }}>
           Nenhuma execução registrada em {mesBR} nesta sede. Os relatórios saem do que foi
           marcado como realizado no Acompanhamento.

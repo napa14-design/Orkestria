@@ -17,12 +17,15 @@ import { sedesPermitidas } from "@/lib/permissions";
  *
  * Chave SWR própria para várias sedes: depois de gravar, revalide com
  * `mutate((k) => typeof k === "string" && k.includes(recurso))`.
+ *
+ * `query` nulo = não buscar (ex.: período inválido), como chave nula no SWR.
  */
-export function useDasSedes<T>(recurso: string, query = "") {
+export function useDasSedes<T>(recurso: string, query: string | null = "") {
   const sessao = useSessao();
   const sedes = sessao ? sedesPermitidas(sessao) : null;
   const umaChamada = `/api/${recurso}${query ? `?${query}` : ""}`;
-  const chave = sedes && sedes.length > 1 ? `${recurso}-das-sedes:${sedes.join(",")}?${query}` : umaChamada;
+  const chave =
+    query === null ? null : sedes && sedes.length > 1 ? `${recurso}-das-sedes:${sedes.join(",")}?${query}` : umaChamada;
   return useSWR<T[]>(chave, (c: string): Promise<T[]> =>
     c === umaChamada
       ? (fetcher(c) as Promise<T[]>)
