@@ -53,6 +53,8 @@ type MetricaSede = {
   ocupMedia: number;
   ociosidade: number;
   sobrecarga: number;
+  /** Os da PRÓPRIA sede: Benfica, DT1, DT2 e Eusébio têm parâmetros próprios. */
+  params: ParametrosResolvidos;
 };
 
 export default function PaginaPanorama() {
@@ -67,6 +69,16 @@ export default function PaginaPanorama() {
   const { data: rotinas } = useDasSedes<RotinaPlanejada>("rotinas", `de=${de}&ate=${ate}`);
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
+  // Cada sede medida com os parâmetros DELA: sem `&sede`, todas usavam os da
+  // principal (ou os globais, para o administrador) — 22/10/2026.
+  const idsSedes = (sedes ?? []).filter((s) => s.ativo).map((s) => s.id);
+  const { data: paramsDaSede } = useSWR<Record<string, ParametrosResolvidos>>(
+    idsSedes.length ? `parametros-das-sedes:${idsSedes.join(",")}` : null,
+    () =>
+      Promise.all(
+        idsSedes.map((id) => fetcher(`/api/parametros?resolvidos=1&sede=${encodeURIComponent(id)}`) as Promise<ParametrosResolvidos>),
+      ).then((lista) => Object.fromEntries(idsSedes.map((id, i) => [id, lista[i]]))),
+  );
 
   // Métricas por sede (mesma lógica do Dashboard, mas para todas as sedes).
   const porSede = useMemo<MetricaSede[]>(() => {
@@ -75,8 +87,9 @@ export default function PaginaPanorama() {
     return (sedes ?? [])
       .filter((s) => s.ativo)
       .map((s) => {
+        const p = paramsDaSede?.[s.id] ?? params;
         const fs = funcs.filter((f) => f.sede_id === s.id);
-        const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, rs), params);
+        const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, rs), p);
         return {
           sede: s,
           funcs: fs.length,
@@ -84,9 +97,10 @@ export default function PaginaPanorama() {
           ocupMedia: resumo.ocupacaoMedia ?? 0,
           ociosidade: resumo.ociosidadeMin,
           sobrecarga: resumo.emSobrecarga,
+          params: p,
         };
       });
-  }, [sedes, funcionarios, rotinas, params]);
+  }, [sedes, funcionarios, rotinas, params, paramsDaSede]);
 
   // Agrupa as sedes por grupo ou por tipo.
   const grupos = useMemo(() => {
@@ -183,7 +197,7 @@ export default function PaginaPanorama() {
           {grupos.map((g) => {
             const classe = classificarOcupacao(g.ocupMedia, params);
             const barras: ItemBarra[] = g.sedes.map((s) => {
-              const c = classificarOcupacao(s.ocupMedia, params);
+              const c = classificarOcupacao(s.ocupMedia, s.params);
               return {
                 rotulo: s.comPlan > 0 ? s.sede.nome_sede : `${s.sede.nome_sede} (sem planejamento)`,
                 valor: s.ocupMedia,

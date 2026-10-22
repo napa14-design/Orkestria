@@ -35,6 +35,9 @@ export default function PaginaEventuais() {
       titulo="Serviços eventuais"
       subtitulo="Trabalho fora da rotina planejada, registrado depois. Use “eventual” para trabalho avulso e “imprevisto” para ocorrências que consumiram tempo — os imprevistos calibram a folga por sede."
       endpoint="/api/servicos-eventuais"
+      // Sem o seletor, a lista era só a da sede principal: o coordenador salvava
+      // na sede extra, não via, e salvava de novo (3× em 22/10/2026).
+      porSede
       textoNovo="+ Registrar eventual"
       campos={[
         {

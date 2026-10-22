@@ -84,8 +84,10 @@ export default function PaginaDashboard() {
     `/api/tarefas${sedeFiltro ? `?sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
+  // Parâmetros da sede do filtro: Benfica, DT1, DT2 e Eusébio têm os próprios, e
+  // sem `&sede` a sede extra era medida com os da principal (22/10/2026).
   const { data: parametros } = useSWR<ParametrosResolvidos>(
-    "/api/parametros?resolvidos=1",
+    `/api/parametros?resolvidos=1${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
   const { data: rotinas } = useSWR<RotinaPlanejada[]>(

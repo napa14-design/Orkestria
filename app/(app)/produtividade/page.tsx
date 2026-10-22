@@ -46,7 +46,7 @@ export default function PaginaProdutividade() {
     `/api/execucoes?de=${de}&ate=${ate}${daSede ? `&${daSede}` : ""}`,
     fetcher,
   );
-  const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
+  const { data: parametros } = useSWR<ParametrosResolvidos>(`/api/parametros?resolvidos=1${daSede ? `&${daSede}` : ""}`, fetcher);
 
   const params = parametros ?? PARAMETROS_PADRAO;
   const carregando = !sedes || !funcionarios || !rotinas || !execucoes;

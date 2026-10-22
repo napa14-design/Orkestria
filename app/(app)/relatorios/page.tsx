@@ -60,8 +60,10 @@ export default function PaginaRelatorios() {
     sedeId ? `/api/rotinas?de=${de}&ate=${ate}&sede=${sedeId}` : null,
     fetcher,
   );
+  // Mesma sede das rotinas: sem `?sede` o coordenador recebia o realizado só da
+  // principal, e na sede extra o relatório saía sem nada feito (22/10/2026).
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
-    `/api/execucoes?de=${de}&ate=${ate}`,
+    sedeId ? `/api/execucoes?de=${de}&ate=${ate}&sede=${sedeId}` : null,
     fetcher,
   );
 

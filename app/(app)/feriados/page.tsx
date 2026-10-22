@@ -15,6 +15,7 @@ export default function PaginaFeriados() {
       titulo="Feriados e recessos"
       subtitulo="Dias em que a sede não opera. O “Gerar o dia” recusa montar a agenda nessas datas e diz o motivo — sem isto, gerar um 7 de setembro por engano produz um dia cheio que ninguém vai trabalhar. Um registro cobre um intervalo: recesso inteiro é uma linha."
       endpoint="/api/feriados"
+      porSede
       textoNovo="+ Novo feriado"
       campos={[
         {

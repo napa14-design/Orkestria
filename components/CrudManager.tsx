@@ -649,6 +649,13 @@ export default function CrudManager<T extends Registro>({
         // Deixa a tela reagir ao registro novo — Usuários usa isto para gerar e
         // mostrar o código de primeiro acesso logo depois do cadastro.
         aoCriar?.(criado);
+        // Salvou noutra sede que não a da lista: a lista vai para lá. Senão o
+        // registro "não aparece" e a pessoa salva de novo, achando que falhou.
+        const sedeDoNovo = typeof corpo.sede_id === "string" ? corpo.sede_id : "";
+        const sedeDaLista = sedeAtual || (sessao && sessao.sede_id !== "geral" ? sessao.sede_id : "");
+        // Só para uma sede do seletor: item global ("geral" ou vazio) não muda a lista.
+        if (porSede && sedeDaLista && sedeDoNovo !== sedeDaLista && sedes?.some((s) => s.id === sedeDoNovo))
+          setSedeAtual(sedeDoNovo);
       }
       await mutate();
       setAberto(false);

@@ -16,6 +16,7 @@ export default function PaginaPeriodosLetivos() {
       titulo="Calendário acadêmico"
       subtitulo="Períodos letivos por sede. Fora do período (férias/recesso), as tarefas marcadas como “depende do calendário” não são cobradas na cobertura da agenda. Cadastre com alguns dias de antecedência."
       endpoint="/api/periodos-letivos"
+      porSede
       textoNovo="+ Novo período"
       campos={[
         {

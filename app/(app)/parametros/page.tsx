@@ -23,6 +23,7 @@ export default function PaginaParametros() {
       titulo="Parâmetros gerais"
       subtitulo="Limites de ocupação, tamanho do bloco da agenda e tempos padrão — globais ou por sede. Toda alteração registra autor e data."
       endpoint="/api/parametros"
+      porSede
       textoNovo="+ Novo parâmetro"
       campos={[
         {

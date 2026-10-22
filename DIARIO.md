@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-10-22 — Sede extra: o que ainda caía na sede principal
+
+Um coordenador registrou o mesmo eventual **três vezes** na sede extra dele:
+salvava, a lista não mostrava, ele achava que tinha falhado. Estava salvo — a
+lista pedia `/api/servicos-eventuais` sem sede, e o servidor (que nunca
+agrega) devolvia só a sede **principal**. Os dois repetidos foram apagados a
+pedido do dono (backup guardado fora do repo). Varredura das telas que leem
+sem `?sede` uma rota com `limitarSedeConsulta`:
+
+- **Serviços eventuais, Feriados, Parâmetros, Períodos letivos:** seletor de
+  sede na lista (`porSede`). Em Parâmetros o efeito é real hoje: Benfica, DT1,
+  DT2 e Eusébio têm parâmetros próprios e são sede extra de três coordenadores.
+- **`CrudManager`:** depois de criar numa sede do seletor diferente da que a
+  lista mostra, a lista vai para a sede do registro novo (item global não muda
+  a lista) — vale para toda tela com o seletor.
+- **Relatórios:** o realizado era pedido sem sede — na sede extra, o
+  relatório saía sem nada feito.
+- **Painel e Produtividade:** parâmetros (meta de ocupação, desvio) da sede do
+  filtro, não da principal. **Panorama:** cada sede com os parâmetros dela.
+- Remanejo entre sedes lê sem sede, mas é só do administrador (sem limite).
+
+Conferido na tela (modo memória), coordenador da DT com a Aldeota de extra:
+registra eventual na extra e a lista passa para lá com o registro; escolhida a
+Aldeota, Relatórios, Parâmetros, Feriados, Períodos letivos e Painel pedem
+`sede=christus_ald`, e o Panorama pede os parâmetros de cada sede.
+
+Arquivos: `app/(app)/eventuais/page.tsx`, `components/CrudManager.tsx`,
+`app/(app)/{feriados,parametros,periodos-letivos,relatorios,dashboard,produtividade,panorama}/page.tsx`.
+
+---
+
 ## 2026-10-21 — "Feita por…": a tarefa de quem faltou fica no nome de quem fez
 
 Pergunta do dono: as tarefas de quem faltou aparecem no Acompanhamento? Elas
