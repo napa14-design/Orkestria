@@ -7,6 +7,79 @@
 
 ---
 
+## 2026-10-23 — Funcionários × Quadro da Infra (Chromos): divergências e "Vincular"
+
+O Chromos é quem sabe quem entra, sai e muda de sede na Infra. A tela
+**Funcionários** passa a mostrar, acima da tabela e **só quando existe alguma**,
+as divergências da sede aberta contra o Quadro (só função ASG):
+- **Desligado no Quadro, ativo aqui** → "Desligar" abre o fluxo de sempre com a
+  data de lá preenchida. Nada desliga sozinho.
+- **Sem vínculo** (sem matrícula) → sugestões do Quadro **da mesma sede** com o
+  nome conferindo; "É FULANO" grava a matrícula e a empresa **de lá** (o
+  cliente só manda os ids). Rota `POST /api/quadro-infra/vincular`.
+- **Em outra sede no Quadro** (só o código da sede), **matrícula que não
+  confere** (nenhum dado de lá) e, depois de todos vinculados, **no Quadro sem
+  cadastro aqui**.
+
+Quem vê: coordenador (uma sede por vez, das dele) e administrador. Doutrina:
+elimina a conferência manual de quem saiu (e a rota gerada para quem já não
+está); é manutenção de cadastro, fora da Agenda; **some quando as divergências
+chegam a zero** ou se a integração não estiver configurada; derivado do Quadro.
+
+Segurança (revisão antes de codar): o vínculo só vale com **matrícula + nome
+conferindo** — a matrícula é digitável, e sozinha deixaria um coordenador ler
+sede e desligamento de alguém de outra sede. A **matrícula passou a ser única**
+(por empresa); `empresa` (campo novo) só muda pelo Vincular, e trocar a
+matrícula à mão a apaga. Falha do Chromos chega à tela com mensagem fixa. O
+Quadro fica 10 min em memória, já reduzido aos 8 campos do contrato.
+Mapa de sedes: código sem espaços, com DT→DT1, BN→BEN, CES→CESIU; sede sem
+código, ou duas que caem no mesmo código, ficam sem Quadro.
+
+"Nome conferindo" tem duas réguas:
+- **Na mesma sede:** basta o primeiro nome quando o cadastro só tem ele — 110
+  dos 148 ativos estão assim ("Aurilene"). É seguro porque tudo o que aparece já
+  é da sede de quem pergunta.
+- **Para atravessar sede** (desligada ou transferida lá): mesmo primeiro nome,
+  e todo nome seguinte DAQUI precisa estar entre os nomes seguintes DE LÁ, com
+  pelo menos um por extenso e sem o cadastro ter mais nomes que o Quadro.
+- As duas revisões pós-código pegaram furos na versão anterior: "Maria M"
+  conferia com qualquer MARIA, e "Joana" + trinta sobrenomes comuns conferia com
+  quase toda JOANA da rede.
+
+**Transferência:** um cadastro desligado não segura a matrícula nem o vínculo.
+Transferir é desligar numa sede e cadastrar de novo na outra, e o cadastro novo
+precisa receber a mesma matrícula (pego na auditoria).
+
+**Riscos aceitos (revisão de segurança):** quem já sabe primeiro nome +
+sobrenome + matrícula de alguém de outra sede consegue confirmar a sede atual
+ou a data de desligamento dessa pessoa (cada tentativa é um PUT com autor no
+histórico; não há limite de pedidos). A unicidade da matrícula não é atômica:
+dois "Vincular" simultâneos para a mesma pessoa passariam (os dois ainda
+precisam do nome conferindo e da sede do coordenador). As 3 matrículas que já
+existiam em produção estão no formato normalizado (só dígitos). Um token
+vazado entrega o Quadro ASG da rede inteira: o escopo só existe deste lado —
+trocar o segredo nas duas Vercels é a resposta. Com o primeiro nome e a
+matrícula, o coordenador confirma a data de desligamento de alguém do Quadro da
+**própria** sede (dado da unidade dele). Desligamento futuro (aviso prévio) já
+libera a matrícula para outro cadastro — de propósito: é a transferência com
+data marcada.
+
+`firestore.rules` entrou no repositório (nega todo acesso direto — igual ao que
+já valia em produção) e o `firebase.json` passa a publicá-lo.
+
+Para ligar: `CHROMOS_QUADRO_URL` e `CHROMOS_QUADRO_TOKEN` na Vercel do Orkestria;
+o mesmo segredo em `QUADRO_EXTERNO_TOKEN` na do Chromos (rota nova lá,
+`GET /api/quadro-externo`).
+
+Arquivos: `lib/quadroInfra.ts`, `services/quadroInfraService.ts`,
+`app/api/quadro-infra/*`, `components/funcionarios/DivergenciasQuadro.tsx`,
+`app/(app)/funcionarios/page.tsx`, `components/CrudManager.tsx`
+(`acimaDaTabela`), `services/funcionariosService.ts`, `types/Funcionario.ts`,
+`lib/schema.ts`, `docs/02`, `firestore.rules`, `firebase.json`; testes em
+`testes/quadro-infra.test.ts` (36, com os casos de ataque; 18 mutações mortas).
+
+---
+
 ## 2026-10-23 — Next 16.4.3 e Vitest 4.1.12 (alertas de segurança)
 
 `npm audit` acusava 3 alertas: Next 16.4.0 (**crítico**: execução remota de

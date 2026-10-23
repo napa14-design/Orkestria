@@ -114,6 +114,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("vaga_sgcp"),
     col("substituido_por"),
     col("posto_extinto", "boolean"),
+    col("empresa"),
   ],
   sedes: [
     col("id"),

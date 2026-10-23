@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
+import DivergenciasQuadro from "@/components/funcionarios/DivergenciasQuadro";
 import Modal from "@/components/Modal";
 import { apiPost, ErroApi } from "@/lib/clientApi";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
@@ -55,14 +56,19 @@ export default function PaginaFuncionarios() {
   const [aviso, setAviso] = useState<{ tipo: "ok" | "aviso"; texto: string } | null>(null);
 
   const recarregar = () =>
-    mutate((k) => typeof k === "string" && (k.startsWith("/api/funcionarios") || k.startsWith("funcionarios-das-sedes")));
+    mutate(
+      (k) =>
+        typeof k === "string" &&
+        (k.startsWith("/api/funcionarios") || k.startsWith("funcionarios-das-sedes") || k.startsWith("/api/quadro-infra")),
+    );
   const dataBR = (iso?: string) => (iso ? iso.split("-").reverse().join("/") : "");
   const fraseDaVaga = (v: { aberta: boolean; codigo?: string; motivo?: string }) =>
     v.aberta ? `Vaga #${v.codigo} aberta no SGCP.` : `A vaga não foi aberta: ${v.motivo}`;
 
-  const abrirDesligar = (f: Funcionario) => {
+  /** `data`: a do Quadro da Infra, quando o Desligar vem de lá. */
+  const abrirDesligar = (f: Funcionario, data = hojeISO()) => {
     setParaDesligar(f);
-    setDesligamento({ data: hojeISO(), motivo: "", abrirVaga: true, extinguirPosto: false });
+    setDesligamento({ data, motivo: "", abrirVaga: true, extinguirPosto: false });
     setErro("");
   };
 
@@ -148,6 +154,16 @@ export default function PaginaFuncionarios() {
       subtitulo="Equipe ASG/serviços gerais. A jornada líquida é calculada automaticamente."
       endpoint="/api/funcionarios"
       porSede
+      acimaDaTabela={(sedeId) => (
+        <DivergenciasQuadro
+          sedeId={sedeId}
+          aoMudar={() => void recarregar()}
+          aoDesligar={(id, data) => {
+            const f = equipe?.find((x) => x.id === id);
+            if (f) abrirDesligar(f, data);
+          }}
+        />
+      )}
       // Cadastrar pode assumir um posto: a lista de candidatas (outra chave SWR,
       // de todas as sedes) precisa refletir isso antes do próximo cadastro.
       aoCriar={() => void recarregar()}

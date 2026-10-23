@@ -33,6 +33,12 @@ export interface Funcionario extends Auditoria {
    */
   matricula?: string;
   /**
+   * Empresa do Quadro da Infra (Chromos), gravada pelo "Vincular" junto com a
+   * matrícula — cada empresa numera a sua, então matrícula sozinha não é única
+   * lá. Não se edita no cadastro; trocar a matrícula à mão a apaga.
+   */
+  empresa?: string;
+  /**
    * Desligamento (AAAA-MM-DD): a partir deste dia a pessoa sai da geração e da
    * agenda. Pode ser futuro (aviso prévio). Ver `lib/desligamento.ts`.
    */

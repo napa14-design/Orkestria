@@ -491,6 +491,7 @@ export default function CrudManager<T extends Registro>({
   aoCriar,
   vazio,
   porSede,
+  acimaDaTabela,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -514,6 +515,8 @@ export default function CrudManager<T extends Registro>({
    * abria a tela em branco achando que o cadastro tinha sumido.
    */
   porSede?: boolean;
+  /** Entre o cabeçalho e a tabela, com a sede que a tabela está mostrando ("" = todas). */
+  acimaDaTabela?: (sedeId: string) => React.ReactNode;
 }) {
   const sessao = useSessao();
   const { data: sedes } = useSWR<Sede[]>(porSede ? "/api/sedes" : null, fetcher);
@@ -751,6 +754,8 @@ export default function CrudManager<T extends Registro>({
           )}
         </div>
       </div>
+
+      {acimaDaTabela?.(sedeAtual || (sessao && sessao.sede_id !== "geral" ? sessao.sede_id : ""))}
 
       <div className="painel" style={{ overflow: "auto" }}>
         <table className="tabela">

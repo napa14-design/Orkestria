@@ -2,6 +2,7 @@ import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { hojeISO } from "@/lib/dateUtils";
 import { comAtivoDoDia, motivoAbreVaga, pedidoDeVaga, validarDesligamento } from "@/lib/desligamento";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
+import { normalizarMatricula } from "@/lib/quadroInfra";
 import { validarFuncionario, temErro } from "@/lib/validations";
 import type { Funcionario } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -22,11 +23,36 @@ export async function getFuncionarios(sedeId?: string): Promise<Funcionario[]> {
   return lista.map((f) => comAtivoDoDia(f, hoje));
 }
 
+/**
+ * Uma matrícula, um cadastro. Era livre, e é por ela que o Quadro da Infra acha
+ * a pessoa: duas fichas com a mesma matrícula apontariam para a mesma pessoa de
+ * lá (revisão de segurança, 23/10/2026). Cada empresa numera a sua, então só
+ * colide com empresa igual — ou quando um dos dois ainda não tem empresa — e só
+ * entre cadastros não desligados. A mensagem não diz quem nem onde.
+ */
+export async function exigirMatriculaLivre(matricula: string, empresa: string | undefined, exceto?: string) {
+  if (!matricula) return;
+  const ds = await getDataSource();
+  const mesmas = await ds.consultar("funcionarios", [{ campo: "matricula", op: "==", valor: matricula }]);
+  // Desligado não segura a matrícula: transferir é desligar numa sede e
+  // cadastrar de novo na outra, com a mesma matrícula (auditoria, 23/10/2026).
+  if (mesmas.some((o) => o.id !== exceto && !o.desligado_em && (!o.empresa || !empresa || o.empresa === empresa)))
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "MATRICULA_REPETIDA", mensagem: "Esta matrícula já está em outro cadastro." },
+    ]);
+}
+
 export async function createFuncionario(
   dados: DadosFuncionario,
   autor: string,
 ): Promise<Funcionario> {
-  const comIntervalos = { ...dados, intervalos: csvDoTrio(dados) };
+  if ("empresa" in dados)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
+    ]);
+  const matricula = normalizarMatricula(dados.matricula);
+  await exigirMatriculaLivre(matricula, undefined);
+  const comIntervalos = { ...dados, matricula, intervalos: csvDoTrio(dados) };
   const alertas = validarFuncionario(comIntervalos);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
   const ds = await getDataSource();
@@ -83,9 +109,21 @@ export async function updateFuncionario(
         mensagem: `Campo(s) que só mudam pelo "Desligar" ou pelo "Assume o posto de": ${proibidos.join(", ")}.`,
       },
     ]);
+  if ("empresa" in mudancas)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
+    ]);
   const ds = await getDataSource();
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
+  if (mudancas.matricula !== undefined) {
+    mudancas = { ...mudancas, matricula: normalizarMatricula(String(mudancas.matricula)) };
+    // Matrícula trocada à mão desfaz o vínculo: a empresa era da pessoa de antes.
+    if (mudancas.matricula !== normalizarMatricula(atual.matricula)) {
+      await exigirMatriculaLivre(mudancas.matricula ?? "", undefined, id);
+      if (atual.empresa) mudancas = { ...mudancas, empresa: "" };
+    }
+  }
   const destino = { ...atual, ...mudancas };
   // Duas situações diferentes que é fácil confundir:
   //  - o formulário **mandou** `intervalos` (mesmo vazio) → vale o que ele mandou;
