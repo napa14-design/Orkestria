@@ -227,6 +227,30 @@ describe("sábado", () => {
     expect(jornadaLiquidaMin(sab)).toBe(4 * 60);
   });
 
+  it("sábado desconta os INTERVALOS DE SÁBADO (lanche 09:00–09:15 em 07:00–11:15), não os do dia útil", () => {
+    const f = { ...base, intervalos: "09:00-09:15;11:30-13:00", entrada_sabado: "07:00", saida_sabado: "11:15", intervalos_sabado: "09:00-09:15" };
+    const sab = jornadaDoDia(f, "2026-08-22");
+    expect(sab.intervalos).toBe("09:00-09:15");
+    expect(sab.intervalo_min).toBe(15);
+    expect(jornadaLiquidaMin(sab)).toBe(4 * 60);
+    // Na semana, a carga soma o sábado já com os 15 min fora (5 × 8h + 4h).
+    expect(cargaSemanalMin({ ...f, intervalos: "12:00-14:00" } as Funcionario)).toBe(5 * 8 * 60 + 4 * 60);
+    // Sem o campo, o sábado não herda nada do dia útil.
+    expect(jornadaDoDia({ ...f, intervalos_sabado: "" }, "2026-08-22").intervalo_min).toBe(0);
+  });
+
+  it("intervalo de sábado fora do horário de sábado é recusado; acima de 4h com intervalo de sábado não avisa", () => {
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "11:00", intervalos_sabado: "11:30-11:45" })).toContain(
+      "INTERVALOS_SABADO_INVALIDOS",
+    );
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "11:15", intervalos_sabado: "09:00-09:15" })).not.toContain(
+      "INTERVALOS_SABADO_INVALIDOS",
+    );
+    expect(codigos({ ...base, entrada_sabado: "07:00", saida_sabado: "13:00", intervalos_sabado: "10:00-10:15" })).not.toContain(
+      "SABADO_SEM_INTERVALO",
+    );
+  });
+
   it("na segunda o intervalo do dia útil continua valendo", () => {
     const f = { ...base, entrada_sabado: "07:00", saida_sabado: "11:00" };
     expect(jornadaLiquidaMin(jornadaDoDia(f, "2026-08-24"))).toBe(8 * 60 + 30);

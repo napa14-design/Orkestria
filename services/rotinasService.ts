@@ -32,6 +32,7 @@ const ROTULO_AUSENCIA: Record<string, string> = {
   atestado: "atestado",
   ferias: "férias",
   folga: "folga",
+  banco_horas: "banco de horas",
   outro: "ausência",
 };
 

@@ -20,6 +20,7 @@ import type {
   TipoServico,
 } from "@/types";
 import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
+import { sincronizarTrio } from "./intervalos";
 
 /**
  * Situação de uma sede no calendário acadêmico em uma data:
@@ -416,15 +417,19 @@ export function jornadaDoDia(f: Funcionario, dataISO: string): JornadaEfetiva {
   const trabalha =
     dia === 0 ? escala === "todos" : dia === 6 ? escala !== "seg_sex" : true;
 
-  // sábado com horário próprio (ex.: turno de 4h, sem intervalo)
+  // Sábado com horário próprio (ex.: turno de 4h) tem os intervalos PRÓPRIOS,
+  // `intervalos_sabado`. Era sempre zero, e o lanche de 15 min do sábado não
+  // tinha onde ser registrado (pedido da coordenação, 23/10/2026).
   if (dia === 6 && f.entrada_sabado && f.saida_sabado) {
+    const intervalos = (f.intervalos_sabado ?? "").trim();
+    const trio = sincronizarTrio({ intervalos });
     return {
       entrada: f.entrada_sabado,
       saida: f.saida_sabado,
-      intervalo_min: 0,
-      intervalo_inicio: "",
-      intervalo_fim: "",
-      intervalos: "",
+      intervalo_min: trio.intervalo_min ?? 0,
+      intervalo_inicio: trio.intervalo_inicio ?? "",
+      intervalo_fim: trio.intervalo_fim ?? "",
+      intervalos,
       trabalha,
     };
   }

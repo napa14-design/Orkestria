@@ -26,6 +26,11 @@ export interface Funcionario extends Auditoria {
   /** Horário só de sábado (ex.: turno de 4h). Vazio = usa o padrão. HH:mm */
   entrada_sabado?: string;
   saida_sabado?: string;
+  /**
+   * Intervalos do sábado, no mesmo formato de `intervalos` (ex.: "09:00-09:15").
+   * Só valem com o horário de sábado preenchido; vazio = sábado sem pausa.
+   */
+  intervalos_sabado?: string;
   cargo: string;
   /**
    * Matrícula do RH — a chave com que outros sistemas (o Chromos) acham a pessoa.

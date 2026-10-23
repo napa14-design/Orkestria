@@ -7,7 +7,7 @@
  *  2. O HISTÓRICO: bloco com realizado nunca sai, e a pessoa nunca é apagada.
  *  3. O POSTO: a rota padrão fica, para quem for contratado assumir.
  *  4. A VAGA: o desligamento não depende dela; ela é idempotente; abandono não
- *     abre (o Chromos já abre).
+ *     abre (a Coordenação pede a vaga pelo Chromos).
  *  5. O FURO ANTIGO: a geração criava blocos para inativo — nada olhava `ativo`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

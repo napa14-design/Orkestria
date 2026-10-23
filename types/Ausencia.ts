@@ -1,6 +1,12 @@
 import type { Auditoria } from "./comum";
 
-export type TipoAusencia = "falta" | "atestado" | "ferias" | "folga" | "outro";
+/**
+ * `banco_horas` (23/10/2026): compensação de banco de horas — a pessoa está fora
+ * com o tempo já pago. Pedido da coordenação para não lançar como "Outro". O
+ * tipo aqui só rotula (agenda, lista); nenhuma conta do Orkestria usa o tipo, e
+ * nada dele vai para o Chromos, onde moram absenteísmo e benefícios.
+ */
+export type TipoAusencia = "falta" | "atestado" | "ferias" | "folga" | "banco_horas" | "outro";
 
 /**
  * Ausência de um funcionário em um período. Durante a ausência a coluna do

@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-10-23 — Intervalos de sábado, ausência "Banco de horas" e o texto da vaga no abandono
+
+Pedidos da coordenação, com print da tela:
+- **Intervalos (sábado)**, campo novo no cadastro (aparece quando o horário de
+  sábado está preenchido). O sábado com horário próprio descontava **zero** de
+  intervalo, e o lanche de 15 min (ex.: 09:00–09:15 num sábado 07:00–11:15)
+  não tinha onde ser registrado. Agora a jornada líquida, a carga semanal e o
+  bloqueio na agenda do sábado usam esse campo; intervalo fora do horário de
+  sábado é recusado; o aviso de "sábado acima de 4h sem intervalo" passa a olhar
+  o campo. Cogitou-se derivar dos intervalos do dia útil que caem dentro do
+  sábado (medido: 5 pessoas, 15 min cada, nenhuma rota afetada), mas o dono
+  preferiu o campo explícito — mais fácil de entender para quem preenche.
+- **Ausência "Banco de horas (compensação)"**: tipo novo, para não lançar
+  compensação como "Outro". O tipo só rotula (lista, agenda, aviso de ausente):
+  nenhuma conta do Orkestria usa o tipo da ausência, e nada dela vai para o
+  Chromos, onde ficam absenteísmo e benefícios. O servidor ainda aceita
+  qualquer tipo (sem lista fechada) — pendência antiga, não mexida.
+- **Texto da vaga no abandono**: dizia que "o Chromos já abre a vaga sozinho";
+  conferido no código do Chromos, ele só **avisa** e a Coordenação pede a vaga
+  por lá. Corrigido no modal do Desligar e nas mensagens do servidor.
+
+Arquivos: `lib/calculations.ts` (`jornadaDoDia`), `lib/validations.ts`,
+`types/Funcionario.ts`, `lib/schema.ts`, `app/(app)/funcionarios/page.tsx`,
+`types/Ausencia.ts`, `app/(app)/ausencias/page.tsx`, rótulos em
+`services/rotinasService.ts`, `app/(app)/rotinas/useRotinaData.ts`,
+`components/agenda/SemanaGrid.tsx`; `lib/desligamento.ts`,
+`services/funcionariosService.ts`; `docs/02`; testes em `intervalos.test.ts`.
+
+---
+
 ## 2026-10-23 — Funcionários × Quadro da Infra (Chromos): divergências e "Vincular"
 
 O Chromos é quem sabe quem entra, sai e muda de sede na Infra. A tela

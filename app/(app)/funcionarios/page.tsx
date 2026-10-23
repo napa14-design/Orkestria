@@ -258,7 +258,22 @@ export default function PaginaFuncionarios() {
           key: "saida_sabado",
           rotulo: "Saída (sábado)",
           tipo: "hora",
-          dica: "Horário de saída SÓ no sábado. Ex.: entrada 07:00 e saída 11:00 = 4 h no sábado. No sábado não é descontado intervalo.",
+          dica: "Horário de saída SÓ no sábado. Ex.: entrada 07:00 e saída 11:15. A pausa do sábado vai em \"Intervalos (sábado)\", logo abaixo.",
+        },
+        {
+          key: "intervalos_sabado",
+          rotulo: "Intervalos (sábado)",
+          tipo: "intervalos",
+          inteira: true,
+          padrao: "",
+          // Só com o horário de sábado: sem ele, o sábado usa o horário do dia útil.
+          mostrarSe: (f) => Boolean(f.entrada_sabado && f.saida_sabado),
+          ajuda: (form) =>
+            resumoIntervalos(
+              String(form.intervalos_sabado ?? ""),
+              Math.max(0, hhmmParaMin(String(form.saida_sabado ?? "")) - hhmmParaMin(String(form.entrada_sabado ?? ""))),
+            ),
+          dica: "Pausas SÓ do sábado, no formato HH:mm-HH:mm. Ex.: lanche de 15 min \"09:00-09:15\". Deixe vazio se no sábado não há pausa.",
         },
         { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
         {
@@ -430,7 +445,7 @@ export default function PaginaFuncionarios() {
       )}
       {desligamento.motivo === "Abandono de emprego" ? (
         <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
-          Abandono não abre vaga por aqui: o Chromos já abre sozinho depois de 15 dias de falta.
+          Abandono não abre vaga por aqui: depois de 15 dias de falta o Chromos avisa a Coordenação, que pede a vaga por lá.
         </p>
       ) : (
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13.5 }}>

@@ -59,6 +59,8 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | entrada, saida | HH:mm | |
 | intervalo_min | número | minutos descontados da jornada |
 | intervalo_inicio, intervalo_fim | HH:mm | bloqueado na agenda |
+| entrada_sabado, saida_sabado | HH:mm | horário próprio de sábado (os dois ou nenhum) |
+| intervalos_sabado | CSV "HH:mm-HH:mm;…" | intervalos do sábado, dentro do horário de sábado; vazio = sem pausa (desde 23/10/2026) |
 | matricula | string | opcional — matrícula do RH, chave do Chromos (o nome tem homônimos). **Única** (por empresa) desde 23/10/2026 |
 | empresa | string | empresa do Quadro da Infra (Chromos), gravada pelo "Vincular" com a matrícula; não se edita no cadastro, e trocar a matrícula à mão a apaga |
 | desligado_em | AAAA-MM-DD | desligamento; a partir deste dia sai da geração e da agenda (pode ser futuro — aviso prévio) |
@@ -242,7 +244,7 @@ planejadas dele entram no painel de cobertura para remanejamento.
 |---|---|---|
 | funcionario_id | string | obrigatório |
 | sede_id | string | herdada do funcionário |
-| tipo | enum | falta · atestado · ferias · folga · outro |
+| tipo | enum | falta · atestado · ferias · folga · banco_horas · outro (`banco_horas` = compensação, desde 23/10/2026; o tipo só rotula — nenhuma conta usa) |
 | data_inicio, data_fim | YYYY-MM-DD | período inclusivo |
 | observacao, auditoria | | |
 

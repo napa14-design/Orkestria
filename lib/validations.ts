@@ -254,14 +254,18 @@ export function validarFuncionario(f: Partial<Funcionario>): AlertaValidacao[] {
         codigo: "SABADO_INVERTIDO",
         mensagem: "No sábado, a saída precisa ser depois da entrada.",
       });
-    // O sistema não representa intervalo no sábado (`jornadaDoDia` zera). Até 4h
-    // isso é fiel; acima disso a jornada líquida do dia sai maior do que é.
-    if (!Number.isNaN(ini) && !Number.isNaN(fim) && fim - ini > 4 * 60)
+    // Os intervalos do sábado são próprios (`intervalos_sabado`) e vivem dentro
+    // do horário de sábado. Até 4h, sem intervalo é fiel (a CLT não exige);
+    // acima disso, sem nenhum, a jornada líquida do sábado sai maior do que é.
+    const problemaSab = problemaNosIntervalos(f.intervalos_sabado, { entrada: f.entrada_sabado, saida: f.saida_sabado });
+    if (problemaSab)
+      alertas.push({ nivel: "erro", codigo: "INTERVALOS_SABADO_INVALIDOS", mensagem: `Sábado: ${problemaSab}` });
+    if (!Number.isNaN(ini) && !Number.isNaN(fim) && fim - ini > 4 * 60 && !f.intervalos_sabado?.trim())
       alertas.push({
         nivel: "alerta",
         codigo: "SABADO_SEM_INTERVALO",
         mensagem:
-          "Sábado com mais de 4h: o sistema não desconta intervalo neste dia, então a jornada líquida do sábado sai cheia.",
+          "Sábado com mais de 4h e sem intervalo de sábado: a jornada líquida do sábado sai cheia. Preencha \"Intervalos (sábado)\" se houver pausa.",
       });
   }
   return alertas;

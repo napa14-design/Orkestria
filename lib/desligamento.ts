@@ -30,8 +30,10 @@ export const MOTIVOS_DESLIGAMENTO = [
 ] as const;
 
 /**
- * Abandono não abre vaga daqui: o Chromos já abre a dele sozinho depois de 15
- * dias de falta. Abrir aqui também daria duas vagas para o mesmo posto.
+ * Abandono não abre vaga daqui: depois de 15 dias de falta o Chromos avisa a
+ * Coordenação, que pede a vaga por lá (o aviso é sozinho; a vaga, não —
+ * conferido no código do Chromos em 23/10/2026). Abrir aqui também daria duas
+ * vagas para o mesmo posto.
  */
 export function motivoAbreVaga(motivo: string): boolean {
   return motivo !== "Abandono de emprego";

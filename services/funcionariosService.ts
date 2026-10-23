@@ -422,7 +422,7 @@ export async function desligarFuncionario(
   ]);
 
   const vaga: ResultadoVaga = !motivoAbreVaga(motivo)
-    ? { aberta: false, motivo: "Abandono de emprego: o Chromos já abre a vaga sozinho depois de 15 dias de falta." }
+    ? { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos, que avisa depois de 15 dias de falta." }
     : extinguir
       ? { aberta: false, motivo: "o posto deixou de existir." }
       : dados.abrirVaga === false
@@ -455,7 +455,7 @@ export async function abrirVagaNoSgcp(
   if (validarDesligamento({ data: f.desligado_em, motivo: f.motivo_desligamento }))
     return { aberta: false, motivo: "O desligamento gravado está incompleto (data ou motivo fora da lista)." };
   if (!motivoAbreVaga(f.motivo_desligamento ?? ""))
-    return { aberta: false, motivo: "Abandono de emprego: a vaga é aberta pelo Chromos." };
+    return { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos." };
 
   const url = process.env.SGCP_VAGAS_URL;
   const token = process.env.SGCP_VAGAS_TOKEN;

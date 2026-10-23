@@ -12,6 +12,7 @@ const TIPOS = [
   { valor: "atestado", rotulo: "Atestado" },
   { valor: "ferias", rotulo: "Férias" },
   { valor: "folga", rotulo: "Folga" },
+  { valor: "banco_horas", rotulo: "Banco de horas (compensação)" },
   { valor: "outro", rotulo: "Outro" },
 ];
 
@@ -20,6 +21,7 @@ const SELO_TIPO: Record<string, string> = {
   atestado: "selo-laranja",
   ferias: "selo-azul",
   folga: "selo-cinza",
+  banco_horas: "selo-verde",
   outro: "selo-cinza",
 };
 
