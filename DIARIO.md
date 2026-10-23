@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-10-23 — Next 16.4.3 e Vitest 4.1.12 (alertas de segurança)
+
+`npm audit` acusava 3 alertas: Next 16.4.0 (**crítico**: execução remota de
+código na otimização de imagem com SVG e em funções `use cache`; e DoS em
+Server Actions) e `@vitest/mocker` (moderado, só ambiente de teste). O
+sistema não usa `next/image` nem `use cache`, mas a rota `/_next/image`
+existe por padrão. Next 16.4.0 → 16.4.3 (só o lock; a faixa `^16.4.0` já
+cobria) e vitest `^4.1.10` → `^4.1.12`. A 16.4.3 saiu no mesmo dia: assinatura
+do registro e procedência (GitHub Actions, SLSA) conferidas com `npm audit
+signatures`. `npm audit`: 0.
+
+Arquivos: `package.json`, `package-lock.json`.
+
+---
+
 ## 2026-10-23 — Categoria = módulo da capacitação; Apoio Pedagógico na métrica de apoio
 
 **Dados (produção, com autoria `capacitacao-23-10-2026` no histórico):** a
