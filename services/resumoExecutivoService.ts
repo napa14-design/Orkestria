@@ -2,7 +2,7 @@
  * Leitura do resumo executivo do Chromos. A conta mora em `lib/resumoExecutivo.ts`
  * (pura, testada sem banco); aqui só se busca o que ela precisa.
  */
-import { CATEGORIA_APOIO_OUTRO_SETOR } from "@/lib/calculations";
+import { CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO } from "@/lib/calculations";
 import { getDataSource } from "@/lib/datasource";
 import { limitesDeDatas, mesCorrenteEmFortaleza, montarResumo } from "@/lib/resumoExecutivo";
 import { resolverParametros } from "./parametrosService";
@@ -36,7 +36,9 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
   if (guardado && guardado.expiraEm > agora.getTime()) return guardado.corpo;
 
   const ds = await getDataSource();
-  const idBanco = `${de}_${ate}`;
+  // A versão no id invalida o que foi guardado antes de o formato mudar
+  // (v2, 23/10/2026: apoio pedagógico no total e à parte). Mudou o corpo? Suba.
+  const idBanco = `v2_${de}_${ate}`;
   // Cache ilegível ou banco instável não derruba o resumo: segue para o cálculo.
   try {
     const noBanco = await ds.obter("cache_resumo", idBanco);
@@ -50,7 +52,7 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
   }
 
   const { inicio, fim } = limitesDeDatas(de, ate);
-  const [sedes, funcionarios, rotinas, execucoes, params, tarefasDeApoio] = await Promise.all([
+  const [sedes, funcionarios, rotinas, execucoes, params, tarefasDeApoio, tarefasPedagogicas] = await Promise.all([
     ds.listar("sedes"),
     ds.listar("funcionarios"),
     ds.consultar("rotinas_planejadas", [
@@ -65,6 +67,7 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
     resolverParametros(),
     // Só as tarefas da categoria — dezenas de leituras, não as 1.200.
     ds.consultar("tarefas", [{ campo: "categoria_id", op: "==", valor: CATEGORIA_APOIO_OUTRO_SETOR }]),
+    ds.consultar("tarefas", [{ campo: "categoria_id", op: "==", valor: CATEGORIA_APOIO_PEDAGOGICO }]),
   ]);
 
   const corpo = montarResumo({
@@ -77,6 +80,7 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
     ate,
     agora,
     tarefasDeApoio: new Set(tarefasDeApoio.map((t) => t.id)),
+    tarefasPedagogicas: new Set(tarefasPedagogicas.map((t) => t.id)),
   });
   const fechado = ate < mesCorrenteEmFortaleza(agora);
   try {

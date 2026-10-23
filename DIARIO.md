@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-10-23 — Categoria = módulo da capacitação; Apoio Pedagógico na métrica de apoio
+
+**Dados (produção, com autoria `capacitacao-23-10-2026` no histórico):** a
+categoria da tarefa passou a ser o **módulo** do programa de capacitação ASG.
+- Categorias novas com id fixo: `modulo_m01`…`modulo_m08`, `modulo_m10`…`modulo_m12`
+  e `apoio_pedagogico`. As antigas (c1–c8 e "Setor Pedagógico") foram
+  desativadas, não apagadas. "Apoio a outro setor" ficou como estava.
+- **1.634 tarefas reclassificadas.** As tarefas do M09 (apoio a alunos) foram
+  para **Apoio Pedagógico**: só a ação de cuidar ou acompanhar aluno. A
+  limpeza perto de aluno ficou no módulo da limpeza. O backup das categorias
+  anteriores ficou fora do repo.
+- Os 4 requisitos do programa foram cadastrados: RDC 216, bebedouros, NR-35 e
+  primeiros socorros.
+
+**Métrica:** o Apoio Pedagógico "segue a mesma linha" do apoio a outro setor,
+sem se fundir com ele.
+- **No Painel:** o KPI "Apoio a outro setor" passa a somar os dois e mostra a
+  parte pedagógica no detalhe.
+- **No resumo do Chromos:** `apoioOutroSetorPct` **passa a incluir** o
+  pedagógico (muda o significado do número), e entra o campo aditivo
+  `apoioPedagogicoPct`.
+- O id do cache virou `v2_<de>_<ate>`, para não servir o formato antigo.
+  Mudou o corpo do resumo? Suba a versão.
+
+Arquivos: `lib/calculations.ts` (`CATEGORIA_APOIO_PEDAGOGICO`),
+`lib/resumoExecutivo.ts`, `services/resumoExecutivoService.ts`,
+`app/(app)/dashboard/page.tsx`, `lib/memoryStore.ts` (seed),
+`types/CacheResumo.ts`; testes em `resumo-executivo.test.ts` e
+`cache-resumo.test.ts`.
+
+---
+
 ## 2026-10-22 — Leituras: cache do resumo do Chromos, Histórico por tabela e Panorama
 
 Levantamento no console do Firebase (Firestore › Uso): 172 mil leituras em 24 h

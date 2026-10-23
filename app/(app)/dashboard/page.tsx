@@ -15,6 +15,7 @@ import {
   resumoDeOcupacao,
   ocupaHorario,
   CATEGORIA_APOIO_OUTRO_SETOR,
+  CATEGORIA_APOIO_PEDAGOGICO,
   percentualApoioOutroSetor,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
@@ -118,11 +119,17 @@ export default function PaginaDashboard() {
     const validas = rs.filter(ocupaHorario);
 
     const tempoPlanejadoTotal = validas.reduce((s, r) => s + r.tempo_previsto_min, 0);
-    // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos).
-    const tarefasDeApoio = new Set(
-      (tarefas ?? []).filter((t) => t.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR).map((t) => t.id),
+    // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos)
+    // — com o apoio pedagógico somado e mostrado à parte (23/10/2026).
+    const tarefasPedagogicas = new Set(
+      (tarefas ?? []).filter((t) => t.categoria_id === CATEGORIA_APOIO_PEDAGOGICO).map((t) => t.id),
     );
+    const tarefasDeApoio = new Set([
+      ...(tarefas ?? []).filter((t) => t.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR).map((t) => t.id),
+      ...tarefasPedagogicas,
+    ]);
     const apoioOutroSetorPct = percentualApoioOutroSetor(validas, tarefasDeApoio);
+    const apoioPedagogicoPct = percentualApoioOutroSetor(validas, tarefasPedagogicas);
 
     // Ocupação média por funcionário nos dias em que houve planejamento.
     const porFuncionario = ocupacaoPorPessoa(funcs, validas);
@@ -171,6 +178,7 @@ export default function PaginaDashboard() {
 
     return {
       apoioOutroSetorPct,
+      apoioPedagogicoPct,
       tempoRealizadoTotal,
       tarefasRealizadas,
       tarefasNaoRealizadas,
@@ -399,7 +407,11 @@ export default function PaginaDashboard() {
             <CartaoKpi
               rotulo="Apoio a outro setor"
               valor={indicadores.apoioOutroSetorPct === null ? "—" : `${indicadores.apoioOutroSetorPct.toFixed(1)}%`}
-              detalhe="do tempo planejado · plantão, cantina, portaria, eventos"
+              detalhe={
+                indicadores.apoioPedagogicoPct
+                  ? `do tempo planejado · ${indicadores.apoioPedagogicoPct.toFixed(1)}% pedagógico`
+                  : "do tempo planejado · plantão, cantina, portaria, eventos"
+              }
               cor="var(--acento)"
             />
           </div>

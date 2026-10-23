@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { GET } from "@/app/api/chromos/resumo/route";
 import {
   CATEGORIA_APOIO_OUTRO_SETOR,
+  CATEGORIA_APOIO_PEDAGOGICO,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   percentualApoioOutroSetor,
@@ -202,6 +203,25 @@ describe("montarResumo", () => {
     expect(linha("Sul 1").apoioOutroSetorPct).toBe(0);
   });
 
+  it("apoio pedagógico entra no total de apoio e aparece à parte (23/10/2026)", () => {
+    // r6 (60 min em Sul 1) é apoio a outro setor; r4 (Benfica) é pedagógico.
+    const res = montarResumo({
+      sedes, funcionarios,
+      rotinas: rotinas.map((x) => (x.id === "r6" ? { ...x, tarefa_id: "t-apoio" } : x.id === "r4" ? { ...x, tarefa_id: "t-ped" } : x)),
+      execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+      tarefasDeApoio: new Set(["t-apoio"]),
+      tarefasPedagogicas: new Set(["t-ped"]),
+    });
+    const sede = (nome: string) => res.porSede.find((s) => s.sede === nome)!;
+    expect(sede("Sul 1")).toMatchObject({ apoioOutroSetorPct: 10, apoioPedagogicoPct: 0 });
+    expect(sede("Benfica")).toMatchObject({ apoioOutroSetorPct: 100, apoioPedagogicoPct: 100 });
+    // O total do conjunto soma as duas; a parte pedagógica nunca passa do total.
+    expect(res.geral.apoioPedagogicoPct!).toBeGreaterThan(0);
+    expect(res.geral.apoioPedagogicoPct!).toBeLessThan(res.geral.apoioOutroSetorPct!);
+    // Sem a lista pedagógica (chamada antiga): 0% onde há planejamento, nunca inventa.
+    expect(linha("Sul 1").apoioPedagogicoPct).toBe(0);
+  });
+
   it("percentualApoioOutroSetor: null sem nada planejado; remanejada e cancelada fora", () => {
     expect(percentualApoioOutroSetor([], new Set(["t"]))).toBeNull();
     const base = { tarefa_id: "t", tempo_previsto_min: 30 } as const;
@@ -269,5 +289,22 @@ describe("GET /api/chromos/resumo — as portas", () => {
     // Agosto: o mês que nenhum outro teste pede, para o cache de 5 min não responder.
     const corpo = await (await pedir("?de=2026-08&ate=2026-08", "segredo")).json();
     expect(corpo.geral.apoioOutroSetorPct).toBe(11.1); // 30 de 270
+  });
+
+  it("apoio pedagógico sai do banco: soma no total e vem à parte", async () => {
+    process.env.ORKESTRIA_TOKEN = "segredo";
+    reiniciarBanco();
+    const ds = await getDataSource();
+    const tarefa = (id: string, categoria_id: string) =>
+      ds.criar("tarefas", { id, nome_tarefa: id, sede_id: "christus_dt", local_id: "christus_l1", categoria_id, ativo: true } as never);
+    await tarefa("t-plantao", CATEGORIA_APOIO_OUTRO_SETOR);
+    await tarefa("t-alunos", CATEGORIA_APOIO_PEDAGOGICO);
+    await tarefa("t-limpeza", "c1");
+    for (const [id, tarefa_id, min] of [["b1", "t-plantao", 30], ["b2", "t-alunos", 30], ["b3", "t-limpeza", 240]] as const)
+      await ds.criar("rotinas_planejadas", rotina({ id, tarefa_id, sede_id: "christus_dt", data: "2026-07-10", tempo_previsto_min: min }));
+    // Julho: outro mês que nenhum teste pede, para o cache não responder.
+    const corpo = await (await pedir("?de=2026-07&ate=2026-07", "segredo")).json();
+    expect(corpo.geral.apoioOutroSetorPct).toBe(20); // 60 de 300
+    expect(corpo.geral.apoioPedagogicoPct).toBe(10); // 30 de 300
   });
 });

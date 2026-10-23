@@ -110,6 +110,8 @@ function seed(): Banco {
       { id: "c8", nome: "Apoio operacional", descricao: "Atividades que não são limpeza: café, recolhimento, aguação, montagem.", cor: "#5a7a8a", fator_intensidade: 1, ativo: true, ...aud },
       // Id fixo (CATEGORIA_APOIO_OUTRO_SETOR): é por ele que o painel e o Chromos medem.
       { id: "apoio_outro_setor", nome: "Apoio a outro setor", descricao: "Trabalho para outro setor: plantão com crianças, cantina, portaria, eventos. Café não entra.", cor: "#9C0D38", fator_intensidade: 1, ativo: true, ...aud },
+      // Id fixo (CATEGORIA_APOIO_PEDAGOGICO): soma no total de apoio e aparece à parte.
+      { id: "apoio_pedagogico", nome: "Apoio Pedagógico", descricao: "Trabalho para o setor pedagógico (apoio a alunos), medido junto com 'Apoio a outro setor'.", cor: "#D4A017", fator_intensidade: 1, ativo: true, ...aud },
     ],
     requisitos: [
       { id: "rq1", nome: "Manuseio de produtos químicos", tipo: "treinamento", descricao: "Capacitação para uso de saneantes/desinfetantes.", ativo: true, ...aud },

@@ -118,9 +118,12 @@ export interface Numeros {
   /**
    * % do tempo planejado em apoio a outro setor (plantão, cantina, portaria,
    * eventos — não café). `null` sem nada planejado. Campo acrescentado em
-   * 20/10/2026: aditivo, quem não conhece ignora.
+   * 20/10/2026: aditivo, quem não conhece ignora. Desde 23/10/2026 INCLUI o
+   * apoio pedagógico (que segue a mesma linha), detalhado em `apoioPedagogicoPct`.
    */
   apoioOutroSetorPct: number | null;
+  /** A parte pedagógica do total acima. Aditivo (23/10/2026). */
+  apoioPedagogicoPct: number | null;
 }
 
 const umaCasa = (n: number) => Math.round(n * 10) / 10;
@@ -137,7 +140,11 @@ export function montarResumo(args: {
   agora: Date;
   /** Ids das tarefas da categoria "Apoio a outro setor". */
   tarefasDeApoio?: ReadonlySet<string>;
+  /** Ids das tarefas da categoria "Apoio Pedagógico" (somam no total de apoio). */
+  tarefasPedagogicas?: ReadonlySet<string>;
 }) {
+  const pedagogicas = args.tarefasPedagogicas ?? new Set<string>();
+  const todoApoio = new Set([...(args.tarefasDeApoio ?? []), ...pedagogicas]);
   const { sedes, params, de, ate, agora } = args;
   const ativos = args.funcionarios.filter((f) => f.ativo);
   const blocos = args.rotinas.filter((r) => r.status !== "cancelada");
@@ -183,7 +190,8 @@ export function montarResumo(args: {
       execucoesOutras: status("remanejada") + status("cancelada"),
       execucoesSemRegistro: semRegistro,
       diasConferidos: [...dias.values()].filter(Boolean).length,
-      apoioOutroSetorPct: percentualApoioOutroSetor(daqui, args.tarefasDeApoio ?? new Set()),
+      apoioOutroSetorPct: percentualApoioOutroSetor(daqui, todoApoio),
+      apoioPedagogicoPct: percentualApoioOutroSetor(daqui, pedagogicas),
     };
   };
   const teveAlgo = (n: Numeros) => n.pessoasPlanejadas > 0 || n.execucoesPrevistas > 0;

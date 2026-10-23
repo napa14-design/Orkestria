@@ -8,7 +8,7 @@
  * Dado DERIVADO, não de negócio: fica fora do histórico de alterações.
  */
 export interface CacheResumo {
-  /** `<de>_<ate>`, ex.: "2026-10_2026-10". */
+  /** `v<versão>_<de>_<ate>`, ex.: "v2_2026-10_2026-10" (a versão invalida o formato antigo). */
   id: string;
   /** O corpo da resposta, em JSON. */
   corpo: string;

@@ -108,6 +108,14 @@ export const FATOR_POR_TIPO_LOCAL: Record<TipoLocal, number> = {
 export const CATEGORIA_APOIO_OUTRO_SETOR = "apoio_outro_setor";
 
 /**
+ * Apoio ao setor pedagógico (acompanhar e receber alunos, auxiliar a professora,
+ * apoio no intervalo) — categoria própria desde 23/10/2026, que "segue a mesma
+ * linha" do apoio a outro setor sem se fundir com ela (decisão do dono): entra
+ * no total de apoio e aparece à parte.
+ */
+export const CATEGORIA_APOIO_PEDAGOGICO = "apoio_pedagogico";
+
+/**
  * Quanto do tempo planejado vai para apoio a outro setor, em %. `null` sem nada
  * planejado — porcentagem de nada não é 0%.
  */

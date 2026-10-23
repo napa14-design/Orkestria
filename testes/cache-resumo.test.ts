@@ -23,7 +23,7 @@ describe("resumo do Chromos com cache no banco", () => {
     const consultar = vi.spyOn(ds, "consultar");
     const primeiro = await resumoExecutivo("2099-03", "2099-03", T0);
     expect(consultar).toHaveBeenCalled();
-    const guardado = await ds.obter("cache_resumo", "2099-03_2099-03");
+    const guardado = await ds.obter("cache_resumo", "v2_2099-03_2099-03");
     expect(guardado?.expira_em).toBe(depois(30 * MIN).toISOString());
 
     consultar.mockClear();
@@ -55,7 +55,7 @@ describe("resumo do Chromos com cache no banco", () => {
 
   it("cache ilegível ou banco instável não derrubam o resumo: recalcula", async () => {
     const ds = await getDataSource();
-    await ds.criar("cache_resumo", { id: "2099-03_2099-03", corpo: "{quebrado", expira_em: depois(60 * MIN).toISOString(), criado_em: T0.toISOString() });
+    await ds.criar("cache_resumo", { id: "v2_2099-03_2099-03", corpo: "{quebrado", expira_em: depois(60 * MIN).toISOString(), criado_em: T0.toISOString() });
     const r1 = await resumoExecutivo("2099-03", "2099-03", T0);
     expect(r1).toMatchObject({ de: "2099-03", ate: "2099-03" });
     const original = ds.obter.bind(ds);
