@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-10-26 — Troca por prioridade em qualquer horário
+
+A troca por prioridade da Central do dia (19/10) só procurava quem, **no mesmo
+horário** da tarefa de quem faltou, estivesse com prioridade menor. Decisão do
+dono: "pode ser qualquer horário". Agora, se ninguém cede no horário da falta,
+a tarefa vai para outro horário do dia em que alguém tenha só prioridade menor
+somando o tempo — ex.: duas baixas às 13:30 cobrem a alta das 10:00 — e é
+**movida para lá** ao confirmar (as cedidas viram "remanejada", como antes).
+
+- Candidatos: o horário da falta e cada início de bloco cedível da pessoa,
+  com a duração da tarefa. Cada janela passa pelas mesmas travas (crítica nunca
+  é cedida; nada começado ou realizado; média só para crítica/alta) e pelo
+  `validarAlocacao` — então a **janela da tarefa** (`janela_inicio/fim`), o
+  intervalo e o expediente continuam valendo.
+- Ordem: baixa antes de média; quem cede **menos minutos** (uma baixa + tempo
+  livre ganha de duas baixas); **mais perto do horário original** (o mesmo
+  horário ganha empate); a pessoa mais leve.
+- A Central mostra "assume às 13:30 (era às 10:00)". O servidor recalcula a
+  proposta ao confirmar e exige que o **horário seja o que a tela mostrou**
+  (`inicio_planejado` no corpo do `/api/central-dia/resolver`): duas janelas da
+  mesma pessoa podem ceder as mesmas tarefas, e na primeira versão a proposta
+  mudava de horário entre a tela e o clique e passava (pego na auditoria). Sem
+  o horário no corpo, só vale a proposta no horário original da tarefa.
+- Em outro horário, o fim é início + tempo previsto — o mesmo que o
+  `updateRotina` grava (antes a tela mostrava o fim pelo tempo visual).
+- Efeito colateral bom: a tarefa de quem faltou que **já tinha começado** (e
+  ninguém fez) deixava de ser pulada — agora pode ir para um horário que ainda
+  vem.
+
+Arquivos: `services/centralDiaService.ts` (`proporTrocaPorPrioridade`,
+`resolverProximaExcecao`), `app/api/central-dia/resolver/route.ts`,
+`types/CentralDia.ts` (`inicio_original`), `components/CentralDoDia.tsx`;
+testes em `troca-prioridade.test.ts` (11 casos novos, 1 revisto; 8 mutações
+mortas).
+
+---
+
 ## 2026-10-23 — Intervalos de sábado, ausência "Banco de horas" e o texto da vaga no abandono
 
 Pedidos da coordenação, com print da tela:

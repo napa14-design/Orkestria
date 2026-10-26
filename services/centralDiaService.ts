@@ -1,5 +1,6 @@
 import {
   feriadoDoDia,
+  fimPlanejadoMin,
   funcionarioNoDia,
   jornadaDoDia,
   jornadaLiquidaMin,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/calculations";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
-import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem } from "@/lib/dateUtils";
+import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "@/lib/dateUtils";
 import {
   limitarSedeConsulta,
   podeAlterarSede,
@@ -222,6 +223,15 @@ async function proporTrocaPorPrioridade(a: {
   const agoraMin = minutosAgora();
   const tarefasEspera = new Set(tarefas.filter((t) => t.espera).map((t) => t.id));
 
+  /** Pode ser cedido: planejado, sem realizado, ainda não começou e de prioridade menor. */
+  const cedivel = (r: RotinaPlanejada) =>
+    (r.status === "planejada" || r.status === "pendente") &&
+    !a.execucoesPorRotina.has(r.id) &&
+    // Só o que ainda não começou: ceder o que já passou gravaria
+    // "remanejada" no que talvez tenha sido feito (revisão de segurança).
+    hhmmParaMin(r.inicio_planejado) >= agoraMin &&
+    nivelDe(r) < nivelFalta;
+
   const opcoes = a.funcionarios
     .filter(
       (f) => f.sede_id === rotina.sede_id && f.id !== rotina.funcionario_id && a.disponiveisIds.has(f.id),
@@ -230,61 +240,75 @@ async function proporTrocaPorPrioridade(a: {
       const doDia = a.rotinasDoDia.filter(
         (r) => r.funcionario_id === f.id && r.id !== rotina.id && ocupaHorario(r),
       );
-      const choques = doDia.filter(
-        (r) =>
-          !tarefasEspera.has(r.tarefa_id) &&
-          intervalosSobrepoem(a.inicioMin, a.fimMin, hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)),
-      );
-      if (choques.length === 0) return []; // sem choque e mesmo assim não coube: outro alerta
-      const cedivel = choques.every(
-        (r) =>
-          (r.status === "planejada" || r.status === "pendente") &&
-          !a.execucoesPorRotina.has(r.id) &&
-          // Só o que ainda não começou: ceder o que já passou gravaria
-          // "remanejada" no que talvez tenha sido feito (revisão de segurança).
-          hhmmParaMin(r.inicio_planejado) >= agoraMin &&
-          nivelDe(r) < nivelFalta,
-      );
-      if (!cedivel) return [];
-      const ficam = doDia.filter((r) => !choques.includes(r));
       const efetivo = funcionarioNoDia(f, rotina.data);
-      const alertas = validarAlocacao({
-        funcionario: efetivo,
-        rotinasExistentes: ficam,
-        inicioMin: a.inicioMin,
-        fimMin: a.fimMin,
-        tarefa,
-        local,
-        parametros: a.parametros,
-        tempoPrevistoNovo: rotina.tempo_previsto_min,
-        requisitosCatalogo: a.requisitosCatalogo,
-        qualificacoesFuncionario: a.qualificacoes.filter((q) => q.funcionario_id === f.id),
-        data: rotina.data,
-        tarefasEspera,
-      });
-      if (alertas.length > 0) return [];
       const jornada = jornadaLiquidaMin(efetivo);
-      return [
-        {
-          funcionario: f,
-          choques,
-          pior: Math.max(...choques.map(nivelDe)),
-          minutosCedidos: choques.reduce((s, r) => s + (r.tempo_previsto_min || 0), 0),
-          carga: jornada > 0 ? tempoPlanejadoMin(ficam) / jornada : Infinity,
-        },
+      // O horário da falta primeiro; depois, QUALQUER horário do dia que comece
+      // num bloco cedível desta pessoa (26/10/2026, decisão do dono: "pode ser
+      // qualquer horário"). Ex.: duas baixas às 10:00 que somam o tempo da
+      // crítica das 08:00. A janela da tarefa (`janela_inicio/fim`) continua
+      // valendo — quem confere é o `validarAlocacao`.
+      const inicios = [
+        a.inicioMin,
+        ...doDia
+          .filter((r) => cedivel(r) && !tarefasEspera.has(r.tarefa_id))
+          .map((r) => hhmmParaMin(r.inicio_planejado))
+          .filter((m) => m !== a.inicioMin),
       ];
+      return [...new Set(inicios)].flatMap((ini) => {
+        // Em outro horário, o fim é o que o `updateRotina` vai gravar (início +
+        // tempo previsto): a janela validada aqui é a mesma que fica no banco.
+        const fim = ini === a.inicioMin ? a.fimMin : fimPlanejadoMin(ini, rotina.tempo_previsto_min);
+        const choques = doDia.filter(
+          (r) =>
+            !tarefasEspera.has(r.tarefa_id) &&
+            intervalosSobrepoem(ini, fim, hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)),
+        );
+        if (choques.length === 0) return []; // sem choque e mesmo assim não coube: outro alerta
+        if (!choques.every(cedivel)) return [];
+        const ficam = doDia.filter((r) => !choques.includes(r));
+        const alertas = validarAlocacao({
+          funcionario: efetivo,
+          rotinasExistentes: ficam,
+          inicioMin: ini,
+          fimMin: fim,
+          tarefa,
+          local,
+          parametros: a.parametros,
+          tempoPrevistoNovo: rotina.tempo_previsto_min,
+          requisitosCatalogo: a.requisitosCatalogo,
+          qualificacoesFuncionario: a.qualificacoes.filter((q) => q.funcionario_id === f.id),
+          data: rotina.data,
+          tarefasEspera,
+        });
+        if (alertas.length > 0) return [];
+        return [
+          {
+            funcionario: f,
+            inicio: ini,
+            fim,
+            choques,
+            pior: Math.max(...choques.map(nivelDe)),
+            minutosCedidos: choques.reduce((s, r) => s + (r.tempo_previsto_min || 0), 0),
+            deslocamento: Math.abs(ini - a.inicioMin),
+            carga: jornada > 0 ? tempoPlanejadoMin(ficam) / jornada : Infinity,
+          },
+        ];
+      });
     })
-    // Baixa antes de média; depois quem cede menos; depois quem está mais leve.
+    // Baixa antes de média; depois quem cede menos; depois o mais perto do
+    // horário de origem (o mesmo horário ganha empate); depois quem está mais leve.
     .sort(
       (x, y) =>
         x.pior - y.pior ||
         x.minutosCedidos - y.minutosCedidos ||
+        x.deslocamento - y.deslocamento ||
         x.carga - y.carga ||
         x.funcionario.nome.localeCompare(y.funcionario.nome, "pt-BR"),
     );
 
   const melhor = opcoes[0];
   if (!melhor) return undefined;
+  const mudou = melhor.inicio !== a.inicioMin;
   return {
     tipo: "trocar_por_prioridade",
     rotina_id: rotina.id,
@@ -293,8 +317,9 @@ async function proporTrocaPorPrioridade(a: {
     funcionario_nome: melhor.funcionario.nome,
     funcionario_origem_nome: a.origemNome,
     tarefa_nome: tarefa.nome_tarefa,
-    inicio_planejado: rotina.inicio_planejado,
-    fim_planejado: rotina.fim_planejado,
+    inicio_planejado: mudou ? minParaHHMM(melhor.inicio) : rotina.inicio_planejado,
+    fim_planejado: mudou ? minParaHHMM(melhor.fim) : rotina.fim_planejado,
+    ...(mudou ? { inicio_original: rotina.inicio_planejado } : {}),
     tarefa_prioridade: rotuloPrioridade(nivelFalta),
     cedidas: [...melhor.choques]
       .sort((x, y) => x.inicio_planejado.localeCompare(y.inicio_planejado))
@@ -463,7 +488,7 @@ export async function getCentralDia(
             ? "Há tarefas com pessoas ausentes"
             : "Há tarefas fora da escala",
         descricao: troca
-          ? `“${resolucao!.tarefa_nome}” (${resolucao!.tarefa_prioridade}) era de ${resolucao!.funcionario_origem_nome}. Ninguém tem o horário livre: ${resolucao!.funcionario_nome} assume e deixa ${cedidasTexto} para outro dia — fica registrado como remanejado, com o motivo.`
+          ? `“${resolucao!.tarefa_nome}” (${resolucao!.tarefa_prioridade}) era de ${resolucao!.funcionario_origem_nome}. Ninguém tem o horário livre: ${resolucao!.funcionario_nome} assume${resolucao!.inicio_original ? ` às ${resolucao!.inicio_planejado} (era às ${resolucao!.inicio_original})` : ""} e deixa ${cedidasTexto} para outro dia — fica registrado como remanejado, com o motivo.`
           : resolucao
             ? `“${resolucao.tarefa_nome}” era de ${resolucao.funcionario_origem_nome}. A troca proposta não gera conflito, sobrecarga ou alerta cadastral.`
             : `${rotinasDeIndisponiveis.length} bloco(s) precisam de outra pessoa antes da execução.`,
@@ -578,6 +603,13 @@ export async function resolverProximaExcecao(
   /** Na troca, os blocos que a pessoa viu que ia ceder — têm que ser os mesmos. */
   cedidasIds: string[] = [],
   sedeSolicitada?: string,
+  /**
+   * O início que a tela mostrou. Com a troca em qualquer horário, duas janelas
+   * da MESMA pessoa podem cortar as MESMAS cedidas: entre a tela e o clique a
+   * proposta mudava de horário e passava (auditoria, 26/10/2026). Sem ele, só
+   * vale a proposta no horário original da tarefa — essa não muda sem ser vista.
+   */
+  inicioVisto?: string,
 ) {
   if (!podeEscrever(sessao)) throw new ErroPermissao();
   const central = await getCentralDia(sessao, sedeSolicitada);
@@ -585,11 +617,14 @@ export async function resolverProximaExcecao(
   const mesmasCedidas =
     [...(proposta?.cedidas ?? []).map((c) => c.rotina_id)].sort().join(",") ===
     [...cedidasIds].sort().join(",");
+  const mesmoHorario =
+    inicioVisto !== undefined ? proposta?.inicio_planejado === inicioVisto : !proposta?.inicio_original;
   if (
     !proposta ||
     proposta.rotina_id !== rotinaId ||
     proposta.funcionario_id !== funcionarioId ||
-    !mesmasCedidas
+    !mesmasCedidas ||
+    !mesmoHorario
   ) {
     throw new ErroValidacao([
       {
@@ -630,6 +665,8 @@ export async function resolverProximaExcecao(
     }
     return await updateRotina(proposta.rotina_id, {
       funcionario_id: proposta.funcionario_id,
+      // Troca em outro horário: a tarefa vai para onde as cedidas abriram espaço.
+      ...(proposta.inicio_original ? { inicio_planejado: proposta.inicio_planejado } : {}),
       bloquearAlertas: true,
     });
   } catch (erro) {

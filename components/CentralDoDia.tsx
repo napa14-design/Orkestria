@@ -35,6 +35,9 @@ export default function CentralDoDia({ nome }: { nome: string }) {
         rotina_id: resolucao.rotina_id,
         funcionario_id: resolucao.funcionario_id,
         cedidas: (resolucao.cedidas ?? []).map((c) => c.rotina_id),
+        // E o horário: a troca pode mudar a tarefa de horário, e o servidor só
+        // confirma no horário que esta tela mostrou.
+        inicio_planejado: resolucao.inicio_planejado,
         sede: sede || undefined,
       });
       await mutate();
@@ -154,6 +157,7 @@ export default function CentralDoDia({ nome }: { nome: string }) {
               <strong>{data.proxima.resolucao.funcionario_nome}</strong>
               <small className="num">
                 {data.proxima.resolucao.inicio_planejado}–{data.proxima.resolucao.fim_planejado}
+                {data.proxima.resolucao.inicio_original && ` (era às ${data.proxima.resolucao.inicio_original})`}
               </small>
               {data.proxima.resolucao.cedidas?.map((c) => (
                 <small key={c.rotina_id}>

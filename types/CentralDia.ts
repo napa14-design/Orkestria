@@ -28,8 +28,14 @@ export interface ResolucaoCentralDia {
   funcionario_nome: string;
   funcionario_origem_nome: string;
   tarefa_nome: string;
+  /** Onde a tarefa fica — na troca, pode ser outro horário que o de origem. */
   inicio_planejado: string;
   fim_planejado: string;
+  /**
+   * Só na troca que MUDA a tarefa de horário (26/10/2026: "pode ser qualquer
+   * horário"): o início que ela tinha. Ausente = mesmo horário.
+   */
+  inicio_original?: string;
 }
 
 /** Uma condição operacional concreta que desaparece quando for resolvida. */

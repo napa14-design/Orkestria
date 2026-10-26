@@ -4,12 +4,14 @@ import { ErroValidacao } from "@/services/erros";
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    const { rotina_id, funcionario_id, cedidas, sede } = (await req.json()) as {
+    const { rotina_id, funcionario_id, cedidas, sede, inicio_planejado } = (await req.json()) as {
       rotina_id?: string;
       funcionario_id?: string;
       /** Na troca por prioridade: ids dos blocos que a pessoa viu que seriam cedidos. */
       cedidas?: unknown;
       sede?: unknown;
+      /** O início que a tela mostrou — a troca pode mudar a tarefa de horário. */
+      inicio_planejado?: unknown;
     };
     if (!rotina_id || !funcionario_id)
       throw new ErroValidacao([
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
         funcionario_id,
         cedidasIds,
         typeof sede === "string" ? sede : undefined,
+        typeof inicio_planejado === "string" ? inicio_planejado : undefined,
       ),
     );
   });

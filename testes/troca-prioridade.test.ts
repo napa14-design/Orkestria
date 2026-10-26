@@ -152,6 +152,155 @@ describe("troca por prioridade", () => {
   });
 });
 
+/**
+ * "Pode ser qualquer horário" (decisão do dono, 26/10/2026): sem ninguém com
+ * baixa/média no horário da falta, a tarefa vai para onde alguém tenha só
+ * prioridade menor somando o tempo — ex.: duas baixas às 13:30.
+ */
+describe("troca por prioridade em outro horário", () => {
+  const baixa15 = (id: string, inicio: string, fim: string) =>
+    bloco(id, "fc", "tEscada", "le", { inicio_planejado: inicio, fim_planejado: fim, tempo_previsto_min: 15, tempo_visual_min: 15 });
+
+  it("ninguém cede no horário da falta: propõe às 13:30, onde duas baixas somam o tempo", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await baixa15("rB2", "13:45", "14:00");
+    await bloco("rAltaDepois", "fc", "tBanheiro", "lb", { inicio_planejado: "14:00", fim_planejado: "14:30" });
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({
+      tipo: "trocar_por_prioridade",
+      funcionario_id: "fc",
+      inicio_planejado: "13:30",
+      fim_planejado: "14:00",
+      inicio_original: "10:00",
+    });
+    expect(p.resolucao?.cedidas?.map((c) => c.rotina_id)).toEqual(["rB1", "rB2"]);
+    expect(p.descricao).toContain("às 13:30 (era às 10:00)");
+  });
+
+  it("confirmar: a tarefa vai para o horário novo com quem assume, e as duas baixas viram remanejadas", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await baixa15("rB2", "13:45", "14:00");
+    await bloco("rAltaDepois", "fc", "tBanheiro", "lb", { inicio_planejado: "14:00", fim_planejado: "14:30" });
+    // Sem o horário visto, a troca em OUTRO horário não passa.
+    await expect(resolverProximaExcecao(COORD, "rFalta", "fc", ["rB1", "rB2"], SEDE)).rejects.toBeInstanceOf(ErroValidacao);
+    await resolverProximaExcecao(COORD, "rFalta", "fc", ["rB1", "rB2"], SEDE, "13:30");
+    const d = await ds();
+    expect(await d.obter("rotinas_planejadas", "rFalta")).toMatchObject({ funcionario_id: "fc", inicio_planejado: "13:30" });
+    expect((await d.obter("rotinas_planejadas", "rB1"))?.status).toBe("remanejada");
+    expect((await d.obter("rotinas_planejadas", "rB2"))?.status).toBe("remanejada");
+  });
+
+  it("cede o mínimo: uma baixa + tempo livre ganha de duas baixas", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await baixa15("rB2", "13:45", "14:00"); // depois das 14:00, livre
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({ inicio_planejado: "13:45", fim_planejado: "14:15" });
+    expect(p.resolucao?.cedidas?.map((c) => c.rotina_id)).toEqual(["rB2"]);
+  });
+
+  it("o mesmo horário ganha quando a outra opção cede o mesmo", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rBaixaB", "fb", "tEscada", "le"); // baixa às 10:00, no horário da falta
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await bloco("rBaixaC", "fc", "tEscada", "le", { inicio_planejado: "13:30", fim_planejado: "14:00" });
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({ funcionario_id: "fb", inicio_planejado: "10:00" });
+    expect(p.resolucao?.inicio_original).toBeUndefined();
+  });
+
+  it("empate em tudo (prioridade, minutos, carga): o mais perto do horário original ganha", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    // Pessoa B: alta às 10:00, baixa às 13:30. Pessoa C: baixa às 10:00, alta às 13:30.
+    // As duas ficariam com a mesma carga; pelo nome, B viria antes.
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rBaixaB", "fb", "tEscada", "le", { inicio_planejado: "13:30", fim_planejado: "14:00" });
+    await bloco("rBaixaC", "fc", "tEscada", "le");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb", { inicio_planejado: "13:30", fim_planejado: "14:00" });
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({ funcionario_id: "fc", inicio_planejado: "10:00" });
+  });
+
+  it("baixa em outro horário vence média no mesmo horário (baixa antes de média)", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rMediaB", "fb", "tSala", "ls");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await bloco("rBaixaC", "fc", "tEscada", "le", { inicio_planejado: "13:30", fim_planejado: "14:00" });
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({ funcionario_id: "fc", inicio_planejado: "13:30" });
+  });
+
+  it("A1 (auditoria): a proposta muda de horário entre a tela e o clique — recusa, e nada é gravado", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rBaixaC", "fc", "tEscada", "le", { inicio_planejado: "10:15", fim_planejado: "10:45" });
+    const vista = (await proposta()).resolucao!;
+    expect(vista).toMatchObject({ funcionario_id: "fc", inicio_planejado: "10:00" });
+    // Antes do clique, alguém põe uma alta para C às 10:00: a mesma pessoa e a
+    // mesma cedida agora caem às 10:15.
+    await bloco("rAltaNova", "fc", "tBanheiro", "lb", { inicio_planejado: "10:00", fim_planejado: "10:15", tempo_previsto_min: 15, tempo_visual_min: 15 });
+    expect((await proposta()).resolucao).toMatchObject({ funcionario_id: "fc", inicio_planejado: "10:15" });
+    const ids = (vista.cedidas ?? []).map((c) => c.rotina_id);
+    await expect(resolverProximaExcecao(COORD, "rFalta", "fc", ids, SEDE, vista.inicio_planejado)).rejects.toBeInstanceOf(ErroValidacao);
+    await expect(resolverProximaExcecao(COORD, "rFalta", "fc", ids, SEDE)).rejects.toBeInstanceOf(ErroValidacao);
+    const d = await ds();
+    expect(await d.obter("rotinas_planejadas", "rFalta")).toMatchObject({ funcionario_id: "fa", inicio_planejado: "10:00" });
+    expect((await d.obter("rotinas_planejadas", "rBaixaC"))?.status).toBe("planejada");
+  });
+
+  it("em outro horário, o fim mostrado é o que fica gravado (início + tempo previsto)", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb", { tempo_previsto_min: 20 }); // visual 30, previsto 20
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await baixa15("rB2", "13:45", "14:00");
+    await bloco("rAltaDepois", "fc", "tBanheiro", "lb", { inicio_planejado: "14:00", fim_planejado: "14:30" });
+    const vista = (await proposta()).resolucao!;
+    expect(vista).toMatchObject({ inicio_planejado: "13:30", fim_planejado: "13:50" });
+    await resolverProximaExcecao(COORD, "rFalta", vista.funcionario_id, (vista.cedidas ?? []).map((c) => c.rotina_id), SEDE, vista.inicio_planejado);
+    expect(await (await ds()).obter("rotinas_planejadas", "rFalta")).toMatchObject({ inicio_planejado: "13:30", fim_planejado: "13:50" });
+  });
+
+  it("a janela da tarefa continua valendo: fora dela, não propõe", async () => {
+    const d = await ds();
+    await d.atualizar("tarefas", "tBanheiro", { janela_inicio: "09:30", janela_fim: "11:00" });
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await baixa15("rB2", "13:45", "14:00");
+    expect((await proposta()).resolucao).toBeUndefined();
+  });
+
+  it("não propõe horário que já passou", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    // 09:30 já passou (são 10:00); a baixa nem é cedível, e o horário não serve.
+    await bloco("rPassada", "fc", "tEscada", "le", { inicio_planejado: "09:30", fim_planejado: "10:00" });
+    expect((await proposta()).resolucao).toBeUndefined();
+  });
+
+  it("se no meio da janela nova houver crítica ou alta, aquele horário não serve", async () => {
+    await bloco("rFalta", "fa", "tBanheiro", "lb");
+    await bloco("rAltaB", "fb", "tBanheiro", "lb");
+    await bloco("rAltaC", "fc", "tBanheiro", "lb");
+    await baixa15("rB1", "13:30", "13:45");
+    await bloco("rAltaTarde", "fc", "tBanheiro", "lb", { inicio_planejado: "13:45", fim_planejado: "14:15" });
+    const p = await proposta();
+    // 13:30 pegaria a alta das 13:45; 13:45 é a própria alta. Nada serve.
+    expect(p.resolucao).toBeUndefined();
+  });
+});
+
 describe("troca por prioridade — o que a revisão de segurança pediu", () => {
   it("remanejada que volta a planejada confere conflito de novo", async () => {
     await bloco("rFalta", "fa", "tBanheiro", "lb");
@@ -191,18 +340,28 @@ describe("troca por prioridade — o que a revisão de segurança pediu", () => 
 });
 
 describe("troca por prioridade — o que a auditoria pediu", () => {
-  it("falta percebida no meio do turno: pula o bloco que já começou e troca o próximo", async () => {
+  it("falta percebida no meio do turno: a tarefa das 07:00 (por fazer) vai para um horário que ainda vem", async () => {
+    // Até 26/10 o bloco que já tinha começado era pulado — no horário dele
+    // ninguém podia ceder. Com a troca em qualquer horário, ele é feito mais
+    // tarde, no lugar de uma baixa que ainda não começou.
     vi.setSystemTime(new Date("2026-10-19T12:00:00Z")); // 09:00 em Fortaleza
-    const sete = { inicio_planejado: "07:00", fim_planejado: "09:30" };
-    await bloco("rFalta7", "fa", "tBanheiro", "lb", sete);
-    await bloco("rAlta7", "fb", "tBanheiro", "lb", sete);
-    await bloco("rBaixa7", "fc", "tEscada", "le", sete);
-    await bloco("rFalta10", "fa", "tBanheiro", "lb");
-    await bloco("rAlta10", "fb", "tBanheiro", "lb");
+    // Já começou (08:45) e ninguém fez; previsto = duração do bloco (30 min).
+    await bloco("rFalta", "fa", "tBanheiro", "lb", { inicio_planejado: "08:45", fim_planejado: "09:15" });
+    await bloco("rBaixa", "fc", "tEscada", "le", { inicio_planejado: "09:30", fim_planejado: "10:00" });
+    const p = await proposta();
+    expect(p.resolucao).toMatchObject({
+      rotina_id: "rFalta", funcionario_id: "fc", inicio_planejado: "09:30", fim_planejado: "10:00", inicio_original: "08:45",
+    });
+    expect(p.resolucao?.cedidas?.map((c) => c.rotina_id)).toEqual(["rBaixa"]);
+  });
+
+  it("tarefa que já começou e é longa demais para caber depois (invade o intervalo) não é movida", async () => {
+    vi.setSystemTime(new Date("2026-10-19T12:00:00Z")); // 09:00
+    // 07:00–09:30 com previsto de 150 min: às 10:00 iria até 12:30, por cima do almoço das 11:30.
+    await bloco("rFalta7", "fa", "tBanheiro", "lb", { inicio_planejado: "07:00", fim_planejado: "09:30", tempo_previsto_min: 150, tempo_visual_min: 150 });
     await bloco("rBaixa10", "fc", "tEscada", "le");
     const p = await proposta();
-    expect(p.resolucao?.rotina_id).toBe("rFalta10");
-    expect(p.resolucao?.cedidas?.map((c) => c.rotina_id)).toEqual(["rBaixa10"]);
+    expect(p.resolucao?.rotina_id).not.toBe("rFalta7");
   });
 
   it("não propõe mover bloco que já terminou, mesmo com alguém livre naquela hora", async () => {
