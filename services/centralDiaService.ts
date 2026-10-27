@@ -2,6 +2,7 @@ import {
   feriadoDoDia,
   fimPlanejadoMin,
   funcionarioNoDia,
+  intervalosDoFuncionario,
   jornadaDoDia,
   jornadaLiquidaMin,
   NIVEL_CRITICA,
@@ -148,6 +149,35 @@ async function proporRedistribuicao(args: {
   const escolhido = candidatos[0]?.funcionario;
   const origem = funcionarios.find((funcionario) => funcionario.id === rotina.funcionario_id);
   if (!escolhido) {
+    // Ninguém livre no horário: alguém livre em OUTRO horário do dia, sem tirar
+    // nada de ninguém, vem antes da troca (decisão do dono, 26/10/2026: "antes
+    // de tirar uma baixa, procurar quem esteja livre em qualquer horário").
+    // Tarefa de espera (café) não ocupa a pessoa: sem saber quais são, um café
+    // no meio do buraco dava "não cabe" (auditoria, 26/10/2026). Saber custa ler
+    // as tarefas da sede — então primeiro sem; só se ninguém couber E a troca
+    // abaixo for ler essas tarefas de qualquer jeito (prioridade acima de
+    // baixa), tenta de novo sabendo. Tarefa baixa com café no buraco cai na
+    // troca, que erra para o lado seguro.
+    const buscar = (tarefasEspera: Set<string>) =>
+      livreEmOutroHorario({ ...args, tarefa, local, parametros, requisitosCatalogo, qualificacoes, inicioMin, tarefasEspera });
+    let livre = buscar(new Set());
+    if (!livre && !tarefa.espera && nivelPrioridade(tarefa, local) > 1)
+      livre = buscar(
+        new Set((await carregar("tarefas", () => getTarefas(rotina.sede_id))).filter((t) => t.espera).map((t) => t.id)),
+      );
+    if (livre)
+      return {
+        tipo: "redistribuir_rotina",
+        rotina_id: rotina.id,
+        sede_id: rotina.sede_id,
+        funcionario_id: livre.funcionario.id,
+        funcionario_nome: livre.funcionario.nome,
+        funcionario_origem_nome: origem?.nome ?? "Pessoa indisponível",
+        tarefa_nome: tarefa.nome_tarefa,
+        inicio_planejado: minParaHHMM(livre.inicio),
+        fim_planejado: minParaHHMM(livre.fim),
+        inicio_original: rotina.inicio_planejado,
+      };
     return proporTrocaPorPrioridade({
       ...args,
       tarefa,
@@ -171,6 +201,91 @@ async function proporRedistribuicao(args: {
     inicio_planejado: rotina.inicio_planejado,
     fim_planejado: rotina.fim_planejado,
   };
+}
+
+/**
+ * Alguém com um buraco livre em outro horário do dia, que comporte a tarefa sem
+ * conflito nem alerta. Inícios tentados: onde um buraco começa (a entrada, o fim
+ * de cada bloco, o fim de cada intervalo), **agora** e o **início da janela da
+ * tarefa**. Os dois últimos existem porque o
+ * buraco que começou antes de agora — a pessoa ociosa desde cedo, com a falta
+ * percebida no meio do turno — ficava invisível, e a Central cedia uma baixa à
+ * toa (auditoria, 26/10/2026). Só o que ainda vem; o mais perto do horário
+ * original ganha, depois quem está mais leve.
+ */
+function livreEmOutroHorario(a: {
+  rotina: RotinaPlanejada;
+  funcionarios: Funcionario[];
+  disponiveisIds: Set<string>;
+  rotinasDoDia: RotinaPlanejada[];
+  tarefa: Tarefa;
+  local: Local;
+  parametros: ParametrosResolvidos;
+  requisitosCatalogo: Requisito[];
+  qualificacoes: QualificacaoFuncionario[];
+  inicioMin: number;
+  tarefasEspera: Set<string>;
+}): { funcionario: Funcionario; inicio: number; fim: number } | undefined {
+  const { rotina } = a;
+  const agoraMin = minutosAgora();
+  // "Agora" entra de dois jeitos: o próximo passo da grade, estável por um passo
+  // inteiro, e o minuto exato — este SÓ quando o passo não cabe (o buraco curto
+  // em andamento: 10:07, livre até 10:40, tarefa de 30 min). Com o minuto exato
+  // sempre, a proposta vencia quando o relógio virava o minuto e o clique de
+  // quem leu antes de confirmar era recusado (auditoria, 26/10/2026).
+  const passo = a.parametros.bloco_agenda_min > 0 ? a.parametros.bloco_agenda_min : 15;
+  const agoraNaGrade = Math.ceil(agoraMin / passo) * passo;
+  const fixos = [
+    agoraNaGrade,
+    agoraMin,
+    ...(a.tarefa.janela_inicio ? [hhmmParaMin(a.tarefa.janela_inicio)] : []),
+  ];
+  const opcoes = a.funcionarios
+    .filter((f) => f.sede_id === rotina.sede_id && f.id !== rotina.funcionario_id && a.disponiveisIds.has(f.id))
+    .flatMap((f) => {
+      const existentes = a.rotinasDoDia.filter((r) => r.funcionario_id === f.id && r.id !== rotina.id);
+      const efetivo = funcionarioNoDia(f, rotina.data);
+      const jornada = jornadaLiquidaMin(efetivo);
+      const carga = jornada > 0 ? tempoPlanejadoMin(existentes) / jornada : Infinity;
+      const bordas = [
+        ...fixos,
+        hhmmParaMin(efetivo.entrada),
+        ...existentes.filter(ocupaHorario).map((r) => hhmmParaMin(r.fim_planejado)),
+        // O mesmo leitor da validação: aceita espaços no CSV e o trio antigo.
+        ...intervalosDoFuncionario(efetivo).map((iv) => hhmmParaMin(iv.fim)),
+      ];
+      const daPessoa = [...new Set(bordas)]
+        .filter((ini) => !Number.isNaN(ini) && ini !== a.inicioMin && ini >= agoraMin)
+        .flatMap((ini) => {
+          const fim = fimPlanejadoMin(ini, rotina.tempo_previsto_min);
+          const alertas = validarAlocacao({
+            funcionario: efetivo,
+            rotinasExistentes: existentes,
+            inicioMin: ini,
+            fimMin: fim,
+            tarefa: a.tarefa,
+            local: a.local,
+            parametros: a.parametros,
+            tempoPrevistoNovo: rotina.tempo_previsto_min,
+            requisitosCatalogo: a.requisitosCatalogo,
+            qualificacoesFuncionario: a.qualificacoes.filter((q) => q.funcionario_id === f.id),
+            data: rotina.data,
+            tarefasEspera: a.tarefasEspera,
+          });
+          return alertas.length ? [] : [{ funcionario: f, inicio: ini, fim, deslocamento: Math.abs(ini - a.inicioMin), carga }];
+        });
+      // O minuto exato só vale se o passo da grade não coube para esta pessoa.
+      return agoraMin !== agoraNaGrade && daPessoa.some((o) => o.inicio === agoraNaGrade)
+        ? daPessoa.filter((o) => o.inicio !== agoraMin)
+        : daPessoa;
+    })
+    .sort(
+      (x, y) =>
+        x.deslocamento - y.deslocamento ||
+        x.carga - y.carga ||
+        x.funcionario.nome.localeCompare(y.funcionario.nome, "pt-BR"),
+    );
+  return opcoes[0];
 }
 
 /**
@@ -490,7 +605,7 @@ export async function getCentralDia(
         descricao: troca
           ? `“${resolucao!.tarefa_nome}” (${resolucao!.tarefa_prioridade}) era de ${resolucao!.funcionario_origem_nome}. Ninguém tem o horário livre: ${resolucao!.funcionario_nome} assume${resolucao!.inicio_original ? ` às ${resolucao!.inicio_planejado} (era às ${resolucao!.inicio_original})` : ""} e deixa ${cedidasTexto} para outro dia — fica registrado como remanejado, com o motivo.`
           : resolucao
-            ? `“${resolucao.tarefa_nome}” era de ${resolucao.funcionario_origem_nome}. A troca proposta não gera conflito, sobrecarga ou alerta cadastral.`
+            ? `“${resolucao.tarefa_nome}” era de ${resolucao.funcionario_origem_nome}.${resolucao.inicio_original ? ` Ninguém está livre às ${resolucao.inicio_original}: ${resolucao.funcionario_nome} faz às ${resolucao.inicio_planejado}, num horário livre, sem deixar nenhuma tarefa.` : ""} A alocação proposta não gera conflito, sobrecarga ou alerta cadastral.`
             : `${rotinasDeIndisponiveis.length} bloco(s) precisam de outra pessoa antes da execução.`,
         quantidade: rotinasDeIndisponiveis.length,
         href: "/rotinas",

@@ -8,6 +8,7 @@ import { getDataSource } from "@/lib/datasource";
 import { hojeISO } from "@/lib/dateUtils";
 import type { SessaoUsuario } from "@/lib/permissions";
 import { reiniciarBanco } from "@/lib/memoryStore";
+import { ocuparResto } from "./equipeCheia";
 
 vi.mock("@/services/rotinasService", async (original) => ({
   ...(await original<typeof import("@/services/rotinasService")>()),
@@ -44,6 +45,10 @@ beforeEach(async () => {
   await r("rFalta", "fa", "tB", "lb");
   await r("rAlta", "fb", "tB", "lb");
   await r("rBaixa", "fc", "tE", "le");
+  // Equipe a 100%: sem isto, a Central acharia B ou C livres às 10:30 e nem
+  // chegaria à troca (26/10/2026).
+  await d.criar("tarefas", { ...tarefa, id: "tO", local_id: "le", sede_id: SEDE, requisitos: "", critica: true });
+  await ocuparResto({ sede_id: SEDE, data: hoje, funcionarios: ["fb", "fc"], tarefa_id: "tO", local_id: "le" });
 });
 afterEach(() => vi.useRealTimers());
 

@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-10-26 — Central: alguém livre em outro horário vem antes da troca
+
+Ressalva da auditoria da troca em qualquer horário, decidida pelo dono: a troca
+cedia uma baixa mesmo quando alguém estava **livre** mais tarde. Agora a ordem
+é: livre no mesmo horário → **livre em outro horário do dia, sem tirar nada de
+ninguém** → só então a troca por prioridade.
+
+- Os horários tentados são onde um buraco começa (a entrada, o fim de cada
+  bloco, o fim de cada intervalo), **agora** e o **início da janela da
+  tarefa**. "Agora" é o próximo passo da grade (estável por um passo inteiro) e,
+  só quando ele não cabe para a pessoa, o minuto exato (o buraco curto em
+  andamento: 10:07, livre até 10:40). Com o minuto exato sempre, a proposta
+  vencia quando o relógio virava o minuto e o clique era recusado. Os dois últimos vieram da
+  auditoria: na primeira versão, quem estava livre desde antes de agora — a
+  pessoa ociosa desde cedo, com a falta percebida no meio do turno — ficava
+  invisível e a Central cedia uma baixa à toa. Só o que ainda vem; precisa
+  caber inteiro (início + tempo previsto) e passar no `validarAlocacao` (janela
+  da tarefa, intervalo, expediente, requisitos), com a tarefa de espera (café)
+  ignorada no choque. O mais perto do horário original ganha, depois quem está
+  mais leve. O fim dos intervalos vem do mesmo leitor da validação
+  (`intervalosDoFuncionario`: aceita espaços no CSV e o trio antigo).
+- Leitura: saber o que é café custa ler as tarefas da sede. A busca roda
+  primeiro sem isso; só relê sabendo se ninguém couber **e** a troca for ler
+  essas tarefas de qualquer jeito (prioridade acima de baixa). Tarefa baixa sem
+  ninguém livre não lê nada a mais (teste com espião).
+- Ressalva: no caminho "livre no mesmo horário" (que já existia) e na tarefa
+  baixa, o café ainda não é ignorado — erra para o lado seguro.
+- A Central diz "Ninguém está livre às 10:00: Fulano faz às 13:30, num horário
+  livre, sem deixar nenhuma tarefa". Confirmar move a tarefa; o servidor exige o
+  horário que a tela mostrou, como na troca.
+- Testes: `testes/equipeCheia.ts` (`ocuparResto`) enche o resto do dia das
+  pessoas do cenário com tarefa crítica — os cenários da troca deixavam todo
+  mundo livre fora das 10:00, o que não acontece com equipe a ~100%. Quem
+  precisa de um buraco declara em `livres`.
+
+Arquivos: `services/centralDiaService.ts` (`livreEmOutroHorario`,
+`proporRedistribuicao`); testes em `troca-prioridade.test.ts` (9 casos novos,
+4 ajustados; 9 mutações mortas), `troca-prioridade-desfaz.test.ts`,
+`equipeCheia.ts`.
+
+---
+
 ## 2026-10-26 — Troca por prioridade em qualquer horário
 
 A troca por prioridade da Central do dia (19/10) só procurava quem, **no mesmo
