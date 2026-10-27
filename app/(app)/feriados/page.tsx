@@ -90,6 +90,18 @@ export default function PaginaFeriados() {
               <span className="selo selo-vinho">Hoje não opera</span>
             ),
         },
+        {
+          // Coordenadores também cadastram (27/10/2026): quem teve a sede
+          // fechada precisa ver quem fechou, sem depender do Histórico.
+          key: "atualizado_por",
+          rotulo: "Alterado por",
+          render: (f) => (
+            <span style={{ fontSize: 12, color: "var(--tinta-2)" }}>
+              {f.atualizado_por || f.criado_por || "—"}
+              {f.atualizado_em && <span style={{ color: "var(--tinta-3)" }}> · {formatarDataBR(f.atualizado_em.slice(0, 10))}</span>}
+            </span>
+          ),
+        },
       ]}
     />
   );

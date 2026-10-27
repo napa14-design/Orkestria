@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-10-27 — Feriados e recessos: coordenador também edita
+
+O "Dia do Servidor Público" (28/10) estava cadastrado para **todas as sedes** e
+fechou a geração do dia numa sede que trabalhava; o coordenador viu "Hoje a
+sede não opera" e não tinha como abrir — a tela era só de administrador (o
+cadastro acabou excluído pelo administrador na manhã de 27/10). Decisão do
+dono: coordenador cria, edita e apaga **qualquer** feriado, inclusive os de
+todas as sedes (a alternativa — só a própria sede, mais uma exceção "minha
+sede funciona" — foi apresentada e preterida). Quem mudou fica no histórico de
+alterações.
+
+- Rotas `POST /api/feriados` e `PUT/DELETE /api/feriados/[id]`: de "só
+  administrador" para administrador e coordenador (`podeEscrever`).
+- Menu: "Feriados e recessos" aparece para o coordenador.
+- `feriadosService`: só os campos do feriado saem do corpo (antes o objeto
+  inteiro era gravado — com o coordenador escrevendo, dava para forjar
+  `criado_por` ou gravar campo estranho); a sede é conferida também na edição.
+- Revisão de segurança (LIBERA COM RESSALVAS), ressalvas atendidas: só data
+  real `AAAA-MM-DD` e **no máximo 62 dias por registro** (um "2027" no lugar de
+  "2026" fecharia as 18 sedes por um ano; nenhum feriado de produção passa de 2
+  dias); nome é texto de até 120 caracteres; apagar/editar id inexistente é
+  recusado (antes o DELETE dizia "ok" e deixava um "excluir" fantasma no
+  histórico); a lista mostra **"Alterado por"** — quem teve a sede fechada vê
+  quem fechou sem depender do Histórico (que o coordenador comum não lê).
+- Risco aceito pelo dono: um coordenador pode fechar um dia válido de todas as
+  sedes de propósito; a defesa é o rastro, não uma validação.
+
+Arquivos: `app/api/feriados/route.ts`, `app/api/feriados/[id]/route.ts`,
+`components/AppShell.tsx`, `services/feriadosService.ts`; teste em
+`feriados-coordenador.test.ts`.
+
+---
+
 ## 2026-10-26 — Central: alguém livre em outro horário vem antes da troca
 
 Ressalva da auditoria da troca em qualquer horário, decidida pelo dono: a troca

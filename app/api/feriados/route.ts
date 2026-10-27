@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { limitarSedeConsulta, podeGerenciarCatalogo } from "@/lib/permissions";
+import { limitarSedeConsulta, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createFeriado, getFeriados } from "@/services/feriadosService";
 
@@ -14,8 +14,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
-    // Feriado fecha o dia de todas as sedes: cadastro global, só administrador.
-    if (!podeGerenciarCatalogo(sessao)) throw new ErroPermissao();
+    // Administrador e coordenador, inclusive o feriado de TODAS as sedes
+    // (decisão do dono, 27/10/2026: o "Dia do Servidor Público" fechou a agenda
+    // de sede que trabalhava e o coordenador não tinha como abrir). Quem mudou
+    // fica no histórico de alterações.
+    if (!podeEscrever(sessao)) throw new ErroPermissao();
     return ok(await createFeriado(await req.json(), sessao.email), 201);
   });
 }
