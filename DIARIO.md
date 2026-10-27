@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-10-27 — "Assume o posto de" também na edição do funcionário
+
+Pedido da coordenação: a nova funcionária foi cadastrada num dia e só no outro
+se soube que ela fica com a rota de quem saiu (desligada, posto vago). O campo
+"Assume o posto de" só existia no cadastro novo — o caminho era cadastrar de
+novo. Agora ele aparece também na **edição**:
+
+- Se a pessoa **já tem rota**, ela é **trocada** pela do posto (decisão do
+  dono: o coordenador escolheu o posto de propósito, "não faz sentido
+  recusar"). Sai a rota padrão dela e o que estava só planejado para ela a
+  partir da data; o realizado e o passado ficam.
+- As travas do cadastro (mesma sede, posto ainda não assumido, ninguém assume o
+  próprio posto) mais a data são conferidas **antes** de apagar qualquer coisa
+  — uma recusa não deixa a pessoa sem rota.
+- Revisão de segurança (BLOQUEIA na primeira versão, corrigido):
+  **quem assume tem de estar no quadro** — abrir o cadastro de uma desligada e
+  escolher uma colega ativa inativava a colega e dava a rota a quem nenhuma tela
+  mostra, sem volta pela tela; agora desligado, inativo, já substituído ou com
+  posto extinto não assume. Na edição, a data é **de hoje em diante** (no
+  passado a troca apagaria o previsto de dias que já foram). A data precisa ser
+  um dia real (`2026-13-45` não é) — também no cadastro novo, que continua
+  aceitando data retroativa.
+- Risco conhecido: dois salvamentos simultâneos do mesmo cadastro com postos
+  diferentes não são atômicos (a conferência e a gravação são passos
+  separados); exige duas pessoas editando a mesma ficha ao mesmo tempo.
+- A própria pessoa não aparece na lista de candidatos; depois de salvar, a tela
+  recarrega a lista (o posto assumido some dos vagos).
+- De quebra: o PUT de funcionário gravava `substitui`/`substitui_desde` (que o
+  formulário sempre manda) como campos mortos no cadastro, e aceitava `id` no
+  corpo — agora os separa, como o POST já fazia.
+
+Arquivos: `app/api/funcionarios/[id]/route.ts`, `services/funcionariosService.ts`
+(`assumirPostoNaEdicao`), `app/(app)/funcionarios/page.tsx`,
+`components/CrudManager.tsx` (`aoEditar`); teste em
+`assumir-posto-edicao.test.ts` (7 casos; 10 mutações mortas).
+
+---
+
 ## 2026-10-27 — Feriados e recessos: coordenador também edita
 
 O "Dia do Servidor Público" (28/10) estava cadastrado para **todas as sedes** e

@@ -125,6 +125,7 @@ export default function PaginaFuncionarios() {
       .filter(
         (f) =>
           f.sede_id === form.sede_id &&
+          f.id !== form.id && // na edição, a própria pessoa não é candidata
           !f.substituido_por &&
           !f.posto_extinto &&
           (f.ativo !== false || Boolean(f.desligado_em)),
@@ -167,6 +168,8 @@ export default function PaginaFuncionarios() {
       // Cadastrar pode assumir um posto: a lista de candidatas (outra chave SWR,
       // de todas as sedes) precisa refletir isso antes do próximo cadastro.
       aoCriar={() => void recarregar()}
+      // A edição também pode passar um posto ("Assume o posto de", 27/10/2026).
+      aoEditar={() => void recarregar()}
       textoNovo="+ Novo funcionário"
       vazio="Adicione a equipe (ASGs): horário, sede e escala. Depois é só montar a rotina arrastando tarefas."
       // Funcionário não se exclui, se desliga: com data, motivo e vaga no SGCP.
@@ -285,15 +288,22 @@ export default function PaginaFuncionarios() {
         // Sem checkbox "Ativo": desmarcar era o caminho antigo de saída, sem data,
         // sem motivo e sem vaga. Quem sai, sai pelo "Desligar" (13/10/2026).
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },
+        // Só para a lista de candidatos saber quem está sendo editado.
+        { key: "id", rotulo: "id", tipo: "texto", mostrarSe: () => false },
         {
           key: "substitui",
           rotulo: "Assume o posto de",
           tipo: "select",
           inteira: true,
           opcoes: candidatos,
-          // Só ao cadastrar, e só quando existe alguém na sede para substituir.
-          mostrarSe: (f) => f.__novo === true && candidatos(f).length > 0,
-          ajuda: "Opcional. A rota padrão de quem sai passa para quem entra.",
+          // Ao cadastrar e também depois, na edição (27/10/2026: uma pessoa foi
+          // cadastrada antes de se saber de quem ficaria com a rota). Na
+          // edição, a rota que a pessoa já tiver é TROCADA pela do posto.
+          mostrarSe: (f) => candidatos(f).length > 0,
+          ajuda: (f) =>
+            f.__novo === true
+              ? "Opcional. A rota padrão de quem sai passa para quem entra."
+              : "Opcional. A rota padrão de quem sai passa para esta pessoa — se ela já tiver rota, a dela é trocada pela do posto (o que já foi feito não muda).",
           dica:
             "A rota é do posto, não da pessoa. Ao salvar, a rota padrão de quem sai é copiada " +
             "para quem entra, os dias ainda não realizados a partir da data abaixo trocam de " +

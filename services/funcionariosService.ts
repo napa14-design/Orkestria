@@ -233,6 +233,25 @@ export async function substituirNoPosto(
   aPartirDe: string,
   autor: string,
 ): Promise<ResultadoSubstituicao> {
+  const { novo, antigo } = await conferirSubstituicao(novoId, antigoId, aPartirDe);
+  const ds = await getDataSource();
+  return passarPosto(ds, novo, antigo, aPartirDe, autor);
+}
+
+/**
+ * As travas da substituição, sem gravar nada — a edição as confere ANTES de
+ * apagar a rota atual da pessoa (senão uma recusa a deixaria sem rota nenhuma).
+ */
+async function conferirSubstituicao(novoId: string, antigoId: string, aPartirDe: string) {
+  // Data de corte vem do formulário: "2026-1-5" compararia errado com as datas
+  // dos blocos (texto) e levaria blocos do passado junto; "2026-13-45" não é dia.
+  const dia = new Date(`${aPartirDe}T12:00:00Z`);
+  const real =
+    /^\d{4}-\d{2}-\d{2}$/u.test(aPartirDe) && !Number.isNaN(dia.getTime()) && dia.toISOString().slice(0, 10) === aPartirDe;
+  if (!real)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DATA_INVALIDA", mensagem: "Informe a data em que a pessoa assume o posto." },
+    ]);
   if (novoId === antigoId)
     throw new ErroValidacao([
       {
@@ -254,6 +273,18 @@ export async function substituirNoPosto(
         mensagem: "Funcionário substituído não encontrado.",
       },
     ]);
+  // Quem assume tem de estar no quadro. No cadastro novo é sempre verdade; na
+  // edição, abrir o cadastro de uma desligada e escolher uma colega ativa
+  // inativava a colega e dava a rota a quem nenhuma tela mostra — sem volta pela
+  // tela (revisão de segurança, 27/10/2026).
+  if (comAtivoDoDia(novo, hojeISO()).ativo === false || novo.desligado_em || novo.substituido_por || novo.posto_extinto)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "QUEM_ASSUME_FORA_DO_QUADRO",
+        mensagem: `${novo.nome} está desligado(a) ou já passou o posto adiante: só quem está no quadro assume um posto.`,
+      },
+    ]);
   if (novo.sede_id !== antigo.sede_id)
     throw new ErroValidacao([
       {
@@ -271,11 +302,22 @@ export async function substituirNoPosto(
       {
         nivel: "erro",
         codigo: "POSTO_JA_ASSUMIDO",
-        mensagem: `O posto de ${antigo.nome} já foi assumido${quem ? ` por ${quem.nome}` : ""}. O cadastro novo foi salvo, sem rota — monte a agenda dele à mão ou escolha outro posto.`,
+        mensagem: `O posto de ${antigo.nome} já foi assumido${quem ? ` por ${quem.nome}` : ""}. O cadastro foi salvo, sem mexer na rota — monte a agenda à mão ou escolha outro posto.`,
       },
     ]);
   }
+  return { novo, antigo };
+}
 
+async function passarPosto(
+  ds: Awaited<ReturnType<typeof getDataSource>>,
+  novo: Funcionario,
+  antigo: Funcionario,
+  aPartirDe: string,
+  autor: string,
+): Promise<ResultadoSubstituicao> {
+  const novoId = novo.id;
+  const antigoId = antigo.id;
   const agora = agoraISO();
   const [itens, blocos] = await Promise.all([
     ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: antigoId }]),
@@ -320,6 +362,47 @@ export async function substituirNoPosto(
     blocosPreservados: preservados,
     inativou: true,
   };
+}
+
+/**
+ * "Assume o posto de" pela EDIÇÃO (27/10/2026): a coordenação cadastrou uma
+ * pessoa num dia e só no outro soube que ela fica com a rota de quem saiu.
+ *
+ * Se a pessoa já tem rota, ela é TROCADA pela do posto — o coordenador escolheu
+ * o posto de propósito (decisão do dono: "não faz sentido recusar"). Sai a rota
+ * padrão dela e o que estava só planejado para ela a partir da data; o
+ * realizado e o passado ficam. As travas (mesma sede, posto ainda não assumido,
+ * ninguém assume o próprio posto, data válida) são conferidas ANTES de apagar:
+ * uma recusa não pode deixá-la sem rota nenhuma.
+ */
+export async function assumirPostoNaEdicao(
+  id: string,
+  antigoId: string,
+  aPartirDe: string,
+  autor: string,
+): Promise<ResultadoSubstituicao & { itensTrocados: number; blocosTrocados: number }> {
+  // Na edição a troca APAGA o planejado da pessoa a partir da data: data no
+  // passado apagaria o previsto de dias que já foram (e traria os de quem saiu).
+  // O "o passado fica" não pode depender de quem chama lembrar.
+  if (aPartirDe < hojeISO())
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DATA_NO_PASSADO", mensagem: "Na edição, a passagem do posto vale de hoje em diante." },
+    ]);
+  const { novo, antigo } = await conferirSubstituicao(id, antigoId, aPartirDe);
+  const ds = await getDataSource();
+  const [rota, blocos] = await Promise.all([
+    ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+  ]);
+  const itensSaem = rota.filter((item) => item.padrao);
+  const blocosSaem = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");
+  if (itensSaem.length || blocosSaem.length)
+    await ds.gravarLote([
+      ...itensSaem.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
+      ...blocosSaem.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })),
+    ]);
+  const r = await passarPosto(ds, novo, antigo, aPartirDe, autor);
+  return { ...r, itensTrocados: itensSaem.length, blocosTrocados: blocosSaem.length };
 }
 
 /** O que aconteceu com a vaga no SGCP — a tela mostra a frase. */

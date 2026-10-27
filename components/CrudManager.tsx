@@ -489,6 +489,7 @@ export default function CrudManager<T extends Registro>({
   acoesExtra,
   permissao,
   aoCriar,
+  aoEditar,
   vazio,
   porSede,
   acimaDaTabela,
@@ -504,6 +505,8 @@ export default function CrudManager<T extends Registro>({
   permissao?: PermissaoCrud<T>;
   /** Chamado com o registro recém-criado (não roda em edição). */
   aoCriar?: (criado: T) => void;
+  /** Chamado depois de salvar uma edição (ex.: Funcionários, cuja edição pode passar um posto). */
+  aoEditar?: () => void;
   /** Mensagem amigável quando ainda não há nada cadastrado. */
   vazio?: string;
   /**
@@ -646,8 +649,10 @@ export default function CrudManager<T extends Registro>({
       if (c.tipo === "numero" || c.numerico) corpo[c.key] = Number(corpo[c.key] ?? 0);
     }
     try {
-      if (editando) await apiPut(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
-      else {
+      if (editando) {
+        await apiPut(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
+        aoEditar?.();
+      } else {
         const criado = await apiPost<T>(endpoint.split("?")[0], corpo);
         // Deixa a tela reagir ao registro novo — Usuários usa isto para gerar e
         // mostrar o código de primeiro acesso logo depois do cadastro.
