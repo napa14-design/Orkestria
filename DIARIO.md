@@ -7,6 +7,65 @@
 
 ---
 
+## 2026-10-27 — Transferir de sede, desmarcar o realizado e o sábado no "Gerar o dia"
+
+**Transferir** (botão próprio ao lado do "Desligar" — "fica muito ruim no
+desligar"). Um passo para o que eram dois:
+- encerra a ficha de origem como desligamento com motivo "Transferência" (a rota
+  fica como posto vago; **vaga no SGCP desmarcada por padrão**, decisão do dono);
+- cria a ficha no destino copiando nome, matrícula, empresa, horário, escala e
+  sábado; lá a coordenação escolhe o posto pelo "Assume o posto de";
+- campos novos `transferido_para` (na origem) e `transferido_de` (na nova), só
+  gravados pelo "Transferir". A lista mostra "Transferida para X em dd/mm".
+- Quem transfere precisa operar as DUAS sedes (o administrador, qualquer uma).
+- Revisão de segurança: BLOQUEIA na primeira versão — com outra ficha ativa de
+  mesma matrícula e empresa diferente, a origem era desligada e a ficha nova
+  recusada (transferência pela metade). A conferência prévia passou a usar a
+  mesma régua do cadastro; tudo que pode recusar é conferido antes de gravar.
+  LIBERA COM RESSALVAS: duplo envio simultâneo não é atômico; com data futura
+  a pessoa fica ativa nas duas sedes até a data; `transferido_*` aparece ao
+  supervisor (não é dado sensível).
+
+**Desmarcar o realizado** (Acompanhamento, botão "Desmarcar" no registro):
+"quando marca feito não tem como voltar atrás, daí não posso desfazer a
+geração" — o "Limpar o dia" nunca apaga bloco com registro. Apaga o registro e
+a tarefa volta a "planejada". Coordenador e supervisor (decisão do dono), com as
+travas do registrar: cancelada/remanejada só o coordenador desfaz; tarefa
+coberta por colega ("Feita por") não se desmarca por aqui; voltar a ocupar
+horário passa pelo `updateRotina`, que recusa cair em cima de outra tarefa.
+Revisão de segurança (BLOQUEIA na primeira versão, corrigido): o supervisor
+desmarcava o registro do COORDENADOR e relançava por cima — a trava de 19/10 do
+registrar contornada pela porta nova. Agora o supervisor só desmarca o que ele
+mesmo lançou, de até 7 dias atrás (a janela do "Feita por"); o coordenador
+desmarca qualquer um. Ressalva: o histórico guarda quem desmarcou e quando,
+mas não o conteúdo do registro apagado (a regra da casa é não criar log à
+mão; o decorator registra a exclusão).
+
+**Sábado no "Gerar o dia"**: a rota padrão salva para "seg a sáb" punha o dia de
+semana inteiro no sábado de 07:00–11:15 (PQL 1, 31/10: 90 de 166 blocos fora do
+horário). Agora, no sábado de quem tem horário próprio de sábado, o item que
+não cabe nele é descartado (`fora_do_horario_do_dia`) e o resumo do Gerar diz
+qual. Só nesse dia: num dia comum, rota que passa do expediente continua sendo
+o dado e o alerta.
+
+**Dados (produção, pedido do dono, com autoria no histórico):**
+- PQL 1 e PQL 2: 18 pessoas passaram a seg–sáb com o sábado da referência da
+  sede (07:00–11:15, lanche 09:00–09:15);
+- PQL 1, 26 e 27/10: registros do realizado e blocos apagados e dias gerados de
+  novo pela rota padrão salva (166 blocos cada); 31/10 gerado com a regra do
+  sábado (76 blocos);
+- a transferência Sul 2 → Pré Sul de 23/10 ganhou os campos `transferido_*`.
+
+Arquivos: `app/api/funcionarios/[id]/transferir/route.ts`,
+`services/funcionariosService.ts` (`transferirFuncionario`),
+`app/api/execucoes/desfazer/route.ts`, `services/execucoesService.ts`
+(`desfazerRegistro`), `lib/projecaoDia.ts`, `services/modelosService.ts`,
+`app/(app)/funcionarios/page.tsx`, `app/(app)/acompanhamento/page.tsx`,
+`types/Funcionario.ts`, `lib/schema.ts`, `docs/02`; testes em
+`transferir.test.ts`, `desfazer-registro.test.ts`, `projecao.test.ts`.
+
+---
+
 ## 2026-10-27 — "Assume o posto de" também na edição do funcionário
 
 Pedido da coordenação: a nova funcionária foi cadastrada num dia e só no outro

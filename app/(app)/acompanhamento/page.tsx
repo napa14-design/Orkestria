@@ -547,6 +547,22 @@ export default function PaginaAcompanhamento() {
     return nomes;
   }, [rotinaAberta, tarefaPorId, reqPorId]);
 
+  /** Apaga o registro e devolve a tarefa a "planejada" (ver `desfazerRegistro`). */
+  async function desmarcar() {
+    if (!rotinaAberta) return;
+    setErro("");
+    setSalvando(true);
+    try {
+      await apiPost("/api/execucoes/desfazer", { rotina_id: rotinaAberta.id });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+      setRotinaAberta(null);
+    } catch (err) {
+      setErro(err instanceof ErroApi ? err.message : "Não foi possível desmarcar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   async function salvarExecucao(e: React.FormEvent) {
     e.preventDefault();
     if (!rotinaAberta) return;
@@ -1151,6 +1167,20 @@ export default function PaginaAcompanhamento() {
             )}
 
             <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              {/* Desmarcar (27/10/2026): sem isto, um "feito" errado prendia o
+                  dia — o "Limpar o dia" não apaga bloco com registro. */}
+              {(execucaoPorRotina.has(rotinaAberta.id) || rotinaAberta.status !== "planejada") && (
+                <button
+                  type="button"
+                  className="btn btn-fantasma"
+                  style={{ marginRight: "auto", color: "var(--vermelho)" }}
+                  disabled={salvando}
+                  onClick={() => void desmarcar()}
+                  title="Apaga o registro e a tarefa volta a planejada."
+                >
+                  Desmarcar
+                </button>
+              )}
               <button type="button" className="btn" onClick={() => setRotinaAberta(null)}>
                 Cancelar
               </button>

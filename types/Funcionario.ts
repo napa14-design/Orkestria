@@ -55,6 +55,15 @@ export interface Funcionario extends Auditoria {
   substituido_por?: string;
   /** No desligamento, o posto deixou de existir: a rota foi apagada e não há posto vago. */
   posto_extinto?: boolean;
+  /**
+   * Transferência (27/10/2026): na ficha que FICOU na sede de origem, a sede
+   * para onde a pessoa foi. Só o "Transferir" grava. A ficha de origem é
+   * encerrada como desligamento com motivo "Transferência" — mas a tela mostra
+   * "Transferida para X", não "Desligado".
+   */
+  transferido_para?: string;
+  /** Na ficha nova, na sede de destino: o id da ficha de origem. */
+  transferido_de?: string;
   ativo: boolean;
   observacoes: string;
 }

@@ -171,6 +171,29 @@ describe("projetarDiaDaRota", () => {
     );
   });
 
+  it("sábado com horário próprio: só o que cabe nele (rota de seg a sáb, 27/10/2026)", () => {
+    const funcionarios = new Map([["f1", funcionario({ escala: "seg_sab", entrada_sabado: "07:00", saida_sabado: "11:15" })]]);
+    const itens = [
+      item({ id: "cedo", inicio_planejado: "06:30" }), // começa antes da entrada
+      item({ id: "dentro", inicio_planejado: "08:00" }),
+      item({ id: "borda", inicio_planejado: "10:45" }), // 10:45–11:15: cabe exato
+      item({ id: "passa", inicio_planejado: "11:00" }), // 11:00–11:30: passa da saída
+      item({ id: "tarde", inicio_planejado: "14:00" }),
+    ];
+    const p = projetarDiaDaRota(itens, contexto({ funcionarios, data: SABADO }));
+    expect(p.materializar.map((i) => i.id)).toEqual(["dentro", "borda"]);
+    expect(p.descartados.map((d) => [d.item.id, d.motivo])).toEqual([
+      ["cedo", "fora_do_horario_do_dia"],
+      ["passa", "fora_do_horario_do_dia"],
+      ["tarde", "fora_do_horario_do_dia"],
+    ]);
+    // Na segunda, o mesmo item da tarde entra: a regra é só do dia de horário próprio.
+    expect(projetarDiaDaRota([item({ id: "tarde", inicio_planejado: "14:00" })], contexto({ funcionarios })).materializar).toHaveLength(1);
+    // Sábado SEM horário próprio usa o horário do dia útil: nada a cortar aqui.
+    const semHorarioSab = new Map([["f1", funcionario({ escala: "seg_sab" })]]);
+    expect(projetarDiaDaRota([item({ inicio_planejado: "14:00" })], contexto({ funcionarios: semHorarioSab, data: SABADO })).materializar).toHaveLength(1);
+  });
+
   it("item da rota vale só nos dias dele", () => {
     const segundaSo = item({ dias_semana: "1" });
     const funcionarios = new Map([["f1", funcionario({ escala: "seg_sab" })]]);

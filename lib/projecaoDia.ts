@@ -32,6 +32,14 @@ export type MotivoDescarte =
   /** A TAREFA é semanal e hoje não está nos dias dela. */
   | "outro_dia_da_semana"
   | "folga_pela_escala"
+  /**
+   * Hoje a pessoa tem HORÁRIO PRÓPRIO (o sábado com `entrada_sabado`/`saida_sabado`)
+   * e o item não cabe nele. A rota padrão salva para "seg a sáb" punha o dia
+   * inteiro de semana no sábado de 07:00–11:15 — 90 de 166 blocos fora do
+   * horário na PQL 1 em 31/10/2026. Só nos dias de horário próprio: num dia
+   * comum, rota que passa do expediente continua sendo o dado (e o alerta).
+   */
+  | "fora_do_horario_do_dia"
   | "pessoa_ausente"
   /**
    * A pessoa já tem outra tarefa nesse horário — montada à mão no lugar de um
@@ -208,13 +216,21 @@ export function projetarDiaDaRota(
       descartar(item, "pessoa_ausente");
       continue;
     }
+    const inicio = hhmmParaMin(item.inicio_planejado);
+    const fim = inicio + ctx.duracaoDoItem(item);
+    if (dow === 6 && funcionario.entrada_sabado && funcionario.saida_sabado) {
+      const ent = hhmmParaMin(funcionario.entrada_sabado);
+      const sai = hhmmParaMin(funcionario.saida_sabado);
+      if (inicio < ent || fim > sai) {
+        descartar(item, "fora_do_horario_do_dia");
+        continue;
+      }
+    }
     // Só contra o que a MÃO pôs no dia. Bloco que é da rota atual, ainda
     // planejado e no lugar onde ela o pôs não conta: rota contra rota continua
     // passando (rota que não cabe é o dado), e esse bloco pode estar sendo
     // alinhado agora mesmo para outro horário — contá-lo recusava o item novo
     // que entra no horário que ele deixa (auditoria, 21/10/2026).
-    const inicio = hhmmParaMin(item.inicio_planejado);
-    const fim = inicio + ctx.duracaoDoItem(item);
     const ocupado = ctx.blocosDoDia.some(
       (b) =>
         b.funcionario_id === item.funcionario_id &&

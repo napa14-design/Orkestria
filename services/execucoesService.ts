@@ -389,6 +389,55 @@ export async function registrarExecucao(
 }
 
 /**
+ * Desmarcar (27/10/2026): "quando marca feito não tem como voltar atrás, daí não
+ * posso desfazer a geração". Apaga o registro do realizado e devolve a tarefa a
+ * "planejada" — o "Limpar o dia" nunca apaga bloco com registro, então sem isto
+ * um "feito" errado prendia o dia inteiro.
+ *
+ * Mesmas travas do registrar (decisão do dono: coordenador e supervisor):
+ *  - cancelada ou remanejada é decisão de quem planeja: o supervisor não desfaz;
+ *  - coberta por colega ("Feita por") não se desmarca por aqui — o desfazer
+ *    teria de devolver também as tarefas que o colega cedeu; o coordenador
+ *    ajusta na agenda.
+ * Voltar a "planejada" o que estava fora da ocupação (cancelada, remanejada)
+ * passa pelo `updateRotina`, que confere se a tarefa não cai em cima de outra.
+ *
+ * E o supervisor só desmarca o que ELE lançou, de até 7 dias atrás: sem isso,
+ * apagava o "não realizada — ausente" do coordenador e relançava "feita" — a
+ * trava de 19/10 do registrar contornada pela porta nova (revisão de
+ * segurança, 27/10/2026). A janela é a mesma do "Feita por".
+ */
+export async function desfazerRegistro(
+  rotinaId: string,
+  opcoes: { perfil: Perfil; usuarioId: string },
+): Promise<{ apagados: number }> {
+  const ds = await getDataSource();
+  const rotina = await ds.obter("rotinas_planejadas", rotinaId);
+  if (!rotina) throw new Error("Rotina planejada não encontrada.");
+  const registros = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: rotinaId }]);
+  if (registros.length === 0 && rotina.status === "planejada") return { apagados: 0 };
+  if (rotina.titular_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "DESFAZER_FEITA_POR",
+        mensagem: "Esta tarefa foi coberta por um colega (Feita por): o coordenador ajusta pela agenda.",
+      },
+    ]);
+  if (opcoes.perfil === "supervisor") {
+    if (rotina.status === "cancelada" || rotina.status === "remanejada")
+      throw new ErroPermissao("Esta tarefa foi cancelada ou remanejada pelo coordenador — só ele desfaz.");
+    if (registros.some((r) => r.supervisor_id !== opcoes.usuarioId))
+      throw new ErroPermissao("Este registro foi feito por outra pessoa — só o coordenador desmarca.");
+    if (rotina.data < somarDias(hojeISO(), -7))
+      throw new ErroPermissao("Tarefa de mais de 7 dias — peça ao coordenador.");
+  }
+  if (rotina.status !== "planejada") await updateRotina(rotinaId, { status: "planejada" });
+  await ds.gravarLote(registros.map((r) => ({ tipo: "excluir" as const, tabela: "execucoes_realizadas" as const, id: r.id })));
+  return { apagados: registros.length };
+}
+
+/**
  * "Feita por <colega>" — a tarefa de quem está ausente foi feita por outra
  * pessoa. Antes, o "Feita" creditava a quem faltou, e só o coordenador, pela
  * Central, conseguia passar a tarefa para quem cobriu (pedido do dono,

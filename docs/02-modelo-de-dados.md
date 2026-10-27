@@ -68,6 +68,8 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | vaga_sgcp | string | código da vaga de substituição aberta no SGCP; vazio = não abriu |
 | substituido_por | string | id de quem assumiu o posto; preenchido = não é mais posto vago |
 | posto_extinto | boolean | no desligamento o posto deixou de existir (quadro reduzido): a rota foi apagada |
+| transferido_para | string | na ficha de origem: sede para onde a pessoa foi transferida (só o "Transferir" grava; a ficha é encerrada com motivo "Transferência") |
+| transferido_de | string | na ficha nova, na sede de destino: id da ficha de origem |
 | ativo | boolean | |
 | observacoes | string | |
 | criado_por, criado_em, atualizado_por, atualizado_em | auditoria | |

@@ -50,6 +50,10 @@ export async function createFuncionario(
     throw new ErroValidacao([
       { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
     ]);
+  if ("transferido_para" in dados || "transferido_de" in dados)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A transferência se faz pelo botão \"Transferir\"." },
+    ]);
   const matricula = normalizarMatricula(dados.matricula);
   await exigirMatriculaLivre(matricula, undefined);
   const comIntervalos = { ...dados, matricula, intervalos: csvDoTrio(dados) };
@@ -93,6 +97,9 @@ const CAMPOS_DO_DESLIGAMENTO: ReadonlySet<string> = new Set([
   "vaga_sgcp",
   "substituido_por",
   "posto_extinto",
+  // Só o "Transferir" grava (27/10/2026).
+  "transferido_para",
+  "transferido_de",
 ]);
 
 export async function updateFuncionario(
@@ -517,6 +524,96 @@ export async function desligarFuncionario(
     itensDeRotaApagados: rota.length,
     vaga,
   };
+}
+
+export interface ResultadoTransferencia extends ResultadoDesligamento {
+  /** A ficha nova, na sede de destino. */
+  novo: Funcionario;
+}
+
+/**
+ * Transferência de sede (27/10/2026: "fica muito ruim no desligar"). Um passo
+ * só para o que antes eram dois — desligar na origem com motivo
+ * "Transferência" e cadastrar de novo no destino:
+ *
+ *  1. encerra a ficha de origem pelo `desligarFuncionario` (motivo
+ *     "Transferência"; a rota fica como posto vago na origem; vaga no SGCP só
+ *     se pedida — decisão do dono: desmarcada por padrão);
+ *  2. marca nela `transferido_para` (a tela mostra "Transferida para X");
+ *  3. cria a ficha no destino copiando nome, matrícula, empresa, horário e
+ *     escala, com `transferido_de`. Lá a coordenação escolhe o posto pelo
+ *     "Assume o posto de" (edição) ou monta a rota.
+ *
+ * Por que duas fichas e não trocar a sede: o bloco guarda o id da pessoa e a
+ * rota é do posto — ver `substituirNoPosto`. A matrícula fica livre para a
+ * ficha nova porque a de origem já está desligada (`exigirMatriculaLivre`).
+ *
+ * Tudo que pode recusar é conferido antes de gravar: uma transferência pela
+ * metade deixaria a pessoa desligada sem ficha no destino.
+ */
+export async function transferirFuncionario(
+  id: string,
+  dados: { sede_id?: unknown; data?: unknown; abrirVaga?: unknown },
+  autor: string,
+  solicitante: { nome: string; email?: string },
+): Promise<ResultadoTransferencia> {
+  const ds = await getDataSource();
+  const atual = await ds.obter("funcionarios", id);
+  if (!atual) throw new Error("Funcionário não encontrado.");
+  const destino = typeof dados.sede_id === "string" ? await ds.obter("sedes", dados.sede_id) : null;
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  if (!destino) throw recusa("TRANSFERENCIA_SEM_DESTINO", "Escolha a sede para onde a pessoa vai.");
+  if (destino.id === atual.sede_id) throw recusa("TRANSFERENCIA_MESMA_SEDE", "A pessoa já é desta sede.");
+  if (atual.desligado_em || atual.ativo === false)
+    throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a): não há o que transferir.`);
+  const erroData = validarDesligamento({ data: dados.data, motivo: "Transferência" });
+  if (erroData) throw recusa("TRANSFERENCIA_DATA", "Informe a data da transferência.");
+  const data = dados.data as string;
+  const sedeOrigem = await ds.obter("sedes", atual.sede_id);
+  const copia = {
+      nome: atual.nome,
+      genero: atual.genero,
+      sede_id: destino.id,
+      turno: atual.turno,
+      entrada: atual.entrada,
+      saida: atual.saida,
+      intervalo_min: atual.intervalo_min,
+      intervalo_inicio: atual.intervalo_inicio,
+      intervalo_fim: atual.intervalo_fim,
+      intervalos: csvDoTrio(atual),
+      escala: atual.escala ?? "seg_sex",
+      entrada_sabado: atual.entrada_sabado ?? "",
+      saida_sabado: atual.saida_sabado ?? "",
+      intervalos_sabado: atual.intervalos_sabado ?? "",
+      cargo: atual.cargo,
+      matricula: atual.matricula ?? "",
+      ativo: true,
+      observacoes: `Transferida de ${sedeOrigem?.nome_sede ?? "outra sede"} em ${data.split("-").reverse().join("/")}.`,
+  } as DadosFuncionario;
+  // O que o cadastro novo recusaria, recusa ANTES de desligar a origem.
+  const alertas = validarFuncionario(copia);
+  if (temErro(alertas)) throw new ErroValidacao(alertas);
+  // A MESMA régua do `createFuncionario` (empresa indefinida = colide com
+  // qualquer ficha ativa): com a empresa da origem, outra ficha de mesma
+  // matrícula e empresa diferente passava aqui e era recusada lá — depois de a
+  // origem já estar desligada (revisão de segurança, 27/10/2026).
+  await exigirMatriculaLivre(normalizarMatricula(copia.matricula), undefined, id);
+
+  const desligamento = await desligarFuncionario(
+    id,
+    { data, motivo: "Transferência", abrirVaga: dados.abrirVaga === true, extinguirPosto: false },
+    autor,
+    solicitante,
+  );
+  await ds.atualizar("funcionarios", id, { transferido_para: destino.id, atualizado_por: autor, atualizado_em: agoraISO() });
+  const novo = await createFuncionario(copia, autor);
+  // Empresa e o elo com a origem não entram pelo cadastro comum (ver as travas
+  // de `createFuncionario`): só por aqui.
+  const ligado = await ds.atualizar("funcionarios", novo.id, {
+    transferido_de: id,
+    ...(atual.empresa ? { empresa: atual.empresa } : {}),
+  });
+  return { ...desligamento, novo: ligado };
 }
 
 /**

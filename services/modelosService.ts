@@ -812,6 +812,10 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(
         `${item.inicio_planejado} ${tarefa?.nome_tarefa}: foi movido à mão no dia — a rota não sobrescreve`,
       );
+    else if (motivo === "fora_do_horario_do_dia")
+      linhas.push(
+        `${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do horário de sábado de ${funcionario?.nome} (${funcionario?.entrada_sabado}–${funcionario?.saida_sabado})`,
+      );
     else if (motivo === "folga_pela_escala")
       linhas.push(`${funcionario?.nome}: folga pela escala em ${ctx.data}`);
     else if (motivo === "pessoa_ausente")
@@ -878,6 +882,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
     fora_do_periodo_letivo: 0,
     outro_dia_da_semana: 0,
     folga_pela_escala: 0,
+    fora_do_horario_do_dia: 0,
     pessoa_ausente: 0,
     horario_ocupado: 0,
     fora_do_quadro: 0,
