@@ -7,7 +7,7 @@
  *  2. Contas de execução que não fecham com o total de blocos — a invariante que
  *     os dois bugs do fechamento do dia violaram.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/chromos/resumo/route";
 import {
   CATEGORIA_APOIO_OUTRO_SETOR,
@@ -246,29 +246,84 @@ describe("montarResumo", () => {
 });
 
 describe("GET /api/chromos/resumo — as portas", () => {
-  const original = process.env.ORKESTRIA_TOKEN;
+  const original = process.env.CHAVE_CROMOS;
   afterEach(() => {
-    if (original === undefined) delete process.env.ORKESTRIA_TOKEN;
-    else process.env.ORKESTRIA_TOKEN = original;
+    if (original === undefined) delete process.env.CHAVE_CROMOS;
+    else process.env.CHAVE_CROMOS = original;
   });
   const pedir = (qs: string, token?: string) =>
     GET(new Request(`http://x/api/chromos/resumo${qs}`, token ? { headers: { authorization: `Bearer ${token}` } } : {}));
 
   it("sem a variável configurada: 503, nunca aberto", async () => {
-    delete process.env.ORKESTRIA_TOKEN;
+    delete process.env.CHAVE_CROMOS;
     expect((await pedir("", "")).status).toBe(503);
   });
 
+  // Casos do revisor de segurança para as chaves entre sistemas (28/10/2026).
+  describe("as chaves", () => {
+    const KC = "chave-do-cromos-de-teste-com-32-caracteres";
+    const KO = "chave-do-orkestria-de-teste-com-32-caracteres";
+    const ANT = "chave-ANTERIOR-do-cromos-com-32-caracteres";
+    const comCabecalho = (authorization: string) =>
+      GET(new Request("http://x/api/chromos/resumo?de=2026-09&ate=2026-09", { headers: { authorization } }));
+    beforeEach(() => {
+      vi.stubEnv("CHAVE_CROMOS", KC);
+      vi.stubEnv("CHAVE_ORKESTRIA", KO);
+      vi.stubEnv("CHAVE_CROMOS_ANTERIOR", "");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+    it("O2 a chave do próprio Orkestria não abre; igual à do Chromos: 503", async () => {
+      expect((await pedir("?de=2026-09&ate=2026-09", KO)).status).toBe(401);
+      vi.stubEnv("CHAVE_ORKESTRIA", KC);
+      expect((await pedir("?de=2026-09&ate=2026-09", KC)).status).toBe(503);
+    });
+
+    it("C3/C4/C6 Basic, duas chaves juntas e espaço duplo: 401; `bearer` minúsculo vale", async () => {
+      for (const a of [`Basic ${KC}`, `Bearer ${KC},${KO}`, `Bearer  ${KC}`, KC])
+        expect((await comCabecalho(a)).status, a).toBe(401);
+      expect((await comCabecalho(`bearer ${KC}`)).status).toBe(200);
+    });
+
+    it("C9 sem chave e com período inválido: 401, não 400", async () => {
+      expect((await pedir("?de=lixo")).status).toBe(401);
+    });
+
+    it("E3 chave de 31 caracteres vale como ausente: 503", async () => {
+      vi.stubEnv("CHAVE_CROMOS", "a".repeat(31));
+      expect((await pedir("?de=2026-09&ate=2026-09", "a".repeat(31))).status).toBe(503);
+    });
+
+    it("O1/E11 a anterior abre e sai no log; sozinha não vale", async () => {
+      vi.stubEnv("CHAVE_CROMOS_ANTERIOR", ANT);
+      expect((await pedir("?de=2026-09&ate=2026-09", ANT)).status).toBe(200);
+      const aviso = vi.mocked(console.warn).mock.calls.flat().join(" ");
+      expect(aviso).toContain("ANTERIOR");
+      expect(aviso).not.toContain(ANT);
+      vi.stubEnv("CHAVE_CROMOS", "");
+      expect((await pedir("?de=2026-09&ate=2026-09", ANT)).status).toBe(503);
+    });
+
+    it("M1 sem a própria chave, ou curta, o Orkestria não tem o que mandar", async () => {
+      const { minhaChave } = await import("@/lib/chaves");
+      expect(minhaChave()).toBe(KO);
+      vi.stubEnv("CHAVE_ORKESTRIA", "a".repeat(31));
+      expect(minhaChave()).toBeNull();
+    });
+  });
+
   it("sem token ou com o errado: 401", async () => {
-    process.env.ORKESTRIA_TOKEN = "segredo";
+    process.env.CHAVE_CROMOS = "chave-do-cromos-de-teste-com-32-caracteres";
     expect((await pedir("")).status).toBe(401);
     expect((await pedir("", "outro")).status).toBe(401);
   });
 
   it("token certo e período inválido: 400; período válido: 200 com o formato", async () => {
-    process.env.ORKESTRIA_TOKEN = "segredo";
-    expect((await pedir("?de=2026-10&ate=2026-09", "segredo")).status).toBe(400);
-    const ok = await pedir("?de=2026-09&ate=2026-09", "segredo");
+    process.env.CHAVE_CROMOS = "chave-do-cromos-de-teste-com-32-caracteres";
+    expect((await pedir("?de=2026-10&ate=2026-09", "chave-do-cromos-de-teste-com-32-caracteres")).status).toBe(400);
+    const ok = await pedir("?de=2026-09&ate=2026-09", "chave-do-cromos-de-teste-com-32-caracteres");
     expect(ok.status).toBe(200);
     const corpo = await ok.json();
     expect(corpo).toMatchObject({ versao: 1, de: "2026-09", ate: "2026-09" });
@@ -277,7 +332,7 @@ describe("GET /api/chromos/resumo — as portas", () => {
   });
 
   it("apoio a outro setor sai do banco: tarefa da categoria conta, a outra não", async () => {
-    process.env.ORKESTRIA_TOKEN = "segredo";
+    process.env.CHAVE_CROMOS = "chave-do-cromos-de-teste-com-32-caracteres";
     reiniciarBanco();
     const ds = await getDataSource();
     const tarefa = (id: string, categoria_id: string) =>
@@ -287,12 +342,12 @@ describe("GET /api/chromos/resumo — as portas", () => {
     for (const [id, tarefa_id, min] of [["b1", "t-plantao", 30], ["b2", "t-limpeza", 240]] as const)
       await ds.criar("rotinas_planejadas", rotina({ id, tarefa_id, sede_id: "christus_dt", data: "2026-08-10", tempo_previsto_min: min }));
     // Agosto: o mês que nenhum outro teste pede, para o cache de 5 min não responder.
-    const corpo = await (await pedir("?de=2026-08&ate=2026-08", "segredo")).json();
+    const corpo = await (await pedir("?de=2026-08&ate=2026-08", "chave-do-cromos-de-teste-com-32-caracteres")).json();
     expect(corpo.geral.apoioOutroSetorPct).toBe(11.1); // 30 de 270
   });
 
   it("apoio pedagógico sai do banco: soma no total e vem à parte", async () => {
-    process.env.ORKESTRIA_TOKEN = "segredo";
+    process.env.CHAVE_CROMOS = "chave-do-cromos-de-teste-com-32-caracteres";
     reiniciarBanco();
     const ds = await getDataSource();
     const tarefa = (id: string, categoria_id: string) =>
@@ -303,7 +358,7 @@ describe("GET /api/chromos/resumo — as portas", () => {
     for (const [id, tarefa_id, min] of [["b1", "t-plantao", 30], ["b2", "t-alunos", 30], ["b3", "t-limpeza", 240]] as const)
       await ds.criar("rotinas_planejadas", rotina({ id, tarefa_id, sede_id: "christus_dt", data: "2026-07-10", tempo_previsto_min: min }));
     // Julho: outro mês que nenhum teste pede, para o cache não responder.
-    const corpo = await (await pedir("?de=2026-07&ate=2026-07", "segredo")).json();
+    const corpo = await (await pedir("?de=2026-07&ate=2026-07", "chave-do-cromos-de-teste-com-32-caracteres")).json();
     expect(corpo.geral.apoioOutroSetorPct).toBe(20); // 60 de 300
     expect(corpo.geral.apoioPedagogicoPct).toBe(10); // 30 de 300
   });

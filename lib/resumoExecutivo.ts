@@ -2,7 +2,7 @@
  * RESUMO EXECUTIVO — os números da operação por sede, para o Chromos (hub da
  * Infraestrutura). `GET /api/chromos/resumo?de=AAAA-MM&ate=AAAA-MM`.
  *
- * Quem consome é outro sistema, com token próprio (`ORKESTRIA_TOKEN`) — não é
+ * Quem consome é outro sistema, com token próprio (`CHAVE_CROMOS`, ver `lib/chaves`) — não é
  * usuário do Orkestria, então não passa pelo login. Mesmo estilo do resumo
  * executivo do Serv3 (`OS Christus/api/_lib/resumoExecutivo.js`).
  *

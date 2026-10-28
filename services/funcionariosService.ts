@@ -3,6 +3,7 @@ import { hojeISO } from "@/lib/dateUtils";
 import { comAtivoDoDia, motivoAbreVaga, pedidoDeVaga, validarDesligamento } from "@/lib/desligamento";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { normalizarMatricula } from "@/lib/quadroInfra";
+import { minhaChave } from "@/lib/chaves";
 import { validarFuncionario, temErro } from "@/lib/validations";
 import type { Funcionario } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -638,7 +639,7 @@ export async function abrirVagaNoSgcp(
     return { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos." };
 
   const url = process.env.SGCP_VAGAS_URL;
-  const token = process.env.SGCP_VAGAS_TOKEN;
+  const token = minhaChave();
   if (!url || !token) return { aberta: false, motivo: "A integração com o SGCP não está configurada." };
   // O token vai no cabeçalho: nunca em texto aberto.
   if (!url.startsWith("https://")) return { aberta: false, motivo: "A URL do SGCP precisa ser https." };

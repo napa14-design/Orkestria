@@ -10,6 +10,7 @@
 import { agoraISO, getDataSource } from "@/lib/datasource";
 import { hojeISO } from "@/lib/dateUtils";
 import { comAtivoDoDia } from "@/lib/desligamento";
+import { minhaChave } from "@/lib/chaves";
 import {
   cruzar,
   lerPessoas,
@@ -49,7 +50,7 @@ export function esquecerQuadro() {
 export async function lerQuadro(agora = Date.now()): Promise<PessoaQuadro[]> {
   if (guardado && guardado.expira > agora) return guardado.pessoas;
   const url = process.env.CHROMOS_QUADRO_URL;
-  const token = process.env.CHROMOS_QUADRO_TOKEN;
+  const token = minhaChave();
   // https antes de mandar o token: em http ele viajaria aberto.
   if (!url || !token || !url.startsWith("https://")) throw new QuadroIndisponivel(false);
 

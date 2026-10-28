@@ -221,7 +221,7 @@ describe("vaga no SGCP", () => {
       return respostaSgcp();
     }) as unknown as typeof fetch;
     vi.stubEnv("SGCP_VAGAS_URL", "https://sgcp.test/api/vagas-externas");
-    vi.stubEnv("SGCP_VAGAS_TOKEN", "segredo-ork");
+    vi.stubEnv("CHAVE_ORKESTRIA", "chave-do-orkestria-de-teste-com-32-caracteres");
   });
   afterEach(() => {
     globalThis.fetch = original;
@@ -235,7 +235,7 @@ describe("vaga no SGCP", () => {
     expect(r.vaga).toEqual({ aberta: true, codigo: "2147180600" });
     expect(chamadas).toHaveLength(1);
     expect(chamadas[0].url).toBe("https://sgcp.test/api/vagas-externas");
-    expect((chamadas[0].init.headers as Record<string, string>).Authorization).toBe("Bearer segredo-ork");
+    expect((chamadas[0].init.headers as Record<string, string>).Authorization).toBe("Bearer chave-do-orkestria-de-teste-com-32-caracteres");
     const corpo = JSON.parse(String(chamadas[0].init.body));
     expect(corpo).toMatchObject({ origem: { sistema: "Orkestria", caso: PESSOA }, sede: "DT", solicitante: { nome: "Larissa" } });
 
@@ -314,7 +314,7 @@ describe("vaga no SGCP", () => {
   });
 
   it("sem a integração configurada: desliga e diz que a vaga não abriu", async () => {
-    vi.stubEnv("SGCP_VAGAS_TOKEN", "");
+    vi.stubEnv("CHAVE_ORKESTRIA", "");
     const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(r.vaga).toEqual({ aberta: false, motivo: expect.stringMatching(/não está configurada/) });
     expect(chamadas).toHaveLength(0);

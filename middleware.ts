@@ -12,7 +12,7 @@ export function middleware(req: NextRequest) {
     pathname === "/login" ||
     pathname.startsWith("/api/auth/") ||
     // Integração com o Chromos: outro sistema, sem sessão. O portão é o token
-    // (ORKESTRIA_TOKEN), conferido dentro de cada rota.
+    // (CHAVE_CROMOS, ver lib/chaves), conferido dentro de cada rota.
     pathname.startsWith("/api/chromos/") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico";

@@ -276,7 +276,7 @@ describe("rotas do Quadro", () => {
       return responder();
     }) as typeof fetch;
     vi.stubEnv("CHROMOS_QUADRO_URL", "https://chromos.test/api/quadro-externo");
-    vi.stubEnv("CHROMOS_QUADRO_TOKEN", "segredo-de-teste");
+    vi.stubEnv("CHAVE_ORKESTRIA", "chave-do-orkestria-de-teste-com-32-caracteres");
     const ds = await getDataSource();
     await ds.atualizar("sedes", "christus_dt", { codigo: "DT" });
     await ds.atualizar("sedes", "christus_ald", { codigo: "ALD" });
@@ -325,7 +325,7 @@ describe("rotas do Quadro", () => {
     expect(chamadas).toHaveLength(1);
     expect(chamadas[0].url).toBe("https://chromos.test/api/quadro-externo");
     expect(chamadas[0].url).not.toContain("segredo");
-    expect((chamadas[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer segredo-de-teste");
+    expect((chamadas[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer chave-do-orkestria-de-teste-com-32-caracteres");
     expect(chamadas[0].init?.redirect).toBe("error");
     expect(chamadas[0].init?.signal).toBeInstanceOf(AbortSignal);
   });
@@ -336,9 +336,9 @@ describe("rotas do Quadro", () => {
   });
 
   it("O37/O38: sem configuração, ou URL http, é 503 e o token não sai", async () => {
-    vi.stubEnv("CHROMOS_QUADRO_TOKEN", "");
+    vi.stubEnv("CHAVE_ORKESTRIA", "");
     expect((await pedirGet("christus_dt")).status).toBe(503);
-    vi.stubEnv("CHROMOS_QUADRO_TOKEN", "segredo-de-teste");
+    vi.stubEnv("CHAVE_ORKESTRIA", "chave-do-orkestria-de-teste-com-32-caracteres");
     vi.stubEnv("CHROMOS_QUADRO_URL", "http://chromos.test/api/quadro-externo");
     const r = await pedirGet("christus_dt");
     expect(r.status).toBe(503);
