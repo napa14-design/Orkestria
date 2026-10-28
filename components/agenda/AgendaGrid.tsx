@@ -136,6 +136,8 @@ export default function AgendaGrid({
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
   const catPorId = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias]);
 
+  /** Horas acrescentadas no fim pelo botão "+ 1 hora". */
+  const [horasExtras, setHorasExtras] = useState(0);
   // Janela de horário da grade: do menor início ao maior fim entre os exibidos.
   const [inicioGrade, fimGrade] = useMemo(() => {
     let ini = Infinity;
@@ -156,8 +158,13 @@ export default function AgendaGrid({
       if (!Number.isNaN(s)) fim = Math.max(fim, s);
     }
     if (!Number.isFinite(ini) || !Number.isFinite(fim)) return [360, 1080]; // 06:00–18:00
-    return [ini, fim];
-  }, [funcionarios, rotinas]);
+    // "+ 1 hora" no pé da régua (decisão do dono, 28/10/2026): espaço para a
+    // TAREFA EXTRA ("como crio um horário 17 às 18 / 18 às 19?"). Soltar
+    // depois da saída é fora do expediente — a caixa de autorização pergunta,
+    // como sempre. Antes a grade parava na maior saída e não havia vazio para
+    // arrastar; depois que a tarefa extra existe, a grade a inclui sozinha.
+    return [ini, Math.min(fim + horasExtras * 60, 24 * 60)];
+  }, [funcionarios, rotinas, horasExtras]);
 
   /**
    * O passo do VAZIO é derivado do próprio dia, não do parâmetro (ver
@@ -290,6 +297,16 @@ export default function AgendaGrid({
               )}
             </div>
           ))}
+          <button
+            type="button"
+            className="btn btn-mini btn-fantasma"
+            style={{ width: "100%", borderRadius: 0, background: "var(--papel-2)" }}
+            disabled={fimGrade >= 24 * 60}
+            onClick={() => setHorasExtras((h) => h + 1)}
+            title="Mais uma hora no fim da agenda, para tarefa extra. Depois da saída é fora do expediente: ao soltar, o sistema pede autorização."
+          >
+            + 1 hora
+          </button>
         </div>
 
         {/* colunas dos funcionários */}

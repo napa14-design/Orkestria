@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-10-28 — Agenda: botão "+ 1 hora" para tarefa extra
+
+Pedido da coordenação: "como crio um horário 17 às 18 / 18 às 19?" — tarefa
+extra depois do expediente. O sistema já aceitava (soltar fora do horário abre
+a caixa de autorização; hora extra é decisão de quem assina), mas a grade da
+agenda terminava na maior saída das pessoas da tela, e não havia vazio onde
+soltar. Agora há um botão **"+ 1 hora"** no pé da régua de horários: cada
+clique acrescenta uma hora no fim da grade (até 24:00). Depois que a tarefa
+extra existe, a grade a inclui sozinha. Cogitou-se deixar a grade sempre até as
+22:00; o dono preferiu o botão — a agenda do dia a dia não ganha horas
+listradas vazias. O trecho depois da saída aparece listrado como fora do
+expediente, como já era.
+
+Arquivo: `components/agenda/AgendaGrid.tsx`.
+
+---
+
 ## 2026-10-27 — Transferir de sede, desmarcar o realizado e o sábado no "Gerar o dia"
 
 **Transferir** (botão próprio ao lado do "Desligar" — "fica muito ruim no
