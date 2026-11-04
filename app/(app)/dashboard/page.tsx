@@ -10,6 +10,8 @@ import {
   classificarOcupacao,
   cobraDesvio,
   desvioPercentual,
+  eventuaisForaDasTarefas,
+  eventuaisNoApoio,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
@@ -17,6 +19,7 @@ import {
   CATEGORIA_APOIO_OUTRO_SETOR,
   CATEGORIA_APOIO_PEDAGOGICO,
   percentualApoioOutroSetor,
+  semAusentes,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
@@ -25,12 +28,15 @@ import { sedesPermitidas } from "@/lib/permissions";
 import { MAX_DIAS_PERIODO, MAX_DIAS_SEM_SEDE, diasDoPeriodo, formatarDataBR, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import type {
   TipoLocalCatalogo,
+  Ausencia,
   ExecucaoRealizada,
+  Feriado,
   Funcionario,
   Local,
   ParametrosResolvidos,
   RotinaPlanejada,
   Sede,
+  ServicoEventual,
   Tarefa,
 } from "@/types";
 
@@ -104,6 +110,15 @@ export default function PaginaDashboard() {
     periodoOk && `/api/rotinas?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
   );
+  const { data: eventuais } = useSWR<ServicoEventual[]>(
+    periodoOk && `/api/servicos-eventuais?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
+    fetcher,
+  );
+  const { data: feriados } = useSWR<Feriado[]>(`/api/feriados${sedeFiltro ? `?sede=${sedeFiltro}` : ""}`, fetcher);
+  const { data: ausencias } = useSWR<Ausencia[]>(
+    periodoOk && `/api/ausencias?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
+    fetcher,
+  );
   const { data: execucoes } = useSWR<ExecucaoRealizada[]>(
     periodoOk && `/api/execucoes?de=${de}&ate=${ate}${sedeFiltro ? `&sede=${sedeFiltro}` : ""}`,
     fetcher,
@@ -118,7 +133,10 @@ export default function PaginaDashboard() {
     );
     const validas = rs.filter(ocupaHorario);
 
-    const tempoPlanejadoTotal = validas.reduce((s, r) => s + r.tempo_previsto_min, 0);
+    // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa.
+    const evs = semAusentes(eventuais ?? [], ausencias ?? []);
+    const foraDasTarefas = eventuaisForaDasTarefas(validas, evs);
+    const tempoPlanejadoTotal = [...validas, ...foraDasTarefas].reduce((s, r) => s + r.tempo_previsto_min, 0);
     // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos)
     // — com o apoio pedagógico somado e mostrado à parte (23/10/2026).
     const tarefasPedagogicas = new Set(
@@ -128,11 +146,19 @@ export default function PaginaDashboard() {
       ...(tarefas ?? []).filter((t) => t.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR).map((t) => t.id),
       ...tarefasPedagogicas,
     ]);
-    const apoioOutroSetorPct = percentualApoioOutroSetor(validas, tarefasDeApoio);
-    const apoioPedagogicoPct = percentualApoioOutroSetor(validas, tarefasPedagogicas);
+    const apoioOutroSetorPct = percentualApoioOutroSetor(
+      validas,
+      tarefasDeApoio,
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO]),
+    );
+    const apoioPedagogicoPct = percentualApoioOutroSetor(
+      validas,
+      tarefasPedagogicas,
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_PEDAGOGICO]),
+    );
 
     // Ocupação média por funcionário nos dias em que houve planejamento.
-    const porFuncionario = ocupacaoPorPessoa(funcs, validas);
+    const porFuncionario = ocupacaoPorPessoa(funcs, [...validas, ...foraDasTarefas], feriados ?? []);
     const resumo = resumoDeOcupacao(porFuncionario, params);
     const ocupacaoMedia = resumo.ocupacaoMedia ?? 0;
     const sobrecarregados = resumo.emSobrecarga;
@@ -149,6 +175,9 @@ export default function PaginaDashboard() {
       tempoPorLocal.set(r.local_id, (tempoPorLocal.get(r.local_id) ?? 0) + r.tempo_previsto_min);
       tempoPorSede.set(r.sede_id, (tempoPorSede.get(r.sede_id) ?? 0) + r.tempo_previsto_min);
     }
+    // Mesma conta do "Tempo planejado" lá em cima: o gráfico dizia 31 h ao lado de 40 h.
+    for (const e of foraDasTarefas)
+      if (e.sede_id) tempoPorSede.set(e.sede_id, (tempoPorSede.get(e.sede_id) ?? 0) + e.tempo_previsto_min);
 
     // Previsto × realizado (execuções com tempo real informado).
     const rotinaPorId = new Map(rs.map((r) => [r.id, r]));
@@ -195,7 +224,7 @@ export default function PaginaDashboard() {
       porStatus,
       funcsAtivos: funcs.length,
     };
-  }, [rotinas, execucoes, funcionarios, tarefas, sedeFiltro, params]);
+  }, [rotinas, eventuais, ausencias, feriados, execucoes, funcionarios, tarefas, sedeFiltro, params]);
 
   const nomeLocal = (id: string) => {
     const l = (locais ?? []).find((x) => x.id === id);
@@ -328,7 +357,11 @@ export default function PaginaDashboard() {
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn" onClick={() => window.print()} disabled={!periodoOk || (rotinas ?? []).length === 0}>
+        <button
+          className="btn"
+          onClick={() => window.print()}
+          disabled={!periodoOk || ((rotinas ?? []).length === 0 && (eventuais ?? []).length === 0)}
+        >
           🖨 Imprimir / PDF
         </button>
         <button className="btn" onClick={exportarCSV} disabled={!periodoOk || (rotinas ?? []).length === 0}>

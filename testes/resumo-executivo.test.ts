@@ -203,6 +203,34 @@ describe("montarResumo", () => {
     expect(linha("Sul 1").apoioOutroSetorPct).toBe(0);
   });
 
+  it("serviço eventual entra na ocupação e no apoio, como no Painel (04/11/2026)", () => {
+    const comEventual = montarResumo({
+      sedes, funcionarios, rotinas, execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+      eventuais: [
+        { id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: "", fim: "", tempo_min: 135, categoria_id: "apoio_pedagogico" } as never,
+      ],
+    });
+    const sul2 = comEventual.porSede.find((s) => s.sede === "Sul 2")!;
+    expect(sul2.ocupacaoMediaPct).toBe(62.5); // (75 + 50) / 2
+    expect(sul2.apoioPedagogicoPct).toBe(20); // 135 de 675
+    expect(sul2.apoioOutroSetorPct).toBe(20);
+    expect(comEventual.porSede.find((s) => s.sede === "Sul 1")!.apoioPedagogicoPct).toBe(0); // outra sede não pega
+  });
+
+  it("eventual sobre a tarefa não conta em dobro na ocupação; apoio a outro setor não é pedagógico", () => {
+    const b = rotinas.find((x) => x.id === "r2")!;
+    const comEventual = montarResumo({
+      sedes, funcionarios, rotinas, execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+      eventuais: [
+        { id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: b.inicio_planejado, fim: b.fim_planejado, tempo_min: 60, categoria_id: "apoio_outro_setor" } as never,
+      ],
+    });
+    const sul2 = comEventual.porSede.find((s) => s.sede === "Sul 2")!;
+    expect(sul2.ocupacaoMediaPct).toBe(50); // igual a sem eventual: o horário já tinha tarefa
+    expect(sul2.apoioPedagogicoPct).toBe(0);
+    expect(sul2.apoioOutroSetorPct).toBeGreaterThan(0);
+  });
+
   it("apoio pedagógico entra no total de apoio e aparece à parte (23/10/2026)", () => {
     // r6 (60 min em Sul 1) é apoio a outro setor; r4 (Benfica) é pedagógico.
     const res = montarResumo({

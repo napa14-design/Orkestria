@@ -12,9 +12,11 @@ import Carregando from "@/components/Carregando";
 import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCards";
 import {
   classificarOcupacao,
+  eventuaisForaDasTarefas,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
+  semAusentes,
   ocupaHorario,
 } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
@@ -22,7 +24,7 @@ import { useSessao } from "@/components/SessaoContexto";
 import { sedesPermitidas } from "@/lib/permissions";
 import { MAX_DIAS_PERIODO, MAX_DIAS_SEM_SEDE, diasDoPeriodo, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
-import type { Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede } from "@/types";
+import type { Ausencia, Feriado, Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede, ServicoEventual } from "@/types";
 
 function diasAtras(n: number): string {
   const d = new Date();
@@ -76,6 +78,9 @@ export default function PaginaPanorama() {
   // sede extra do coordenador aparecia zerada.
   const { data: funcionarios } = useDasSedes<Funcionario>("funcionarios");
   const { data: rotinas } = useDasSedes<RotinaPlanejada>("rotinas", periodoOk ? `de=${de}&ate=${ate}` : null);
+  const { data: eventuais } = useDasSedes<ServicoEventual>("servicos-eventuais", periodoOk ? `de=${de}&ate=${ate}` : null);
+  const { data: feriados } = useDasSedes<Feriado>("feriados");
+  const { data: ausencias } = useDasSedes<Ausencia>("ausencias", periodoOk ? `de=${de}&ate=${ate}` : null);
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
   // Cada sede medida com os parâmetros DELA: sem `&sede`, todas usavam os da
@@ -90,13 +95,14 @@ export default function PaginaPanorama() {
   // Métricas por sede (mesma lógica do Dashboard, mas para todas as sedes).
   const porSede = useMemo<MetricaSede[]>(() => {
     const rs = (rotinas ?? []).filter(ocupaHorario);
+    const foraDasTarefas = eventuaisForaDasTarefas(rs, semAusentes(eventuais ?? [], ausencias ?? []));
     const funcs = (funcionarios ?? []).filter((f) => f.ativo);
     return (sedes ?? [])
       .filter((s) => s.ativo)
       .map((s) => {
         const p = paramsDaSede?.[s.id] ?? params;
         const fs = funcs.filter((f) => f.sede_id === s.id);
-        const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, rs), p);
+        const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, [...rs, ...foraDasTarefas], feriados ?? []), p);
         return {
           sede: s,
           funcs: fs.length,
@@ -107,7 +113,7 @@ export default function PaginaPanorama() {
           params: p,
         };
       });
-  }, [sedes, funcionarios, rotinas, params, paramsDaSede]);
+  }, [sedes, funcionarios, rotinas, eventuais, ausencias, feriados, params, paramsDaSede]);
 
   // Agrupa as sedes por grupo ou por tipo.
   const grupos = useMemo(() => {

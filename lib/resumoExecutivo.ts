@@ -12,7 +12,9 @@
  *
  * Definições (06/10/2026):
  *  - ocupação, ociosidade, sobrecarga: por PESSOA ativa, agrupada pela sede DELA,
- *    nos dias em que teve bloco. Ocupação média = média das ocupações individuais.
+ *    nos dias em que teve bloco, ou só serviço eventual com a escala mandando
+ *    trabalhar (`eventuaisForaDasTarefas`; em dia ausente, o eventual não conta).
+ *    Ocupação média = média das ocupações individuais.
  *    Sobrecarga = acima de `ocupacao_alta` (100%, só administrador muda).
  *  - execuções: por BLOCO não cancelado, agrupado pela sede DO BLOCO (o remanejo
  *    entre sedes conta onde o trabalho foi feito). As seis contas somam sempre
@@ -24,12 +26,24 @@
  * inteiro, nunca a partir das linhas de `porSede`.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
-import { ocupacaoPorPessoa, percentualApoioOutroSetor, resumoDeOcupacao } from "./calculations";
+import {
+  CATEGORIA_APOIO_OUTRO_SETOR,
+  CATEGORIA_APOIO_PEDAGOGICO,
+  eventuaisForaDasTarefas,
+  eventuaisNoApoio,
+  ocupacaoPorPessoa,
+  percentualApoioOutroSetor,
+  resumoDeOcupacao,
+  semAusentes,
+} from "./calculations";
 import type {
+  Ausencia,
   ExecucaoRealizada,
+  Feriado,
   Funcionario,
   ParametrosResolvidos,
   RotinaPlanejada,
+  ServicoEventual,
   Sede,
 } from "@/types";
 
@@ -142,12 +156,18 @@ export function montarResumo(args: {
   tarefasDeApoio?: ReadonlySet<string>;
   /** Ids das tarefas da categoria "Apoio Pedagógico" (somam no total de apoio). */
   tarefasPedagogicas?: ReadonlySet<string>;
+  /** Serviços eventuais do período: contam como no Painel. */
+  eventuais?: ServicoEventual[];
+  feriados?: Feriado[];
+  ausencias?: Ausencia[];
 }) {
   const pedagogicas = args.tarefasPedagogicas ?? new Set<string>();
   const todoApoio = new Set([...(args.tarefasDeApoio ?? []), ...pedagogicas]);
   const { sedes, params, de, ate, agora } = args;
   const ativos = args.funcionarios.filter((f) => f.ativo);
   const blocos = args.rotinas.filter((r) => r.status !== "cancelada");
+  const eventuais = semAusentes(args.eventuais ?? [], args.ausencias ?? []);
+  const foraDasTarefas = eventuaisForaDasTarefas(blocos, eventuais);
 
   // Um realizado por bloco; se houver mais de um, vale o último gravado.
   const realizado = new Map<string, ExecucaoRealizada>();
@@ -158,10 +178,11 @@ export function montarResumo(args: {
 
   const numeros = (sedeIds: Set<string>): Numeros => {
     const ocup = resumoDeOcupacao(
-      ocupacaoPorPessoa(ativos.filter((f) => sedeIds.has(f.sede_id)), blocos),
+      ocupacaoPorPessoa(ativos.filter((f) => sedeIds.has(f.sede_id)), [...blocos, ...foraDasTarefas], args.feriados),
       params,
     );
     const daqui = blocos.filter((r) => sedeIds.has(r.sede_id));
+    const evsDaqui = eventuais.filter((e) => sedeIds.has(e.sede_id));
     const status = (s: string) => daqui.filter((r) => realizado.get(r.id)?.status_realizado === s).length;
     const conformes = status("conforme_planejado");
     const comAtraso = status("com_atraso");
@@ -190,8 +211,12 @@ export function montarResumo(args: {
       execucoesOutras: status("remanejada") + status("cancelada"),
       execucoesSemRegistro: semRegistro,
       diasConferidos: [...dias.values()].filter(Boolean).length,
-      apoioOutroSetorPct: percentualApoioOutroSetor(daqui, todoApoio),
-      apoioPedagogicoPct: percentualApoioOutroSetor(daqui, pedagogicas),
+      apoioOutroSetorPct: percentualApoioOutroSetor(
+        daqui,
+        todoApoio,
+        eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO]),
+      ),
+      apoioPedagogicoPct: percentualApoioOutroSetor(daqui, pedagogicas, eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_PEDAGOGICO])),
     };
   };
   const teveAlgo = (n: Numeros) => n.pessoasPlanejadas > 0 || n.execucoesPrevistas > 0;

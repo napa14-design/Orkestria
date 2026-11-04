@@ -11,10 +11,13 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   classificarOcupacao,
+  diaSemJornada,
+  eventuaisForaDasTarefas,
   jornadaLiquidaMin,
   ocupacaoPercentual,
   ocupacaoPorPessoa,
   resumoDeOcupacao,
+  semAusentes,
   tempoPlanejadoMin,
   ocupaHorario,
 } from "@/lib/calculations";
@@ -22,9 +25,11 @@ import { formatarDuracao, hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import type {
   Ausencia,
   ClassificacaoOcupacao,
+  Feriado,
   Funcionario,
   ParametrosResolvidos,
   RotinaPlanejada,
+  ServicoEventual,
   Tarefa,
 } from "@/types";
 
@@ -60,6 +65,8 @@ const ROTULO_AUSENCIA: Record<string, string> = {
 export default function SemanaGrid({
   funcionarios,
   rotinas,
+  eventuais,
+  feriados,
   ausencias,
   tarefas,
   parametros,
@@ -69,6 +76,8 @@ export default function SemanaGrid({
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
+  eventuais: ServicoEventual[];
+  feriados: Feriado[];
   ausencias: Ausencia[];
   /** Para o nome das tarefas na lista do dia. */
   tarefas: Tarefa[];
@@ -95,9 +104,14 @@ export default function SemanaGrid({
     return rotinas.filter((r) => ids.has(r.funcionario_id) && ocupaHorario(r) && !ausente(r));
   }, [funcionarios, rotinas, ausencias]);
   /** Total da pessoa na semana — mesma conta do Painel (`ocupacaoPorPessoa`). */
+  // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa.
+  const foraDasTarefas = useMemo(() => {
+    const ids = new Set(funcionarios.map((f) => f.id));
+    return eventuaisForaDasTarefas(daGrade, semAusentes(eventuais.filter((e) => ids.has(e.funcionario_id)), ausencias));
+  }, [funcionarios, eventuais, ausencias, daGrade]);
   const daSemana = useMemo(
-    () => new Map(ocupacaoPorPessoa(funcionarios, daGrade).map((p) => [p.funcionario.id, p])),
-    [funcionarios, daGrade],
+    () => new Map(ocupacaoPorPessoa(funcionarios, [...daGrade, ...foraDasTarefas], feriados).map((p) => [p.funcionario.id, p])),
+    [funcionarios, daGrade, foraDasTarefas, feriados],
   );
   /** Total do dia na equipe (`resumoDeOcupacao`): só conta quem tem algo planejado. */
   const totalDoDia = useMemo(
@@ -105,10 +119,11 @@ export default function SemanaGrid({
       new Map(
         datas.map((d) => {
           const rs = daGrade.filter((r) => r.data === d);
-          return [d, { tarefas: rs.length, planejado: tempoPlanejadoMin(rs), ...resumoDeOcupacao(ocupacaoPorPessoa(funcionarios, rs), parametros) }];
+          const ev = foraDasTarefas.filter((e) => e.data === d);
+          return [d, { tarefas: rs.length, planejado: tempoPlanejadoMin(rs) + ev.reduce((s, e) => s + e.tempo_previsto_min, 0), ...resumoDeOcupacao(ocupacaoPorPessoa(funcionarios, [...rs, ...ev], feriados), parametros) }];
         }),
       ),
-    [datas, daGrade, funcionarios, parametros],
+    [datas, daGrade, foraDasTarefas, funcionarios, feriados, parametros],
   );
   const daEquipe = useMemo(() => resumoDeOcupacao([...daSemana.values()], parametros), [daSemana, parametros]);
 
@@ -219,7 +234,12 @@ export default function SemanaGrid({
                   const doDia = rotinas.filter(
                     (r) => r.funcionario_id === f.id && r.data === data && ocupaHorario(r),
                   );
-                  const planejado = tempoPlanejadoMin(doDia);
+                  const eventualMin = foraDasTarefas
+                    .filter((e) => e.funcionario_id === f.id && e.data === data)
+                    .reduce((s, e) => s + e.tempo_previsto_min, 0);
+                  const planejado = tempoPlanejadoMin(doDia) + eventualMin;
+                  // Folga ou feriado só com eventual: há horas, mas nenhuma jornada para medir.
+                  const soHoras = doDia.length === 0 && eventualMin > 0 && diaSemJornada(f, data, feriados);
                   const ocupacao = ocupacaoPercentual(planejado, jornada);
                   const classe = classificarOcupacao(ocupacao, parametros);
 
@@ -229,9 +249,10 @@ export default function SemanaGrid({
                       onClick={() => aoAbrirDia(data)}
                       onMouseEnter={doDia.length ? (e) => mostrarTarefas(e.currentTarget, f, data, doDia) : undefined}
                       onMouseLeave={() => setDica(null)}
+                      title={eventualMin > 0 ? `Inclui ${formatarDuracao(eventualMin)} de serviço eventual fora das tarefas` : undefined}
                       style={{ cursor: "pointer", minWidth: 96 }}
                     >
-                      {doDia.length === 0 ? (
+                      {planejado === 0 ? (
                         <span style={{ color: "var(--tinta-3)", fontSize: 11 }}>— vazio —</span>
                       ) : (
                         <>
@@ -239,18 +260,22 @@ export default function SemanaGrid({
                             <strong className="num">{doDia.length}</strong> tarefas ·{" "}
                             <span className="num">{formatarDuracao(planejado)}</span>
                           </div>
-                          <div className="barra-trilho" style={{ height: 10 }}>
-                            <div
-                              className="barra-preenchimento"
-                              style={{
-                                width: `${Math.min(100, ocupacao)}%`,
-                                background: COR_CLASSE[classe],
-                              }}
-                            />
-                          </div>
-                          <div className="num" style={{ fontSize: 10, color: "var(--tinta-2)", marginTop: 2 }}>
-                            {ocupacao.toFixed(0)}%
-                          </div>
+                          {!soHoras && (
+                            <>
+                              <div className="barra-trilho" style={{ height: 10 }}>
+                                <div
+                                  className="barra-preenchimento"
+                                  style={{
+                                    width: `${Math.min(100, ocupacao)}%`,
+                                    background: COR_CLASSE[classe],
+                                  }}
+                                />
+                              </div>
+                              <div className="num" style={{ fontSize: 10, color: "var(--tinta-2)", marginTop: 2 }}>
+                                {ocupacao.toFixed(0)}%
+                              </div>
+                            </>
+                          )}
                         </>
                       )}
                     </td>
@@ -259,7 +284,14 @@ export default function SemanaGrid({
                 <td style={{ textAlign: "center", background: "var(--papel-2)" }}>
                   {(() => {
                     const s = daSemana.get(f.id);
-                    if (!s || s.dias === 0) return <span style={{ color: "var(--tinta-3)", fontSize: 11 }}>—</span>;
+                    if (!s || s.planejado === 0) return <span style={{ color: "var(--tinta-3)", fontSize: 11 }}>—</span>;
+                    // Só eventual em folga ou feriado: as horas existem, sem média a calcular.
+                    if (s.dias === 0)
+                      return (
+                        <div className="num" style={{ fontSize: 11 }}>
+                          <strong>0</strong> dia(s) · {formatarDuracao(s.planejado)}
+                        </div>
+                      );
                     return (
                       <>
                         <div className="num" style={{ fontSize: 11 }}>
@@ -280,11 +312,11 @@ export default function SemanaGrid({
           <tr style={{ borderTop: "2px solid var(--tinta)" }}>
             <td className="col-fixa">
               <strong>Total do dia</strong>
-              <div style={{ fontSize: 10, color: "var(--tinta-3)" }}>média de quem tem tarefa</div>
+              <div style={{ fontSize: 10, color: "var(--tinta-3)" }}>média de quem tem tarefa ou eventual</div>
             </td>
             {datas.map((data) => {
               const t = totalDoDia.get(data)!;
-              if (t.tarefas === 0)
+              if (t.planejado === 0)
                 return (
                   <td key={data} style={{ textAlign: "center", color: "var(--tinta-3)", fontSize: 11 }}>
                     —
@@ -295,9 +327,12 @@ export default function SemanaGrid({
                   <div className="num" style={{ fontSize: 11 }}>
                     <strong>{t.tarefas}</strong> tarefas · {formatarDuracao(t.planejado)}
                   </div>
-                  <div className="num" style={{ fontSize: 11, color: COR_TEXTO[classificarOcupacao(t.ocupacaoMedia ?? 0, parametros)] }}>
-                    <strong>{(t.ocupacaoMedia ?? 0).toFixed(0)}%</strong> · {t.pessoasPlanejadas} pessoa(s)
-                  </div>
+                  {/* Só eventual em folga ou feriado: há horas, mas nenhuma jornada para medir. */}
+                  {t.pessoasPlanejadas > 0 && (
+                    <div className="num" style={{ fontSize: 11, color: COR_TEXTO[classificarOcupacao(t.ocupacaoMedia ?? 0, parametros)] }}>
+                      <strong>{(t.ocupacaoMedia ?? 0).toFixed(0)}%</strong> · {t.pessoasPlanejadas} pessoa(s)
+                    </div>
+                  )}
                   {t.emSobrecarga > 0 && (
                     <span className="selo selo-vermelho" style={{ fontSize: 8 }}>
                       {t.emSobrecarga} em sobrecarga

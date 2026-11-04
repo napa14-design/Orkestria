@@ -1,5 +1,5 @@
 import { comSessao, ok } from "@/lib/api";
-import { limitarSedeConsulta, podeEscrever } from "@/lib/permissions";
+import { leituraCompleta, limitarSedeConsulta, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { createFeriado, getFeriados } from "@/services/feriadosService";
 
@@ -8,7 +8,14 @@ export async function GET(req: Request) {
   return comSessao(async (sessao) => {
     const url = new URL(req.url);
     const sedeId = limitarSedeConsulta(sessao, url.searchParams.get("sede") ?? undefined);
-    return ok(await getFeriados({ sedeId }));
+    const feriados = await getFeriados({ sedeId });
+    // Mínimo necessário: a Semana do supervisor agora chama esta rota, e o feriado
+    // global traria o e-mail de quem o criou, às vezes de outra sede.
+    return ok(
+      leituraCompleta(sessao)
+        ? feriados
+        : feriados.map(({ id, sede_id, nome, data_inicio, data_fim, ativo }) => ({ id, sede_id, nome, data_inicio, data_fim, ativo })),
+    );
   });
 }
 

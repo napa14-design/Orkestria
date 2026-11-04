@@ -18,6 +18,7 @@ import type {
   TipoLocalCatalogo,
   Ausencia,
   Categoria,
+  Feriado,
   Funcionario,
   Local,
   ParametrosResolvidos,
@@ -26,6 +27,7 @@ import type {
   Requisito,
   RotinaPlanejada,
   Sede,
+  ServicoEventual,
   Tarefa,
   TempoPersonalizado,
 } from "@/types";
@@ -81,6 +83,8 @@ export function useRotinaData(
   const { data: qualificacoes } = useSWR<QualificacaoFuncionario[]>(sedeId ? `/api/qualificacoes?sede=${sedeId}` : null, fetcher);
   const { data: parametros } = useSWR<ParametrosResolvidos>(sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null, fetcher);
   const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null, fetcher);
+  // O eventual conta na ocupação do mostrador (poucos registros por dia).
+  const { data: eventuais } = useSWR<ServicoEventual[]>(sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
   const { data: ausencias } = useSWR<Ausencia[]>(sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null, fetcher);
   // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
   const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
@@ -118,6 +122,11 @@ export function useRotinaData(
     modo === "semana" && sedeId ? `/api/rotinas?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
     fetcher,
   );
+  const { data: eventuaisSemana } = useSWR<ServicoEventual[]>(
+    modo === "semana" && sedeId ? `/api/servicos-eventuais?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
+    fetcher,
+  );
+  const { data: feriados } = useSWR<Feriado[]>(sedeId ? `/api/feriados?sede=${sedeId}` : null, fetcher);
   const { data: ausenciasSemana } = useSWR<Ausencia[]>(
     modo === "semana" && sedeId ? `/api/ausencias?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
     fetcher,
@@ -159,6 +168,9 @@ export function useRotinaData(
     parametros,
     rotinas,
     mutateRotinas,
+    eventuais,
+    eventuaisSemana,
+    feriados,
     ausencias,
     historico,
     modelos,

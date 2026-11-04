@@ -2,8 +2,7 @@
 
 /**
  * Serviços eventuais e imprevistos (Fase C) — o "segundo eixo": trabalho fora
- * da rotina planejada, registrado a posteriori. Alimenta a calibração da folga
- * (buffer) por sede.
+ * da rotina planejada, registrado a posteriori. Conta na ocupação de quem fez.
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
@@ -33,7 +32,7 @@ export default function PaginaEventuais() {
   return (
     <CrudManager<ServicoEventual>
       titulo="Serviços eventuais"
-      subtitulo="Trabalho fora da rotina planejada, registrado depois. Use “eventual” para trabalho avulso e “imprevisto” para ocorrências que consumiram tempo — os imprevistos calibram a folga por sede."
+      subtitulo="Trabalho fora da rotina planejada, registrado depois. Use “eventual” para trabalho avulso e “imprevisto” para ocorrências que consumiram tempo. Com pessoa, conta na ocupação dela; com categoria de apoio, também no indicador de apoio do Painel."
       endpoint="/api/servicos-eventuais"
       // Sem o seletor, a lista era só a da sede principal: o coordenador salvava
       // na sede extra, não via, e salvava de novo (3× em 22/10/2026).
@@ -54,7 +53,7 @@ export default function PaginaEventuais() {
           opcoes: TIPOS,
           padrao: "eventual",
           obrigatorio: true,
-          dica: "“Serviço eventual” = trabalho avulso produtivo que surgiu (ex.: apoio a um evento). “Imprevisto” = ocorrência que consumiu tempo (ex.: vazamento, queda de energia) — não é ociosidade e serve para calibrar a folga da sede.",
+          dica: "“Serviço eventual” = trabalho avulso produtivo que surgiu (ex.: apoio a um evento). “Imprevisto” = ocorrência que consumiu tempo (ex.: vazamento, queda de energia). Os dois contam na ocupação de quem fez.",
         },
         {
           key: "sede_id",
@@ -70,7 +69,7 @@ export default function PaginaEventuais() {
           tipo: "textarea",
           inteira: true,
           obrigatorio: true,
-          dica: "O que foi feito ou o que aconteceu, em poucas palavras.",
+          dica: "O que foi feito ou o que aconteceu, em poucas palavras. Saúde e atestado não vão aqui: use Ausências.",
         },
         {
           key: "funcionario_id",
@@ -102,7 +101,7 @@ export default function PaginaEventuais() {
           key: "inicio",
           rotulo: "Início",
           tipo: "hora",
-          dica: "Hora de início, se souber. Opcional — o que conta para o cálculo é o tempo em minutos.",
+          dica: "Hora de início, se souber. Com início e fim, o horário é que vale na ocupação da pessoa, e o tempo que já tinha tarefa não conta duas vezes.",
         },
         {
           key: "fim",
@@ -115,11 +114,16 @@ export default function PaginaEventuais() {
           rotulo: "Tempo (min)",
           tipo: "numero",
           padrao: 0,
-          obrigatorio: true,
-          ajuda: "Duração real em minutos",
-          dica: "Quanto tempo consumiu, em minutos. É o número que entra na soma de tempo eventual/imprevisto da sede.",
+          ajuda: "Só se não houver início e fim",
+          dica: "Quanto tempo consumiu, em minutos. Com início e fim, o sistema calcula sozinho e este campo é ignorado.",
         },
-        { key: "observacao", rotulo: "Observações", tipo: "textarea", inteira: true },
+        {
+          key: "observacao",
+          rotulo: "Observações",
+          tipo: "textarea",
+          inteira: true,
+          dica: "Saúde e atestado não vão aqui: use Ausências.",
+        },
       ]}
       colunas={[
         { key: "data", rotulo: "Data", render: (e) => <span className="num">{formatarDataBR(e.data)}</span> },

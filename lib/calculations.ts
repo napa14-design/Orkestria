@@ -6,6 +6,7 @@
  * igualmente para Google Sheets hoje e Firebase Firestore no futuro.
  */
 import type {
+  Ausencia,
   ClassificacaoOcupacao,
   Feriado,
   Funcionario,
@@ -14,6 +15,7 @@ import type {
   PeriodoLetivo,
   Prioridade,
   RotinaPlanejada,
+  ServicoEventual,
   StatusRotina,
   Tarefa,
   TipoLocal,
@@ -123,15 +125,130 @@ export const CATEGORIA_APOIO_PEDAGOGICO = "apoio_pedagogico";
 export function percentualApoioOutroSetor(
   rotinas: Pick<RotinaPlanejada, "tarefa_id" | "status" | "tempo_previsto_min">[],
   tarefasDeApoio: ReadonlySet<string>,
+  /** O serviço eventual na conta: o apoio inteiro, e no total só o que não tinha tarefa. */
+  eventuais: { apoioMin: number; foraDasTarefasMin: number } = { apoioMin: 0, foraDasTarefasMin: 0 },
 ): number | null {
-  let total = 0;
-  let apoio = 0;
+  let total = eventuais.foraDasTarefasMin;
+  let apoio = eventuais.apoioMin;
   for (const r of rotinas) {
     if (!ocupaHorario(r)) continue;
     total += r.tempo_previsto_min || 0;
     if (tarefasDeApoio.has(r.tarefa_id)) apoio += r.tempo_previsto_min || 0;
   }
-  return total > 0 ? Math.round((apoio / total) * 1000) / 10 : null;
+  return total > 0 ? Math.round((Math.min(apoio, total) / total) * 1000) / 10 : null;
+}
+
+type EventualNaConta = Pick<ServicoEventual, "funcionario_id" | "data" | "inicio" | "fim" | "tempo_min"> & { sede_id?: string };
+
+/** Hora de relógio. "24:00" e "09:75" não são: `hhmmParaMin` faria a conta assim mesmo. */
+export function horaValida(hora: unknown): hora is string {
+  return typeof hora === "string" && /^([01]\d|2[0-3]):[0-5]\d$/u.test(hora);
+}
+
+/** Com início e fim válidos, vale o horário; o tempo digitado é só para quando não há. */
+function janelaDoEventual(e: Pick<ServicoEventual, "inicio" | "fim">): [number, number] | null {
+  if (!horaValida(e.inicio) || !horaValida(e.fim)) return null;
+  const ini = hhmmParaMin(e.inicio);
+  const fim = hhmmParaMin(e.fim);
+  return fim > ini ? [ini, fim] : null;
+}
+
+/**
+ * Sem os eventuais de quem estava ausente no dia. Vale nas telas todas: a célula da
+ * Semana diz "Falta", e 1 h nesse dia criava um dia na conta do Painel (93% × 52%).
+ */
+export function semAusentes<E extends Pick<ServicoEventual, "funcionario_id" | "data">>(
+  eventuais: E[],
+  ausencias: Pick<Ausencia, "funcionario_id" | "data_inicio" | "data_fim">[],
+): E[] {
+  return eventuais.filter(
+    (e) => !ausencias.some((a) => a.funcionario_id === e.funcionario_id && a.data_inicio <= e.data && e.data <= a.data_fim),
+  );
+}
+
+/**
+ * Folga ou feriado: a pessoa não tinha jornada a cumprir no dia. Sem bloco, o eventual
+ * mostra só as horas: dizer "Subutilizado, 12%" e "7 h de ociosidade" sobre 1 h feita
+ * num sábado é inventar uma cobrança (auditoria, 04/11/2026).
+ */
+export function diaSemJornada(f: Funcionario, dataISO: string, feriados: Feriado[]): boolean {
+  return !jornadaDoDia(f, dataISO).trabalha || !!feriadoDoDia(feriados, f.sede_id, dataISO);
+}
+
+/**
+ * Teto de um lançamento: um dia inteiro. Sem isto, um erro de digitação (ou quem é
+ * medido) levava o resumo do Chromos a 20.845% de ocupação (revisão de segurança).
+ */
+export const MAX_MINUTOS_EVENTUAL = 1440;
+
+export function minutosDoEventual(e: Pick<ServicoEventual, "inicio" | "fim" | "tempo_min">): number {
+  const janela = janelaDoEventual(e);
+  return janela ? janela[1] - janela[0] : Math.min(MAX_MINUTOS_EVENTUAL, Math.max(0, Number(e.tempo_min) || 0));
+}
+
+/**
+ * O serviço eventual como tempo da pessoa (pedido da coordenação, 04/11/2026: ele
+ * fica "no limbo", à disposição do pedagógico, e o mostrador não sabe). Devolve, um
+ * por eventual, os minutos que ela **não tinha com tarefa**, no formato que
+ * `ocupacaoPorPessoa` já lê.
+ *
+ * ⚠️ Somar o `tempo_min` direto contaria em dobro: em produção, 810 de 2.860 minutos
+ * caíam em horário que já tinha bloco. E o horário manda sobre o tempo digitado: o
+ * formulário nasce com tempo 0 e não confere um com o outro, então um eventual de
+ * 95 min sumia, e outro de 1 h com tempo 120 dava sobrecarga (auditoria, 04/11/2026).
+ * Sem início e fim, entra o tempo digitado. Sem pessoa, não é ocupação de ninguém.
+ *
+ * `so_tempo`: num dia sem bloco, o eventual só cria dia na conta se a escala mandar
+ * trabalhar e não for feriado (decisão do dono, 04/11/2026). Em folga, contar somava a
+ * jornada inteira: 1 h no sábado de quem é de segunda a sexta derrubava uma semana cheia para 85%. E
+ * tirar todo dia sem bloco também erra: 3 dias cheios + 2 só no detector davam 167%.
+ */
+export function eventuaisForaDasTarefas(
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado">[],
+  eventuais: EventualNaConta[],
+): { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] {
+  const sobra: { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] = [];
+  const ocupadoPorDia = new Map<string, [number, number][]>();
+  const somadoPorDia = new Map<string, number>();
+  for (const r of rotinas) {
+    if (!ocupaHorario(r)) continue;
+    const chave = `${r.funcionario_id}|${r.data}`;
+    if (!ocupadoPorDia.has(chave)) ocupadoPorDia.set(chave, []);
+    ocupadoPorDia.get(chave)!.push([hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)]);
+  }
+  for (const e of eventuais) {
+    if (!e.funcionario_id) continue;
+    const chave = `${e.funcionario_id}|${e.data}`;
+    const ocupado = ocupadoPorDia.get(chave) ?? [];
+    const janela = janelaDoEventual(e);
+    let minutos = minutosDoEventual(e);
+    if (janela) {
+      // Minuto a minuto: blocos e eventuais do dia podem se sobrepor entre si.
+      for (let m = janela[0]; m < janela[1]; m++) if (ocupado.some(([a, b]) => a <= m && m < b)) minutos--;
+      ocupado.push(janela);
+      ocupadoPorDia.set(chave, ocupado);
+    }
+    // O teto vale por pessoa e dia: sem horário, vários lançamentos somariam sem limite.
+    minutos = Math.min(minutos, MAX_MINUTOS_EVENTUAL - (somadoPorDia.get(chave) ?? 0));
+    somadoPorDia.set(chave, (somadoPorDia.get(chave) ?? 0) + Math.max(0, minutos));
+    if (minutos > 0) sobra.push({ funcionario_id: e.funcionario_id, sede_id: e.sede_id, data: e.data, status: "planejada", tempo_previsto_min: minutos, so_tempo: true });
+  }
+  return sobra;
+}
+
+/** O que os eventuais somam no indicador de apoio do Painel. */
+export function eventuaisNoApoio(
+  rotinas: Parameters<typeof eventuaisForaDasTarefas>[0],
+  eventuais: (EventualNaConta & Pick<ServicoEventual, "categoria_id">)[],
+  categorias: readonly string[],
+): { apoioMin: number; foraDasTarefasMin: number } {
+  const soma = (lista: { tempo_previsto_min: number }[]) => lista.reduce((s, x) => s + x.tempo_previsto_min, 0);
+  return {
+    // Sem blocos na conta: no apoio entra o tempo inteiro, mesmo sobre tarefa, mas o
+    // mesmo horário lançado duas vezes e o teto do dia valem igual.
+    apoioMin: soma(eventuaisForaDasTarefas([], eventuais.filter((e) => categorias.includes(e.categoria_id ?? "")))),
+    foraDasTarefasMin: soma(eventuaisForaDasTarefas(rotinas, eventuais)),
+  };
 }
 
 /**
@@ -597,13 +714,20 @@ export interface OcupacaoDaPessoa<F> {
  */
 export function ocupacaoPorPessoa<F extends Parameters<typeof jornadaLiquidaMin>[0] & { id: string }>(
   funcionarios: F[],
-  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "tempo_previsto_min">[],
+  rotinas: (Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "tempo_previsto_min"> & { so_tempo?: boolean })[],
+  /** Em feriado não há jornada a cobrar: o eventual soma tempo, sem criar dia. */
+  feriados: Feriado[] = [],
 ): OcupacaoDaPessoa<F>[] {
+  const porId = new Map(funcionarios.map((f) => [f.id, f]));
+  const naEscala = (r: { funcionario_id: string; data: string }) => {
+    const f = porId.get(r.funcionario_id) as unknown as Funcionario | undefined;
+    return !!f && !diaSemJornada(f, r.data, feriados);
+  };
   const porPessoa = new Map<string, { dias: Set<string>; planejado: number }>();
   for (const r of rotinas) {
     if (!ocupaHorario(r)) continue;
     const acc = porPessoa.get(r.funcionario_id) ?? { dias: new Set<string>(), planejado: 0 };
-    acc.dias.add(r.data);
+    if (!r.so_tempo || naEscala(r)) acc.dias.add(r.data);
     acc.planejado += r.tempo_previsto_min;
     porPessoa.set(r.funcionario_id, acc);
   }
@@ -685,9 +809,11 @@ export function resumoFuncionario(
   funcionario: Funcionario,
   rotinasDoDia: RotinaPlanejada[],
   p: ParametrosResolvidos,
+  /** Minutos de serviço eventual fora das tarefas (`eventuaisForaDasTarefas`). */
+  eventualMin = 0,
 ): ResumoFuncionario {
   const jornada = jornadaLiquidaMin(funcionario);
-  const planejado = tempoPlanejadoMin(rotinasDoDia);
+  const planejado = tempoPlanejadoMin(rotinasDoDia) + eventualMin;
   const totalTarefas = rotinasDoDia.filter(ocupaHorario).length;
   const ocupacao = ocupacaoPercentual(planejado, jornada);
   return {

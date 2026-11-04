@@ -7,6 +7,85 @@
 
 ---
 
+## 2026-11-04 — Serviço eventual conta na ocupação
+
+Relato da coordenação: quatro pessoas ficam com detector de metal nas provas, quartas e
+sextas, e "é como se estivessem no limbo": o lançamento ficava só na tela de Serviços
+eventuais, e o mostrador não mudava. Agora entra na ocupação do Dia e da Semana, no Painel,
+no Panorama e no resumo enviado ao Chromos, e, com categoria de apoio, no indicador de Apoio.
+
+- **Conta o que a pessoa não tinha com tarefa** (`eventuaisForaDasTarefas`). Somar direto
+  contaria em dobro: nos lançamentos de produção, 28% dos minutos caíam em horário com
+  bloco. Com início e fim, **o horário manda sobre o tempo digitado**: o formulário nasce
+  com 0 e não confere um com o outro, e a primeira versão, reprovada pelo auditor, fazia o
+  eventual sumir ou virar sobrecarga. Sem horário, entra o tempo digitado. Sem pessoa, não
+  é ocupação de ninguém.
+- **No Apoio entra o tempo inteiro**, mesmo sobre tarefa: é a hora que foi para o outro
+  setor, e o que justifica contingente. Tarefa e eventual de apoio na mesma hora somam os
+  dois, limitados a 100%.
+- **Dia só com eventual entra na média se a escala mandar trabalhar** (decisão do dono). Em
+  folga e feriado, soma as horas sem somar a jornada: 1 h no sábado de quem é de segunda a
+  sexta derrubava uma semana cheia para 85%. Tirar todo dia sem bloco também errava: 3 dias
+  cheios + 2 só no detector davam 167%. Custo aceito: 1 h de eventual num dia útil sem
+  agenda dá ocupação baixa e ociosidade alta nesse dia, e uma sede sem agenda pode aparecer
+  com folga no Panorama.
+- **Só eventual em folga ou feriado mostra só as horas**, no Dia e na Semana, sem %, selo
+  ou ociosidade: "Subutilizado, 12%" sobre 1 h feita num sábado inventava uma cobrança.
+- **Em dia ausente, o eventual não conta em tela nenhuma** (`semAusentes`): a célula da
+  Semana dizia "Falta", e 1 h nesse dia criava um dia na conta do Painel (93% × 52%).
+- **Teto de 1.440 minutos por lançamento e por pessoa e dia**, também no que já está
+  gravado: um erro de digitação levava o resumo do Chromos a 20.845%. Hora impossível e
+  horário invertido são recusados (produção conferida: nenhum dos 25 lançamentos cai aí).
+  Com início e fim, o tempo gravado passa a ser o do horário, para a lista mostrar o
+  número que conta. Sem início e fim, tempo zero é recusado: gravava e o mostrador não
+  mudava, a queixa original. O formulário deixa de exigir o tempo quando há horário.
+  Data, tipo e campo com tipo errado são recusados com erro de validação, não com 500.
+  Criar e editar só aceitam os campos do formulário: dava para forjar `criado_por` num PUT,
+  e `supervisor_id` não muda depois de criado.
+- **Risco que fica:** o coordenador é a fonte do número. Com valores críveis (2 h de
+  eventual por dia e por pessoa), a ociosidade de uma sede de teste foi de 130 h para 10 h,
+  e nenhum teto pega isso. O mesmo vale para o Apoio: 8 h com categoria de apoio sobre um
+  bloco de 8 h levam o indicador a 100% sem mexer na ocupação. O histórico guarda quem
+  lançou e quais campos mudaram, não sede, pessoa, data nem minutos: apagado o lançamento,
+  não sobra o número. Dá para lançar em mês fechado e em data futura. Vale olhar o peso do
+  eventual por sede.
+- O resumo do funcionário mostra "Eventual lançado" e "Fora das tarefas (já somado)": sem
+  isso, a ocupação subia sem bloco que explicasse, ou não subia depois de lançar sobre
+  tarefa, e a pessoa achava que não tinha entrado. "Tempo planejado" do Painel e o gráfico
+  por sede incluem o eventual; a impressão libera só com eventual, o CSV segue só de tarefas.
+- O supervisor abre a Rotina e agora recebe os eventuais para o mostrador, então a rota
+  devolve a ele só quem, quando e quanto, de um período real de até 7 dias. Os feriados
+  também vão por lista positiva, sem o e-mail de quem criou. Descrição e observação são
+  texto livre, e o formulário avisa que saúde e atestado vão por Ausências.
+- O resumo enviado ao Chromos muda de significado sem mudar de formato: quem consome esses
+  números precisa saber que agora incluem o eventual.
+- A tela prometia que imprevistos "calibram a folga", e nenhum código fazia isso: saiu.
+- Contam também imprevisto e eventual em intervalo ou fora da jornada.
+
+**Ainda não faz:** as tarefas daquele horário continuam pendentes, sem o motivo; o eventual
+não aparece como bloco na agenda; "Tempo livre" do painel de Cobertura, a Central e o aviso
+de sobrecarga ao soltar uma tarefa não o enxergam, nem o "Gerar o dia", então o sistema pode
+propor essa pessoa naquele horário; e os blocos que a pessoa tem em outra sede no mesmo dia
+não descontam, porque a tela só lê a sede aberta (o Painel de todas as sedes já diferia
+antes). O dono escolheu começar só pelas horas. O mesmo lançamento sem horário digitado duas
+vezes soma. Sábado com jornada própria dá % diferente no Dia e na Semana (já era assim com
+bloco). O resumo do Chromos demora a refletir: 5 min em memória, 30 min no banco, 24 h em
+mês fechado.
+
+Publicado antes do fim da auditoria independente, a pedido do dono. Revisão de segurança:
+libera com ressalvas (as acima, mais id com barra e descrição enorme, que dão erro 500 sem
+expor segredo, e Painel e Panorama recebendo mais campos de ausência do que usam).
+
+Arquivos: `lib/calculations.ts`, `lib/resumoExecutivo.ts`, `services/resumoExecutivoService.ts`
+(cache v3), `services/servicosEventuaisService.ts`, `app/api/servicos-eventuais/*`,
+`app/api/feriados/route.ts`, `components/agenda/OccupancySummary.tsx`,
+`components/agenda/SemanaGrid.tsx`, `app/(app)/rotinas/*`, `app/(app)/dashboard/page.tsx`,
+`app/(app)/panorama/page.tsx`, `app/(app)/eventuais/page.tsx`,
+`docs/03-regras-de-negocio-e-calculos.md`, `testes/eventuais-ocupacao.test.ts`,
+`testes/eventuais-telas.test.ts`.
+
+---
+
 ## 2026-11-04 — Coordenador cria coordenador
 
 Pedido do dono: coordenador pode criar outros coordenadores, mas não editar nem excluir.

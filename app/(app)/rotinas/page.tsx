@@ -97,6 +97,9 @@ export default function PaginaRotinas() {
     qualificacoes,
     parametros,
     rotinas,
+    eventuais,
+    eventuaisSemana,
+    feriados,
     mutateRotinas,
     historico,
     mutateModelos,
@@ -104,6 +107,7 @@ export default function PaginaRotinas() {
     datasSemana,
     rotinasSemana,
     mutateSemana,
+    ausencias,
     ausenciasSemana,
     ausentesMap,
     fonteRepetir,
@@ -928,6 +932,8 @@ export default function PaginaRotinas() {
         <SemanaGrid
           funcionarios={funcionariosVisiveis}
           rotinas={rotinasSemana ?? []}
+          eventuais={eventuaisSemana ?? []}
+          feriados={feriados ?? []}
           ausencias={ausenciasSemana ?? []}
           tarefas={tarefas ?? []}
           parametros={params}
@@ -1087,6 +1093,10 @@ export default function PaginaRotinas() {
             <OccupancySummary
               funcionarios={efetivosVisiveis}
               rotinas={rotinas ?? []}
+              eventuais={eventuais ?? []}
+              ausencias={ausencias ?? []}
+              feriados={feriados ?? []}
+              data={data}
               tarefas={tarefas ?? []}
               parametros={params}
               selecionadoId={selecionado}

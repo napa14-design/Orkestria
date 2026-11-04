@@ -109,6 +109,24 @@ Mesma tarefa, locais diferentes → tempos diferentes. Os dois fatores
 Os limites vêm dos parâmetros `ocupacao_baixa`, `ocupacao_adequada` e
 `ocupacao_alta` (globais ou por sede).
 
+### Serviço eventual na ocupação
+
+Conta no Dia, na Semana, no Painel, no Panorama e no resumo do Chromos, pela mesma
+função (`eventuaisForaDasTarefas`).
+
+| Situação | O que conta |
+|---|---|
+| Com início e fim válidos | O horário, não o tempo digitado |
+| Sem início ou sem fim | O tempo digitado (obrigatório: sem nenhum dos dois, não grava) |
+| Horário que já tinha tarefa | Não soma de novo no total |
+| Sem pessoa | Não é ocupação de ninguém |
+| Dia em que a pessoa estava ausente | Não conta, em tela nenhuma |
+| Dia só com eventual, escala manda trabalhar | Entra na média, com a jornada do dia |
+| Dia só com eventual, folga ou feriado | Soma as horas, sem somar jornada; a tela mostra só as horas |
+| Categoria de apoio | No indicador de Apoio entra o tempo inteiro, mesmo sobre tarefa (limitado a 100%) |
+
+Teto: 1.440 minutos por lançamento e por pessoa e dia, também no que já está gravado.
+
 ## 4. Validações da agenda
 
 | Código | Nível | Situação |

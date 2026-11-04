@@ -22,8 +22,8 @@ export async function PUT(req: Request, ctx: Ctx) {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
     const { id } = await ctx.params;
     await exigirAcesso((s) => podeAlterarSede(sessao, s), id);
-    const mudancas = await req.json();
-    if (mudancas.sede_id && !podeAlterarSede(sessao, mudancas.sede_id))
+    const mudancas = await req.json().catch(() => null);
+    if (mudancas?.sede_id && !podeAlterarSede(sessao, mudancas.sede_id))
       throw new ErroPermissao("Coordenadores não podem mover registros para outra sede.");
     return ok(await updateServicoEventual(id, mudancas, sessao.email));
   });

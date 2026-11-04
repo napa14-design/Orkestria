@@ -4,7 +4,7 @@ import type { Auditoria, TipoEventual } from "./comum";
  * Serviço eventual / eventualidade — o "segundo eixo" do Orkestria: trabalho
  * NÃO planejado, registrado a posteriori (não parte de uma rotina). Distingue-se
  * pelo `tipo`: trabalho avulso ("eventual") ou imprevisto que consumiu tempo
- * ("imprevisto"). Alimenta a calibração da folga (buffer) por sede.
+ * ("imprevisto"). Com pessoa, conta na ocupação dela (`eventuaisForaDasTarefas`).
  */
 export interface ServicoEventual extends Auditoria {
   id: string;
@@ -21,7 +21,7 @@ export interface ServicoEventual extends Auditoria {
   tipo: TipoEventual;
   /** O que foi feito / o que ocorreu. */
   descricao: string;
-  /** Início/fim (HH:mm) — opcionais; o que vale para o cálculo é `tempo_min`. */
+  /** Início/fim (HH:mm) — opcionais; quando há os dois, valem no cálculo, e não `tempo_min`. */
   inicio: string;
   fim: string;
   /** Duração real em minutos (tempo consumido). */

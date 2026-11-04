@@ -3,15 +3,23 @@
 /** Lado direito da tela de rotina: resumo do funcionário e da equipe. */
 import { useMemo } from "react";
 import {
+  diaSemJornada,
+  eventuaisForaDasTarefas,
+  minutosDoEventual,
+  ocupaHorario,
   resumoFuncionario,
   ROTULO_CLASSIFICACAO,
+  semAusentes,
 } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type {
+  Ausencia,
   ClassificacaoOcupacao,
+  Feriado,
   Funcionario,
   ParametrosResolvidos,
   RotinaPlanejada,
+  ServicoEventual,
   Tarefa,
 } from "@/types";
 
@@ -52,6 +60,10 @@ function BarraOcupacao({
 export default function OccupancySummary({
   funcionarios,
   rotinas,
+  eventuais,
+  ausencias,
+  feriados,
+  data,
   tarefas,
   parametros,
   selecionadoId,
@@ -59,6 +71,10 @@ export default function OccupancySummary({
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
+  eventuais: ServicoEventual[];
+  ausencias: Ausencia[];
+  feriados: Feriado[];
+  data: string;
   tarefas: Tarefa[];
   parametros: ParametrosResolvidos;
   selecionadoId: string | null;
@@ -66,18 +82,24 @@ export default function OccupancySummary({
 }) {
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
 
-  const resumos = useMemo(
-    () =>
-      funcionarios.map((f) => ({
+  const resumos = useMemo(() => {
+    // Só os deste dia: ao trocar de data, a lista anterior fica na tela até a nova chegar.
+    const doDia = semAusentes(eventuais.filter((e) => e.data === data), ausencias);
+    const foraDasTarefas = eventuaisForaDasTarefas(rotinas, doDia);
+    return funcionarios.map((f) => {
+      const dela = rotinas.filter((r) => r.funcionario_id === f.id);
+      const eventualMin = foraDasTarefas.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + e.tempo_previsto_min, 0);
+      return {
         funcionario: f,
-        resumo: resumoFuncionario(
-          f,
-          rotinas.filter((r) => r.funcionario_id === f.id),
-          parametros,
-        ),
-      })),
-    [funcionarios, rotinas, parametros],
-  );
+        eventualMin,
+        // Tudo o que foi lançado: sobre tarefas, a ocupação não muda, e sem isto a
+        // pessoa lançava e achava que não tinha entrado.
+        lancadoMin: doDia.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + minutosDoEventual(e), 0),
+        soHoras: eventualMin > 0 && !dela.some(ocupaHorario) && diaSemJornada(f, data, feriados),
+        resumo: resumoFuncionario(f, dela, parametros, eventualMin),
+      };
+    });
+  }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros]);
 
   const selecionado = resumos.find((r) => r.funcionario.id === selecionadoId);
 
@@ -88,9 +110,13 @@ export default function OccupancySummary({
         <div className="painel">
           <div className="painel-cabecalho" style={{ padding: "10px 12px" }}>
             <span className="rotulo">Resumo do funcionário</span>
-            <span className={`selo ${SELO_CLASSIFICACAO[selecionado.resumo.classificacao]}`}>
-              {ROTULO_CLASSIFICACAO[selecionado.resumo.classificacao]}
-            </span>
+            {selecionado.soHoras ? (
+              <span className="selo selo-cinza">Só eventual</span>
+            ) : (
+              <span className={`selo ${SELO_CLASSIFICACAO[selecionado.resumo.classificacao]}`}>
+                {ROTULO_CLASSIFICACAO[selecionado.resumo.classificacao]}
+              </span>
+            )}
           </div>
           <div style={{ padding: 14 }}>
             <h3 style={{ fontSize: 18, marginBottom: 2 }}>{selecionado.funcionario.nome}</h3>
@@ -99,22 +125,34 @@ export default function OccupancySummary({
               {selecionado.funcionario.intervalo_inicio}–{selecionado.funcionario.intervalo_fim}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-              <span className="rotulo">Ocupação</span>
-              <span className="num" style={{ fontSize: 22, fontWeight: 700 }}>
-                {selecionado.resumo.ocupacao_percentual.toFixed(1)}%
-              </span>
-            </div>
-            <BarraOcupacao
-              percentual={selecionado.resumo.ocupacao_percentual}
-              classe={selecionado.resumo.classificacao}
-            />
+            {!selecionado.soHoras && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                  <span className="rotulo">Ocupação</span>
+                  <span className="num" style={{ fontSize: 22, fontWeight: 700 }}>
+                    {selecionado.resumo.ocupacao_percentual.toFixed(1)}%
+                  </span>
+                </div>
+                <BarraOcupacao
+                  percentual={selecionado.resumo.ocupacao_percentual}
+                  classe={selecionado.resumo.classificacao}
+                />
+              </>
+            )}
 
             <dl style={{ marginTop: 14, display: "grid", gap: 7 }}>
               {[
-                ["Jornada líquida", formatarDuracao(selecionado.resumo.jornada_liquida_min)],
+                ...(selecionado.soHoras ? [] : [["Jornada líquida", formatarDuracao(selecionado.resumo.jornada_liquida_min)]]),
                 ["Tempo planejado", formatarDuracao(selecionado.resumo.tempo_planejado_min)],
-                ["Ociosidade prevista", formatarDuracao(selecionado.resumo.ociosidade_prevista_min)],
+                // Sem isto, a ocupação sobe sem nenhum bloco a mais na agenda que explique,
+                // ou não sobe depois de um lançamento, e a pessoa acha que não entrou.
+                ...(selecionado.lancadoMin > 0
+                  ? [
+                      ["Eventual lançado", formatarDuracao(selecionado.lancadoMin)],
+                      ["Fora das tarefas (já somado)", formatarDuracao(selecionado.eventualMin)],
+                    ]
+                  : []),
+                ...(selecionado.soHoras ? [] : [["Ociosidade prevista", formatarDuracao(selecionado.resumo.ociosidade_prevista_min)]]),
                 ["Tarefas no dia", String(selecionado.resumo.total_tarefas)],
               ].map(([rotulo, valor]) => (
                 <div key={rotulo} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--linha)", paddingBottom: 4 }}>
@@ -161,7 +199,7 @@ export default function OccupancySummary({
           <span className="rotulo" data-tour="painel-ocupacao">Equipe — ocupação</span>
         </div>
         <div style={{ padding: 12, display: "grid", gap: 10 }}>
-          {resumos.map(({ funcionario, resumo }) => (
+          {resumos.map(({ funcionario, resumo, soHoras, eventualMin }) => (
             <button
               key={funcionario.id}
               onClick={() => aoSelecionar(funcionario.id)}
@@ -172,10 +210,10 @@ export default function OccupancySummary({
                   {funcionario.nome}
                 </span>
                 <span className="num" style={{ color: "var(--tinta-2)" }}>
-                  {resumo.ocupacao_percentual.toFixed(0)}%
+                  {soHoras ? formatarDuracao(eventualMin) : `${resumo.ocupacao_percentual.toFixed(0)}%`}
                 </span>
               </div>
-              <BarraOcupacao percentual={resumo.ocupacao_percentual} classe={resumo.classificacao} />
+              {!soHoras && <BarraOcupacao percentual={resumo.ocupacao_percentual} classe={resumo.classificacao} />}
             </button>
           ))}
         </div>
