@@ -118,6 +118,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("intervalos_sabado"),
     col("transferido_para"),
     col("transferido_de"),
+    col("transferido_setor"),
   ],
   sedes: [
     col("id"),

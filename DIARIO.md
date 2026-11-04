@@ -7,6 +7,80 @@
 
 ---
 
+## 2026-11-04 — Central: leva a sede junto, confere o cadastro e diz o que foi feito
+
+Três defeitos achados na consulta sobre a tela do dia (nota no vault), medidos em
+produção antes de mudar.
+
+**1. A Central perdia a sede.** Ela deixa escolher a sede, mas os links iam para
+`/rotinas` e `/acompanhamento` sem nada, e a tela abria na primeira sede da lista:
+quem via "o dia não foi montado" numa sede podia gerar o dia em outra. A maioria dos
+coordenadores opera mais de uma. Agora o link leva `?sede=`, e a tela só aceita a
+sede se ela estiver na lista da pessoa (`lib/sedeDaTela.ts`); a escolha feita na
+própria tela vence. A sede com que se chegou vale enquanto a tela estiver aberta,
+porque o menu tira o parâmetro, e o "Confirmar realizados" da Rotina a leva junto.
+Os links para Funcionários, Tarefas e Feriados não mudaram: não escrevem no dia.
+Continua: quem sai para outra tela pelo menu perde a sede, como sempre foi.
+
+**2. "O dia está em ordem" sem conferir o cadastro.** A Central não olhava o painel
+de Pendências. A regra saiu do componente para `lib/pendencias.ts`, a mesma para os
+dois. Medido em produção, a maioria das sedes tem diárias fora da agenda todo dia,
+então como ação a Central nunca sairia dela:
+- **crítica fora da agenda** vira decisão ("atenção") e fica até alguém resolver, o
+  que em algumas sedes é crônico. Crítica letiva em sede **sem calendário** não
+  entra: ninguém sabe se hoje tem aula, e alocar não resolveria;
+- **diária fora da agenda** não vira decisão, mas troca o título para "Sem exceções
+  abertas" e diz quantas são;
+- **sábado** não confere, porque a rota é parcial e tudo fora dela pareceria falta.
+  Domingo também. O título é o mesmo "Sem exceções abertas";
+- **periódicas ficam só no painel**: o vencimento leria 31 dias de blocos a cada
+  abertura. Hoje não há nenhuma em produção;
+- só lê as tarefas da sede quando não há decisão antes, para não pagar a leitura em
+  dia de falta (dois testes antigos de custo pegaram a primeira versão).
+
+**3. Confirmar não dizia o que aconteceu.** A tela trocava para a próxima exceção em
+silêncio. Agora aparece quem assumiu o quê, em que horário e o que foi remanejado. A
+recusa de uma proposta velha também passou a aparecer: o erro ficava dentro do cartão
+da proposta e sumia com ele.
+
+Arquivos: `services/centralDiaService.ts`, `components/CentralDoDia.tsx`,
+`lib/pendencias.ts`, `lib/sedeDaTela.ts`, `components/agenda/PendenciasPanel.tsx`,
+`app/(app)/rotinas/useRotinaData.ts`, `app/(app)/acompanhamento/page.tsx`,
+`testes/central-sede-e-pendencias.test.ts`.
+
+---
+
+## 2026-11-04 — Transferir também para outro setor, fora das sedes
+
+Pedido da coordenação: a pessoa foi para um setor que não é sede (a cantina) e o
+"Transferir" só listava sedes; o caminho que sobrava era "Desligar", e a lista
+mostrava "Desligado". Agora a lista do modal, que passou a se chamar "Para onde",
+termina em **"Outro setor (fora das sedes)"**, que abre o campo "Qual setor".
+
+- Encerra a ficha com o mesmo motivo "Transferência" (o SGCP já o conhece) e guarda
+  a rota como posto vago; vaga no SGCP desmarcada por padrão, como entre sedes.
+- **Não nasce ficha nova**: a pessoa sai do Orkestria. Por isso basta operar a sede
+  de origem. A lista mostra "Transferida para Cantina em dd/mm".
+- Campo novo `transferido_setor`, texto de até 60 caracteres, só gravado pelo
+  "Transferir". Não há cadastro de setores: seria mais uma lista para manter, e
+  este nome só aparece nesse selo. Por ser texto livre, não vai para o supervisor,
+  como o motivo do desligamento.
+- Portão da doutrina: elimina o desvio pelo "Desligar" e o selo falso de
+  desligamento. Não cria tela nem botão, só uma opção no select que já existia.
+- Revisão: o destino (setor ou sede) passou a ser gravado **junto** com o
+  encerramento e antes do SGCP; em duas escritas, uma falha na segunda deixava a
+  ficha encerrada sem destino e sem conserto. `validarDesligamento` passou a recusar
+  data impossível ("2026-13-45") e mais de 1 ano à frente, que deixavam a pessoa ativa
+  e sem poder ser desligada de novo; o passado fica livre, porque registrar saída
+  antiga é uso real (decisão do dono). Setor digitado errado não tem conserto pela
+  tela, como a data.
+
+Arquivos: `services/funcionariosService.ts`, `app/api/funcionarios/[id]/transferir/route.ts`,
+`app/api/funcionarios/route.ts`, `app/(app)/funcionarios/page.tsx`, `types/Funcionario.ts`,
+`lib/schema.ts`, `docs/02-modelo-de-dados.md`, `testes/transferir.test.ts`.
+
+---
+
 ## 2026-10-28 — Agenda: botão "+ 1 hora" para tarefa extra
 
 Pedido da coordenação: "como crio um horário 17 às 18 / 18 às 19?" — tarefa

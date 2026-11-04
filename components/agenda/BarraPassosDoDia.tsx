@@ -96,7 +96,7 @@ export default function BarraPassosDoDia({
 
       {faltamRegistrar > 0 && (
         <Link
-          href="/acompanhamento"
+          href={`/acompanhamento?sede=${encodeURIComponent(sedeId)}`}
           className="btn btn-mini btn-primario"
           data-tour="confirmar-realizados"
           title={`${faltamRegistrar} tarefa(s) cujo horário já terminou`}

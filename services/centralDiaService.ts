@@ -1,4 +1,5 @@
 import {
+  coberturaPorHistorico,
   feriadoDoDia,
   fimPlanejadoMin,
   funcionarioNoDia,
@@ -13,7 +14,8 @@ import {
 } from "@/lib/calculations";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
-import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "@/lib/dateUtils";
+import { agoraHHMM, diaDaSemana, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "@/lib/dateUtils";
+import { pendenciasDoDia } from "@/lib/pendencias";
 import {
   limitarSedeConsulta,
   podeAlterarSede,
@@ -41,6 +43,7 @@ import { getFuncionarios } from "./funcionariosService";
 import { getLocais } from "./locaisService";
 import { getRotaPadrao } from "./modelosService";
 import { resolverParametros } from "./parametrosService";
+import { getPeriodosLetivos } from "./periodosLetivosService";
 import { getQualificacoes } from "./qualificacoesService";
 import { getRotinasByData, updateRotina } from "./rotinasService";
 import { getTarefas } from "./tarefasService";
@@ -478,8 +481,8 @@ async function sedesDoSeletor(
  *
  * Deliberadamente não calcula saúde cadastral, prontidão nem cobertura de 31
  * dias. No escopo global isso recriaria milhares de leituras na página mais
- * visitada; no escopo de sede, a própria Agenda já calcula cobertura quando o
- * supervisor realmente entra para planejar.
+ * visitada; no escopo de sede, confere só as tarefas de hoje, e as periódicas
+ * ficam com a Agenda, que as calcula quando o coordenador entra para planejar.
  */
 export async function getCentralDia(
   sessao: SessaoUsuario,
@@ -490,6 +493,10 @@ export async function getCentralDia(
   // sede por consulta é o que impede a Central de multiplicar leituras.
   const sedeId = limitarSedeConsulta(sessao, sedeSolicitada);
   const ds = await getDataSource();
+  // O link leva a sede que a pessoa está vendo. Sem isto, a Rotina abria na
+  // primeira sede da lista: quem via "o dia não foi montado" na Sul 3 podia gerar
+  // o dia em outra sede (consulta de 04/11/2026; a maioria dos coordenadores opera várias).
+  const naSede = (href: string) => (sedeId ? `${href}?sede=${encodeURIComponent(sedeId)}` : href);
 
   const [sede, funcionarios, rotinas, execucoes, ausencias, feriados] = await Promise.all([
     sedeId ? ds.obter("sedes", sedeId) : Promise.resolve(null),
@@ -522,6 +529,8 @@ export async function getCentralDia(
 
   const acoes: AcaoCentralDia[] = [];
   const podeCorrigirCadastro = podeEscrever(sessao);
+  /** `null` = a cobertura do cadastro não foi conferida hoje (ver abaixo). */
+  let foraDaAgenda: number | null = null;
 
   if (sedeId && !sede) {
     acoes.push({
@@ -547,7 +556,7 @@ export async function getCentralDia(
         rotinasValidas.length > 0
           ? `Ainda há ${rotinasValidas.length} bloco(s) planejado(s) nesta data — provavelmente gerados antes do feriado ser cadastrado. Revise se alguém vai trabalhar.`
           : "Não há nada a montar nem a confirmar. Se houver trabalho hoje, ajuste em Estrutura › Feriados e recessos.",
-      href: rotinasValidas.length > 0 ? "/rotinas" : "/feriados",
+      href: rotinasValidas.length > 0 ? naSede("/rotinas") : "/feriados",
       acao: rotinasValidas.length > 0 ? "Ver o que ficou planejado" : "Ver feriados",
     });
   } else {
@@ -608,7 +617,7 @@ export async function getCentralDia(
             ? `“${resolucao.tarefa_nome}” era de ${resolucao.funcionario_origem_nome}.${resolucao.inicio_original ? ` Ninguém está livre às ${resolucao.inicio_original}: ${resolucao.funcionario_nome} faz às ${resolucao.inicio_planejado}, num horário livre, sem deixar nenhuma tarefa.` : ""} A alocação proposta não gera conflito, sobrecarga ou alerta cadastral.`
             : `${rotinasDeIndisponiveis.length} bloco(s) precisam de outra pessoa antes da execução.`,
         quantidade: rotinasDeIndisponiveis.length,
-        href: "/rotinas",
+        href: naSede("/rotinas"),
         acao: troca ? "Confirmar troca" : resolucao ? "Confirmar alocação" : "Redistribuir",
         resolucao,
       });
@@ -644,7 +653,7 @@ export async function getCentralDia(
                 nivel: "atencao",
                 titulo: "O dia ainda não foi montado",
                 descricao: `${disponiveis.length} pessoa(s) estão disponíveis e ainda não têm uma agenda para hoje.`,
-                href: "/rotinas",
+                href: naSede("/rotinas"),
                 acao: "Gerar o dia",
               }
             : {
@@ -652,10 +661,48 @@ export async function getCentralDia(
                 nivel: "atencao",
                 titulo: "Esta sede ainda não tem uma rota padrão",
                 descricao: `${disponiveis.length} pessoa(s) disponíveis, mas não há de onde gerar o dia. Monte um dia na agenda e salve como rota padrão — a partir daí, montar o dia vira um clique.`,
-                href: "/rotinas",
+                href: naSede("/rotinas"),
                 acao: "Montar o primeiro dia",
               },
         );
+      }
+    }
+
+    // A régua do painel de Pendências, para o "em ordem" não dizer o que não
+    // conferiu. Só em dia útil: no sábado a rota é parcial e toda diária fora dela
+    // pareceria falta. E sem as periódicas:
+    // o vencimento delas leria 31 dias de blocos a cada abertura; ficam no painel.
+    // E só sem decisão pendente antes: ler as tarefas da sede é custo, e com uma
+    // falta para cobrir nada disto apareceria como a próxima ação.
+    if (acoes.length === 0 && sedeId && podeCorrigirCadastro && rotinasValidas.length > 0 && [1, 2, 3, 4, 5].includes(diaDaSemana(data))) {
+      const [tarefas, periodos] = await Promise.all([getTarefas(sedeId), getPeriodosLetivos({ sedeId })]);
+      const { criticasSemCobertura, diariasFaltando, devidasHoje, letivasSemCalendario } = pendenciasDoDia({
+        tarefas: tarefas.filter((t) => !coberturaPorHistorico(t)),
+        rotinasDoDia: rotinasValidas,
+        historico: [],
+        data,
+        periodos,
+      });
+      // Só a crítica vira decisão. A diária fora da agenda é crônica na maioria das
+      // sedes (medido em 04/11/2026): como ação, a Central nunca sairia dela.
+      // Crítica letiva em sede sem calendário não é falta: ninguém sabe se hoje tem
+      // aula, e alocar não resolveria. O painel da Agenda avisa do calendário.
+      const semCalendario = new Set(letivasSemCalendario.map((t) => t.id));
+      const criticas = criticasSemCobertura.filter((c) => !semCalendario.has(c.tarefa.id));
+      foraDaAgenda = diariasFaltando.length + devidasHoje.length + criticasSemCobertura.length - criticas.length;
+      if (criticas.length > 0) {
+        acoes.push({
+          id: "criticas-sem-bloco",
+          nivel: "atencao",
+          titulo: "Há tarefas críticas de hoje fora da agenda",
+          descricao: `${criticas.length} tarefa(s) crítica(s) previstas para hoje não estão com ninguém: ${criticas
+            .slice(0, 3)
+            .map((c) => `“${c.tarefa.nome_tarefa}”`)
+            .join(", ")}${criticas.length > 3 ? "…" : ""}.`,
+          quantidade: criticas.length,
+          href: naSede("/rotinas"),
+          acao: "Ver pendências",
+        });
       }
     }
 
@@ -666,7 +713,7 @@ export async function getCentralDia(
         titulo: "Atividades concluídas no horário aguardam confirmação",
         descricao: `${aguardandoConfirmacao.length} bloco(s) já passaram do horário planejado e ainda não têm realizado.`,
         quantidade: aguardandoConfirmacao.length,
-        href: "/acompanhamento",
+        href: naSede("/acompanhamento"),
         acao: "Confirmar realizado",
       });
     }
@@ -676,13 +723,20 @@ export async function getCentralDia(
     acoes.push({
       id: "dia-em-ordem",
       nivel: "ok",
-      titulo: rotinasValidas.length > 0 ? "O dia está em ordem" : "Nenhuma operação está pendente hoje",
+      titulo:
+        rotinasValidas.length === 0
+          ? "Nenhuma operação está pendente hoje"
+          : foraDaAgenda === 0
+            ? "O dia está em ordem"
+            : "Sem exceções abertas",
       descricao:
-        rotinasValidas.length > 0
-          ? "Não há exceções abertas neste momento."
-          : "Não existe equipe disponível nem agenda que exija intervenção neste escopo.",
-      href: "/rotinas",
-      acao: "Abrir agenda",
+        rotinasValidas.length === 0
+          ? "Não existe equipe disponível nem agenda que exija intervenção neste escopo."
+          : foraDaAgenda
+            ? `${foraDaAgenda} tarefa(s) do cadastro previstas para hoje estão fora da agenda. Não travam o dia, mas vale conferir se ainda existem.`
+            : "Não há exceções abertas neste momento.",
+      href: naSede("/rotinas"),
+      acao: foraDaAgenda ? "Ver na agenda" : "Abrir agenda",
     });
   }
 

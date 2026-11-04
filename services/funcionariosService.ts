@@ -51,7 +51,7 @@ export async function createFuncionario(
     throw new ErroValidacao([
       { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
     ]);
-  if ("transferido_para" in dados || "transferido_de" in dados)
+  if ("transferido_para" in dados || "transferido_de" in dados || "transferido_setor" in dados)
     throw new ErroValidacao([
       { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A transferência se faz pelo botão \"Transferir\"." },
     ]);
@@ -101,6 +101,7 @@ const CAMPOS_DO_DESLIGAMENTO: ReadonlySet<string> = new Set([
   // Só o "Transferir" grava (27/10/2026).
   "transferido_para",
   "transferido_de",
+  "transferido_setor",
 ]);
 
 export async function updateFuncionario(
@@ -448,6 +449,12 @@ export async function desligarFuncionario(
   dados: { data?: unknown; motivo?: unknown; abrirVaga?: unknown; extinguirPosto?: unknown },
   autor: string,
   solicitante: { nome: string; email?: string },
+  /**
+   * O destino da transferência, gravado JUNTO com o encerramento e antes do SGCP:
+   * em duas escritas, uma falha na segunda deixava a ficha encerrada sem destino e
+   * sem conserto (revisão, 04/11/2026). Não vem de `dados`, que é o corpo cru do /desligar.
+   */
+  destino: Pick<Funcionario, "transferido_para" | "transferido_setor"> = {},
 ): Promise<ResultadoDesligamento> {
   const erro = validarDesligamento(dados);
   if (erro) throw new ErroValidacao([{ nivel: "erro", codigo: "DESLIGAMENTO_INVALIDO", mensagem: erro }]);
@@ -498,6 +505,7 @@ export async function desligarFuncionario(
         // tiram a pessoa sozinhas quando a data chega.
         ...(data <= hojeISO() ? { ativo: false } : {}),
         ...(extinguir ? { posto_extinto: true } : {}),
+        ...destino,
         observacoes: [
           atual.observacoes,
           `Desligado(a) em ${data.split("-").reverse().join("/")} — ${motivo}${extinguir ? " · posto extinto" : ""}.`,
@@ -568,7 +576,7 @@ export async function transferirFuncionario(
   if (atual.desligado_em || atual.ativo === false)
     throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a): não há o que transferir.`);
   const erroData = validarDesligamento({ data: dados.data, motivo: "Transferência" });
-  if (erroData) throw recusa("TRANSFERENCIA_DATA", "Informe a data da transferência.");
+  if (erroData) throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
   const data = dados.data as string;
   const sedeOrigem = await ds.obter("sedes", atual.sede_id);
   const copia = {
@@ -605,8 +613,8 @@ export async function transferirFuncionario(
     { data, motivo: "Transferência", abrirVaga: dados.abrirVaga === true, extinguirPosto: false },
     autor,
     solicitante,
+    { transferido_para: destino.id },
   );
-  await ds.atualizar("funcionarios", id, { transferido_para: destino.id, atualizado_por: autor, atualizado_em: agoraISO() });
   const novo = await createFuncionario(copia, autor);
   // Empresa e o elo com a origem não entram pelo cadastro comum (ver as travas
   // de `createFuncionario`): só por aqui.
@@ -615,6 +623,47 @@ export async function transferirFuncionario(
     ...(atual.empresa ? { empresa: atual.empresa } : {}),
   });
   return { ...desligamento, novo: ligado };
+}
+
+/** O nome do setor aparece no selo da lista; não é campo de observação. */
+const MAX_NOME_SETOR = 60;
+
+/**
+ * Transferência para outro setor, fora das sedes (04/11/2026: "foi para a
+ * cantina"). Encerra a ficha como o `transferirFuncionario`, com o mesmo motivo
+ * — que o SGCP já conhece —, mas não há ficha nova: a pessoa sai do Orkestria.
+ * A rota fica como posto vago e a tela mostra "Transferida para <setor>".
+ */
+export async function transferirParaSetor(
+  id: string,
+  dados: { sede_id?: unknown; setor?: unknown; data?: unknown; abrirVaga?: unknown },
+  autor: string,
+  solicitante: { nome: string; email?: string },
+): Promise<ResultadoDesligamento> {
+  const ds = await getDataSource();
+  const atual = await ds.obter("funcionarios", id);
+  if (!atual) throw new Error("Funcionário não encontrado.");
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  if (dados.sede_id !== undefined) throw recusa("TRANSFERENCIA_DESTINO_DUPLO", "Escolha uma sede ou um setor, não os dois.");
+  const setor = typeof dados.setor === "string" ? dados.setor.trim() : "";
+  if (!setor) throw recusa("TRANSFERENCIA_SEM_DESTINO", "Informe o setor para onde a pessoa vai.");
+  if (setor.length > MAX_NOME_SETOR)
+    throw recusa("TRANSFERENCIA_SETOR_LONGO", `O nome do setor pode ter até ${MAX_NOME_SETOR} caracteres.`);
+  // Caractere invisível passa pelo trim e deixaria o selo sem nome.
+  if (/[\p{C}\p{Zl}\p{Zp}\p{DI}]/u.test(setor) || !/[\p{L}\p{N}]/u.test(setor))
+    throw recusa("TRANSFERENCIA_SEM_DESTINO", "Informe o setor para onde a pessoa vai.");
+  if (atual.desligado_em || atual.ativo === false)
+    throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a): não há o que transferir.`);
+  if (validarDesligamento({ data: dados.data, motivo: "Transferência" }))
+    throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
+
+  return desligarFuncionario(
+    id,
+    { data: dados.data, motivo: "Transferência", abrirVaga: dados.abrirVaga === true, extinguirPosto: false },
+    autor,
+    solicitante,
+    { transferido_setor: setor },
+  );
 }
 
 /**

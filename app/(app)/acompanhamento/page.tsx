@@ -5,6 +5,7 @@
  * aconteceu (status, tempo real, justificativa) e o sistema confronta
  * previsto × realizado.
  */
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
@@ -27,6 +28,7 @@ import {
   hhmmParaMin,
   hojeISO,
 } from "@/lib/dateUtils";
+import { sedeDaTela } from "@/lib/sedeDaTela";
 import type {
   Ausencia,
   ExecucaoRealizada,
@@ -98,7 +100,9 @@ export default function PaginaAcompanhamento() {
   }, [mensagem]);
 
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
+  // A sede com que se chegou vale enquanto a tela estiver aberta (o menu tira o parâmetro).
+  const [doLink] = useState(useSearchParams().get("sede"));
+  const sedeId = sedeDaTela(sedes, sedeEscolhida, doLink);
 
   const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(
     sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null,

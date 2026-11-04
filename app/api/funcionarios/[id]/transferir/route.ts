@@ -2,7 +2,7 @@ import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
 import { podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
-import { transferirFuncionario } from "@/services/funcionariosService";
+import { transferirFuncionario, transferirParaSetor } from "@/services/funcionariosService";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,6 +14,9 @@ type Ctx = { params: Promise<{ id: string }> };
  * Quem transfere precisa operar as DUAS sedes: a ficha nova nasce no destino, e
  * coordenador só cria cadastro nas sedes que opera. Entre sedes de coordenadores
  * diferentes, quem faz é o administrador.
+ *
+ * Com { setor, data, abrirVaga? } a pessoa vai para fora das sedes (ex.: cantina):
+ * não nasce ficha em lugar nenhum, então basta operar a sede de origem.
  */
 export async function POST(req: Request, ctx: Ctx) {
   return comSessao(async (sessao) => {
@@ -21,9 +24,11 @@ export async function POST(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const atual = await (await getDataSource()).obter("funcionarios", id);
     if (!atual) throw new Error("Funcionário não encontrado.");
-    const dados = (await req.json().catch(() => ({}))) as { sede_id?: unknown; data?: unknown; abrirVaga?: unknown };
+    const dados = (await req.json().catch(() => ({}))) as { sede_id?: unknown; setor?: unknown; data?: unknown; abrirVaga?: unknown };
     if (!podeAlterarSede(sessao, atual.sede_id))
       throw new ErroPermissao("Coordenadores só transferem funcionários das sedes que operam.");
+    if (dados.setor !== undefined)
+      return ok(await transferirParaSetor(id, dados, sessao.email, { nome: sessao.nome, email: sessao.email }));
     if (typeof dados.sede_id !== "string" || !podeAlterarSede(sessao, dados.sede_id))
       throw new ErroPermissao(
         "Você não opera a sede de destino: peça ao coordenador de lá ou ao administrador para fazer a transferência.",

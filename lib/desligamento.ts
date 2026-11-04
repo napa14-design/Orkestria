@@ -9,6 +9,7 @@
  *
  * Funções puras: usadas pelo serviço, pela geração do dia e pela agenda.
  */
+import { dataReal, hojeISO, somarDias } from "@/lib/dateUtils";
 import type { Funcionario, Sede } from "@/types";
 
 /**
@@ -61,8 +62,15 @@ export function comAtivoDoDia<F extends Pick<Funcionario, "ativo" | "desligado_e
   return f.desligado_em && f.desligado_em <= hoje && f.ativo !== false ? { ...f, ativo: false } : f;
 }
 
+const MAX_DIAS_A_FRENTE = 365;
+
 export function validarDesligamento(d: { data?: unknown; motivo?: unknown }): string | null {
-  if (typeof d.data !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(d.data)) return "Informe a data do desligamento.";
+  // "2026-13-45" passava: gravava e nunca chegava, e a pessoa ficava ativa e sem
+  // poder ser desligada de novo (auditoria, 04/11/2026).
+  if (typeof d.data !== "string" || !dataReal(d.data)) return "Informe a data do desligamento.";
+  // Ano digitado errado dá o mesmo beco. O passado fica livre: registrar uma saída
+  // antiga é uso real da coordenação (decisão do dono, 04/11/2026).
+  if (d.data > somarDias(hojeISO(), MAX_DIAS_A_FRENTE)) return "A data pode ser de até 1 ano à frente.";
   if (typeof d.motivo !== "string" || !(MOTIVOS_DESLIGAMENTO as readonly string[]).includes(d.motivo))
     return "Escolha o motivo do desligamento.";
   return null;

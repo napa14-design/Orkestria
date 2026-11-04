@@ -1335,12 +1335,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   text-underline-offset: 3px;
 }
 
-.central-proxima-erro {
-  color: var(--papel);
-  font-size: 9px;
-  line-height: 1.35;
-}
-
 .central-fila {
   padding: 15px 17px 4px;
   background: color-mix(in srgb, var(--cartao) 88%, transparent);

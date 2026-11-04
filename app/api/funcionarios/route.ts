@@ -15,10 +15,11 @@ export async function GET(req: Request) {
     const lista = await getFuncionarios(sedeId);
     // Mínimo necessário (LGPD): o supervisor não recebe o motivo do desligamento
     // — nem nas observações, onde o Desligar também o escreve (revisão, 19/10/2026).
+    // O setor da transferência é texto livre: mesma regra.
     return ok(
       leituraCompleta(sessao)
         ? lista
-        : lista.map((f) => ({ ...f, motivo_desligamento: "", observacoes: "" })),
+        : lista.map((f) => ({ ...f, motivo_desligamento: "", observacoes: "", transferido_setor: "" })),
     );
   });
 }

@@ -64,6 +64,11 @@ export interface Funcionario extends Auditoria {
   transferido_para?: string;
   /** Na ficha nova, na sede de destino: o id da ficha de origem. */
   transferido_de?: string;
+  /**
+   * Transferida para fora das sedes (ex.: cantina), em texto: o setor não é um
+   * cadastro daqui. Mesmo encerramento da ficha, sem ficha nova. Só o "Transferir" grava.
+   */
+  transferido_setor?: string;
   ativo: boolean;
   observacoes: string;
 }

@@ -5,12 +5,14 @@
  * sede/data/modo) e as derivações puras a partir do que foi buscado. A página
  * cuida do estado de UI (filtros, seleção, modais) e das mutações.
  */
-import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { coberturaPorHistorico, jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
+import { sedeDaTela } from "@/lib/sedeDaTela";
 import type {
   TipoLocalCatalogo,
   Ausencia,
@@ -50,7 +52,10 @@ export function useRotinaData(
   somenteLeitura = false,
 ) {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
-  const sedeId = sedeEscolhida || sedes?.find((s) => s.ativo)?.id || "";
+  // A sede com que se chegou vale enquanto a tela estiver aberta: o item do menu
+  // leva para a mesma tela sem o parâmetro, e ela voltaria para a primeira sede.
+  const [doLink] = useState(useSearchParams().get("sede"));
+  const sedeId = sedeDaTela(sedes, sedeEscolhida, doLink);
 
   const { data: funcionarios } = useSWR<Funcionario[]>(sedeId ? `/api/funcionarios?sede=${sedeId}` : null, fetcher);
   const { data: tarefas } = useSWR<Tarefa[]>(sedeId ? `/api/tarefas?sede=${sedeId}` : null, fetcher);

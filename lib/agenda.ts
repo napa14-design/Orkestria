@@ -1,8 +1,23 @@
 /**
  * Lógica de exibição da agenda (pura, sem React) — testável isolada.
  */
-import type { Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
+import type { Local, ResolucaoCentralDia, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
 import { hhmmParaMin } from "./dateUtils";
+
+/**
+ * O que a Central diz depois de confirmar uma proposta. A tela já troca para a
+ * próxima exceção: sem isto, nada conta o que foi feito (04/11/2026).
+ */
+export function fraseDoFeito(r: ResolucaoCentralDia): string {
+  const cedidas = r.cedidas ?? [];
+  const nomes = cedidas.map((c) => `“${c.tarefa_nome}”`).join(", ");
+  return (
+    `${r.funcionario_nome} assumiu “${r.tarefa_nome}”, das ${r.inicio_planejado} às ${r.fim_planejado}` +
+    `${r.inicio_original ? ` (era às ${r.inicio_original})` : ""}, no lugar de ${r.funcionario_origem_nome}.` +
+    (cedidas.length === 1 ? ` ${nomes} foi registrada como remanejada.` : "") +
+    (cedidas.length > 1 ? ` ${nomes} foram registradas como remanejadas.` : "")
+  );
+}
 
 /**
  * Locais que o "+ Nova tarefa" da Rotina oferece: só os ATIVOS da sede da

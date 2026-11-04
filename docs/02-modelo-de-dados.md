@@ -70,6 +70,7 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | posto_extinto | boolean | no desligamento o posto deixou de existir (quadro reduzido): a rota foi apagada |
 | transferido_para | string | na ficha de origem: sede para onde a pessoa foi transferida (só o "Transferir" grava; a ficha é encerrada com motivo "Transferência") |
 | transferido_de | string | na ficha nova, na sede de destino: id da ficha de origem |
+| transferido_setor | string | na ficha encerrada: setor fora das sedes para onde a pessoa foi (ex.: cantina), em texto; sem ficha nova (só o "Transferir" grava) |
 | ativo | boolean | |
 | observacoes | string | |
 | criado_por, criado_em, atualizado_por, atualizado_em | auditoria | |

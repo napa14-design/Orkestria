@@ -33,6 +33,9 @@ const ESCALAS = [
   { valor: "todos", rotulo: "Todos os dias" },
 ];
 
+/** No select do "Transferir": o destino é um setor fora das sedes, não uma sede. */
+const OUTRO_SETOR = "__outro_setor__";
+
 export default function PaginaFuncionarios() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   // Todas as sedes da pessoa: as candidatas a ser substituídas são escolhidas
@@ -70,10 +73,11 @@ export default function PaginaFuncionarios() {
    * desligar". Vaga no SGCP desmarcada por padrão (decisão do dono).
    */
   const [paraTransferir, setParaTransferir] = useState<Funcionario | null>(null);
-  const [transferencia, setTransferencia] = useState({ sede_id: "", data: hojeISO(), abrirVaga: false });
+  const [transferencia, setTransferencia] = useState({ sede_id: "", setor: "", data: hojeISO(), abrirVaga: false });
+  const paraSetor = transferencia.sede_id === OUTRO_SETOR;
   const abrirTransferir = (f: Funcionario) => {
     setParaTransferir(f);
-    setTransferencia({ sede_id: "", data: hojeISO(), abrirVaga: false });
+    setTransferencia({ sede_id: "", setor: "", data: hojeISO(), abrirVaga: false });
     setErro("");
   };
   const confirmarTransferencia = async () => {
@@ -83,13 +87,17 @@ export default function PaginaFuncionarios() {
     try {
       const r = await apiPost<{ blocosRemovidos: number; vaga: { aberta: boolean; codigo?: string; motivo?: string } }>(
         `/api/funcionarios/${paraTransferir.id}/transferir`,
-        transferencia,
+        paraSetor
+          ? { setor: transferencia.setor, data: transferencia.data, abrirVaga: transferencia.abrirVaga }
+          : { sede_id: transferencia.sede_id, data: transferencia.data, abrirVaga: transferencia.abrirVaga },
       );
       setAviso({
         tipo: "ok",
         texto:
-          `${paraTransferir.nome} transferida para ${nomeSede(transferencia.sede_id)} a partir de ${dataBR(transferencia.data)}. ` +
-          `A ficha dela já está lá — para dar a rota, edite e escolha "Assume o posto de".` +
+          `${paraTransferir.nome} transferida para ${paraSetor ? transferencia.setor.trim() : nomeSede(transferencia.sede_id)} a partir de ${dataBR(transferencia.data)}. ` +
+          (paraSetor
+            ? "A rota daqui fica guardada como posto vago."
+            : `A ficha dela já está lá — para dar a rota, edite e escolha "Assume o posto de".`) +
           (r.blocosRemovidos ? ` ${r.blocosRemovidos} bloco(s) planejado(s) saíram da agenda daqui.` : "") +
           (transferencia.abrirVaga ? ` ${fraseDaVaga(r.vaga)}` : ""),
       });
@@ -437,10 +445,10 @@ export default function PaginaFuncionarios() {
               const futuro = f.desligado_em > hojeISO();
               const vaga = f.vaga_sgcp ? ` · vaga #${f.vaga_sgcp} no SGCP` : "";
               // Transferência não é desligamento para quem lê a lista.
-              if (f.transferido_para)
+              if (f.transferido_para || f.transferido_setor)
                 return (
                   <span className={`selo ${futuro ? "selo-amarelo" : "selo-azul"}`} title={vaga.replace(/^ · /, "")}>
-                    {futuro ? "Vai para" : "Transferida para"} {nomeSede(f.transferido_para)} em {dataBR(f.desligado_em)}
+                    {futuro ? "Vai para" : "Transferida para"} {f.transferido_setor || nomeSede(f.transferido_para ?? "")} em {dataBR(f.desligado_em)}
                   </span>
                 );
               return (
@@ -565,13 +573,19 @@ export default function PaginaFuncionarios() {
       larguraMax={460}
     >
       <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)", marginTop: 0 }}>
-        A partir da data, {paraTransferir?.nome} sai da agenda de {paraTransferir ? nomeSede(paraTransferir.sede_id) : ""} e
-        ganha uma ficha na sede nova, com o mesmo horário e matrícula. A rota daqui fica guardada como posto vago; lá,
-        para dar a rota, edite a ficha e escolha "Assume o posto de".
+        A partir da data, {paraTransferir?.nome} sai da agenda de {paraTransferir ? nomeSede(paraTransferir.sede_id) : ""}
+        {paraSetor ? (
+          ". A rota daqui fica guardada como posto vago para quem assumir."
+        ) : (
+          <>
+            {" "}e ganha uma ficha na sede nova, com o mesmo horário e matrícula. A rota daqui fica guardada como posto vago; lá,
+            para dar a rota, edite a ficha e escolha "Assume o posto de".
+          </>
+        )}
       </p>
       <div className="form-grade">
         <label className="campo">
-          <span className="rotulo">Para qual sede</span>
+          <span className="rotulo">Para onde</span>
           <select
             value={transferencia.sede_id}
             onChange={(e) => setTransferencia((t) => ({ ...t, sede_id: e.target.value }))}
@@ -584,6 +598,7 @@ export default function PaginaFuncionarios() {
                   {s.nome_sede}
                 </option>
               ))}
+            <option value={OUTRO_SETOR}>Outro setor (fora das sedes)</option>
           </select>
         </label>
         <label className="campo">
@@ -595,6 +610,18 @@ export default function PaginaFuncionarios() {
           />
         </label>
       </div>
+      {paraSetor && (
+        <label className="campo" style={{ marginTop: 12 }}>
+          <span className="rotulo">Qual setor</span>
+          <input
+            type="text"
+            maxLength={60}
+            placeholder="Ex.: Cantina"
+            value={transferencia.setor}
+            onChange={(e) => setTransferencia((t) => ({ ...t, setor: e.target.value }))}
+          />
+        </label>
+      )}
       <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13.5 }}>
         <input
           type="checkbox"
@@ -616,7 +643,7 @@ export default function PaginaFuncionarios() {
           type="button"
           className="btn btn-primario"
           onClick={() => void confirmarTransferencia()}
-          disabled={enviando || !transferencia.sede_id || !transferencia.data}
+          disabled={enviando || !transferencia.sede_id || !transferencia.data || (paraSetor && !transferencia.setor.trim())}
         >
           {enviando ? "Transferindo…" : "Transferir"}
         </button>

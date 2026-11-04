@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
+import { fraseDoFeito } from "@/lib/agenda";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
 import type { CentralDiaDados, NivelCentralDia, ResolucaoCentralDia } from "@/types";
@@ -17,6 +18,7 @@ const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
 export default function CentralDoDia({ nome }: { nome: string }) {
   const [resolvendo, setResolvendo] = useState(false);
   const [erroAcao, setErroAcao] = useState("");
+  const [feito, setFeito] = useState("");
   // Vazio = a sede principal decidida no servidor. Quem opera uma sede só
   // nunca mexe nisto.
   const [sedeVista, setSedeVista] = useState("");
@@ -28,6 +30,7 @@ export default function CentralDoDia({ nome }: { nome: string }) {
   async function confirmarAlocacao(resolucao: ResolucaoCentralDia, sede: string) {
     setResolvendo(true);
     setErroAcao("");
+    setFeito("");
     try {
       // As cedidas vão junto: o servidor só confirma se for exatamente a troca
       // que esta tela mostrou.
@@ -40,6 +43,9 @@ export default function CentralDoDia({ nome }: { nome: string }) {
         inicio_planejado: resolucao.inicio_planejado,
         sede: sede || undefined,
       });
+      // A tela já troca para a próxima exceção: sem isto, nada diz o que foi feito
+      // e a pessoa abre a agenda só para conferir.
+      setFeito(fraseDoFeito(resolucao));
       await mutate();
     } catch (erro) {
       setErroAcao(
@@ -99,7 +105,11 @@ export default function CentralDoDia({ nome }: { nome: string }) {
               </span>
               <select
                 value={data.escopo.sede_id}
-                onChange={(e) => setSedeVista(e.target.value)}
+                onChange={(e) => {
+                  setSedeVista(e.target.value);
+                  setFeito("");
+                  setErroAcao("");
+                }}
                 disabled={isValidating}
                 aria-label="Sede exibida na Central"
               >
@@ -130,6 +140,19 @@ export default function CentralDoDia({ nome }: { nome: string }) {
         <span><strong className="num">{data.resumo.ausencias}</strong> ausências</span>
         <span><strong className="num">{data.resumo.realizados_registrados}</strong> confirmados</span>
       </div>
+
+      {feito && (
+        <div className="alerta alerta-ok" role="status" style={{ marginBottom: 14 }}>
+          {feito}
+        </div>
+      )}
+      {/* Aqui e não junto da proposta: se ela ficou velha, a recusa troca o cartão
+          por outro e o erro sumiria com ele, sem explicar o clique. */}
+      {erroAcao && (
+        <div className="alerta alerta-erro" role="alert" style={{ marginBottom: 14 }}>
+          {erroAcao}
+        </div>
+      )}
 
       <main className={`central-proxima nivel-${data.proxima.nivel}`} data-tour="central-proxima">
         <div className="central-proxima-marca" aria-hidden="true">
@@ -179,9 +202,6 @@ export default function CentralDoDia({ nome }: { nome: string }) {
             <Link className="central-proxima-alternativa" href={data.proxima.href}>
               Escolher outra pessoa na Agenda
             </Link>
-            {erroAcao && (
-              <small className="central-proxima-erro" role="alert">{erroAcao}</small>
-            )}
           </div>
         ) : (
           <Link className="btn btn-primario central-proxima-acao" href={data.proxima.href}>
