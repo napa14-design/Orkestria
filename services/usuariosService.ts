@@ -1,5 +1,5 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { lerSedesExtra, podeGerirSupervisor, sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
+import { criouCoordenador, lerSedesExtra, podeCriarCoordenador, podeGerirSupervisor, sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
 import {
   DIAS_VALIDADE_CODIGO,
   gerarCodigoAcesso,
@@ -41,11 +41,13 @@ export function usuarioPublico(u: Usuario): UsuarioListado {
   };
 }
 
-/** O administrador vê todos; o coordenador, só os supervisores que ele gerencia. */
+/** O administrador vê todos; o coordenador, os supervisores que gerencia e os coordenadores que criou. */
 export async function getUsuarios(sessao: SessaoUsuario): Promise<UsuarioListado[]> {
   const ator = await conferirAtor(sessao);
   const todos = await (await getDataSource()).listar("usuarios");
-  return (ator.perfil === "administrador" ? todos : todos.filter((u) => podeGerirSupervisor(ator, u))).map(usuarioPublico);
+  return (
+    ator.perfil === "administrador" ? todos : todos.filter((u) => podeGerirSupervisor(ator, u) || criouCoordenador(ator, u))
+  ).map(usuarioPublico);
 }
 
 /**
@@ -243,7 +245,7 @@ const CAMPOS_DO_CADASTRO: ReadonlySet<string> = new Set(["nome", "email", "perfi
 // `__x__` é nome reservado no Firestore: passaria aqui e voltaria como erro 500.
 const ID_SEDE = /^(?!__.*__$)[\w-]{1,64}$/u;
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/u;
-const NEGADO = "Você só gerencia contas de supervisor das sedes que opera.";
+const NEGADO = "Você só gerencia contas de supervisor e só cria coordenadores nas sedes que opera.";
 
 const invalido = (mensagem: string) =>
   new ErroValidacao([{ nivel: "erro", codigo: "CADASTRO_INVALIDO", mensagem }]);
@@ -326,7 +328,8 @@ export async function createUsuario(corpo: unknown, sessao: SessaoUsuario): Prom
   validarPerfil(perfil, sede_id);
   if (
     ator.perfil !== "administrador" &&
-    !podeGerirSupervisor(ator, { id: "", perfil, sede_id, sedes_extra: dados.sedes_extra })
+    !podeGerirSupervisor(ator, { id: "", perfil, sede_id, sedes_extra: dados.sedes_extra }) &&
+    !podeCriarCoordenador(ator, { perfil, sede_id, sedes_extra: dados.sedes_extra })
   )
     throw new ErroPermissao(NEGADO);
   await exigirEmailLivre(email);
@@ -342,6 +345,7 @@ export async function createUsuario(corpo: unknown, sessao: SessaoUsuario): Prom
     sedes_extra,
     ativo: dados.ativo ?? true,
     id: novoId(),
+    criado_por_id: ator.id,
     criado_em: agora,
     atualizado_em: agora,
   });
@@ -393,11 +397,15 @@ export async function updateUsuario(id: string, corpo: unknown, sessao: SessaoUs
   });
 }
 
-/** Confere ANTES de gerar: gerar apaga a senha da pessoa. */
+/**
+ * Confere ANTES de gerar: gerar apaga a senha da pessoa. No coordenador que criou, só
+ * enquanto ele não tem senha: depois disso seria entrar como o colega.
+ */
 export async function conferirConvite(id: string, sessao: SessaoUsuario): Promise<void> {
   const ator = await conferirAtor(sessao);
   const alvo = await (await getDataSource()).obter("usuarios", id);
-  if (ator.perfil !== "administrador" && (!alvo || !podeGerirSupervisor(ator, alvo))) throw new ErroPermissao(NEGADO);
+  if (ator.perfil !== "administrador" && (!alvo || !(podeGerirSupervisor(ator, alvo) || (criouCoordenador(ator, alvo) && !alvo.senha_hash))))
+    throw new ErroPermissao(NEGADO);
   if (!alvo) throw new Error("Usuário não encontrado.");
   if (alvo.ativo !== true) throw invalido("Esta conta está inativa: reative antes de gerar um código.");
 }

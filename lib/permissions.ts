@@ -218,10 +218,35 @@ export function podeGerirSupervisor(
   alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string },
 ): boolean {
   if (sessao.perfil !== "coordenador" || alvo.perfil !== "supervisor" || alvo.id === sessao.id) return false;
+  return cabeNasSedes(sessao, alvo);
+}
+
+function cabeNasSedes(sessao: SessaoUsuario, alvo: { sede_id: string; sedes_extra?: string }): boolean {
   // Dado torto no banco fica fora do escopo, em vez de derrubar a lista de todos.
   if (typeof alvo.sede_id !== "string" || (alvo.sedes_extra != null && typeof alvo.sedes_extra !== "string")) return false;
-  const sedes =montarSedesDaSessao(alvo.sede_id, alvo.sedes_extra);
+  const sedes = montarSedesDaSessao(alvo.sede_id, alvo.sedes_extra);
   return sedes.length > 0 && sedes.every((sede) => podeAlterarSede(sessao, sede));
+}
+
+/**
+ * Coordenador também cria coordenador (04/11/2026), sem ampliar alcance: só com sedes
+ * dentro das dele, e "geral" cai na lista vazia. Só criar: editar, inativar e zerar a
+ * senha de um colega seguem com o administrador, porque gerar código apaga a senha e
+ * deixaria um coordenador entrar como o outro.
+ */
+export function podeCriarCoordenador(
+  sessao: SessaoUsuario,
+  alvo: { perfil: unknown; sede_id: string; sedes_extra?: string },
+): boolean {
+  return sessao.perfil === "coordenador" && alvo.perfil === "coordenador" && cabeNasSedes(sessao, alvo);
+}
+
+/** O coordenador que ele mesmo criou: aparece na lista dele, para ver se já entrou. */
+export function criouCoordenador(
+  sessao: SessaoUsuario,
+  alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string; criado_por_id?: string },
+): boolean {
+  return podeCriarCoordenador(sessao, alvo) && alvo.id !== sessao.id && !!sessao.id && alvo.criado_por_id === sessao.id;
 }
 
 /**

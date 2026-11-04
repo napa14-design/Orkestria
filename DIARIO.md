@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-11-04 — Coordenador cria coordenador
+
+Pedido do dono: coordenador pode criar outros coordenadores, mas não editar nem excluir.
+
+- **Cria só nas sedes dele** (`podeCriarCoordenador`): nunca "Geral", nunca sede fora do
+  alcance, nem por sede adicional. Quem foi criado com uma sede não cria com outra, então a
+  cadeia não amplia nada. Administrador segue fora do alcance.
+- **Depois de criar, só acompanha** (`criouCoordenador`): vê na lista os que criou e gera o
+  código de primeiro acesso enquanto a pessoa não tem senha. Gerar código apaga a senha, e
+  depois disso seria entrar como o colega. Coordenador que ele não criou não aparece.
+- Coluna nova `usuarios.criado_por_id`, vinda da sessão e fora do corpo aceito. Contas
+  anteriores não têm, e por isso nenhum coordenador existente passa a ser alcançado.
+- **Limitações:** quem entra só pelo Google não tem senha, então o criador ainda poderia
+  gerar código para ele. E-mail errado no cadastro, só o administrador corrige. A conta criada
+  não some quando o criador sai: quem tira é o administrador.
+
+Publicado antes da revisão de segurança, a pedido do dono.
+
+Arquivos: `lib/permissions.ts`, `services/usuariosService.ts`, `lib/schema.ts`,
+`types/Usuario.ts`, `app/(app)/usuarios/page.tsx`, `app/api/usuarios/route.ts`,
+`docs/01-documentacao-funcional.md`, `docs/02-modelo-de-dados.md`, `CLAUDE.md`,
+`testes/coordenador-supervisores.test.ts`, `testes/usuarios-tela.test.ts`.
+
+---
+
 ## 2026-11-04 — Coordenador cadastra supervisor; coleta de uso; régua única de cobertura
 
 Três itens que sobraram da consulta sobre a tela do dia.

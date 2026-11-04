@@ -10,7 +10,7 @@ import { getDataSource } from "@/lib/datasource";
 import { conviteAcesso } from "@/lib/emails/conviteAcesso";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import type { SessaoUsuario } from "@/lib/permissions";
-import { podeGerirSupervisor } from "@/lib/permissions";
+import { criouCoordenador, podeCriarCoordenador, podeGerirSupervisor, sessaoDoCadastro } from "@/lib/permissions";
 import { codigoConfere, gerarConviteUsuario, getUsuarioPorEmail } from "@/services/usuariosService";
 import type { Usuario } from "@/types";
 
@@ -229,8 +229,9 @@ describe("coordenador cadastra supervisor", () => {
       }
     });
 
-    it("perfil: só 'supervisor' exato", async () => {
-      for (const perfil of ["administrador", "coordenador", "visualizador", "Supervisor", "supervisor ", ["supervisor"], null, "", 0]) {
+    it("perfil: só 'supervisor' ou 'coordenador' exatos, e editar não promove", async () => {
+      await nega("sA", () => editar("sA", { perfil: "coordenador" }));
+      for (const perfil of ["administrador", "visualizador", "Supervisor", "supervisor ", "Coordenador", "coordenador ", ["supervisor"], ["coordenador"], null, "", 0]) {
         await nega("sA", () => editar("sA", { perfil }), 403, 422);
         expect([403, 422]).toContain((await POST(corpo(novo({ perfil })))).status);
       }
@@ -401,6 +402,106 @@ describe("coordenador cadastra supervisor", () => {
       const { html } = conviteAcesso({ nome: '<a/href="http://mal">clique', codigo: "AAAA", expiraEm: "2026-12-01T00:00:00Z", url: "http://x" });
       expect(html).not.toContain('<a/href="http://mal"');
       expect(html).toContain("&#60;a/href");
+    });
+  });
+
+  describe("coordenador cria coordenador, e só cria", () => {
+    const criar = async (extra: Record<string, unknown> = {}) => {
+      const r = await POST(corpo(novo({ perfil: "coordenador", email: "coord-novo@x.com", ...extra })));
+      expect(r.status).toBe(201);
+      return (await r.json()).id as string;
+    };
+
+    it("cria nas sedes dele, o código sai na hora, e a conta nova só alcança aquelas sedes", async () => {
+      const id = await criar({ sedes_extra: B });
+      expect(await ler(id)).toMatchObject({ perfil: "coordenador", sede_id: A, sedes_extra: B, criado_por_id: "c1", ativo: true });
+      const g = await codigo(id);
+      expect(g.status).toBe(200);
+      expect(codigoConfere((await ler(id))!, (await g.json()).codigo)).toBe(true);
+      expect(sessaoDoCadastro((await ler(id))!)).toMatchObject({ perfil: "coordenador", sedes: [A, B] });
+    });
+
+    it("nunca fora das sedes dele, nem 'geral', nem por sede adicional", async () => {
+      for (const extra of [{ sede_id: C }, { sedes_extra: C }, { sede_id: "geral" }, { sedes_extra: "geral" }, { sede_id: B, sedes_extra: C }])
+        expect([403, 422], JSON.stringify(extra)).toContain((await POST(corpo(novo({ perfil: "coordenador", ...extra })))).status);
+      sessao = CG;
+      expect((await POST(corpo(novo({ perfil: "coordenador", sede_id: "geral" })))).status).toBe(403);
+      expect(await getUsuarioPorEmail("novo@x.com")).toBeNull();
+      expect((await POST(corpo(novo({ perfil: "coordenador", sede_id: C })))).status).toBe(201);
+    });
+
+    it("a cadeia não amplia: quem foi criado só com uma sede não cria com a outra", async () => {
+      const id = await criar();
+      sessao = sessaoDoCadastro((await ler(id))!);
+      expect((await POST(corpo(novo({ perfil: "coordenador", email: "c3@x.com", sede_id: B })))).status).toBe(403);
+      expect((await POST(corpo(novo({ perfil: "coordenador", email: "c3@x.com", sede_id: A })))).status).toBe(201);
+    });
+
+    it("não forja quem criou", async () => {
+      expect((await POST(corpo(novo({ perfil: "coordenador", criado_por_id: "adm1" })))).status).toBe(422);
+      const r = await POST(corpo(novo({ criado_por_id: "c1" })));
+      expect(r.status).toBe(422);
+      await nega("coord2", () => editar("coord2", { criado_por_id: "c1" }), 422);
+    });
+
+    it("não edita nem exclui nenhum coordenador, nem o que ele mesmo criou", async () => {
+      const id = await criar();
+      for (const c of [{ nome: "X" }, { email: "y@x.com" }, { ativo: false }, { perfil: "supervisor" }, { perfil: "administrador" }, { sede_id: B }, { sedes_extra: B }])
+        await nega(id, () => editar(id, c));
+      await nega(id, () => DELETE(corpo({}, "DELETE"), ctx(id)));
+      await nega("coord2", () => DELETE(corpo({}, "DELETE"), ctx("coord2")));
+    });
+
+    it("o código só sai enquanto o criado não tem senha: depois seria entrar como o colega", async () => {
+      const id = await criar();
+      await (await getDataSource()).atualizar("usuarios", id, { senha_hash: "salt:hash" });
+      await nega(id, () => codigo(id));
+    });
+
+    it("o colega que ele não criou fica de fora, mesmo sem senha e na mesma sede", async () => {
+      await conta("par", "coordenador", A, { senha_hash: "" });
+      await conta("deOutro", "coordenador", A, { senha_hash: "", criado_por_id: "cg" });
+      for (const id of ["par", "deOutro"]) await nega(id, () => codigo(id));
+      const ids = (await (await GET()).json()).map((u: Usuario) => u.id);
+      expect(ids).not.toEqual(expect.arrayContaining(["par"]));
+      expect(ids).not.toEqual(expect.arrayContaining(["deOutro"]));
+    });
+
+    it("a lista mostra o que ele criou, sem dizer quem criou, e só para ele", async () => {
+      const id = await criar();
+      const lista = await (await GET()).json();
+      expect(lista.map((u: Usuario) => u.id)).toContain(id);
+      expect(JSON.stringify(lista)).not.toMatch(/criado_por_id|senha_hash|convite_hash/u);
+      sessao = { ...C1, id: "outro", email: "outro@x.com" };
+      await conta("outro", "coordenador", A, { email: "outro@x.com", sedes_extra: B });
+      expect((await (await GET()).json()).map((u: Usuario) => u.id)).not.toContain(id);
+      await nega(id, () => codigo(id));
+    });
+
+    it("quem perdeu a sede ou o perfil deixa de ver e de gerar código", async () => {
+      const id = await criar();
+      const d = await getDataSource();
+      await d.atualizar("usuarios", "c1", { sede_id: C, sedes_extra: "" });
+      expect((await (await GET()).json()).map((u: Usuario) => u.id)).not.toContain(id);
+      await nega(id, () => codigo(id));
+      await d.atualizar("usuarios", "c1", { perfil: "visualizador", sede_id: A });
+      expect((await POST(corpo(novo({ perfil: "coordenador", email: "z@x.com" })))).status).toBe(403);
+      await nega(id, () => codigo(id));
+    });
+
+    it("conta inativa não recebe código, e não dá para o criado virar administrador por aqui", async () => {
+      const id = await criar({ ativo: false });
+      await nega(id, () => codigo(id), 422);
+      expect((await POST(corpo(novo({ perfil: "administrador", sede_id: A, email: "adm2@x.com" })))).status).toBe(403);
+    });
+
+    it("regra pura: sem id na sessão, nada liga a conta a ela", () => {
+      const alvo = { id: "x", perfil: "coordenador", sede_id: A };
+      expect(criouCoordenador({ ...C1, id: "" }, { ...alvo, criado_por_id: "" })).toBe(false);
+      expect(criouCoordenador(C1, alvo)).toBe(false);
+      expect(criouCoordenador(C1, { ...alvo, id: "c1", criado_por_id: "c1" })).toBe(false);
+      expect(podeCriarCoordenador(ADM, alvo)).toBe(false);
+      expect(podeCriarCoordenador(C1, { ...alvo, perfil: "Coordenador" })).toBe(false);
     });
   });
 

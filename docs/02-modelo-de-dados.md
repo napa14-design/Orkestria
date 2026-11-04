@@ -32,6 +32,7 @@ parametros (sede_id|geral)   │ ├──< funcionarios (sede_id)
 | sede_id | string | sede **principal** (abre por padrão). `geral` = todas as sedes |
 | ativo | boolean | |
 | criado_em, atualizado_em | ISO 8601 | |
+| criado_por_id | string | quem criou a conta (desde 04/11/2026); liga o coordenador ao colega que o cadastrou |
 | sedes_extra | string | sedes **adicionais** que o coordenador/supervisor opera: ids separadas por vírgula. Vazio = opera só a principal |
 | versao_sessao | number | sobe ao trocar a senha ou gerar código de primeiro acesso; sessão com versão diferente cai na próxima reconferência. Ausente = 0 |
 

@@ -48,6 +48,11 @@ export interface Usuario {
    * reconferência (até 1 h). Ausente = 0.
    */
   versao_sessao?: number;
+  /**
+   * Quem criou a conta. Só isto liga um coordenador ao colega que o cadastrou (ver
+   * `criouCoordenador`). Contas anteriores a 04/11/2026 não têm.
+   */
+  criado_por_id?: string;
   ativo: boolean;
   criado_em: string;
   atualizado_em: string;

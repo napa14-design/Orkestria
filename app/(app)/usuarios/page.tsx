@@ -23,8 +23,9 @@ const SELO_PERFIL: Record<string, string> = {
 };
 
 export default function PaginaUsuarios() {
-  // O coordenador cadastra só os supervisores das sedes dele: o servidor garante,
-  // e a tela não oferece o que ele recusaria.
+  // O coordenador cadastra supervisores e coordenadores nas sedes dele; do coordenador
+  // criado, só acompanha o acesso. O servidor garante, e a tela não oferece o que ele
+  // recusaria.
   const coordenador = useSessao()?.perfil === "coordenador";
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const nomeSede = (id: string) =>
@@ -82,12 +83,12 @@ export default function PaginaUsuarios() {
       titulo="Usuários"
       subtitulo={
         coordenador
-          ? "Os supervisores das sedes que você opera. Eles veem a rota e marcam o que foi feito. Para reativar uma conta inativa, fale com um administrador."
+          ? "Os supervisores das sedes que você opera e os coordenadores que você cadastrou. Coordenador novo opera só sedes suas; depois de criado, editar ou inativar é com um administrador, como reativar uma conta inativa."
           : "Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance de coordenadores e supervisores — cada um pode operar mais de uma. Acesso restrito a administradores."
       }
       endpoint="/api/usuarios"
-      textoNovo={coordenador ? "+ Novo supervisor" : "+ Novo usuário"}
-      permissao={{ excluir: !coordenador }}
+      textoNovo="+ Novo usuário"
+      permissao={{ excluir: !coordenador, alterar: (u) => !(coordenador && u.perfil === "coordenador") }}
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
         {
@@ -103,7 +104,7 @@ export default function PaginaUsuarios() {
           rotulo: "Perfil",
           tipo: "select",
           obrigatorio: true,
-          opcoes: coordenador ? PERFIS.filter((p) => p.valor === "supervisor") : PERFIS,
+          opcoes: coordenador ? PERFIS.filter((p) => p.valor === "supervisor" || p.valor === "coordenador") : PERFIS,
           padrao: coordenador ? "supervisor" : undefined,
           dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • COORDENADOR: monta as rotas e faz os cadastros, apenas nas sedes que opera (uma ou várias). • SUPERVISOR: vê a rota e marca as tarefas como feitas ou não, só nas sedes dele — não pode ter \"Geral\" (todas as sedes). • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
         },
@@ -119,7 +120,7 @@ export default function PaginaUsuarios() {
           // O supervisor nunca alcança todas as sedes (o servidor recusa
           // "Geral" para ele), então a opção nem aparece.
           opcoes: (form) => [
-            ...(form.perfil === "supervisor"
+            ...(form.perfil === "supervisor" || coordenador
               ? []
               : [
                   {
@@ -220,7 +221,7 @@ export default function PaginaUsuarios() {
         },
       ]}
       aoCriar={(criado) => abrirCodigo(criado, true)}
-      acoesExtra={(u) => !u.ativo ? null : (
+      acoesExtra={(u) => !u.ativo || (coordenador && u.perfil === "coordenador" && u.senha_definida) ? null : (
         <button
           className="btn btn-mini btn-fantasma"
           onClick={() => abrirCodigo(u, false)}

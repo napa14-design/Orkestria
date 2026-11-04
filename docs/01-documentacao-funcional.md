@@ -38,7 +38,7 @@ DT" (45 m²) são **registros distintos**, com metragens, tempos e rotinas próp
 
 | Ação | Administrador | Coordenador | Supervisor | Visualizador/Gerência |
 |---|---|---|---|---|
-| Cadastrar usuários | ✔ | ✘ | ✘ | ✘ |
+| Cadastrar usuários | ✔ | Supervisor e coordenador, nas sedes que opera (de coordenador, só criar: não edita nem exclui) | ✘ | ✘ |
 | Cadastrar sedes | ✔ | ✘ | ✘ | ✘ |
 | Cadastrar funcionários/locais/tarefas | ✔ (todas) | ✔ (sedes que opera) | ✘ | ✘ |
 | Editar parâmetros gerais | ✔ | ✔ (quando `editavel_por_supervisor`) | ✘ | ✘ |
