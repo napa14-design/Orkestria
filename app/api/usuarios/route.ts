@@ -1,20 +1,12 @@
 import { comSessao, ok } from "@/lib/api";
-import { podeGerenciarUsuarios } from "@/lib/permissions";
-import { ErroPermissao } from "@/services/erros";
-import { createUsuario, getUsuarios } from "@/services/usuariosService";
+import { createUsuario, getUsuarios, usuarioPublico } from "@/services/usuariosService";
 
+// Quem pode o quê é conferido no serviço: o administrador gerencia todos, o
+// coordenador só os supervisores das sedes dele (`podeGerirSupervisor`).
 export async function GET() {
-  return comSessao(async (sessao) => {
-    if (!podeGerenciarUsuarios(sessao))
-      throw new ErroPermissao("Apenas administradores gerenciam usuários.");
-    return ok(await getUsuarios());
-  });
+  return comSessao(async (sessao) => ok(await getUsuarios(sessao)));
 }
 
 export async function POST(req: Request) {
-  return comSessao(async (sessao) => {
-    if (!podeGerenciarUsuarios(sessao))
-      throw new ErroPermissao("Apenas administradores gerenciam usuários.");
-    return ok(await createUsuario(await req.json()), 201);
-  });
+  return comSessao(async (sessao) => ok(usuarioPublico(await createUsuario(await req.json().catch(() => null), sessao)), 201));
 }

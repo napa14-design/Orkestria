@@ -207,6 +207,24 @@ export function podeGerenciarUsuarios(sessao: SessaoUsuario): boolean {
 }
 
 /**
+ * Coordenador cadastra os supervisores dele (04/11/2026): só conta de perfil
+ * exatamente "supervisor", nunca a própria, com TODAS as sedes dentro das que ele
+ * opera. Lista vazia nega: `[].every` seria verdadeiro, e um supervisor antigo com
+ * "geral" cairia no escopo de qualquer coordenador. Excluir continua sendo só do
+ * administrador (`podeGerenciarUsuarios`).
+ */
+export function podeGerirSupervisor(
+  sessao: SessaoUsuario,
+  alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string },
+): boolean {
+  if (sessao.perfil !== "coordenador" || alvo.perfil !== "supervisor" || alvo.id === sessao.id) return false;
+  // Dado torto no banco fica fora do escopo, em vez de derrubar a lista de todos.
+  if (typeof alvo.sede_id !== "string" || (alvo.sedes_extra != null && typeof alvo.sedes_extra !== "string")) return false;
+  const sedes =montarSedesDaSessao(alvo.sede_id, alvo.sedes_extra);
+  return sedes.length > 0 && sedes.every((sede) => podeAlterarSede(sessao, sede));
+}
+
+/**
  * Catálogo global (tipos de local, categorias, requisitos): **criar é aditivo,
  * editar é que afeta todo mundo.**
  *

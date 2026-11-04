@@ -1,5 +1,5 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { lerSedesExtra } from "@/lib/permissions";
+import { lerSedesExtra, podeGerirSupervisor, sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
 import {
   DIAS_VALIDADE_CODIGO,
   gerarCodigoAcesso,
@@ -20,24 +20,32 @@ export function conviteValido(u: Usuario, agora = new Date()): boolean {
 }
 
 /**
- * Troca os hashes por indicadores booleanos.
- *
- * Nem a senha nem o código saem do servidor; os booleanos saem porque o
- * administrador precisa ver quem ainda não entrou e quem precisa de código novo.
+ * O que a API devolve de um usuário, por lista positiva: remover campos deixaria
+ * vazar o próximo que nascer (e o PUT devolvia `senha_hash`). Os booleanos saem
+ * porque quem gerencia precisa ver quem ainda não entrou e quem precisa de código novo.
  */
-function semSegredos(u: Usuario): UsuarioListado {
-  const { senha_hash, convite_hash, ...resto } = u;
+export function usuarioPublico(u: Usuario): UsuarioListado {
   return {
-    ...resto,
-    senha_definida: !!senha_hash,
+    id: u.id,
+    nome: u.nome,
+    email: u.email,
+    perfil: u.perfil,
+    sede_id: u.sede_id,
+    sedes_extra: u.sedes_extra,
+    ativo: u.ativo,
+    criado_em: u.criado_em,
+    atualizado_em: u.atualizado_em,
+    senha_definida: !!u.senha_hash,
     convite_valido: conviteValido(u),
-    convite_expirado: !!convite_hash && !conviteValido(u),
+    convite_expirado: !!u.convite_hash && !conviteValido(u),
   };
 }
 
-export async function getUsuarios(): Promise<UsuarioListado[]> {
-  const ds = await getDataSource();
-  return (await ds.listar("usuarios")).map(semSegredos);
+/** O administrador vê todos; o coordenador, só os supervisores que ele gerencia. */
+export async function getUsuarios(sessao: SessaoUsuario): Promise<UsuarioListado[]> {
+  const ator = await conferirAtor(sessao);
+  const todos = await (await getDataSource()).listar("usuarios");
+  return (ator.perfil === "administrador" ? todos : todos.filter((u) => podeGerirSupervisor(ator, u))).map(usuarioPublico);
 }
 
 /**
@@ -139,14 +147,14 @@ export function codigoConfere(usuario: Usuario, codigo: string): boolean {
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {
   const ds = await getDataSource();
-  // lê só o(s) usuário(s) com este e-mail (campo único) em vez de toda a tabela
   const alvo = email.trim().toLowerCase();
-  const achados = await ds.consultar("usuarios", [{ campo: "email", op: "==", valor: alvo }]);
-  // tolera cadastros antigos com e-mail em outra caixa
-  const lista = achados.length
-    ? achados
-    : (await ds.listar("usuarios")).filter((u) => u.email.toLowerCase() === alvo);
-  return lista.find((u) => u.ativo) ?? null;
+  // A tabela inteira, de propósito: é pequena e o login é raro. Consultar pelo e-mail
+  // exato não enxergava cadastro antigo em outra caixa, e duas contas assim entravam.
+  const ativos = (await ds.listar("usuarios")).filter(
+    (u) => u.ativo === true && String(u.email ?? "").trim().toLowerCase() === alvo,
+  );
+  // Duas contas ativas com o mesmo e-mail: não dá para saber quem é, então ninguém entra.
+  return ativos.length === 1 ? ativos[0] : null;
 }
 
 type DadosUsuario = Pick<
@@ -230,52 +238,168 @@ function validarPerfil(perfil: unknown, sedeId: string): void {
     ]);
 }
 
-export async function createUsuario(dados: DadosUsuario): Promise<Usuario> {
-  const existente = await getUsuarioPorEmail(dados.email);
-  if (existente) throw new Error(`Já existe um usuário ativo com o e-mail ${dados.email}.`);
-  validarPerfil(dados.perfil, dados.sede_id);
-  await validarSedeUsuario(dados.sede_id);
-  const sedes_extra = await normalizarSedesExtra(
-    dados.perfil,
-    dados.sede_id,
-    dados.sedes_extra,
-  );
-  const ds = await getDataSource();
-  const agora = agoraISO();
-  const usuario: Usuario = {
-    ...dados,
-    id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
-    sedes_extra,
-    criado_em: agora,
-    atualizado_em: agora,
-  };
-  return ds.criar("usuarios", usuario);
+/** Os únicos campos que o cadastro aceita do corpo; o resto é recusado, nunca copiado. */
+const CAMPOS_DO_CADASTRO: ReadonlySet<string> = new Set(["nome", "email", "perfil", "sede_id", "sedes_extra", "ativo"]);
+// `__x__` é nome reservado no Firestore: passaria aqui e voltaria como erro 500.
+const ID_SEDE = /^(?!__.*__$)[\w-]{1,64}$/u;
+const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/u;
+const NEGADO = "Você só gerencia contas de supervisor das sedes que opera.";
+
+const invalido = (mensagem: string) =>
+  new ErroValidacao([{ nivel: "erro", codigo: "CADASTRO_INVALIDO", mensagem }]);
+
+function normalizarEmail(valor: unknown): string {
+  const texto = typeof valor === "string" ? valor.trim() : "";
+  // Confere antes de baixar a caixa: o K de Kelvin (U+212A) viraria "k" e passaria.
+  const ascii = texto.length <= 254 && /^[\x21-\x7e]+$/u.test(texto);
+  if (!ascii || !EMAIL.test(texto.toLowerCase())) throw invalido("Informe um e-mail válido.");
+  return texto.toLowerCase();
 }
 
-export async function updateUsuario(
-  id: string,
-  mudancas: Partial<DadosUsuario>,
-): Promise<Usuario> {
+/**
+ * Lê o corpo pela lista positiva. Espalhar o corpo no cadastro deixava gravar
+ * `id`, `senha_hash` e `versao_sessao` de outra conta, e a sessão do supervisor
+ * virava a de um administrador na reconferência (revisão de segurança, 04/11/2026).
+ */
+function lerCorpo(corpo: unknown): Partial<DadosUsuario> {
+  if (!corpo || typeof corpo !== "object" || Array.isArray(corpo)) throw invalido("Cadastro inválido.");
+  const c = corpo as Record<string, unknown>;
+  if (Object.keys(c).some((k) => !CAMPOS_DO_CADASTRO.has(k))) throw invalido("Cadastro com campo não permitido.");
+  const lido: Partial<DadosUsuario> = {};
+  if ("nome" in c) {
+    const nome = typeof c.nome === "string" ? c.nome.trim() : "";
+    if (!nome || nome.length > 120 || /\p{C}/u.test(nome)) throw invalido("Informe um nome válido.");
+    lido.nome = nome;
+  }
+  if ("email" in c) lido.email = normalizarEmail(c.email);
+  if ("perfil" in c) {
+    if (!PERFIS.has(c.perfil)) throw new ErroValidacao([{ nivel: "erro", codigo: "PERFIL_INVALIDO", mensagem: "Perfil inválido." }]);
+    lido.perfil = c.perfil as Usuario["perfil"];
+  }
+  if ("sede_id" in c) {
+    if (typeof c.sede_id !== "string" || !ID_SEDE.test(c.sede_id)) throw invalido("Sede inválida.");
+    lido.sede_id = c.sede_id;
+  }
+  if ("sedes_extra" in c) {
+    if (typeof c.sedes_extra !== "string") throw invalido("Sedes adicionais inválidas.");
+    const extras = lerSedesExtra(c.sedes_extra);
+    if (extras.some((id) => id === "geral" || !ID_SEDE.test(id))) throw invalido("Sedes adicionais inválidas.");
+    lido.sedes_extra = extras.join(",");
+  }
+  if ("ativo" in c) {
+    if (typeof c.ativo !== "boolean") throw invalido("Status inválido.");
+    lido.ativo = c.ativo;
+  }
+  return lido;
+}
+
+/**
+ * Único entre TODAS as contas, ativas ou não, em qualquer caixa: o login resolve a
+ * pessoa pelo e-mail, e o histórico registra a autoria por ele. Lê a tabela, que é
+ * pequena, e isto só roda ao salvar um cadastro.
+ */
+async function exigirEmailLivre(email: string, exceto?: string): Promise<void> {
+  const ds = await getDataSource();
+  const todos = await ds.listar("usuarios");
+  if (todos.some((u) => u.id !== exceto && String(u.email ?? "").trim().toLowerCase() === email))
+    throw invalido("Este e-mail já está em uso.");
+}
+
+/**
+ * Quem está pedindo, conferido no banco: um rebaixado ainda teria até 1 h de cookie,
+ * e um administrador nessa janela criaria outro administrador, que sobrevive ao
+ * rebaixamento. Ações de cadastro são raras, então a leitura é barata.
+ */
+export async function conferirAtor(sessao: SessaoUsuario): Promise<SessaoUsuario> {
+  if (sessao.perfil !== "administrador" && sessao.perfil !== "coordenador") throw new ErroPermissao(NEGADO);
+  const cadastro = await (await getDataSource()).obter("usuarios", sessao.id);
+  const atual = cadastro && sessaoDoCadastro(cadastro);
+  if (!atual || (atual.perfil !== "administrador" && atual.perfil !== "coordenador")) throw new ErroPermissao(NEGADO);
+  return atual;
+}
+
+export async function createUsuario(corpo: unknown, sessao: SessaoUsuario): Promise<Usuario> {
+  const ator = await conferirAtor(sessao);
+  const dados = lerCorpo(corpo);
+  const { nome, email, perfil, sede_id } = dados;
+  if (!nome || !email || !perfil || !sede_id) throw invalido("Preencha nome, e-mail, perfil e sede.");
+  validarPerfil(perfil, sede_id);
+  if (
+    ator.perfil !== "administrador" &&
+    !podeGerirSupervisor(ator, { id: "", perfil, sede_id, sedes_extra: dados.sedes_extra })
+  )
+    throw new ErroPermissao(NEGADO);
+  await exigirEmailLivre(email);
+  await validarSedeUsuario(sede_id);
+  const sedes_extra = await normalizarSedesExtra(perfil, sede_id, dados.sedes_extra);
+  const ds = await getDataSource();
+  const agora = agoraISO();
+  return ds.criar("usuarios", {
+    nome,
+    email,
+    perfil,
+    sede_id,
+    sedes_extra,
+    ativo: dados.ativo ?? true,
+    id: novoId(),
+    criado_em: agora,
+    atualizado_em: agora,
+  });
+}
+
+export async function updateUsuario(id: string, corpo: unknown, sessao: SessaoUsuario): Promise<Usuario> {
+  const ator = await conferirAtor(sessao);
+  const coordenador = ator.perfil !== "administrador";
+  const mudancas = lerCorpo(corpo);
   const ds = await getDataSource();
   const atual = await ds.obter("usuarios", id);
+  // Mesma resposta para fora do escopo e para inexistente: não revela quem existe.
+  if (coordenador && (!atual || !podeGerirSupervisor(ator, atual))) throw new ErroPermissao(NEGADO);
   if (!atual) throw new Error("Usuário não encontrado.");
+  // Reativar é do administrador: um ex-funcionário não volta sem ele saber.
+  if (coordenador && atual.ativo !== true && mudancas.ativo === true)
+    throw new ErroPermissao("Só um administrador reativa uma conta.");
   const perfil = mudancas.perfil ?? atual.perfil;
   const sedeId = mudancas.sede_id ?? atual.sede_id;
   validarPerfil(perfil, sedeId);
+  if (
+    coordenador &&
+    !podeGerirSupervisor(ator, { id, perfil, sede_id: sedeId, sedes_extra: mudancas.sedes_extra ?? atual.sedes_extra })
+  )
+    throw new ErroPermissao(NEGADO);
   await validarSedeUsuario(sedeId);
+  const emailAtual = String(atual.email ?? "").trim().toLowerCase();
+  // Reenviar o mesmo e-mail do formulário não é troca, nem de caixa.
+  if (mudancas.email === emailAtual) delete mudancas.email;
+  if (mudancas.email) await exigirEmailLivre(mudancas.email, id);
   // Renormaliza sempre, mesmo quando `sedes_extra` não veio no corpo: trocar só
   // o perfil (ou passar a sede para "geral") tem que limpar as extras, senão
   // sobra escopo pendurado num usuário que não deveria mais tê-lo.
-  const sedes_extra = await normalizarSedesExtra(
-    perfil,
-    sedeId,
-    mudancas.sedes_extra ?? atual.sedes_extra,
-  );
+  const sedes_extra = await normalizarSedesExtra(perfil, sedeId, mudancas.sedes_extra ?? atual.sedes_extra);
+  // Mudou quem a pessoa é ou onde opera: a sessão aberta cai na próxima reconferência
+  // e o código pendente morre. Sem isto, um código guardado antes de uma promoção
+  // entrava como o perfil novo (revisão de segurança, 04/11/2026).
+  const sensivel =
+    perfil !== atual.perfil ||
+    !!mudancas.email ||
+    sedeId !== atual.sede_id ||
+    sedes_extra !== (atual.sedes_extra ?? "") ||
+    (mudancas.ativo === false && atual.ativo !== false);
   return ds.atualizar("usuarios", id, {
     ...mudancas,
     sedes_extra,
+    ...(sensivel ? { versao_sessao: (atual.versao_sessao ?? 0) + 1, convite_hash: "", convite_expira_em: "" } : {}),
     atualizado_em: agoraISO(),
   });
+}
+
+/** Confere ANTES de gerar: gerar apaga a senha da pessoa. */
+export async function conferirConvite(id: string, sessao: SessaoUsuario): Promise<void> {
+  const ator = await conferirAtor(sessao);
+  const alvo = await (await getDataSource()).obter("usuarios", id);
+  if (ator.perfil !== "administrador" && (!alvo || !podeGerirSupervisor(ator, alvo))) throw new ErroPermissao(NEGADO);
+  if (!alvo) throw new Error("Usuário não encontrado.");
+  if (alvo.ativo !== true) throw invalido("Esta conta está inativa: reative antes de gerar um código.");
 }
 
 export async function deleteUsuario(id: string): Promise<void> {

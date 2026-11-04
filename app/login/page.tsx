@@ -333,8 +333,8 @@ export default function PaginaLogin() {
           </form>
 
           <p style={{ fontSize: 12, color: "var(--tinta-3)", marginTop: 12, lineHeight: 1.5 }}>
-            <strong>Esqueceu a senha?</strong> Peça um código novo ao administrador: você entra com
-            ele e escolhe outra senha.
+            <strong>Esqueceu a senha?</strong> Peça um código novo a quem cuidou do seu cadastro: você
+            entra com ele e escolhe outra senha.
           </p>
           </>
           )}

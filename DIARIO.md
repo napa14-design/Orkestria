@@ -7,6 +7,63 @@
 
 ---
 
+## 2026-11-04 — Coordenador cadastra supervisor; coleta de uso; régua única de cobertura
+
+Três itens que sobraram da consulta sobre a tela do dia.
+
+**Coordenador cadastra os supervisores** (decisão do dono: quem cadastra são eles).
+Só conta de perfil "supervisor", com TODAS as sedes dentro das que ele opera, e nunca
+a própria (`podeGerirSupervisor`). Lista, cria, edita, inativa e gera código. Não
+exclui nem reativa; o coordenador "geral" alcança todas as sedes; qualquer domínio de
+e-mail serve. Supervisor com uma sede fora do escopo só o administrador gerencia.
+
+A segurança revisou **antes** do código e bloqueou o desenho, por defeitos que só o
+administrador alcançava até aqui. Corrigidos no serviço, para todos os perfis:
+- o corpo do PUT era copiado para o cadastro: dava para gravar `id`, `senha_hash` e
+  `versao_sessao` de outra conta e virar administrador na reconferência. Agora é lista
+  positiva, e campo fora dela dá 422;
+- e-mail único entre todas as contas, ativas ou não, em qualquer caixa. Login com duas
+  contas ativas no mesmo e-mail não entra (produção conferida: nenhuma duplicada);
+- mudar perfil, e-mail, sede ou inativar derruba a sessão e mata o código pendente, que
+  antes sobrevivia a uma promoção;
+- a API não devolve mais segredo: lista positiva de campos (o PUT devolvia `senha_hash`);
+- coordenador e administrador são relidos do banco nestas rotas, porque um rebaixado
+  teria até 1 h de cookie; conta inativa não recebe código; o nome é escapado no e-mail.
+
+Riscos que ficam, todos no histórico com o e-mail de quem fez:
+- o coordenador pode entrar como o supervisor: vê o código, ou troca o e-mail dele por
+  um próprio e entra pelo Google; gerar código também apaga a senha da pessoa;
+- com qualquer domínio de e-mail, pode dar acesso a quem não é da empresa, e a conta
+  continua depois que ele sai. Ao desligar um coordenador, revise o histórico de usuários;
+- "não reativa" só barra a conta antiga: dá para recriar a pessoa com outro e-mail;
+- uma sessão aberta só cai na reconferência, em até 1 h.
+
+**Coleta de uso por 14 dias** (05 a 18/11, `lib/usoTelas.ts`). Ninguém sabia quais telas
+são abertas. Anota "esta tela foi aberta hoje", por perfil e sede, de coordenadores e
+supervisores: **sem pessoa, sem hora e sem contagem** (decisão do dono). Desliga sozinha
+na data; os dados só saem por script, e a coleção e o código saem depois da análise,
+até 19/12. **Nada apaga sozinho:** o apagamento é tarefa, não automatismo. Fora do
+histórico, para poder sumir inteira. Em sede com um coordenador só dá para deduzir quem
+é, então não serve para avaliar ninguém, e os usuários foram avisados antes do início.
+O resultado por sede não vai para este diário, que é público. Portão da doutrina: não
+é superfície, e o gatilho de aposentadoria é a data no código.
+
+**Régua única de cobertura.** O painel de Cobertura da Agenda ordenava por ociosidade e
+a Central conferia requisitos, conflito e carga: o painel oferecia primeiro quem a
+Central recusaria. Agora os dois usam `lib/redistribuicao.ts`, e o painel olha a equipe
+toda, sem os filtros da tela. Quem tem alerta continua na lista, em grupo separado e
+com o motivo na opção, porque cada alerta dá numa coisa no "Mover": conflito pede
+autorização, sobrecarga só avisa depois e requisito é recusado. O auditor reprovou a
+primeira versão, cujo rótulo prometia autorização para todos.
+
+Arquivos: `services/usuariosService.ts`, `lib/permissions.ts`, `app/api/usuarios/*`,
+`app/(app)/usuarios/page.tsx`, `lib/usoTelas.ts`, `services/usoTelasService.ts`,
+`app/api/uso-telas/route.ts`, `lib/useRegistrarTela.ts`, `lib/redistribuicao.ts`,
+`components/agenda/CoberturaPanel.tsx`, testes `coordenador-supervisores`, `uso-telas`,
+`redistribuicao`.
+
+---
+
 ## 2026-11-04 — Central: leva a sede junto, confere o cadastro e diz o que foi feito
 
 Três defeitos achados na consulta sobre a tela do dia (nota no vault), medidos em

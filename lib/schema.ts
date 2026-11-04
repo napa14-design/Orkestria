@@ -18,6 +18,7 @@ import type {
   QualificacaoFuncionario,
   RegistroHistorico,
   CacheResumo,
+  UsoTela,
   Requisito,
   RotinaPlanejada,
   Sede,
@@ -48,6 +49,7 @@ export interface MapaTabelas {
   feriados: Feriado;
   historico: RegistroHistorico;
   cache_resumo: CacheResumo;
+  uso_telas: UsoTela;
 }
 
 export type NomeTabela = keyof MapaTabelas;
@@ -340,6 +342,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("criado_em"),
   ],
   cache_resumo: [col("id"), col("corpo"), col("expira_em"), col("criado_em")],
+  uso_telas: [col("id"), col("dia"), col("perfil"), col("sede_id"), col("tela")],
 };
 
 /** Converte uma linha crua do Sheets (strings) no objeto tipado da tabela. */

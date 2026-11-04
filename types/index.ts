@@ -19,4 +19,5 @@ export * from "./Feriado";
 export * from "./PeriodoLetivo";
 export * from "./Historico";
 export * from "./CacheResumo";
+export * from "./UsoTela";
 export * from "./CentralDia";

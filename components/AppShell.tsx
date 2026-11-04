@@ -30,6 +30,8 @@ type Item = {
   href: string;
   rotulo: string;
   apenasAdmin?: boolean;
+  /** Administrador e coordenador; a tela e o servidor limitam o que o coordenador faz. */
+  apenasGestao?: boolean;
   ocultarCoordenador?: boolean;
 };
 type Grupo = { rotulo: string; itens: Item[] };
@@ -86,7 +88,7 @@ const GRUPOS: Grupo[] = [
       { href: "/da-ata", rotulo: "Da ata ao sistema", ocultarCoordenador: true },
       { href: "/parametros", rotulo: "Parâmetros" },
       { href: "/historico", rotulo: "Histórico", ocultarCoordenador: true },
-      { href: "/usuarios", rotulo: "Usuários", apenasAdmin: true },
+      { href: "/usuarios", rotulo: "Usuários", apenasGestao: true },
     ],
   },
 ];
@@ -130,6 +132,7 @@ export default function AppShell({
       ehSupervisor
         ? TELAS_SUPERVISOR.includes(i.href)
         : (!i.apenasAdmin || ehAdmin) &&
+          (!i.apenasGestao || ehAdmin || sessao.perfil === "coordenador") &&
           (!i.ocultarCoordenador || sessao.perfil !== "coordenador"),
     );
 

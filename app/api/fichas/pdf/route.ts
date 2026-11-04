@@ -2,7 +2,9 @@ import { comSessao } from "@/lib/api";
 import { leituraCompleta, limitarSedeConsulta } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
 import { gerarFichasPdf } from "@/services/fichaPdf";
+import { registrarUso } from "@/services/usoTelasService";
 import { somarDias } from "@/lib/dateUtils";
+import { TELA_FICHA } from "@/lib/usoTelas";
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/u;
 /** Uma semana: o PDF de um período maior seria um maço que ninguém imprime de uma vez. */
@@ -40,6 +42,8 @@ export async function GET(req: Request) {
     // marcar=todas: gabarito de teste (todas as caixas com X) — calibração do leitor
     const marcarTodas = url.searchParams.get("marcar") === "todas";
     const { bytes } = await gerarFichasPdf(sedePermitida ?? sede, datas, { marcarTodas });
+    // Falhar a anotação não pode custar a ficha de quem está imprimindo.
+    await registrarUso(sessao, TELA_FICHA, sedePermitida ?? sede).catch((e) => console.error("[uso-telas]", e));
     return new Response(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",

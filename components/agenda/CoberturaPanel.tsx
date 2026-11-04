@@ -2,14 +2,18 @@
 
 /**
  * Cobertura de ausências: lista as tarefas planejadas de funcionários
- * ausentes ("órfãs") e sugere colegas com ociosidade para assumi-las.
+ * ausentes ("órfãs") e sugere colegas para assumi-las, pela régua da Central.
  */
 import { useMemo, useState } from "react";
-import { resumoFuncionario } from "@/lib/calculations";
+import { jornadaDoDia, ocupaHorario, resumoFuncionario } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
+import { avaliarCandidatos, type CandidatoAvaliado } from "@/lib/redistribuicao";
 import type {
   Funcionario,
+  Local,
   ParametrosResolvidos,
+  QualificacaoFuncionario,
+  Requisito,
   RotinaPlanejada,
   Tarefa,
 } from "@/types";
@@ -19,6 +23,9 @@ export default function CoberturaPanel({
   ausencias,
   rotinas,
   tarefas,
+  locais,
+  requisitos,
+  qualificacoes,
   parametros,
   aoMover,
 }: {
@@ -27,6 +34,9 @@ export default function CoberturaPanel({
   ausencias: Map<string, string>;
   rotinas: RotinaPlanejada[];
   tarefas: Tarefa[];
+  locais: Local[];
+  requisitos: Requisito[];
+  qualificacoes: QualificacaoFuncionario[];
   parametros: ParametrosResolvidos;
   /** Ausente = só leitura (supervisor): lista as órfãs, sem remanejar. */
   aoMover?: (rotinaId: string, funcionarioId: string, inicio: string) => void;
@@ -51,24 +61,58 @@ export default function CoberturaPanel({
     [rotinas, ausencias],
   );
 
-  // Colegas presentes, ordenados da maior para a menor ociosidade prevista.
-  const candidatos = useMemo(
+  const livrePorPessoa = useMemo(
     () =>
-      funcionarios
-        .filter((f) => !ausencias.has(f.id))
-        .map((f) => ({
-          funcionario: f,
-          resumo: resumoFuncionario(
-            f,
-            rotinas.filter((r) => r.funcionario_id === f.id),
-            parametros,
-          ),
-        }))
-        .sort((a, b) => b.resumo.ociosidade_prevista_min - a.resumo.ociosidade_prevista_min),
-    [funcionarios, ausencias, rotinas, parametros],
+      new Map(
+        funcionarios.map((f) => [
+          f.id,
+          resumoFuncionario(f, rotinas.filter((r) => r.funcionario_id === f.id), parametros).ociosidade_prevista_min,
+        ]),
+      ),
+    [funcionarios, rotinas, parametros],
   );
 
+  // Pela mesma régua da Central: primeiro quem assume sem alerta, do mais leve ao
+  // mais cheio. Quem tem alerta continua na lista, porque o "Mover" pede autorização.
+  const candidatosPorOrfa = useMemo(() => {
+    const ocupando = rotinas.filter(ocupaHorario);
+    return new Map(
+      orfas.map((r) => {
+        const tarefa = tarefaPorId.get(r.tarefa_id);
+        const local = locais.find((l) => l.id === tarefa?.local_id);
+        const disponiveisIds = new Set(
+          funcionarios.filter((f) => !ausencias.has(f.id) && jornadaDoDia(f, r.data).trabalha).map((f) => f.id),
+        );
+        return [
+          r.id,
+          tarefa && local
+            ? avaliarCandidatos({
+                rotina: r,
+                funcionarios,
+                disponiveisIds,
+                rotinasDoDia: ocupando,
+                tarefa,
+                local,
+                parametros,
+                requisitosCatalogo: requisitos,
+                qualificacoes,
+              }).filter((c) => !tarefa.restricao_genero || c.funcionario.genero === tarefa.restricao_genero)
+            : [],
+        ];
+      }),
+    );
+  }, [orfas, tarefaPorId, locais, funcionarios, ausencias, rotinas, parametros, requisitos, qualificacoes]);
+
   if (orfas.length === 0) return null;
+
+  // O motivo vai na opção porque cada alerta dá numa coisa ao clicar em "Mover":
+  // conflito pede autorização, sobrecarga só avisa depois e requisito é recusado.
+  const opcao = ({ funcionario, alertas }: CandidatoAvaliado) => (
+    <option key={funcionario.id} value={funcionario.id}>
+      {funcionario.nome} (livre: {formatarDuracao(livrePorPessoa.get(funcionario.id) ?? 0)})
+      {alertas.length ? ` — ${alertas.map((a) => a.mensagem).join(" ")}` : ""}
+    </option>
+  );
 
   return (
     <div
@@ -85,6 +129,9 @@ export default function CoberturaPanel({
           const tarefa = tarefaPorId.get(r.tarefa_id);
           const ausente = funcPorId.get(r.funcionario_id);
           const destino = destinos[r.id] ?? "";
+          const candidatos = candidatosPorOrfa.get(r.id) ?? [];
+          const semAlerta = candidatos.filter((c) => c.alertas.length === 0);
+          const comAlerta = candidatos.filter((c) => c.alertas.length > 0);
           return (
             <div
               key={r.id}
@@ -107,17 +154,8 @@ export default function CoberturaPanel({
                     style={{ fontSize: 12, padding: 4 }}
                   >
                     <option value="">— remanejar para —</option>
-                    {candidatos
-                      .filter(
-                        ({ funcionario }) =>
-                          !tarefa?.restricao_genero ||
-                          funcionario.genero === tarefa.restricao_genero,
-                      )
-                      .map(({ funcionario, resumo }) => (
-                        <option key={funcionario.id} value={funcionario.id}>
-                          {funcionario.nome} (livre: {formatarDuracao(resumo.ociosidade_prevista_min)})
-                        </option>
-                      ))}
+                    {semAlerta.length > 0 && <optgroup label="Sem alerta">{semAlerta.map(opcao)}</optgroup>}
+                    {comAlerta.length > 0 && <optgroup label="Com alerta">{comAlerta.map(opcao)}</optgroup>}
                   </select>
                   <button
                     className="btn btn-mini btn-primario"
@@ -134,9 +172,10 @@ export default function CoberturaPanel({
         })}
         {aoMover && (
           <p style={{ fontSize: 11, color: "var(--tinta-3)" }}>
-            A movimentação mantém o horário original e passa pelas validações normais
-            (conflito, intervalo, expediente). Se conflitar, arraste o card manualmente
-            para outro horário do colega.
+            A movimentação mantém o horário original e passa pelas validações normais:
+            conflito pede autorização, sobrecarga só avisa depois de mover e requisito
+            faltando é recusado. Se conflitar, arraste o card manualmente para outro
+            horário do colega.
           </p>
         )}
       </div>

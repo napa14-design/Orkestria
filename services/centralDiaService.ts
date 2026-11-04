@@ -16,6 +16,7 @@ import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
 import { agoraHHMM, diaDaSemana, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "@/lib/dateUtils";
 import { pendenciasDoDia } from "@/lib/pendencias";
+import { avaliarCandidatos } from "@/lib/redistribuicao";
 import {
   limitarSedeConsulta,
   podeAlterarSede,
@@ -108,48 +109,18 @@ async function proporRedistribuicao(args: {
   const fimMin = hhmmParaMin(rotina.fim_planejado);
   if (Number.isNaN(inicioMin) || Number.isNaN(fimMin) || fimMin <= inicioMin) return undefined;
 
-  const candidatos = funcionarios
-    .filter(
-      (funcionario) =>
-        funcionario.sede_id === rotina.sede_id &&
-        funcionario.id !== rotina.funcionario_id &&
-        disponiveisIds.has(funcionario.id),
-    )
-    .map((funcionario) => {
-      const rotinasExistentes = rotinasDoDia.filter(
-        (item) => item.funcionario_id === funcionario.id && item.id !== rotina.id,
-      );
-      const efetivo = funcionarioNoDia(funcionario, rotina.data);
-      const alertas = validarAlocacao({
-        funcionario: efetivo,
-        rotinasExistentes,
-        inicioMin,
-        fimMin,
-        tarefa,
-        local,
-        parametros,
-        tempoPrevistoNovo: rotina.tempo_previsto_min,
-        requisitosCatalogo,
-        qualificacoesFuncionario: qualificacoes.filter(
-          (qualificacao) => qualificacao.funcionario_id === funcionario.id,
-        ),
-        data: rotina.data,
-      });
-      const jornada = jornadaLiquidaMin(efetivo);
-      return {
-        funcionario,
-        segura: alertas.length === 0,
-        carga: jornada > 0 ? tempoPlanejadoMin(rotinasExistentes) / jornada : Infinity,
-      };
-    })
-    .filter((candidato) => candidato.segura)
-    .sort(
-      (a, b) =>
-        a.carga - b.carga ||
-        a.funcionario.nome.localeCompare(b.funcionario.nome, "pt-BR"),
-    );
-
-  const escolhido = candidatos[0]?.funcionario;
+  const melhor = avaliarCandidatos({
+    rotina,
+    funcionarios,
+    disponiveisIds,
+    rotinasDoDia,
+    tarefa,
+    local,
+    parametros,
+    requisitosCatalogo,
+    qualificacoes,
+  })[0];
+  const escolhido = melhor?.alertas.length === 0 ? melhor.funcionario : undefined;
   const origem = funcionarios.find((funcionario) => funcionario.id === rotina.funcionario_id);
   if (!escolhido) {
     // Ninguém livre no horário: alguém livre em OUTRO horário do dia, sem tirar

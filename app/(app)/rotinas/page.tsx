@@ -156,6 +156,12 @@ export default function PaginaRotinas() {
     () => funcionariosVisiveis.map((f) => funcionarioNoDia(f, data)),
     [funcionariosVisiveis, data],
   );
+  // Sem os filtros da tela: cobrir uma falta olha a equipe toda, como a Central.
+  // Com o filtro de turno, o painel oferecia outra pessoa, e a busca escondia quem faltou.
+  const equipeDoDia = useMemo(
+    () => (funcionarios ?? []).filter((f) => f.ativo && noQuadro(f, data)).map((f) => funcionarioNoDia(f, data)),
+    [funcionarios, data],
+  );
 
   /** Seleciona e garante que a coluna do funcionário esteja na página visível. */
   function selecionarFuncionario(id: string) {
@@ -967,10 +973,13 @@ export default function PaginaRotinas() {
           )}
 
           <CoberturaPanel
-            funcionarios={efetivosVisiveis}
+            funcionarios={equipeDoDia}
             ausencias={ausentesMap}
             rotinas={rotinas ?? []}
             tarefas={tarefas ?? []}
+            locais={locais ?? []}
+            requisitos={requisitos ?? []}
+            qualificacoes={qualificacoes ?? []}
             parametros={params}
             aoMover={somenteLeitura ? undefined : mover}
           />

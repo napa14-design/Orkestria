@@ -49,7 +49,10 @@ título, o que mudou e os arquivos principais. Nunca edite entradas antigas.
    (`podeRegistrarRealizado`), nas sedes dele e nunca em "todas"; as telas
    mostram **uma sede por vez**, nunca agregam; visualizador só lê; parâmetros
    respeitam `editavel_por_supervisor` (nome antigo da coluna — vale para o
-   coordenador).
+   coordenador). Contas: administrador gerencia todas; coordenador só as de
+   supervisor inteiramente nas sedes dele (`podeGerirSupervisor`), sem excluir nem
+   reativar. O corpo do cadastro passa por lista positiva (`lerCorpo`): nunca o
+   espalhe no banco.
 
 ## Comandos
 

@@ -3,14 +3,24 @@
  * supervisor) e "supervisor" (perfil de chão, só nas sedes dele).
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { getDataSource } from "@/lib/datasource";
 import { reiniciarBanco } from "@/lib/memoryStore";
-import { createUsuario, updateUsuario } from "@/services/usuariosService";
+import type { SessaoUsuario } from "@/lib/permissions";
+import { createUsuario as criar, updateUsuario as atualizar } from "@/services/usuariosService";
 
-const dados = (extra: Record<string, unknown> = {}) =>
+const ADM: SessaoUsuario = { id: "a1", nome: "Adm", email: "a@x.com", perfil: "administrador", sede_id: "geral", sedes: [] };
+const createUsuario = (corpo: unknown) => criar(corpo, ADM);
+const updateUsuario = (id: string, corpo: unknown) => atualizar(id, corpo, ADM);
+const dados =(extra: Record<string, unknown> = {}) =>
   ({ nome: "Fulana", email: `f${Math.random()}@x.com`, perfil: "supervisor", sede_id: "christus_dt", ativo: true, ...extra }) as never;
 
 describe("perfis no cadastro de usuário", () => {
-  beforeEach(() => reiniciarBanco());
+  beforeEach(async () => {
+    reiniciarBanco();
+    await (await getDataSource()).criar("usuarios", {
+      id: "a1", nome: "Adm", email: "a@x.com", perfil: "administrador", sede_id: "geral", ativo: true, criado_em: "", atualizado_em: "",
+    });
+  });
 
   it("supervisor precisa de sede de verdade — 'todas as sedes' é recusado", async () => {
     await expect(createUsuario(dados({ sede_id: "geral" }))).rejects.toThrow(/sede principal/);

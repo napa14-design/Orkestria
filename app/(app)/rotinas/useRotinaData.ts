@@ -13,6 +13,7 @@ import { coberturaPorHistorico, jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { sedeDaTela } from "@/lib/sedeDaTela";
+import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type {
   TipoLocalCatalogo,
   Ausencia,
@@ -56,6 +57,7 @@ export function useRotinaData(
   // leva para a mesma tela sem o parâmetro, e ela voltaria para a primeira sede.
   const [doLink] = useState(useSearchParams().get("sede"));
   const sedeId = sedeDaTela(sedes, sedeEscolhida, doLink);
+  useRegistrarTela(modo, sedeId);
 
   const { data: funcionarios } = useSWR<Funcionario[]>(sedeId ? `/api/funcionarios?sede=${sedeId}` : null, fetcher);
   const { data: tarefas } = useSWR<Tarefa[]>(sedeId ? `/api/tarefas?sede=${sedeId}` : null, fetcher);

@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   if (!usuario || !codigoConfere(usuario, senha_atual)) {
     return NextResponse.json(
       {
-        erro: "Não foi possível concluir o primeiro acesso. Confira o código recebido — se ele venceu, peça um novo ao administrador.",
+        erro: "Não foi possível concluir o primeiro acesso. Confira o código recebido — se ele venceu, peça um novo a quem cuidou do seu cadastro.",
       },
       { status: 401 },
     );

@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { fraseDoFeito } from "@/lib/agenda";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
+import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type { CentralDiaDados, NivelCentralDia, ResolucaoCentralDia } from "@/types";
 import Carregando from "./Carregando";
 
@@ -26,6 +27,8 @@ export default function CentralDoDia({ nome }: { nome: string }) {
     sedeVista ? `/api/central-dia?sede=${encodeURIComponent(sedeVista)}` : "/api/central-dia",
     fetcher,
   );
+  // Sem sede de verdade ("geral"), o servidor ignora o aviso.
+  useRegistrarTela("central", data?.escopo.sede_id ?? "");
 
   async function confirmarAlocacao(resolucao: ResolucaoCentralDia, sede: string) {
     setResolvendo(true);

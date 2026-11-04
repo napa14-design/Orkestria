@@ -18,9 +18,11 @@ import type { MapaTabelas, NomeTabela } from "./schema";
 /**
  * Tabelas que NÃO entram no histórico: o próprio histórico (recursão) e dado
  * derivado que o sistema regrava sozinho — o cache do resumo do Chromos
- * encheria o log de linhas que ninguém fez (22/10/2026).
+ * encheria o log de linhas que ninguém fez (22/10/2026). `uso_telas` é coleta
+ * temporária e precisa sumir inteira: no log imutável, sobreviveria ao apagamento,
+ * com o e-mail de quem abriu a tela.
  */
-const SEM_HISTORICO: ReadonlySet<NomeTabela> = new Set<NomeTabela>(["historico", "cache_resumo"]);
+const SEM_HISTORICO: ReadonlySet<NomeTabela> = new Set<NomeTabela>(["historico", "cache_resumo", "uso_telas"]);
 
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
 const CAMPOS_NOME = [

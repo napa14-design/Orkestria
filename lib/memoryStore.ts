@@ -213,6 +213,7 @@ function seed(): Banco {
     modelos_rotina: [],
     historico: [],
     cache_resumo: [],
+    uso_telas: [],
     ausencias: [],
     periodos_letivos: [],
     feriados: [],

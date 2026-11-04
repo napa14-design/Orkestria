@@ -2,9 +2,7 @@ import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
 import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { conviteAcesso } from "@/lib/emails/conviteAcesso";
-import { podeGerenciarUsuarios } from "@/lib/permissions";
-import { ErroPermissao } from "@/services/erros";
-import { gerarConviteUsuario } from "@/services/usuariosService";
+import { conferirConvite, gerarConviteUsuario } from "@/services/usuariosService";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -31,11 +29,8 @@ function urlDoSistema(req: Request): string {
  */
 export async function POST(req: Request, ctx: Ctx) {
   return comSessao(async (sessao) => {
-    if (!podeGerenciarUsuarios(sessao))
-      throw new ErroPermissao(
-        "Apenas administradores geram código de primeiro acesso.",
-      );
     const { id } = await ctx.params;
+    await conferirConvite(id, sessao);
     const convite = await gerarConviteUsuario(id);
 
     const ds = await getDataSource();

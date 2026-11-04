@@ -61,7 +61,7 @@ export interface Usuario {
  * em `Usuario` corria o risco de ser gravado no banco junto num update.
  */
 export interface UsuarioListado
-  extends Omit<Usuario, "senha_hash" | "convite_hash"> {
+  extends Pick<Usuario, "id" | "nome" | "email" | "perfil" | "sede_id" | "sedes_extra" | "ativo" | "criado_em" | "atualizado_em"> {
   /** `false` = ainda não fez o primeiro acesso. */
   senha_definida: boolean;
   /** Tem código de primeiro acesso gerado e dentro da validade. */

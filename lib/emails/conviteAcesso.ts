@@ -30,6 +30,11 @@ function dataBR(iso: string): string {
     : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+/** O nome é digitado por quem cadastra: sem isto, viraria link no e-mail da empresa. */
+function escaparHtml(texto: string): string {
+  return texto.replace(/[&<>"']/gu, (c) => `&#${c.charCodeAt(0)};`);
+}
+
 export function conviteAcesso(dados: ConviteAcesso): {
   assunto: string;
   texto: string;
@@ -41,8 +46,8 @@ export function conviteAcesso(dados: ConviteAcesso): {
   const texto = [
     `${primeiroNome}, seu acesso ao Orkestria está pronto.`,
     "",
-    "O Orkestria é onde a rotina da sua equipe passa a ser montada — o que hoje",
-    "você faz na planilha. Para entrar pela primeira vez, use o código abaixo:",
+    "O Orkestria é onde fica a rotina da equipe da sua sede.",
+    "Para entrar pela primeira vez, use o código abaixo:",
     "",
     `    ${dados.codigo}`,
     "",
@@ -58,7 +63,7 @@ export function conviteAcesso(dados: ConviteAcesso): {
     "ele deixa de funcionar.",
     "",
     "Se você perder o código ou esquecer a senha depois, peça um código novo a",
-    "quem administra o sistema.",
+    "quem cuidou do seu cadastro.",
     "",
     "Não precisa se preparar para nada: ao entrar, o sistema oferece um passo a",
     "passo dentro das próprias telas, e você faz no seu ritmo.",
@@ -75,10 +80,10 @@ export function conviteAcesso(dados: ConviteAcesso): {
       <tr><td style="padding:24px 24px 8px;">
         <!-- "Boas-vindas" e não "bem-vindo/bem-vinda": não presume o gênero de
              quem recebe, e a maioria das coordenações de sede é de mulheres. -->
-        <div style="font-size:21px;color:${TINTA};font-weight:bold;padding-bottom:12px;">Boas-vindas, ${primeiroNome}.</div>
+        <div style="font-size:21px;color:${TINTA};font-weight:bold;padding-bottom:12px;">Boas-vindas, ${escaparHtml(primeiroNome)}.</div>
         <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#4a584e;">
-          É aqui que a rotina da sua equipe passa a ser montada — o que hoje você faz
-          na planilha. Para entrar pela primeira vez, use o código abaixo.
+          É aqui que fica a rotina da equipe da sua sede. Para entrar pela primeira
+          vez, use o código abaixo.
         </div>
       </td></tr>
 

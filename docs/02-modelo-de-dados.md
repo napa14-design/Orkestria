@@ -317,6 +317,24 @@ Uma releitura custa uma leitura. Dado **derivado**: fica fora do histórico.
 | expira_em | ISO 8601 | mês aberto: 30 min; período já fechado: 1 dia |
 | criado_em | ISO 8601 | |
 
+### uso_telas
+Coleta temporária (05 a 18/11/2026, datas em `lib/usoTelas.ts`): quais telas foram
+abertas, por dia, perfil e sede. **Sem pessoa, sem hora e sem contagem**: é só
+"abriu ou não naquele dia". Fora do histórico, sem rota de leitura. Apagar até
+19/12/2026 e tirar a coleção e o código depois da análise. Em sede com um
+coordenador só, ainda dá para deduzir quem é: não usar para avaliar pessoa.
+Ao ler: abrir a Rotina registra `dia` na sede que abriu por padrão, e todo uso de
+Semana passa antes pelo Dia. "Abriu" não quer dizer que foi essa a sede ou o modo
+que a pessoa queria, e `dia` e a primeira sede da lista saem inflados.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| id | string | `<dia>__<perfil>__<sede_id>__<tela>` |
+| dia | string | YYYY-MM-DD, no fuso da operação |
+| perfil | string | coordenador ou supervisor |
+| sede_id | string | |
+| tela | string | central, dia, semana, acompanhamento, ficha_pdf |
+
 ### parametros
 | Campo | Tipo | Observação |
 |---|---|---|

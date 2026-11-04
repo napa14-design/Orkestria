@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   if (!usuario || !credencialCorreta) {
     return NextResponse.json(
       {
-        erro: "E-mail, senha ou código incorretos. Se este é o seu primeiro acesso, use o código que o administrador enviou.",
+        erro: "E-mail, senha ou código incorretos. Se este é o seu primeiro acesso, use o código que você recebeu.",
       },
       { status: 401 },
     );

@@ -29,6 +29,7 @@ import {
   hojeISO,
 } from "@/lib/dateUtils";
 import { sedeDaTela } from "@/lib/sedeDaTela";
+import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type {
   Ausencia,
   ExecucaoRealizada,
@@ -103,6 +104,7 @@ export default function PaginaAcompanhamento() {
   // A sede com que se chegou vale enquanto a tela estiver aberta (o menu tira o parâmetro).
   const [doLink] = useState(useSearchParams().get("sede"));
   const sedeId = sedeDaTela(sedes, sedeEscolhida, doLink);
+  useRegistrarTela("acompanhamento", sedeId);
 
   const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(
     sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null,
