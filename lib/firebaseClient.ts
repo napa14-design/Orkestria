@@ -74,6 +74,23 @@ export class FirebaseDataSource implements DataSource {
     });
   }
 
+  async atualizarSe<K extends NomeTabela>(
+    tabela: K,
+    id: string,
+    condicao: (atual: MapaTabelas[K]) => boolean,
+    mudancas: Partial<MapaTabelas[K]>,
+  ): Promise<MapaTabelas[K] | null> {
+    const ref = this.db.collection(tabela).doc(id);
+    return this.db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      if (!doc.exists) throw new Error(`Registro ${id} não encontrado em ${tabela}.`);
+      if (!condicao(doc.data() as MapaTabelas[K])) return null;
+      const atualizado = { ...(doc.data() as MapaTabelas[K]), ...semUndefined(mudancas) };
+      tx.set(ref, atualizado);
+      return atualizado;
+    });
+  }
+
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     await this.db.collection(tabela).doc(id).delete();
   }

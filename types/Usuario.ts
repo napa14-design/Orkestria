@@ -49,8 +49,8 @@ export interface Usuario {
    */
   versao_sessao?: number;
   /**
-   * Quem criou a conta. Só isto liga um coordenador ao colega que o cadastrou (ver
-   * `criouCoordenador`). Contas anteriores a 04/11/2026 não têm.
+   * Quem criou a conta: o histórico só guarda o nome de quem foi criado. Nunca vai para
+   * o cliente. Contas anteriores a 04/11/2026 não têm.
    */
   criado_por_id?: string;
   ativo: boolean;

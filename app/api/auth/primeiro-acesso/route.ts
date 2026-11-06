@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sessaoDoCadastro } from "@/lib/permissions";
 import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
+import { ErroConflito } from "@/services/erros";
 import {
   codigoConfere,
   definirSenhaUsuario,
@@ -68,7 +69,14 @@ export async function POST(req: Request) {
   // `definirSenhaUsuario` apaga o código junto, então ele não serve duas vezes.
   // Ele também sobe a versão de sessão: o cookie sai com a NOVA, senão a sessão
   // recém-criada cairia na primeira reconferência.
-  const sv = await definirSenhaUsuario(usuario.id, nova_senha, senha_atual);
+  // Com a versão lida agora: promovida no meio do caminho, a conta não fica com esta senha.
+  let sv: number;
+  try {
+    sv = await definirSenhaUsuario(usuario.id, nova_senha, senha_atual, usuario.versao_sessao ?? 0);
+  } catch (e) {
+    if (e instanceof ErroConflito) return NextResponse.json({ erro: e.message }, { status: 409 });
+    throw e;
+  }
   await gravarSessao(sessao, { sv });
   return NextResponse.json({ nome: usuario.nome, perfil: usuario.perfil });
 }

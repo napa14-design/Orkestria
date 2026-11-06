@@ -94,6 +94,8 @@ export interface PermissaoCrud<T> {
   criar?: boolean;
   /** Por item: falso esconde "Editar" e "Excluir" naquela linha. */
   alterar?: (item: T) => boolean;
+  /** O que aparece no lugar deles. Sem isto: "compartilhado". */
+  semAcao?: { texto: string; dica: string };
   /**
    * Falso esconde só o "Excluir". Funcionário não se exclui, se desliga (com
    * data e motivo) — a tela põe o "Desligar" no lugar via `acoesExtra`.
@@ -506,7 +508,7 @@ export default function CrudManager<T extends Registro>({
   /** Chamado com o registro recém-criado (não roda em edição). */
   aoCriar?: (criado: T) => void;
   /** Chamado depois de salvar uma edição (ex.: Funcionários, cuja edição pode passar um posto). */
-  aoEditar?: () => void;
+  aoEditar?: (salvo: T, antes: T) => void;
   /** Mensagem amigável quando ainda não há nada cadastrado. */
   vazio?: string;
   /**
@@ -628,7 +630,9 @@ export default function CrudManager<T extends Registro>({
   }
 
   function abrirEdicao(item: T) {
-    const inicial: Record<string, unknown> = {};
+    // `__antes`: o registro como está gravado, para os campos decidirem por ele e não pelo
+    // que já foi digitado. Como `__novo`, não vai para o servidor.
+    const inicial: Record<string, unknown> = { __antes: item };
     for (const c of campos) inicial[c.key] = valorDe(item, c.key) ?? "";
     setForm(inicial);
     setEditando(item);
@@ -650,8 +654,8 @@ export default function CrudManager<T extends Registro>({
     }
     try {
       if (editando) {
-        await apiPut(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
-        aoEditar?.();
+        const salvo = await apiPut<T>(`${endpoint.split("?")[0]}/${editando.id}`, corpo);
+        aoEditar?.(salvo, editando);
       } else {
         const criado = await apiPost<T>(endpoint.split("?")[0], corpo);
         // Deixa a tela reagir ao registro novo — Usuários usa isto para gerar e
@@ -669,6 +673,8 @@ export default function CrudManager<T extends Registro>({
       setAberto(false);
     } catch (err) {
       setErro(err instanceof ErroApi ? err.message : "Erro ao salvar.");
+      // Conflito: alguém mudou o registro. A lista atrás precisa mostrar o que está gravado.
+      if (err instanceof ErroApi && err.status === 409) void mutate();
     } finally {
       setSalvando(false);
     }
@@ -815,9 +821,9 @@ export default function CrudManager<T extends Registro>({
                   {permissao?.alterar && !permissao.alterar(item) ? (
                     <span
                       style={{ fontSize: 11, color: "var(--tinta-3)" }}
-                      title="Item compartilhado por todas as sedes — só um administrador altera."
+                      title={permissao.semAcao?.dica ?? "Item compartilhado por todas as sedes — só um administrador altera."}
                     >
-                      compartilhado
+                      {permissao.semAcao?.texto ?? "compartilhado"}
                     </span>
                   ) : (
                     <>

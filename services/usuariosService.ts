@@ -1,5 +1,6 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { criouCoordenador, lerSedesExtra, podeCriarCoordenador, podeGerirSupervisor, sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
+import { emailConfigurado } from "@/lib/emailConfig";
+import { lerSedesExtra, podeGerirCoordenador, podeGerirSupervisor, podeVerCoordenador, sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
 import {
   DIAS_VALIDADE_CODIGO,
   gerarCodigoAcesso,
@@ -9,7 +10,7 @@ import {
   verificarSenha,
 } from "@/lib/senha";
 import type { Usuario, UsuarioListado } from "@/types";
-import { ErroPermissao, ErroValidacao } from "./erros";
+import { ErroConflito, ErroPermissao, ErroValidacao } from "./erros";
 
 /** O código de primeiro acesso está gerado e ainda dentro da validade? */
 export function conviteValido(u: Usuario, agora = new Date()): boolean {
@@ -41,13 +42,27 @@ export function usuarioPublico(u: Usuario): UsuarioListado {
   };
 }
 
-/** O administrador vê todos; o coordenador, os supervisores que gerencia e os coordenadores que criou. */
+/** O administrador vê todos; o coordenador, os supervisores que gerencia e os coordenadores com sede em comum. */
 export async function getUsuarios(sessao: SessaoUsuario): Promise<UsuarioListado[]> {
   const ator = await conferirAtor(sessao);
   const todos = await (await getDataSource()).listar("usuarios");
   return (
-    ator.perfil === "administrador" ? todos : todos.filter((u) => podeGerirSupervisor(ator, u) || criouCoordenador(ator, u))
+    ator.perfil === "administrador" ? todos : todos.filter((u) => podeGerirSupervisor(ator, u) || podeVerCoordenador(ator, u))
   ).map(usuarioPublico);
+}
+
+const versaoDe = (u: Pick<Usuario, "versao_sessao">) => u.versao_sessao ?? 0;
+
+/**
+ * Grava só se a conta ainda estiver na versão lida na conferência. Toda mudança sensível
+ * sobe a versão, então código e senha não caem por cima de uma promoção feita no meio do
+ * caminho: com pedidos simultâneos, o código de supervisor voltava na tela de quem
+ * promovia, e a senha sobrevivia à promoção (revisão de segurança, 06/11/2026).
+ */
+async function gravarSeNaoMudou(id: string, versaoLida: number, mudancas: Partial<Usuario>): Promise<Usuario> {
+  const salvo = await (await getDataSource()).atualizarSe("usuarios", id, (u) => versaoDe(u) === versaoLida, mudancas);
+  if (!salvo) throw new ErroConflito("Esta conta acabou de mudar. Feche, abra de novo e confira antes de repetir.");
+  return salvo;
 }
 
 /**
@@ -60,6 +75,7 @@ export async function definirSenhaUsuario(
   id: string,
   novaSenha: string,
   codigoUsado?: string,
+  versaoLida?: number,
 ): Promise<number> {
   const problema = problemaNaSenha(novaSenha, codigoUsado);
   if (problema) throw new Error(problema);
@@ -69,8 +85,9 @@ export async function definirSenhaUsuario(
   // Senha nova derruba as sessões abertas em outros aparelhos (na próxima
   // reconferência). Quem chamou recebe a versão para emitir o próprio cookie
   // já com ela — senão a sessão recém-criada nasceria velha.
-  const versao_sessao = (usuario.versao_sessao ?? 0) + 1;
-  await ds.atualizar("usuarios", id, {
+  const lida = versaoLida ?? versaoDe(usuario);
+  const versao_sessao = lida + 1;
+  await gravarSeNaoMudou(id, lida, {
     senha_hash: hashSenha(novaSenha),
     convite_hash: "",
     convite_expira_em: "",
@@ -107,7 +124,7 @@ export async function trocarPropriaSenha(
     throw new ErroPermissao("Sua sessão terminou. Entre de novo.");
   if (usuario.senha_hash && !verificarSenha(senhaAtual, usuario.senha_hash))
     throw new Error("A senha atual não confere.");
-  return definirSenhaUsuario(id, novaSenha);
+  return definirSenhaUsuario(id, novaSenha, undefined, versaoDe(usuario));
 }
 
 /**
@@ -117,22 +134,30 @@ export async function trocarPropriaSenha(
  * serviço de e-mail e sem o administrador conhecer a senha de ninguém. Chamar de
  * novo invalida o código anterior.
  */
-export async function gerarConviteUsuario(id: string): Promise<{ codigo: string; expira_em: string }> {
-  const ds = await getDataSource();
-  const usuario = await ds.obter("usuarios", id);
+export async function gerarConviteUsuario(id: string, versaoLida?: number): Promise<{ codigo: string; expira_em: string }> {
+  const usuario = await (await getDataSource()).obter("usuarios", id);
   if (!usuario) throw new Error("Usuário não encontrado.");
-  const codigo = gerarCodigoAcesso();
+  const convite = prepararConvite();
+  await gravarConvite(id, versaoLida ?? versaoDe(usuario), convite);
+  return convite;
+}
+
+/** O código ainda sem gravar: quem só o entrega por e-mail envia antes de apagar a senha. */
+export function prepararConvite(): { codigo: string; expira_em: string } {
   const expira = new Date(Date.now() + DIAS_VALIDADE_CODIGO * 24 * 60 * 60 * 1000);
-  await ds.atualizar("usuarios", id, {
+  return { codigo: gerarCodigoAcesso(), expira_em: expira.toISOString() };
+}
+
+export async function gravarConvite(id: string, versaoLida: number, convite: { codigo: string; expira_em: string }): Promise<void> {
+  await gravarSeNaoMudou(id, versaoLida, {
     senha_hash: "",
-    convite_hash: hashSenha(normalizarCodigo(codigo)),
-    convite_expira_em: expira.toISOString(),
+    convite_hash: hashSenha(normalizarCodigo(convite.codigo)),
+    convite_expira_em: convite.expira_em,
     // "Esqueci a senha" também derruba a sessão que estiver aberta (inclusive
     // uma copiada): sem isto, com a renovação ela viveria até o teto.
-    versao_sessao: (usuario.versao_sessao ?? 0) + 1,
+    versao_sessao: versaoLida + 1,
     atualizado_em: agoraISO(),
   });
-  return { codigo, expira_em: expira.toISOString() };
 }
 
 /**
@@ -245,7 +270,9 @@ const CAMPOS_DO_CADASTRO: ReadonlySet<string> = new Set(["nome", "email", "perfi
 // `__x__` é nome reservado no Firestore: passaria aqui e voltaria como erro 500.
 const ID_SEDE = /^(?!__.*__$)[\w-]{1,64}$/u;
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/u;
-const NEGADO = "Você só gerencia contas de supervisor e só cria coordenadores nas sedes que opera.";
+const NEGADO = "Você só gerencia supervisores e coordenadores que estejam inteiramente nas sedes que opera.";
+
+const SEM_EMAIL = "O envio de e-mail não está configurado: peça a um administrador.";
 
 const invalido = (mensagem: string) =>
   new ErroValidacao([{ nivel: "erro", codigo: "CADASTRO_INVALIDO", mensagem }]);
@@ -320,6 +347,9 @@ export async function conferirAtor(sessao: SessaoUsuario): Promise<SessaoUsuario
   return atual;
 }
 
+const alcanca = (ator: SessaoUsuario, alvo: Parameters<typeof podeGerirSupervisor>[1]) =>
+  podeGerirSupervisor(ator, alvo) || podeGerirCoordenador(ator, alvo);
+
 export async function createUsuario(corpo: unknown, sessao: SessaoUsuario): Promise<Usuario> {
   const ator = await conferirAtor(sessao);
   const dados = lerCorpo(corpo);
@@ -328,8 +358,7 @@ export async function createUsuario(corpo: unknown, sessao: SessaoUsuario): Prom
   validarPerfil(perfil, sede_id);
   if (
     ator.perfil !== "administrador" &&
-    !podeGerirSupervisor(ator, { id: "", perfil, sede_id, sedes_extra: dados.sedes_extra }) &&
-    !podeCriarCoordenador(ator, { perfil, sede_id, sedes_extra: dados.sedes_extra })
+    !alcanca(ator, { id: "", perfil, sede_id, sedes_extra: dados.sedes_extra })
   )
     throw new ErroPermissao(NEGADO);
   await exigirEmailLivre(email);
@@ -358,23 +387,26 @@ export async function updateUsuario(id: string, corpo: unknown, sessao: SessaoUs
   const ds = await getDataSource();
   const atual = await ds.obter("usuarios", id);
   // Mesma resposta para fora do escopo e para inexistente: não revela quem existe.
-  if (coordenador && (!atual || !podeGerirSupervisor(ator, atual))) throw new ErroPermissao(NEGADO);
+  if (coordenador && (!atual || !alcanca(ator, atual))) throw new ErroPermissao(NEGADO);
   if (!atual) throw new Error("Usuário não encontrado.");
   // Reativar é do administrador: um ex-funcionário não volta sem ele saber.
   if (coordenador && atual.ativo !== true && mudancas.ativo === true)
     throw new ErroPermissao("Só um administrador reativa uma conta.");
   const perfil = mudancas.perfil ?? atual.perfil;
   const sedeId = mudancas.sede_id ?? atual.sede_id;
-  validarPerfil(perfil, sedeId);
-  if (
-    coordenador &&
-    !podeGerirSupervisor(ator, { id, perfil, sede_id: sedeId, sedes_extra: mudancas.sedes_extra ?? atual.sedes_extra })
-  )
-    throw new ErroPermissao(NEGADO);
-  await validarSedeUsuario(sedeId);
   const emailAtual = String(atual.email ?? "").trim().toLowerCase();
   // Reenviar o mesmo e-mail do formulário não é troca, nem de caixa.
   if (mudancas.email === emailAtual) delete mudancas.email;
+  // Os dois caminhos para entrar como o colega: com o e-mail trocado, o código iria para
+  // a caixa de quem editou; rebaixado a supervisor, o código voltaria na tela dele.
+  if (coordenador && atual.perfil === "coordenador") {
+    if (mudancas.email) throw new ErroPermissao("Só um administrador troca o e-mail de um coordenador.");
+    if (perfil !== "coordenador") throw new ErroPermissao("Só um administrador tira o perfil de coordenador.");
+  }
+  validarPerfil(perfil, sedeId);
+  if (coordenador && !alcanca(ator, { id, perfil, sede_id: sedeId, sedes_extra: mudancas.sedes_extra ?? atual.sedes_extra }))
+    throw new ErroPermissao(NEGADO);
+  await validarSedeUsuario(sedeId);
   if (mudancas.email) await exigirEmailLivre(mudancas.email, id);
   // Renormaliza sempre, mesmo quando `sedes_extra` não veio no corpo: trocar só
   // o perfil (ou passar a sede para "geral") tem que limpar as extras, senão
@@ -388,26 +420,45 @@ export async function updateUsuario(id: string, corpo: unknown, sessao: SessaoUs
     !!mudancas.email ||
     sedeId !== atual.sede_id ||
     sedes_extra !== (atual.sedes_extra ?? "") ||
-    (mudancas.ativo === false && atual.ativo !== false);
-  return ds.atualizar("usuarios", id, {
-    ...mudancas,
-    sedes_extra,
-    ...(sensivel ? { versao_sessao: (atual.versao_sessao ?? 0) + 1, convite_hash: "", convite_expira_em: "" } : {}),
-    atualizado_em: agoraISO(),
+    (mudancas.ativo !== undefined && mudancas.ativo !== atual.ativo);
+  // Quem sai de supervisor entra de novo pelo código: o código de supervisor aparece na
+  // tela do coordenador, então a senha pode ter sido definida por ele. Vale para qualquer
+  // destino e qualquer autor: promovida pelo administrador a administrador, a conta
+  // continuaria com a senha que o colega escolheu (revisão de segurança, 06/11/2026).
+  const saiDeSupervisor = atual.perfil === "supervisor" && perfil !== "supervisor";
+  if (coordenador && saiDeSupervisor) {
+    if (!emailConfigurado()) throw invalido(SEM_EMAIL);
+    if ((mudancas.ativo ?? atual.ativo) !== true) throw invalido("Só uma conta ativa pode virar coordenador.");
+  }
+  const dados = { ...mudancas, sedes_extra, atualizado_em: agoraISO() };
+  // Também na edição comum: "não sensível" foi decidido sobre uma leitura que já pode estar
+  // velha, e o formulário manda perfil, sede e ativo. Sem a condição, renomear em paralelo
+  // desfazia a inativação ou a retirada de sede feita pelo administrador.
+  if (!sensivel) return gravarSeNaoMudou(id, versaoDe(atual), dados);
+  return gravarSeNaoMudou(id, versaoDe(atual), {
+    ...dados,
+    versao_sessao: versaoDe(atual) + 1,
+    convite_hash: "",
+    convite_expira_em: "",
+    ...(saiDeSupervisor ? { senha_hash: "" } : {}),
   });
 }
 
 /**
- * Confere ANTES de gerar: gerar apaga a senha da pessoa. No coordenador que criou, só
- * enquanto ele não tem senha: depois disso seria entrar como o colega.
+ * Confere ANTES de gerar: gerar apaga a senha da pessoa. Devolve `soPorEmail`: o código de
+ * um coordenador nunca volta para o colega que pediu, senão ele entraria como a pessoa ou
+ * criaria conta com um e-mail que não é dele (revisão de segurança, 04/11/2026). Sem envio
+ * de e-mail, recusa aqui, antes de a senha sumir.
  */
-export async function conferirConvite(id: string, sessao: SessaoUsuario): Promise<void> {
+export async function conferirConvite(id: string, sessao: SessaoUsuario): Promise<{ soPorEmail: boolean; versao: number }> {
   const ator = await conferirAtor(sessao);
   const alvo = await (await getDataSource()).obter("usuarios", id);
-  if (ator.perfil !== "administrador" && (!alvo || !(podeGerirSupervisor(ator, alvo) || (criouCoordenador(ator, alvo) && !alvo.senha_hash))))
-    throw new ErroPermissao(NEGADO);
+  if (ator.perfil !== "administrador" && (!alvo || !alcanca(ator, alvo))) throw new ErroPermissao(NEGADO);
   if (!alvo) throw new Error("Usuário não encontrado.");
   if (alvo.ativo !== true) throw invalido("Esta conta está inativa: reative antes de gerar um código.");
+  const soPorEmail = ator.perfil !== "administrador" && alvo.perfil === "coordenador";
+  if (soPorEmail && !emailConfigurado()) throw invalido(SEM_EMAIL);
+  return { soPorEmail, versao: versaoDe(alvo) };
 }
 
 export async function deleteUsuario(id: string): Promise<void> {

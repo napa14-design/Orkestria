@@ -7,6 +7,58 @@
 
 ---
 
+## 2026-11-06 — Coordenador vê e edita coordenador; o código vai só por e-mail
+
+Relato da coordenação: a lista de Usuários vinha vazia, e trocar um supervisor para
+coordenador era recusado com uma mensagem que falava em sedes, a quem operava a sede. O dono
+decidiu que o coordenador vê, cria e edita coordenadores das sedes dele. Ao mesmo tempo, a
+revisão de segurança bloqueou a versão de 04/11: quem criava via o código na tela e podia
+entrar como o colega, ou criar conta com um e-mail que não era dele.
+
+- **Vê** quem tem ao menos uma sede em comum (`podeVerCoordenador`); **edita** quem está
+  inteiro nas sedes dele (`podeGerirCoordenador`): nome, sedes dentro das dele e inativar. O
+  que também opera outra sede aparece só para consulta.
+- **O código de coordenador vai só para o e-mail da pessoa** quando quem pede é um
+  coordenador: a resposta não traz o código. Envia antes de gravar, então uma falha de envio
+  mantém a senha de quem a tinha. Na promoção a senha já caiu ao salvar: se o envio falhar, a
+  tela diz que a pessoa não entra até receber um código. Sem envio configurado, recusa.
+  Administrador e código de supervisor seguem como eram.
+- **Promover supervisor a coordenador agora pode**, e a pessoa entra de novo pelo código no
+  e-mail: sem isso, bastava criar supervisor, ver o código na tela, entrar e se promover.
+- **Qualquer saída do perfil supervisor apaga a senha**, para qualquer destino e por qualquer
+  autor, inclusive o administrador: o código de supervisor aparece na tela do coordenador,
+  então a senha pode ser dele. Quem entra pelo Google não é afetado.
+- **Toda gravação de conta só vale se ela não mudou desde a leitura** (`atualizarSe`, no
+  contrato do `DataSource`; a resposta é 409): código, senha e edição, inclusive a comum. A
+  revisão de segurança bloqueou duas versões desta correção: com pedidos simultâneos, o código
+  de supervisor voltava na tela de quem promovia, a senha sobrevivia à promoção, e renomear em
+  paralelo desfazia uma inativação do administrador. Reativar também derruba a sessão. A
+  leitura é a do servidor no próprio pedido: quem deixa um formulário aberto e salva depois
+  ainda grava por cima, porque a tela não manda a versão.
+- **Continua do administrador**, porque daria para entrar como o colega: trocar o e-mail de
+  um coordenador (o código iria para outra caixa) e tirar o perfil dele (o código voltaria na
+  tela). Reativar e excluir também.
+- O perfil não vem mais marcado ao criar: com "Supervisor" já escolhido, quem queria um
+  coordenador salvava outra coisa sem perceber.
+- **Riscos que ficam, aceitos pelo dono:** sem limite de domínio, dá para criar conta com
+  e-mail pessoal, que sobrevive à saída de quem criou; quem inativa ou zera a senha de um
+  colega atrapalha, sem entrar como ele. Dois coordenadores das mesmas sedes podem se editar:
+  quem tira uma sede do outro deixa de ser alcançado por ele, e só o administrador desfaz. Não
+  há limite de envios de código. A lista de consulta traz, na resposta da API, sedes fora do
+  alcance e o estado de acesso do colega, sem segredo. A sessão copiada continua valendo até a reconferência de 1 h
+  também para cadastrar. O histórico não diz quem criou quem: `criado_por_id` só se vê no banco.
+
+Arquivos: `lib/permissions.ts`, `services/usuariosService.ts`, `services/erros.ts`,
+`lib/datasource.ts`, `lib/firebaseClient.ts`, `lib/memoryStore.ts`, `lib/googleSheetsClient.ts`,
+`lib/historico.ts`, `lib/api.ts`, `lib/email.ts`, `lib/emailConfig.ts`,
+`lib/emails/conviteAcesso.ts`, `app/api/usuarios/[id]/codigo/route.ts`,
+`app/api/auth/primeiro-acesso/route.ts`, `app/(app)/usuarios/page.tsx`,
+`components/CrudManager.tsx`, `testes/coordenador-supervisores.test.ts`,
+`testes/datasource-contrato.test.ts`, `testes/usuarios-tela.test.ts`,
+`testes/usuarios-formulario.test.ts`.
+
+---
+
 ## 2026-11-04 — Serviço eventual conta na ocupação
 
 Relato da coordenação: quatro pessoas ficam com detector de metal nas provas, quartas e

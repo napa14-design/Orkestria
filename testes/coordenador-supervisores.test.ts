@@ -10,9 +10,23 @@ import { getDataSource } from "@/lib/datasource";
 import { conviteAcesso } from "@/lib/emails/conviteAcesso";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import type { SessaoUsuario } from "@/lib/permissions";
-import { criouCoordenador, podeCriarCoordenador, podeGerirSupervisor, sessaoDoCadastro } from "@/lib/permissions";
-import { codigoConfere, gerarConviteUsuario, getUsuarioPorEmail } from "@/services/usuariosService";
+import { podeGerirCoordenador, podeGerirSupervisor, podeVerCoordenador, sessaoDoCadastro } from "@/lib/permissions";
+import { ErroConflito } from "@/services/erros";
+import { hashSenha } from "@/lib/senha";
+import { codigoConfere, gerarConviteUsuario, getUsuarioPorEmail, trocarPropriaSenha } from "@/services/usuariosService";
 import type { Usuario } from "@/types";
+
+const smtp = vi.hoisted(() => ({ ligado: true, falha: false }));
+const enviados = vi.hoisted(() => [] as { para: string }[]);
+vi.mock("@/lib/emailConfig", () => ({ emailConfigurado: () => smtp.ligado }));
+vi.mock("@/lib/email", () => ({
+  emailConfigurado: () => smtp.ligado,
+  enviarEmail: async (args: { para: string }) => {
+    if (smtp.falha) return { enviado: false, motivo: "smtp.interno:587 recusou" };
+    enviados.push(args);
+    return { enviado: true };
+  },
+}));
 
 let sessao: SessaoUsuario | null = null;
 vi.mock("@/lib/session", () => ({
@@ -59,6 +73,9 @@ async function nega(id: string, chamada: () => Promise<Response>, ...status: num
 describe("coordenador cadastra supervisor", () => {
   beforeEach(async () => {
     reiniciarBanco();
+    smtp.ligado = true;
+    smtp.falha = false;
+    enviados.length = 0;
     const d = await getDataSource();
     const sede = await d.obter("sedes", A);
     await d.criar("sedes", { ...sede!, id: C, nome_sede: "Sede C" });
@@ -229,8 +246,7 @@ describe("coordenador cadastra supervisor", () => {
       }
     });
 
-    it("perfil: só 'supervisor' ou 'coordenador' exatos, e editar não promove", async () => {
-      await nega("sA", () => editar("sA", { perfil: "coordenador" }));
+    it("perfil: só 'supervisor' ou 'coordenador' exatos", async () => {
       for (const perfil of ["administrador", "visualizador", "Supervisor", "supervisor ", "Coordenador", "coordenador ", ["supervisor"], ["coordenador"], null, "", 0]) {
         await nega("sA", () => editar("sA", { perfil }), 403, 422);
         expect([403, 422]).toContain((await POST(corpo(novo({ perfil })))).status);
@@ -335,10 +351,10 @@ describe("coordenador cadastra supervisor", () => {
       expect(ids).toEqual(["sA", "sAB"]);
     });
 
-    it("o geral vê os supervisores de todas as sedes, sem o legado e o de caixa diferente", async () => {
+    it("o geral vê supervisores e coordenadores de todas as sedes, sem o legado e o de caixa diferente", async () => {
       sessao = CG;
       const ids = (await (await GET()).json()).map((u: Usuario) => u.id).sort();
-      expect(ids).toEqual(["sA", "sAB", "sAC", "sC"]);
+      expect(ids).toEqual(["c1", "coord2", "sA", "sAB", "sAC", "sC"]);
     });
 
     it("nenhuma resposta carrega segredo, para nenhum perfil", async () => {
@@ -403,21 +419,27 @@ describe("coordenador cadastra supervisor", () => {
       expect(html).not.toContain('<a/href="http://mal"');
       expect(html).toContain("&#60;a/href");
     });
+
+    it("a validade do e-mail é a de Fortaleza, seja qual for o fuso do servidor", () => {
+      vi.stubEnv("TZ", "UTC"); // o da Vercel: sem o fuso fixo, sairia "21 de novembro"
+      const { texto } = conviteAcesso({ nome: "A", codigo: "AAAA", expiraEm: "2026-11-21T01:00:00Z", url: "http://x" });
+      vi.unstubAllEnvs();
+      expect(texto).toContain("20 de novembro");
+    });
   });
 
-  describe("coordenador cria coordenador, e só cria", () => {
+  describe("coordenador gerencia coordenador das sedes dele", () => {
     const criar = async (extra: Record<string, unknown> = {}) => {
       const r = await POST(corpo(novo({ perfil: "coordenador", email: "coord-novo@x.com", ...extra })));
       expect(r.status).toBe(201);
       return (await r.json()).id as string;
     };
+    /** Coordenador da mesma sede, já com senha: o colega que não pode ser tomado. */
+    const colega = async (extra: Partial<Usuario> = {}) => conta("par", "coordenador", A, { email: "par@x.com", ...extra });
 
-    it("cria nas sedes dele, o código sai na hora, e a conta nova só alcança aquelas sedes", async () => {
+    it("cria nas sedes dele, com a autoria da sessão, e a conta nova só alcança aquelas sedes", async () => {
       const id = await criar({ sedes_extra: B });
       expect(await ler(id)).toMatchObject({ perfil: "coordenador", sede_id: A, sedes_extra: B, criado_por_id: "c1", ativo: true });
-      const g = await codigo(id);
-      expect(g.status).toBe(200);
-      expect(codigoConfere((await ler(id))!, (await g.json()).codigo)).toBe(true);
       expect(sessaoDoCadastro((await ler(id))!)).toMatchObject({ perfil: "coordenador", sedes: [A, B] });
     });
 
@@ -439,69 +461,311 @@ describe("coordenador cadastra supervisor", () => {
 
     it("não forja quem criou", async () => {
       expect((await POST(corpo(novo({ perfil: "coordenador", criado_por_id: "adm1" })))).status).toBe(422);
-      const r = await POST(corpo(novo({ criado_por_id: "c1" })));
-      expect(r.status).toBe(422);
-      await nega("coord2", () => editar("coord2", { criado_por_id: "c1" }), 422);
+      await colega();
+      await nega("par", () => editar("par", { criado_por_id: "c1" }), 422);
     });
 
-    it("não edita nem exclui nenhum coordenador, nem o que ele mesmo criou", async () => {
-      const id = await criar();
-      for (const c of [{ nome: "X" }, { email: "y@x.com" }, { ativo: false }, { perfil: "supervisor" }, { perfil: "administrador" }, { sede_id: B }, { sedes_extra: B }])
-        await nega(id, () => editar(id, c));
-      await nega(id, () => DELETE(corpo({}, "DELETE"), ctx(id)));
-      await nega("coord2", () => DELETE(corpo({}, "DELETE"), ctx("coord2")));
-    });
-
-    it("o código só sai enquanto o criado não tem senha: depois seria entrar como o colega", async () => {
-      const id = await criar();
-      await (await getDataSource()).atualizar("usuarios", id, { senha_hash: "salt:hash" });
-      await nega(id, () => codigo(id));
-    });
-
-    it("o colega que ele não criou fica de fora, mesmo sem senha e na mesma sede", async () => {
-      await conta("par", "coordenador", A, { senha_hash: "" });
-      await conta("deOutro", "coordenador", A, { senha_hash: "", criado_por_id: "cg" });
-      for (const id of ["par", "deOutro"]) await nega(id, () => codigo(id));
-      const ids = (await (await GET()).json()).map((u: Usuario) => u.id);
-      expect(ids).not.toEqual(expect.arrayContaining(["par"]));
-      expect(ids).not.toEqual(expect.arrayContaining(["deOutro"]));
-    });
-
-    it("a lista mostra o que ele criou, sem dizer quem criou, e só para ele", async () => {
-      const id = await criar();
+    it("vê quem tem sede em comum, sem segredo; quem não tem nenhuma fica de fora", async () => {
+      await colega();
+      await conta("meio", "coordenador", A, { sedes_extra: C });
       const lista = await (await GET()).json();
-      expect(lista.map((u: Usuario) => u.id)).toContain(id);
+      const ids = lista.map((u: Usuario) => u.id);
+      expect(ids).toEqual(expect.arrayContaining(["par", "meio"]));
+      expect(ids).not.toContain("coord2"); // só a sede C
+      expect(ids).not.toContain("cg"); // "geral" não é sede em comum
+      expect(ids).not.toContain("c1"); // ele mesmo
+      expect(ids).not.toContain("adm1");
       expect(JSON.stringify(lista)).not.toMatch(/criado_por_id|senha_hash|convite_hash/u);
-      sessao = { ...C1, id: "outro", email: "outro@x.com" };
-      await conta("outro", "coordenador", A, { email: "outro@x.com", sedes_extra: B });
-      expect((await (await GET()).json()).map((u: Usuario) => u.id)).not.toContain(id);
-      await nega(id, () => codigo(id));
     });
 
-    it("quem perdeu a sede ou o perfil deixa de ver e de gerar código", async () => {
-      const id = await criar();
+    it("edita nome e sedes de quem está inteiro nas sedes dele, e inativa, mas não reativa nem exclui", async () => {
+      await colega();
+      expect((await editar("par", { nome: "Par Novo", sede_id: B, sedes_extra: A })).status).toBe(200);
+      expect(await ler("par")).toMatchObject({ nome: "Par Novo", sede_id: B, sedes_extra: A, senha_hash: "salt:hash" });
+      expect((await editar("par", { ativo: false })).status).toBe(200);
+      await nega("par", () => editar("par", { ativo: true }));
+      await nega("par", () => DELETE(corpo({}, "DELETE"), ctx("par")));
+    });
+
+    it("o que opera sede fora das dele, só vê: nem edita, nem gera código, nem puxa para dentro", async () => {
+      await conta("meio", "coordenador", A, { sedes_extra: C });
+      await nega("meio", () => editar("meio", { nome: "X" }));
+      await nega("meio", () => editar("meio", { sedes_extra: "" }));
+      await nega("meio", () => codigo("meio"));
+    });
+
+    it("não dá sede que ele não opera ao colega", async () => {
+      await colega();
+      await nega("par", () => editar("par", { sede_id: C }));
+      await nega("par", () => editar("par", { sedes_extra: C }));
+    });
+
+    it("tomar a conta: o e-mail de um coordenador só o administrador troca", async () => {
+      await colega();
+      await nega("par", () => editar("par", { email: "c1-pessoal@x.com" }));
+      await nega("par", () => editar("par", { email: "c1-pessoal@x.com", nome: "Par" }));
+      // Reenviar o mesmo e-mail é o que o formulário faz: não é troca.
+      expect((await editar("par", { nome: "Par 2", email: "PAR@x.com" })).status).toBe(200);
+      expect((await ler("par"))?.email).toBe("par@x.com");
+      sessao = ADM;
+      expect((await editar("par", { email: "novo-par@x.com" })).status).toBe(200);
+    });
+
+    it("tomar a conta: rebaixar o colega abriria o código na tela, então é do administrador", async () => {
+      await colega();
+      for (const perfil of ["supervisor", "visualizador", "administrador"]) await nega("par", () => editar("par", { perfil }));
+      expect(await (await editar("par", { perfil: "supervisor" })).json()).toMatchObject({ erro: "Só um administrador tira o perfil de coordenador." });
+      sessao = ADM;
+      expect((await editar("par", { perfil: "supervisor" })).status).toBe(200);
+    });
+
+    it("o código do coordenador nunca volta para quem pediu, e o e-mail é o único caminho", async () => {
+      await colega();
+      for (const id of ["par", await criar()]) {
+        const r = await codigo(id);
+        expect(r.status).toBe(200);
+        const corpoR = await r.json();
+        expect(corpoR).not.toHaveProperty("codigo");
+        expect(JSON.stringify(corpoR)).not.toMatch(/[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}/u);
+        expect(enviados.at(-1)).toMatchObject({ para: (await ler(id))?.email });
+      }
+      // A senha sai, e quem pediu não tem o código: só quem tem a caixa entra.
+      expect((await ler("par"))?.senha_hash).toBe("");
+    });
+
+    it("sem e-mail configurado, recusa antes de apagar a senha do colega", async () => {
+      await colega();
+      smtp.ligado = false;
+      await nega("par", () => codigo("par"), 422);
+      expect(await (await codigo("par")).json()).toMatchObject({ erro: expect.stringContaining("administrador") });
+    });
+
+    it("e-mail que falha: nada muda na conta, a senha segue valendo, e o erro do SMTP não vaza", async () => {
+      await colega();
+      smtp.falha = true;
+      const antes = JSON.stringify(await ler("par"));
+      const r = await (await codigo("par")).json();
+      expect(r).not.toHaveProperty("codigo");
+      expect(r.email).toMatchObject({ enviado: false, destino: "par@x.com" });
+      expect(JSON.stringify(r)).not.toContain("smtp.interno");
+      expect(JSON.stringify(await ler("par"))).toBe(antes);
+    });
+
+    it("supervisor segue como era: o código volta para o coordenador", async () => {
+      expect(await (await codigo("sA")).json()).toHaveProperty("codigo");
+    });
+
+    it("administrador segue vendo o código de quem for", async () => {
+      await colega();
+      sessao = ADM;
+      expect(await (await codigo("par")).json()).toHaveProperty("codigo");
+    });
+
+    it("promover supervisor: vira coordenador e tem de provar a caixa de novo", async () => {
+      const antes = (await ler("sA"))!;
+      const r = await editar("sA", { perfil: "coordenador" });
+      expect(r.status).toBe(200);
+      const depois = (await ler("sA"))!;
+      expect(depois).toMatchObject({ perfil: "coordenador", senha_hash: "", convite_hash: "" });
+      expect(depois.versao_sessao).toBe((antes.versao_sessao ?? 0) + 1);
+      // O caminho do ataque: criar supervisor, ver o código na tela, entrar e se promover.
+      expect(await (await codigo("sA")).json()).not.toHaveProperty("codigo");
+    });
+
+    it("sem e-mail configurado, nem promove: a senha sairia sem ter como mandar o código", async () => {
+      smtp.ligado = false;
+      await nega("sA", () => editar("sA", { perfil: "coordenador" }), 422);
+    });
+
+    it("sair de supervisor apaga a senha para qualquer destino e qualquer autor: ela pode ser do colega", async () => {
+      sessao = ADM;
+      for (const [id, perfil] of [["sA", "coordenador"], ["sAB", "administrador"], ["sC", "visualizador"]]) {
+        expect((await editar(id, { perfil })).status).toBe(200);
+        expect((await ler(id))?.senha_hash, perfil).toBe("");
+      }
+      // O administrador vê o código, como sempre.
+      expect(await (await codigo("sA")).json()).toHaveProperty("codigo");
+    });
+
+    it("rebaixar pelo administrador, o colega definir a senha, e devolver o perfil: a senha não volta", async () => {
+      await colega();
+      sessao = ADM;
+      await editar("par", { perfil: "supervisor" });
+      await (await getDataSource()).atualizar("usuarios", "par", { senha_hash: "senha-do-colega" });
+      await editar("par", { perfil: "coordenador" });
+      expect((await ler("par"))?.senha_hash).toBe("");
+    });
+
+    it("mudança que não tira de supervisor não mexe na senha", async () => {
+      await colega();
+      sessao = ADM;
+      expect((await editar("par", { perfil: "administrador", sede_id: "geral" })).status).toBe(200);
+      expect((await ler("par"))?.senha_hash).toBe("salt:hash");
+      expect((await editar("sA", { sede_id: B })).status).toBe(200);
+      expect((await ler("sA"))?.senha_hash).toBe("salt:hash");
+    });
+
+    it("promover e inativar no mesmo salvar é recusado: o código não sairia", async () => {
+      await nega("sA", () => editar("sA", { perfil: "coordenador", ativo: false }), 422);
+    });
+
+    describe("corridas: a conta muda entre a leitura e a gravação, pelas rotas", () => {
+      /** Roda `acao` na n-ésima leitura que casar: é o pedido do outro chegando no meio deste. */
+      const intercalar = async (casa: (t: string, i: string) => boolean, nVezes: number, acao: () => Promise<unknown>) => {
+        const d = await getDataSource();
+        const orig = d.obter.bind(d);
+        let n = 0;
+        return vi.spyOn(d, "obter").mockImplementation((async (tab: string, id: string) => {
+          if (casa(tab, id) && ++n === nVezes) await acao();
+          return orig(tab as never, id);
+        }) as never);
+      };
+      const comoAdm = (f: () => Promise<unknown>) => async () => {
+        const s = sessao;
+        sessao = ADM;
+        expect(((await f()) as Response).status).toBe(200);
+        sessao = s;
+      };
+      const naConta = (id: string) => (t: string, i: string) => t === "usuarios" && i === id;
+      const naSede = (t: string) => t === "sedes";
+
+      it("rota do código: promovida entre conferir e gravar, o código não sai nem é gravado", async () => {
+        const spy = await intercalar(naConta("sA"), 2, comoAdm(() => editar("sA", { perfil: "coordenador" })));
+        const r = await codigo("sA");
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        expect(await r.json()).not.toHaveProperty("codigo");
+        expect(await ler("sA")).toMatchObject({ perfil: "coordenador", convite_hash: "", senha_hash: "" });
+      });
+
+      it("rota do primeiro acesso: promovida entre conferir e gravar, a senha não é gravada", async () => {
+        const { codigo: cod } = await gerarConviteUsuario("sA");
+        const { POST: primeiro } = await import("@/app/api/auth/primeiro-acesso/route");
+        const spy = await intercalar(naConta("sA"), 1, comoAdm(() => editar("sA", { perfil: "coordenador" })));
+        const r = await primeiro(corpo({ email: "sA@x.com", senha_atual: cod, nova_senha: "Senha-Do-Colega-1!" }));
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        expect(await ler("sA")).toMatchObject({ perfil: "coordenador", senha_hash: "" });
+      });
+
+      it("promoção: código gravado depois de ela ler a conta, a promoção recusa em vez de passar por cima", async () => {
+        let visto = "";
+        const spy = await intercalar(naSede, 1, async () => {
+          visto = (await gerarConviteUsuario("sA")).codigo;
+        });
+        const r = await editar("sA", { perfil: "coordenador" });
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        const g = (await ler("sA"))!;
+        expect(g.perfil).toBe("supervisor");
+        expect(codigoConfere(g, visto)).toBe(true);
+      });
+
+      it("trocar a própria senha: conta promovida no meio, a senha não é gravada", async () => {
+        await (await getDataSource()).atualizar("usuarios", "sA", { senha_hash: hashSenha("Senha-Atual-1!x") });
+        const spy = await intercalar(naConta("sA"), 2, comoAdm(() => editar("sA", { perfil: "coordenador" })));
+        await expect(trocarPropriaSenha("sA", "Senha-Atual-1!x", "Senha-Nova-Certa-1!")).rejects.toBeInstanceOf(ErroConflito);
+        spy.mockRestore();
+        expect(await ler("sA")).toMatchObject({ perfil: "coordenador", senha_hash: "" });
+      });
+
+      it("edição comum não desfaz a inativação do administrador feita no meio", async () => {
+        await colega();
+        const spy = await intercalar(naSede, 1, comoAdm(() => editar("par", { ativo: false })));
+        const r = await editar("par", { nome: "Renomeado", email: "par@x.com", perfil: "coordenador", sede_id: A, sedes_extra: "", ativo: true });
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        expect(await ler("par")).toMatchObject({ ativo: false, nome: "par" });
+      });
+
+      it("renomear não devolve a sede que o administrador acabou de tirar, nem por acidente", async () => {
+        await colega({ sedes_extra: B });
+        const spy = await intercalar(naSede, 1, comoAdm(() => editar("par", { sedes_extra: "" })));
+        const r = await editar("par", { nome: "Renomeado" });
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        expect(await ler("par")).toMatchObject({ sedes_extra: "", nome: "par" });
+      });
+
+      it("edição comum não desfaz o rebaixamento do administrador feito no meio", async () => {
+        await colega();
+        const spy = await intercalar(naSede, 1, comoAdm(() => editar("par", { perfil: "supervisor" })));
+        const r = await editar("par", { nome: "Renomeado", perfil: "coordenador" });
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        expect((await ler("par"))?.perfil).toBe("supervisor");
+      });
+
+      it("código de colega: a conta muda depois do e-mail, 409 avisa que o e-mail pode chegar", async () => {
+        await colega();
+        const spy = await intercalar(naConta("par"), 2, comoAdm(() => editar("par", { nome: "Mudou", sedes_extra: B })));
+        const r = await codigo("par");
+        spy.mockRestore();
+        expect(r.status).toBe(409);
+        const corpoR = await r.json();
+        expect(corpoR.erro).toContain("último envio");
+        expect(corpoR).not.toHaveProperty("codigo");
+        expect((await ler("par"))?.senha_hash).toBe("salt:hash");
+      });
+
+      it("reativar também derruba a sessão, como inativar", async () => {
+        await conta("par", "coordenador", A, { ativo: false, versao_sessao: 7 });
+        sessao = ADM;
+        expect((await editar("par", { ativo: true })).status).toBe(200);
+        expect((await ler("par"))?.versao_sessao).toBe(8);
+      });
+
+      it("a resposta de conflito é 409, para a tela pedir nova tentativa", async () => {
+        const { comSessao } = await import("@/lib/api");
+        const r = await comSessao(async () => {
+          throw new ErroConflito("mudou");
+        });
+        expect(r.status).toBe(409);
+      });
+    });
+
+    it("erro do SMTP no código de supervisor: o motivo cru é só do administrador", async () => {
+      smtp.falha = true;
+      expect(JSON.stringify(await (await codigo("sA")).json())).not.toContain("smtp.interno");
+      sessao = ADM;
+      expect(JSON.stringify(await (await codigo("sAB")).json())).toContain("smtp.interno");
+    });
+
+    it("não promove quem tem sede fora, e nunca a administrador", async () => {
+      await nega("sAC", () => editar("sAC", { perfil: "coordenador" }));
+      await nega("sA", () => editar("sA", { perfil: "coordenador", sede_id: C }));
+      await nega("sA", () => editar("sA", { perfil: "administrador" }));
+    });
+
+    it("quem perdeu a sede ou o perfil deixa de ver e de editar", async () => {
+      await colega();
       const d = await getDataSource();
       await d.atualizar("usuarios", "c1", { sede_id: C, sedes_extra: "" });
-      expect((await (await GET()).json()).map((u: Usuario) => u.id)).not.toContain(id);
-      await nega(id, () => codigo(id));
+      expect((await (await GET()).json()).map((u: Usuario) => u.id)).not.toContain("par");
+      await nega("par", () => editar("par", { nome: "X" }));
+      await nega("par", () => codigo("par"));
       await d.atualizar("usuarios", "c1", { perfil: "visualizador", sede_id: A });
       expect((await POST(corpo(novo({ perfil: "coordenador", email: "z@x.com" })))).status).toBe(403);
-      await nega(id, () => codigo(id));
     });
 
-    it("conta inativa não recebe código, e não dá para o criado virar administrador por aqui", async () => {
-      const id = await criar({ ativo: false });
-      await nega(id, () => codigo(id), 422);
+    it("não mexe em si mesmo e não cria administrador", async () => {
+      await nega("c1", () => editar("c1", { nome: "X" }));
+      await nega("c1", () => codigo("c1"));
       expect((await POST(corpo(novo({ perfil: "administrador", sede_id: A, email: "adm2@x.com" })))).status).toBe(403);
     });
 
-    it("regra pura: sem id na sessão, nada liga a conta a ela", () => {
+    it("regra pura: perfil exato, sem lista vazia, e ver não é editar", () => {
       const alvo = { id: "x", perfil: "coordenador", sede_id: A };
-      expect(criouCoordenador({ ...C1, id: "" }, { ...alvo, criado_por_id: "" })).toBe(false);
-      expect(criouCoordenador(C1, alvo)).toBe(false);
-      expect(criouCoordenador(C1, { ...alvo, id: "c1", criado_por_id: "c1" })).toBe(false);
-      expect(podeCriarCoordenador(ADM, alvo)).toBe(false);
-      expect(podeCriarCoordenador(C1, { ...alvo, perfil: "Coordenador" })).toBe(false);
+      expect(podeGerirCoordenador(C1, alvo)).toBe(true);
+      expect(podeGerirCoordenador(ADM, alvo)).toBe(false);
+      expect(podeGerirCoordenador(C1, { ...alvo, perfil: "Coordenador" })).toBe(false);
+      expect(podeGerirCoordenador(C1, { ...alvo, id: "c1" })).toBe(false);
+      expect(podeGerirCoordenador(C1, { ...alvo, sede_id: "geral" })).toBe(false);
+      expect(podeGerirCoordenador(C1, { ...alvo, sedes_extra: C })).toBe(false);
+      expect(podeVerCoordenador(C1, { ...alvo, sedes_extra: C })).toBe(true);
+      expect(podeVerCoordenador(C1, { ...alvo, sede_id: C })).toBe(false);
+      expect(podeVerCoordenador(C1, { ...alvo, sede_id: "geral" })).toBe(false);
+      expect(podeVerCoordenador(C1, { ...alvo, sedes_extra: [A] as never })).toBe(false);
     });
   });
 

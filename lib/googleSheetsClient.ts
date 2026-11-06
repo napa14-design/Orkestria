@@ -130,6 +130,19 @@ export class GoogleSheetsDataSource implements DataSource {
     return atualizado;
   }
 
+  /** **Não é atômico**, pelo mesmo motivo de `gravarLote`: a condição só reduz a janela. */
+  async atualizarSe<K extends NomeTabela>(
+    tabela: K,
+    id: string,
+    condicao: (atual: MapaTabelas[K]) => boolean,
+    mudancas: Partial<MapaTabelas[K]>,
+  ): Promise<MapaTabelas[K] | null> {
+    this.cache.delete(tabela);
+    const atual = await this.obter(tabela, id);
+    if (!atual) throw new Error(`Registro ${id} não encontrado em ${tabela}.`);
+    return condicao(atual) ? this.atualizar(tabela, id, mudancas) : null;
+  }
+
   /**
    * **Não é atômico** — a API do Sheets não oferece transação. Grava em sequência
    * e deixa o erro subir; um lote interrompido fica pela metade, e é impossível

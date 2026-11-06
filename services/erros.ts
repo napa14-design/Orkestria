@@ -11,6 +11,14 @@ export class ErroValidacao extends Error {
   }
 }
 
+/** O registro mudou entre a conferência e a gravação: nada foi gravado, tente de novo. */
+export class ErroConflito extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = "ErroConflito";
+  }
+}
+
 export class ErroPermissao extends Error {
   constructor(mensagem = "Sem permissão para esta operação.") {
     super(mensagem);

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import useSWR from "swr";
+import { useRef, useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
 import Modal from "@/components/Modal";
 import { useSessao } from "@/components/SessaoContexto";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
+import { podeGerirCoordenador, podeGerirSupervisor } from "@/lib/permissions";
 import type { Sede, UsuarioListado } from "@/types";
 
 const PERFIS = [
@@ -15,6 +16,9 @@ const PERFIS = [
   { valor: "visualizador", rotulo: "Visualizador/Gerência" },
 ];
 
+/** O perfil como está gravado: decide por ele, e não pelo que já foi escolhido no formulário. */
+const perfilGravado = (form: Record<string, unknown>) => (form.__antes as UsuarioListado | undefined)?.perfil;
+
 const SELO_PERFIL: Record<string, string> = {
   administrador: "selo-vermelho",
   coordenador: "selo-azul",
@@ -23,13 +27,17 @@ const SELO_PERFIL: Record<string, string> = {
 };
 
 export default function PaginaUsuarios() {
-  // O coordenador cadastra supervisores e coordenadores nas sedes dele; do coordenador
-  // criado, só acompanha o acesso. O servidor garante, e a tela não oferece o que ele
-  // recusaria.
-  const coordenador = useSessao()?.perfil === "coordenador";
+  // O coordenador cadastra e edita supervisores e coordenadores inteiramente nas sedes
+  // dele, e só vê os que também operam outras. O servidor garante, e a tela não oferece o
+  // que ele recusaria.
+  const sessao = useSessao();
+  const coordenador = sessao?.perfil === "coordenador";
+  const alcanca = (u: UsuarioListado) => !coordenador || podeGerirSupervisor(sessao, u) || podeGerirCoordenador(sessao, u);
+  /** O código de coordenador pedido por um colega vai só para o e-mail dele. */
+  const soPorEmail = (u: UsuarioListado | null) => coordenador && u?.perfil === "coordenador";
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
   const nomeSede = (id: string) =>
-    id === "geral" ? "Geral (todas)" : (sedes?.find((s) => s.id === id)?.nome_sede ?? id);
+    id === "geral" ? "Geral (todas)" : (sedes?.find((s) => s.id === id)?.nome_sede ?? (coordenador ? "Outra sede" : id));
 
   const [alvo, setAlvo] = useState<UsuarioListado | null>(null);
   const [estado, setEstado] = useState<"idle" | "enviando" | "ok" | "erro">("idle");
@@ -38,8 +46,12 @@ export default function PaginaUsuarios() {
   const [codigo, setCodigo] = useState("");
   /** Envio do e-mail deu certo? Muda o alerta de verde para vermelho. */
   const [emailOk, setEmailOk] = useState(false);
+  const { mutate } = useSWRConfig();
+  /** O pedido em curso: a resposta de um anterior não cai no modal de outra pessoa. */
+  const pedidoAtual = useRef(0);
 
   function abrirCodigo(u: UsuarioListado, jaGerar: boolean) {
+    pedidoAtual.current += 1;
     setAlvo(u);
     setCodigo("");
     setMsg("");
@@ -53,27 +65,37 @@ export default function PaginaUsuarios() {
   async function gerarCodigo(u?: UsuarioListado) {
     const usuario = u ?? alvo;
     if (!usuario) return;
+    const pedido = ++pedidoAtual.current;
     setEstado("enviando");
     setMsg("");
     try {
       const r = await apiPost<{
-        codigo: string;
-        expira_em: string;
+        codigo?: string;
+        expira_em?: string;
         email: { enviado: boolean; motivo?: string; destino: string };
       }>(`/api/usuarios/${usuario.id}/codigo`, {});
-      setCodigo(r.codigo);
+      if (pedido !== pedidoAtual.current) return;
+      setCodigo(r.codigo ?? "");
       setEstado("ok");
-      const validade = `Vale até ${new Date(r.expira_em).toLocaleDateString("pt-BR")}.`;
-      // O resultado do envio é dito sempre. Se ele falhou e ninguém avisar, o
-      // administrador acha que a pessoa recebeu — e ela fica sem acesso.
-      const sobreEmail = r.email.enviado
-        ? ` E-mail enviado para ${r.email.destino}.`
-        : ` E-mail NÃO enviado${r.email.motivo ? ` (${r.email.motivo})` : ""} — passe o código por outro caminho.`;
-      setMsg(`${validade}${sobreEmail}`);
+      const motivo = r.email.motivo ? ` (${r.email.motivo})` : "";
+      const validade = r.expira_em ? `Vale até ${new Date(r.expira_em).toLocaleDateString("pt-BR")}.` : "";
+      // O resultado do envio é dito sempre. Se ele falhou e ninguém avisar, quem pediu
+      // acha que a pessoa recebeu — e ela fica sem acesso.
+      setMsg(
+        r.email.enviado
+          ? `${validade} E-mail enviado para ${r.email.destino}.`
+          : r.codigo
+            ? `${validade} E-mail NÃO enviado${motivo} — passe o código por outro caminho.`
+            : `E-mail NÃO enviado${motivo}. Nenhum código foi gerado${usuario.senha_definida ? "; a senha dela segue valendo" : ", e ela não entra até receber um"}. Tente de novo ou peça a um administrador.`,
+      );
       setEmailOk(r.email.enviado);
     } catch (e) {
+      if (pedido !== pedidoAtual.current) return;
       setEstado("erro");
       setMsg(e instanceof ErroApi ? e.message : "Erro ao gerar o código.");
+    } finally {
+      // O selo de acesso da linha mudou (ou não): a lista diz o que está gravado.
+      void mutate("/api/usuarios");
     }
   }
 
@@ -83,12 +105,16 @@ export default function PaginaUsuarios() {
       titulo="Usuários"
       subtitulo={
         coordenador
-          ? "Os supervisores das sedes que você opera e os coordenadores que você cadastrou. Coordenador novo opera só sedes suas; depois de criado, editar ou inativar é com um administrador, como reativar uma conta inativa."
+          ? "Os supervisores e coordenadores das sedes que você opera. Coordenador que também opera outra sede aparece só para consulta. Trocar o e-mail ou tirar o perfil de um coordenador, reativar e excluir é com um administrador."
           : "Quem acessa o sistema. O perfil define as permissões; as sedes limitam o alcance de coordenadores e supervisores — cada um pode operar mais de uma. Acesso restrito a administradores."
       }
       endpoint="/api/usuarios"
       textoNovo="+ Novo usuário"
-      permissao={{ excluir: !coordenador, alterar: (u) => !(coordenador && u.perfil === "coordenador") }}
+      permissao={{
+        excluir: !coordenador,
+        alterar: alcanca,
+        semAcao: { texto: "só consulta", dica: "Também opera uma sede fora das suas: só um administrador altera." },
+      }}
       campos={[
         { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
         {
@@ -96,7 +122,10 @@ export default function PaginaUsuarios() {
           rotulo: "E-mail",
           tipo: "texto",
           obrigatorio: true,
-          ajuda: "Usado no login",
+          ajuda: (f) =>
+            coordenador && perfilGravado(f) === "coordenador"
+              ? "Usado no login. Só um administrador troca o e-mail de um coordenador"
+              : "Usado no login",
           dica: "O e-mail com que a pessoa entra no sistema. É também por ele que o histórico registra quem fez cada alteração.",
         },
         {
@@ -104,8 +133,16 @@ export default function PaginaUsuarios() {
           rotulo: "Perfil",
           tipo: "select",
           obrigatorio: true,
-          opcoes: coordenador ? PERFIS.filter((p) => p.valor === "supervisor" || p.valor === "coordenador") : PERFIS,
-          padrao: coordenador ? "supervisor" : undefined,
+          // Sem padrão: com "Supervisor" pré-selecionado, quem queria um coordenador salvava
+          // supervisor sem perceber. Ao editar um coordenador, rebaixar nem aparece.
+          opcoes: (form) =>
+            coordenador
+              ? PERFIS.filter((p) => p.valor === "coordenador" || (p.valor === "supervisor" && perfilGravado(form) !== "coordenador"))
+              : PERFIS,
+          ajuda: (f) =>
+            perfilGravado(f) === "supervisor" && f.perfil && f.perfil !== "supervisor"
+              ? "Ao salvar, a senha dela deixa de valer e ela entra de novo pelo código"
+              : "",
           dica: "Define o que a pessoa pode fazer. • ADMINISTRADOR: acesso total, em todas as sedes (inclui cadastrar usuários). • COORDENADOR: monta as rotas e faz os cadastros, apenas nas sedes que opera (uma ou várias). • SUPERVISOR: vê a rota e marca as tarefas como feitas ou não, só nas sedes dele — não pode ter \"Geral\" (todas as sedes). • VISUALIZADOR/GERÊNCIA: só consulta dashboards e relatórios, não altera nada.",
         },
         {
@@ -221,7 +258,11 @@ export default function PaginaUsuarios() {
         },
       ]}
       aoCriar={(criado) => abrirCodigo(criado, true)}
-      acoesExtra={(u) => !u.ativo || (coordenador && u.perfil === "coordenador" && u.senha_definida) ? null : (
+      // Saiu de supervisor, a senha caiu: sem um código novo, a pessoa não entra.
+      aoEditar={(salvo, antes) => {
+        if (antes.perfil === "supervisor" && salvo.perfil !== "supervisor" && salvo.ativo) abrirCodigo(salvo, true);
+      }}
+      acoesExtra={(u) => !u.ativo || !alcanca(u) ? null : (
         <button
           className="btn btn-mini btn-fantasma"
           onClick={() => abrirCodigo(u, false)}
@@ -231,7 +272,7 @@ export default function PaginaUsuarios() {
               : "Gera o código para a pessoa fazer o primeiro acesso"
           }
         >
-          {u.senha_definida ? "Novo código" : "Ver código"}
+          {soPorEmail(u) ? "Enviar código" : u.senha_definida ? "Novo código" : "Ver código"}
         </button>
       )}
     />
@@ -239,7 +280,9 @@ export default function PaginaUsuarios() {
     <Modal
       titulo={`Código de primeiro acesso — ${alvo?.nome ?? ""}`}
       aberto={!!alvo}
-      aoFechar={() => setAlvo(null)}
+      aoFechar={() => {
+        if (estado !== "enviando") setAlvo(null);
+      }}
       larguraMax={460}
     >
       {codigo ? (
@@ -263,8 +306,13 @@ export default function PaginaUsuarios() {
             outro.
           </p>
         </>
-      ) : (
+      ) : estado === "ok" ? null : (
         <p style={{ fontSize: 13, color: "var(--tinta-2)", marginBottom: 14, lineHeight: 1.55 }}>
+          {soPorEmail(alvo) && (
+            <>
+              O código vai só para o e-mail <strong>{alvo?.email}</strong>: você não o vê.{" "}
+            </>
+          )}
           {alvo?.senha_definida ? (
             <>
               <strong>{alvo?.nome.split(" ")[0]}</strong> já tem senha própria. Gerar um código novo{" "}
@@ -280,24 +328,25 @@ export default function PaginaUsuarios() {
       )}
       {msg && (
         <div
-          className={`alerta ${estado === "erro" || (codigo && !emailOk) ? "alerta-erro" : "alerta-ok"}`}
+          className={`alerta ${estado === "erro" || (estado === "ok" && !emailOk) ? "alerta-erro" : "alerta-ok"}`}
           style={{ marginTop: 12, marginBottom: 4 }}
         >
           {msg}
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-        <button type="button" className="btn" onClick={() => setAlvo(null)}>
-          {codigo ? "Já anotei, fechar" : "Cancelar"}
+        {/* Durante o envio não há como cancelar: o e-mail sai de qualquer jeito. */}
+        <button type="button" className="btn" onClick={() => setAlvo(null)} disabled={estado === "enviando"}>
+          {codigo ? "Já anotei, fechar" : estado === "ok" ? "Fechar" : "Cancelar"}
         </button>
-        {!codigo && (
+        {!codigo && estado !== "ok" && (
           <button
             type="button"
             className="btn btn-primario"
             onClick={() => void gerarCodigo()}
             disabled={estado === "enviando"}
           >
-            {estado === "enviando" ? "Gerando…" : "Gerar código"}
+            {estado === "enviando" ? "Gerando…" : soPorEmail(alvo) ? "Enviar código" : "Gerar código"}
           </button>
         )}
       </div>

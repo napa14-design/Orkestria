@@ -92,6 +92,18 @@ export interface DataSource {
     id: string,
     mudancas: Partial<MapaTabelas[K]>,
   ): Promise<MapaTabelas[K]>;
+  /**
+   * Atualiza só se `condicao` ainda valer para o que está gravado, lendo e escrevendo
+   * como uma operação; se não valer, devolve `null` sem gravar. Existe para o que não
+   * pode ser escrito por cima de uma mudança feita no meio do caminho: entre conferir uma
+   * conta e gravar o código dela, um colega podia promovê-la (revisão de segurança, 06/11/2026).
+   */
+  atualizarSe<K extends NomeTabela>(
+    tabela: K,
+    id: string,
+    condicao: (atual: MapaTabelas[K]) => boolean,
+    mudancas: Partial<MapaTabelas[K]>,
+  ): Promise<MapaTabelas[K] | null>;
   excluir(tabela: NomeTabela, id: string): Promise<void>;
   /**
    * Grava várias escritas como UMA operação.

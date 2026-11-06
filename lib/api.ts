@@ -1,6 +1,6 @@
 /** Helpers das rotas de API: sessão obrigatória + tradução de erros em HTTP. */
 import { NextResponse } from "next/server";
-import { ErroPermissao, ErroValidacao } from "@/services/erros";
+import { ErroConflito, ErroPermissao, ErroValidacao } from "@/services/erros";
 import { executarComUsuario } from "./contextoUsuario";
 import { getDataSource } from "./datasource";
 import { sessaoDoCadastro, type SessaoUsuario } from "./permissions";
@@ -66,6 +66,9 @@ export async function comSessao(
     }
     if (e instanceof ErroPermissao) {
       return NextResponse.json({ erro: e.message }, { status: 403 });
+    }
+    if (e instanceof ErroConflito) {
+      return NextResponse.json({ erro: e.message }, { status: 409 });
     }
     const mensagem = e instanceof Error ? e.message : "Erro interno.";
     console.error("[api]", e);

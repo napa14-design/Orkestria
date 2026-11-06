@@ -90,6 +90,21 @@ export class HistoricoDataSource implements DataSource {
     return resultado;
   }
 
+  async atualizarSe<K extends NomeTabela>(
+    tabela: K,
+    id: string,
+    condicao: (atual: MapaTabelas[K]) => boolean,
+    mudancas: Partial<MapaTabelas[K]>,
+  ): Promise<MapaTabelas[K] | null> {
+    const resultado = await this.interno.atualizarSe(tabela, id, condicao, mudancas);
+    if (!resultado) return null; // Não gravou: não há o que registrar.
+    const campos = Object.keys(mudancas)
+      .filter((c) => !["atualizado_por", "atualizado_em"].includes(c))
+      .join(", ");
+    await this.logar(tabela, id, "atualizar", campos);
+    return resultado;
+  }
+
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     await this.interno.excluir(tabela, id);
     await this.logar(tabela, id, "excluir", "");

@@ -308,6 +308,20 @@ export class MemoryDataSource implements DataSource {
     return lista[i];
   }
 
+  async atualizarSe<K extends NomeTabela>(
+    tabela: K,
+    id: string,
+    condicao: (atual: MapaTabelas[K]) => boolean,
+    mudancas: Partial<MapaTabelas[K]>,
+  ): Promise<MapaTabelas[K] | null> {
+    const lista = banco()[tabela] as Array<MapaTabelas[K] & { id: string }>;
+    const i = lista.findIndex((r) => r.id === id);
+    if (i === -1) throw new Error(`Registro ${id} não encontrado em ${tabela}.`);
+    if (!condicao(lista[i])) return null;
+    lista[i] = { ...lista[i], ...semUndefined(mudancas) };
+    return lista[i];
+  }
+
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     const lista = banco()[tabela] as Array<{ id: string }>;
     const i = lista.findIndex((r) => r.id === id);

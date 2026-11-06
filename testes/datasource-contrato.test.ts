@@ -169,6 +169,38 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(r.cidade).toBe("Fortaleza");
     });
 
+    it("atualizarSe grava quando a condição vale, e preserva o que não foi passado", async () => {
+      await criarSede(sede("cond-ok", { codigo: "AAA" }));
+      const r = await ds.atualizarSe("sedes", `${P}cond-ok`, (a) => a.codigo === "AAA", { nome_sede: "Novo", cidade: undefined });
+      expect(r).toMatchObject({ nome_sede: "Novo", codigo: "AAA", cidade: "Fortaleza" });
+      expect((await ds.obter("sedes", `${P}cond-ok`))?.nome_sede).toBe("Novo");
+    });
+
+    it("atualizarSe não grava quando a condição não vale, e a condição vê o que está gravado", async () => {
+      await criarSede(sede("cond-nao", { codigo: "AAA" }));
+      await ds.atualizar("sedes", `${P}cond-nao`, { codigo: "BBB" });
+      const r = await ds.atualizarSe("sedes", `${P}cond-nao`, (a) => a.codigo === "AAA", { nome_sede: "Novo" });
+      expect(r).toBeNull();
+      const g = await ds.obter("sedes", `${P}cond-nao`);
+      expect(g?.codigo).toBe("BBB");
+      expect(g?.nome_sede).not.toBe("Novo");
+    });
+
+    it("atualizarSe simultâneos na mesma versão: um só grava, e o outro vê a mudança", async () => {
+      await criarSede(sede("cond-corrida", { codigo: "V0" }));
+      const tentar = (nome: string) =>
+        ds.atualizarSe("sedes", `${P}cond-corrida`, (a) => a.codigo === "V0", { codigo: "V1", nome_sede: nome });
+      const r = await Promise.all(["A", "B", "C", "D"].map(tentar));
+      const venceu = r.filter(Boolean);
+      expect(venceu).toHaveLength(1);
+      expect((await ds.obter("sedes", `${P}cond-corrida`))?.nome_sede).toBe(venceu[0]!.nome_sede);
+    }, 30_000); // Transações na mesma linha se reenfileiram: sob carga, passou dos 5 s padrão.
+
+    it("atualizarSe em registro inexistente falha como atualizar, sem criar", async () => {
+      await expect(ds.atualizarSe("sedes", `${P}cond-sem`, () => true, { nome_sede: "X" })).rejects.toThrow();
+      expect(await ds.obter("sedes", `${P}cond-sem`)).toBeNull();
+    });
+
     it("atualizar com undefined PRESERVA o valor — incidente de 20/08", async () => {
       // `undefined` quer dizer "não mexi neste campo". Quem limpa grava "".
       await criarSede(sede("preserva", { codigo: "PQL1" }));

@@ -117,18 +117,20 @@ próprio e Resend/SendGrid/Mailgun — trocar de caminho é trocar variáveis.
 
 Duas regras de projeto:
 
-- **Melhor esforço, nunca dependência.** `enviarEmail` não lança; o código
-  continua aparecendo na tela e a resposta diz `email: { enviado, motivo }`. Um
-  envio quebrado não pode virar uma pessoa sem acesso — e o motivo é sempre
-  exibido, inclusive o "não configurado", senão o administrador acha que algo
-  falhou.
+- **Melhor esforço, com uma exceção.** `enviarEmail` não lança; o código continua
+  aparecendo na tela e a resposta diz `email: { enviado, motivo }`. Um envio
+  quebrado não pode virar uma pessoa sem acesso — e o motivo é sempre exibido,
+  inclusive o "não configurado", senão o administrador acha que algo falhou. A
+  exceção é o código de coordenador pedido por um colega: ele só existe no e-mail,
+  e por isso é enviado antes de gravar. Sem envio configurado, a operação é recusada.
 - **Timeouts de 10s** no transporte. Host errado ou porta bloqueada penduraria a
   tela: medido, o padrão do nodemailer levava 21s onde o nosso corta em 10.
 
 Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 (opcional) e `APP_URL` (link do e-mail). No Google Workspace, `SMTP_PASS` é uma
 **senha de aplicativo**, nunca a senha da conta. Sem as variáveis o sistema
-funciona igual, apenas sem enviar.
+funciona, apenas sem enviar, e coordenador não entrega código nem promove
+supervisor: isso passa a depender do administrador.
 
 ## Limitações conhecidas do banco provisório (Sheets)
 

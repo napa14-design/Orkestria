@@ -51,10 +51,11 @@ título, o que mudou e os arquivos principais. Nunca edite entradas antigas.
    respeitam `editavel_por_supervisor` (nome antigo da coluna — vale para o
    coordenador). Contas: administrador gerencia todas; coordenador só as de
    supervisor inteiramente nas sedes dele (`podeGerirSupervisor`), sem excluir nem
-   reativar. O coordenador também **cria** coordenador nas sedes dele
-   (`podeCriarCoordenador`), mas não edita nem exclui: só vê os que criou e gera o
-   código enquanto não têm senha (`criouCoordenador`). O corpo do cadastro passa por lista positiva (`lerCorpo`): nunca o
-   espalhe no banco.
+   reativar. O coordenador também cria e edita coordenador inteiramente nas sedes dele
+   (`podeGerirCoordenador`) e vê, só para consulta, quem tem sede em comum
+   (`podeVerCoordenador`). Para não tomar a conta do colega: o código de coordenador vai
+   só por e-mail, e trocar o e-mail ou tirar o perfil é do administrador. O corpo do
+   cadastro passa por lista positiva (`lerCorpo`): nunca o espalhe no banco.
 
 ## Comandos
 

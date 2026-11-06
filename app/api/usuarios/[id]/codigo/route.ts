@@ -2,7 +2,8 @@ import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
 import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { conviteAcesso } from "@/lib/emails/conviteAcesso";
-import { conferirConvite, gerarConviteUsuario } from "@/services/usuariosService";
+import { ErroConflito } from "@/services/erros";
+import { conferirConvite, gerarConviteUsuario, gravarConvite, prepararConvite } from "@/services/usuariosService";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,25 +16,50 @@ function urlDoSistema(req: Request): string {
 }
 
 /**
- * Gera o código de primeiro acesso de um usuário e devolve o texto puro — a
- * **única vez** em que ele existe fora do hash. Serve para dois momentos:
+ * Gera o código de primeiro acesso de um usuário. Serve para dois momentos:
  * liberar quem acabou de ser cadastrado e destravar quem esqueceu a senha.
  *
  * Gerar apaga a senha atual, então a chamada é destrutiva de propósito: quem
  * esqueceu perde a senha antiga e cria outra. Não existe rota para o
  * administrador **definir** a senha de alguém — ele nunca precisa conhecê-la.
  *
- * Quando há SMTP configurado, o código também vai por e-mail. O envio é
- * **melhor esforço**: falhando, a resposta diz o motivo e o código continua na
- * tela para o administrador repassar por outro caminho.
+ * Dois caminhos:
+ *  - Administrador e código de supervisor: a resposta traz o texto puro, a **única
+ *    vez** em que ele existe fora do hash, e o e-mail é melhor esforço: falhando, a
+ *    resposta diz o motivo e o código segue na tela para repassar por outro caminho.
+ *  - Coordenador pedindo o de outro coordenador (`soPorEmail`): o código só existe na
+ *    caixa da pessoa. Envia ANTES de gravar: se o envio falhar, a senha dela continua
+ *    valendo, em vez de ela ficar sem senha e sem código.
  */
 export async function POST(req: Request, ctx: Ctx) {
   return comSessao(async (sessao) => {
     const { id } = await ctx.params;
-    await conferirConvite(id, sessao);
-    const convite = await gerarConviteUsuario(id);
+    const { soPorEmail, versao } = await conferirConvite(id, sessao);
 
     const ds = await getDataSource();
+    if (soPorEmail) {
+      const convite = prepararConvite();
+      const usuario = await ds.obter("usuarios", id);
+      const destino = usuario?.email ?? "";
+      const envio = await enviarEmail({
+        para: destino,
+        ...conviteAcesso({ nome: usuario?.nome ?? destino, codigo: convite.codigo, expiraEm: convite.expira_em, url: urlDoSistema(req) }),
+      });
+      if (!envio.enviado) {
+        // O erro do SMTP fica no log (`enviarEmail`): pode trazer host e porta.
+        return ok({ email: { enviado: false, destino, motivo: "o servidor de e-mail não aceitou o envio" } });
+      }
+      try {
+        await gravarConvite(id, versao, convite);
+      } catch (e) {
+        // O e-mail já saiu com um código que não vale: a tela precisa dizer.
+        if (e instanceof ErroConflito) throw new ErroConflito("Esta conta acabou de mudar. Tente de novo: se chegar um e-mail, vale só o do último envio.");
+        throw e;
+      }
+      return ok({ expira_em: convite.expira_em, email: { enviado: true, destino } });
+    }
+
+    const convite = await gerarConviteUsuario(id, versao);
     const usuario = await ds.obter("usuarios", id);
     const destino = usuario?.email ?? "";
 
@@ -63,6 +89,8 @@ export async function POST(req: Request, ctx: Ctx) {
       url: urlDoSistema(req),
     });
     const envio = await enviarEmail({ para: destino, ...conteudo });
-    return ok({ ...convite, email: { ...envio, destino } });
+    // O erro do SMTP pode trazer host e porta: o motivo cru é só do administrador.
+    const motivo = envio.enviado || sessao.perfil === "administrador" ? envio.motivo : "o servidor de e-mail não aceitou o envio";
+    return ok({ ...convite, email: { ...envio, motivo, destino } });
   });
 }

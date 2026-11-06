@@ -2,8 +2,8 @@ import { comSessao, ok } from "@/lib/api";
 import { createUsuario, getUsuarios, usuarioPublico } from "@/services/usuariosService";
 
 // Quem pode o quê é conferido no serviço: o administrador gerencia todos, o
-// coordenador só os supervisores das sedes dele (`podeGerirSupervisor`), e cria
-// coordenadores nelas, sem editá-los depois (`podeCriarCoordenador`).
+// coordenador só os supervisores e coordenadores inteiramente nas sedes dele
+// (`podeGerirSupervisor`, `podeGerirCoordenador`).
 export async function GET() {
   return comSessao(async (sessao) => ok(await getUsuarios(sessao)));
 }

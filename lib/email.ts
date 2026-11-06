@@ -6,32 +6,19 @@
  * Resend/SendGrid/Mailgun (todos oferecem SMTP). Trocar de caminho é trocar
  * variáveis de ambiente, não código.
  *
- * **Nunca lança.** E-mail é melhor esforço: se a entrega falhar, o fluxo que
- * chamou (criar usuário, gerar código) tem que continuar e mostrar o dado na
- * tela. Um envio quebrado não pode virar uma pessoa sem acesso.
+ * **Nunca lança.** Quem chama decide o que fazer com a falha: no código visto pelo
+ * administrador, o fluxo continua e o mostra na tela; no código de coordenador pedido por
+ * um colega, nada é gravado (ver `app/api/usuarios/[id]/codigo/route.ts`).
  */
 import nodemailer, { type Transporter } from "nodemailer";
+import { configDoEmail as config, emailConfigurado } from "./emailConfig";
+
+export { emailConfigurado };
 
 export interface ResultadoEnvio {
   enviado: boolean;
   /** Por que não foi — mostrado a quem operou, não engolido. */
   motivo?: string;
-}
-
-function config() {
-  return {
-    host: process.env.SMTP_HOST?.trim(),
-    porta: Number(process.env.SMTP_PORT ?? 587),
-    usuario: process.env.SMTP_USER?.trim(),
-    senha: process.env.SMTP_PASS,
-    de: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
-  };
-}
-
-/** Há credenciais para enviar? A interface usa isto para não prometer o que não vai cumprir. */
-export function emailConfigurado(): boolean {
-  const c = config();
-  return !!(c.host && c.usuario && c.senha);
 }
 
 let transporte: Transporter | null = null;

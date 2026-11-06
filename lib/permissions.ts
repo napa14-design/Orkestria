@@ -229,24 +229,26 @@ function cabeNasSedes(sessao: SessaoUsuario, alvo: { sede_id: string; sedes_extr
 }
 
 /**
- * Coordenador também cria coordenador (04/11/2026), sem ampliar alcance: só com sedes
- * dentro das dele, e "geral" cai na lista vazia. Só criar: editar, inativar e zerar a
- * senha de um colega seguem com o administrador, porque gerar código apaga a senha e
- * deixaria um coordenador entrar como o outro.
+ * Coordenador cria e edita coordenador inteiramente nas sedes dele (decisão do dono,
+ * 06/11/2026), sem ampliar alcance: "geral" cai na lista vazia. O que tomaria a conta do
+ * colega fica de fora, em `updateUsuario` e `conferirConvite`: trocar o e-mail, tirar o
+ * perfil e ver o código. Excluir e reativar seguem com o administrador.
  */
-export function podeCriarCoordenador(
+export function podeGerirCoordenador(
   sessao: SessaoUsuario,
-  alvo: { perfil: unknown; sede_id: string; sedes_extra?: string },
+  alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string },
 ): boolean {
-  return sessao.perfil === "coordenador" && alvo.perfil === "coordenador" && cabeNasSedes(sessao, alvo);
+  return sessao.perfil === "coordenador" && alvo.perfil === "coordenador" && alvo.id !== sessao.id && cabeNasSedes(sessao, alvo);
 }
 
-/** O coordenador que ele mesmo criou: aparece na lista dele, para ver se já entrou. */
-export function criouCoordenador(
+/** Vê, só para consulta, o coordenador com ao menos uma sede em comum: saber quem já existe. */
+export function podeVerCoordenador(
   sessao: SessaoUsuario,
-  alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string; criado_por_id?: string },
+  alvo: { id: string; perfil: unknown; sede_id: string; sedes_extra?: string },
 ): boolean {
-  return podeCriarCoordenador(sessao, alvo) && alvo.id !== sessao.id && !!sessao.id && alvo.criado_por_id === sessao.id;
+  if (sessao.perfil !== "coordenador" || alvo.perfil !== "coordenador" || alvo.id === sessao.id) return false;
+  if (typeof alvo.sede_id !== "string" || (alvo.sedes_extra != null && typeof alvo.sedes_extra !== "string")) return false;
+  return montarSedesDaSessao(alvo.sede_id, alvo.sedes_extra).some((sede) => podeAlterarSede(sessao, sede));
 }
 
 /**

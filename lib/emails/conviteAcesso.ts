@@ -27,7 +27,7 @@ function dataBR(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Fortaleza" });
 }
 
 /** O nome é digitado por quem cadastra: sem isto, viraria link no e-mail da empresa. */

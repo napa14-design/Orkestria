@@ -1,7 +1,7 @@
 /**
- * A tela de Usuários não oferece ao coordenador o que o servidor recusaria: da conta de
- * outro coordenador, nem "Editar" nem "Excluir", e "Novo código" só enquanto ela não tem
- * senha (gerar apaga a senha do colega). Monta a página e lê os botões de cada linha.
+ * A tela de Usuários não oferece ao coordenador o que o servidor recusaria: de outro
+ * coordenador, edita e pede código só se ele está inteiro nas sedes dele, e nunca exclui.
+ * Monta a página e lê os botões de cada linha.
  */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -52,14 +52,25 @@ describe("Usuários, visto pelo coordenador", () => {
     expect(sup).not.toContain("Excluir");
   });
 
-  it("coordenador que criou: nem edita, nem exclui; o código só antes de ter senha", () => {
+  it("coordenador das sedes dele: edita e pede código, não exclui", () => {
     const { novo, entrou } = linhas("coordenador");
     for (const l of [novo, entrou]) {
-      expect(l).not.toContain("Editar");
+      expect(l).toContain("Editar");
       expect(l).not.toContain("Excluir");
     }
-    expect(novo).toContain("Ver código");
-    expect(entrou).not.toContain("código");
+    expect(novo).toContain("Enviar código");
+    expect(entrou).toContain("Enviar código");
+    expect(entrou).not.toContain("Novo código"); // o rótulo de quem vê o código na tela
+  });
+
+  it("coordenador que também opera sede de fora: só aparece, sem nenhuma ação", () => {
+    swr.usuarios = [{ ...pessoa("meio", "coordenador", true), sedes_extra: "fora" }];
+    const { meio } = linhas("coordenador");
+    expect(meio).not.toContain("Editar");
+    expect(meio).not.toContain("Excluir");
+    expect(meio).not.toContain("código");
+    expect(meio).toContain("só consulta");
+    expect(meio).not.toContain("compartilhado");
   });
 });
 
