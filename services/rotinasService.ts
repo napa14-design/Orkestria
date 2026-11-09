@@ -590,6 +590,10 @@ export interface PropostaTroca {
   bloqueia: boolean;
   /** Há erro de horário que o coordenador pode autorizar, como no arrasto. */
   pedeAutorizacao: boolean;
+  /** Itens da rota padrão de cada um, que trocam junto se a tela marcar "também na rota". */
+  rota: { a: number; b: number };
+  /** Itens da rota que quem recebe não pode fazer (requisito, validade, gênero): com eles, a rota não troca. */
+  rotaRecusas: { tarefa: string; para: string; inicio: string; motivo: string }[];
   /** O que a tela viu: confirmar com outra lista é recusado. */
   assinatura: string;
   gravados?: number;
@@ -609,6 +613,8 @@ export async function trocarTarefasDoDia(args: {
   bId: unknown;
   confirmar?: boolean;
   forcar?: boolean;
+  /** Troca também os itens da rota padrão, para os próximos dias gerados virem trocados. */
+  rota?: boolean;
   assinatura?: unknown;
 }): Promise<PropostaTroca> {
   const { data, sedeId, aId, bId } = args;
@@ -627,25 +633,30 @@ export async function trocarTarefasDoDia(args: {
     exigirEscala(f, data);
   }
 
-  const [doDia, realizados] = await Promise.all([
+  const [doDia, realizados, modelosDaSede] = await Promise.all([
     getRotinasByData(data, sedeId),
     ds.consultar("execucoes_realizadas", [
       { campo: "sede_id", op: "==", valor: sedeId },
       { campo: "data_execucao", op: "==", valor: data },
     ]),
+    ds.consultar("modelos_rotina", [{ campo: "sede_id", op: "==", valor: sedeId }]),
   ]);
+  // Mesma leitura de `getRotaPadrao`: só itens da rota padrão, nunca de evento.
+  const rotaDe = (id: string) => modelosDaSede.filter((m) => m.padrao === true && !m.evento && m.funcionario_id === id);
+  const [rotaDeA, rotaDeB] = [rotaDe(aId), rotaDe(bId)];
   // O status da rotina é gravado depois do realizado, em outra escrita que pode falhar:
   // bloco com registro fica com quem fez, mesmo se o status ainda disser "planejada".
   const comRegistro = new Set(realizados.map((e) => e.rotina_id));
   const movel = (r: RotinaPlanejada) => TROCA_MOVEL.has(r.status) && !comRegistro.has(r.id);
   const dele = (id: string) => doDia.filter((r) => r.funcionario_id === id);
   const [vaiDeA, vaiDeB] = [dele(aId).filter(movel), dele(bId).filter(movel)];
-  if (!vaiDeA.length && !vaiDeB.length)
-    throw recusa("TROCA_VAZIA", "Nenhum dos dois tem tarefa planejada para trocar neste dia.");
+  if (!vaiDeA.length && !vaiDeB.length && !rotaDeA.length && !rotaDeB.length)
+    throw recusa("TROCA_VAZIA", "Nenhum dos dois tem tarefa planejada para trocar neste dia, nem na rota padrão.");
   // Tudo o que entra na conta, dos dois: quem tem o bloco, horário, duração, situação e
   // registro. Um bloco que muda de horário entre ver e confirmar mudaria os alertas.
   const assinatura = [...dele(aId), ...dele(bId)]
     .map((r) => [r.id, r.funcionario_id, r.inicio_planejado, r.tempo_previsto_min, r.status, comRegistro.has(r.id) ? "r" : ""].join("@"))
+    .concat([...rotaDeA, ...rotaDeB].map((m) => `rota:${m.id}@${m.funcionario_id}`))
     .sort()
     .join(",");
   if (args.confirmar && args.assinatura !== assinatura)
@@ -654,7 +665,7 @@ export async function trocarTarefasDoDia(args: {
   // senão a tela perdia a caixa e levava a autorização para a próxima pessoa escolhida.
   const forcar = args.confirmar === true && args.forcar === true;
 
-  const todos = [...dele(aId), ...dele(bId)];
+  const todos: { tarefa_id: string; local_id: string }[] = [...dele(aId), ...dele(bId), ...rotaDeA, ...rotaDeB];
   const [tarefas, locais, parametros, requisitosCatalogo, qualA, qualB] = await Promise.all([
     Promise.all([...new Set(todos.map((r) => r.tarefa_id))].map((id) => ds.obter("tarefas", id))),
     Promise.all([...new Set(todos.map((r) => r.local_id))].map((id) => ds.obter("locais", id))),
@@ -707,6 +718,43 @@ export async function trocarTarefasDoDia(args: {
   avaliar(vaiDeB, fa, dele(aId).filter((r) => !movel(r)), qualA);
   blocos.sort((x, y) => x.inicio.localeCompare(y.inicio));
 
+  // Na rota, o que depende só da pessoa: requisito, validade e restrição de gênero. Sem
+  // isto, trocar só a rota escalava para a tarefa quem o arrasto recusaria, e o "Gerar o
+  // dia" montava o bloco e só avisava (revisão de segurança, 09/11/2026). Horário,
+  // intervalo e expediente seguem com o "Gerar o dia", que confere cada dia que monta.
+  const DA_PESSOA = new Set(["REQUISITO_FALTANDO", "REQUISITO_VENCIDO", "RESTRICAO_GENERO"]);
+  const rotaRecusas: PropostaTroca["rotaRecusas"] = [];
+  const conferirRota = (itens: typeof rotaDeA, destino: Funcionario, qualificacoes: typeof qualA) => {
+    for (const item of itens) {
+      const tarefa = tarefaPorId.get(item.tarefa_id);
+      const inicioMin = hhmmParaMin(item.inicio_planejado);
+      const previsto = item.duracao_min && item.duracao_min > 0 ? item.duracao_min : 30;
+      const motivos = validarAlocacao({
+        funcionario: funcionarioNoDia(destino, data),
+        rotinasExistentes: [],
+        inicioMin,
+        fimMin: fimPlanejadoMin(inicioMin, previsto),
+        tarefa,
+        local: localPorId.get(item.local_id),
+        parametros,
+        tempoPrevistoNovo: previsto,
+        requisitosCatalogo,
+        qualificacoesFuncionario: qualificacoes,
+        data,
+      }).filter((a) => a.nivel === "erro" && DA_PESSOA.has(a.codigo));
+      if (motivos.length)
+        rotaRecusas.push({
+          tarefa: tarefa?.nome_tarefa ?? "Tarefa",
+          para: destino.nome,
+          inicio: item.inicio_planejado,
+          motivo: motivos.map((a) => a.mensagem).join(" "),
+        });
+    }
+  };
+  conferirRota(rotaDeA, fb, qualB);
+  conferirRota(rotaDeB, fa, qualA);
+  rotaRecusas.sort((x, y) => x.inicio.localeCompare(y.inicio));
+
   const erros = blocos.flatMap((b) => b.alertas.filter((a) => a.nivel === "erro"));
   const proposta: PropostaTroca = {
     a: { id: fa.id, nome: fa.nome, recebe: vaiDeB.length },
@@ -715,16 +763,35 @@ export async function trocarTarefasDoDia(args: {
     ficam: dele(aId).length + dele(bId).length - vaiDeA.length - vaiDeB.length,
     bloqueia: erros.some((a) => !CODIGOS_AUTORIZAVEIS.has(a.codigo)),
     pedeAutorizacao: erros.length > 0 && erros.every((a) => CODIGOS_AUTORIZAVEIS.has(a.codigo)),
+    rota: { a: rotaDeA.length, b: rotaDeB.length },
+    rotaRecusas,
     assinatura,
   };
   if (!args.confirmar) return proposta;
   if (erros.length) throw new ErroValidacao(erros);
+  const comRota = args.rota === true;
+  if (comRota && rotaRecusas.length)
+    throw new ErroValidacao(
+      rotaRecusas.map((r) => ({ nivel: "erro" as const, codigo: "ROTA_RECUSADA", mensagem: `Na rota, ${r.inicio} ${r.tarefa} → ${r.para}: ${r.motivo}` })),
+    );
+  if (!blocos.length && !comRota)
+    throw recusa("TROCA_VAZIA", "Nenhum dos dois tem tarefa planejada neste dia: marque a troca na rota padrão.");
 
   const agora = agoraISO();
   const porId = new Map(doDia.map((r) => [r.id, r]));
-  // Num lote só: ou os dois ficam trocados, ou nada muda.
-  await ds.gravarLote(
-    blocos.map((b) => {
+  // Num lote só: ou os dois ficam trocados, com a rota se marcada, ou nada muda. A rota
+  // não passa pela régua do arrasto: o "Gerar o dia" já confere cada dia que montar.
+  const naRota = comRota
+    ? [...rotaDeA.map((m) => ({ id: m.id, para: bId })), ...rotaDeB.map((m) => ({ id: m.id, para: aId }))].map((m) => ({
+        tipo: "atualizar" as const,
+        tabela: "modelos_rotina" as const,
+        id: m.id,
+        mudancas: { funcionario_id: m.para, atualizado_em: agora },
+      }))
+    : [];
+  await ds.gravarLote([
+    ...naRota,
+    ...blocos.map((b) => {
       const atual = porId.get(b.rotina_id)!;
       const autorizado = b.alertas.some((a) => a.mensagem.endsWith("(autorizado manualmente)"));
       return {
@@ -742,7 +809,7 @@ export async function trocarTarefasDoDia(args: {
         },
       };
     }),
-  );
+  ]);
   return { ...proposta, gravados: blocos.length };
 }
 

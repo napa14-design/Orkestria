@@ -183,6 +183,86 @@ describe("trocar as tarefas do dia", () => {
     expect((await ler("a1"))?.fim_planejado).toBe("08:00");
   });
 
+  describe("também na rota padrão", () => {
+    const item = (id: string, funcionario_id: string, extra: Record<string, unknown> = {}) =>
+      ({ id, nome_modelo: "Rota", sede_id: SEDE, funcionario_id, tarefa_id: "tt", local_id: "christus_l1", inicio_planejado: "07:30", padrao: true, ...extra }) as never;
+    const donoDoItem = async (id: string) => (await (await getDataSource()).obter("modelos_rotina", id))?.funcionario_id;
+    beforeEach(async () => {
+      const d = await getDataSource();
+      await d.criar("modelos_rotina", item("ra", A));
+      await d.criar("modelos_rotina", item("rb", B));
+      await d.criar("modelos_rotina", item("rb-sab", B, { dias_semana: "6" }));
+      await d.criar("modelos_rotina", item("evento", A, { padrao: false, evento: true, nome_modelo: "Formatura" }));
+      await d.criar("modelos_rotina", item("outro", A, { padrao: false, nome_modelo: "Modelo solto" }));
+      await d.criar("modelos_rotina", item("colega", "christus_f3"));
+    });
+
+    it("a proposta conta os itens da rota padrão de cada um, sem evento nem modelo solto", async () => {
+      expect((await (await pedir(troca())).json()).rota).toEqual({ a: 1, b: 2 });
+    });
+
+    it("marcado, troca a pessoa nos itens da rota padrão, junto com o dia", async () => {
+      const { assinatura } = await (await pedir(troca())).json();
+      expect((await pedir(troca({ confirmar: true, rota: true, assinatura }))).status).toBe(200);
+      expect([await donoDoItem("ra"), await donoDoItem("rb"), await donoDoItem("rb-sab")]).toEqual([B, A, A]);
+      expect([await donoDoItem("evento"), await donoDoItem("outro"), await donoDoItem("colega")]).toEqual([A, A, "christus_f3"]);
+      expect(await donos()).toEqual({ a1: B, a2: B, b1: A, b2: A });
+    });
+
+    it("sem marcar, a rota fica como estava", async () => {
+      const { assinatura } = await (await pedir(troca())).json();
+      await pedir(troca({ confirmar: true, assinatura }));
+      expect([await donoDoItem("ra"), await donoDoItem("rb")]).toEqual([A, B]);
+    });
+
+    it("rota mudada entre ver e confirmar: 409, e nada muda", async () => {
+      const { assinatura } = await (await pedir(troca())).json();
+      await (await getDataSource()).criar("modelos_rotina", item("ra2", A, { inicio_planejado: "10:00" }));
+      expect((await pedir(troca({ confirmar: true, rota: true, assinatura }))).status).toBe(409);
+      expect([await donoDoItem("ra"), await donoDoItem("ra2")]).toEqual([A, A]);
+      expect(await donos()).toEqual({ a1: A, a2: A, b1: B, b2: B });
+    });
+
+    it("rota com tarefa que quem recebe não pode fazer: a proposta diz, e a confirmação com rota recusa", async () => {
+      const d = await getDataSource();
+      const aud = { criado_por: "a", criado_em: "", atualizado_por: "a", atualizado_em: "" };
+      await d.criar("requisitos", { id: "apt", nome: "Altura", tipo: "aptidao", descricao: "", ativo: true, ...aud });
+      const t1 = (await d.obter("tarefas", "christus_t1"))!;
+      await d.criar("tarefas", { ...t1, id: "fachada", nome_tarefa: "Limpar fachada", requisitos: "apt", restricao_genero: "feminino" } as never);
+      await d.criar("qualificacoes_funcionario", { id: "q", funcionario_id: A, requisito_id: "apt", sede_id: SEDE, validade: "", observacao: "", ...aud } as never);
+      await d.criar("modelos_rotina", item("ra-fachada", A, { tarefa_id: "fachada", inicio_planejado: "14:00" }));
+      for (const id of ["a1", "a2", "b1", "b2"]) await d.excluir("rotinas_planejadas", id);
+      const p = await (await pedir(troca({ b: "christus_f3" }))).json(); // Do Vale: sem a aptidão e masculino
+      expect(p.rotaRecusas).toEqual([expect.objectContaining({ tarefa: "Limpar fachada", inicio: "14:00" })]);
+      expect(p.rotaRecusas[0].motivo).toMatch(/Altura|feminino|gênero/iu);
+      const r = await pedir(troca({ b: "christus_f3", confirmar: true, rota: true, forcar: true, assinatura: p.assinatura }));
+      expect(r.status).toBe(422);
+      expect(await donoDoItem("ra-fachada")).toBe(A);
+      expect(await donoDoItem("ra")).toBe(A);
+    });
+
+    it("depois da troca na rota, a substituição no posto leva o item para o substituto, sem apagá-lo", async () => {
+      const { substituirNoPosto } = await import("@/services/funcionariosService");
+      const { assinatura } = await (await pedir(troca())).json();
+      await pedir(troca({ confirmar: true, rota: true, assinatura }));
+      expect(await donoDoItem("ra")).toBe(B); // o id ainda carrega A
+      await (await getDataSource()).atualizar("funcionarios", "christus_f4", { entrada: "07:00", saida: "17:00" });
+      await substituirNoPosto("christus_f4", B, DIA, "c@x.com");
+      expect(await donoDoItem("ra")).toBe("christus_f4");
+      expect(await (await getDataSource()).obter("modelos_rotina", "ra")).not.toBeNull();
+    });
+
+    it("dia sem tarefa: só a rota troca, e só se marcada", async () => {
+      const d = await getDataSource();
+      for (const id of ["a1", "a2", "b1", "b2"]) await d.excluir("rotinas_planejadas", id);
+      const p = await (await pedir(troca())).json();
+      expect(p.blocos).toEqual([]);
+      expect((await pedir(troca({ confirmar: true, assinatura: p.assinatura }))).status).toBe(422);
+      expect((await pedir(troca({ confirmar: true, rota: true, assinatura: p.assinatura }))).status).toBe(200);
+      expect([await donoDoItem("ra"), await donoDoItem("rb")]).toEqual([B, A]);
+    });
+  });
+
   it("a troca entra no histórico, bloco a bloco", async () => {
     const { assinatura } = await (await pedir(troca())).json();
     await pedir(troca({ confirmar: true, assinatura }));

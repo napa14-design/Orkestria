@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-11-09 — Troca de tarefas: também na rota padrão
+
+Pedido da coordenação: ao trocar no modal, poder atualizar a rota padrão com a troca, senão o
+"Gerar o dia" de amanhã devolve tudo como estava. O modal mostra quantos itens da rota padrão
+cada pessoa tem e oferece "Trocar também na rota padrão", desmarcado de início e a cada pessoa
+escolhida. Marcado, a pessoa é trocada nos itens da rota padrão dos dois (todas as camadas,
+inclusive as de dia da semana), no mesmo lote da troca do dia.
+
+- Só a rota padrão: itens de evento e modelos soltos não mudam. A assinatura inclui os itens
+  da rota, então rota mudada entre ver e confirmar dá 409, e o 409 desmarca as duas caixas.
+- **A rota confere o que depende da pessoa**: requisito, validade e restrição de gênero de
+  quem recebe cada item. Com algum recusado, o modal lista o motivo e não deixa marcar a
+  rota; o servidor recusa também. A primeira versão, bloqueada pela revisão de segurança,
+  deixava trocar só a rota para quem não tinha a aptidão, e o "Gerar o dia" montava o bloco
+  e só avisava. Horário, intervalo e expediente seguem como aviso do "Gerar o dia". A validade
+  do requisito é conferida só na data da troca: qualificação que vence na semana seguinte
+  passa, e o "Gerar o dia" avisa `REQUISITO_VENCIDO` quando chegar, como já faz com qualquer
+  rota.
+- Num dia útil sem tarefa, dá para trocar só a rota. Folga pela escala ou ausência naquela
+  data recusam a troca inteira, inclusive a da rota: escolha um dia em que os dois trabalham.
+- **Substituição no posto depois da troca**: o item trocado guarda o id do primeiro dono, e a
+  substituição recriava o item com o mesmo id e o apagava em seguida. Agora, item sem a
+  pessoa no id muda só de dono (`passarPosto`).
+- Dias já gerados não mudam. Risco que fica: no Firestore o lote se divide a cada 500
+  operações, e o histórico dobra a conta; acima de ~250 blocos e itens dos dois juntos, a
+  troca deixa de ser tudo-ou-nada (medido no banco de teste: 50).
+
+Arquivos: `services/rotinasService.ts`, `services/funcionariosService.ts`,
+`app/api/rotinas/trocar/route.ts`, `components/agenda/TrocarTarefas.tsx`,
+`testes/trocar-tarefas.test.ts`.
+
+---
+
 ## 2026-11-09 — Troca de tarefas: a autorização não sobrevive à lista recarregada
 
 Achado da auditoria, reproduzido na versão publicada: com o "autorizar" marcado, se a lista de

@@ -333,9 +333,13 @@ async function passarPosto(
     ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: antigoId }]),
   ]);
 
-  // 1. a rota do posto passa a ser do novo. O id do item carrega a pessoa, por
-  // isso é recalculado — senão o novo item colidiria com o do antigo.
-  const copiados = itens.map((item) => ({
+  // 1. a rota do posto passa a ser do novo. O id do item costuma carregar a pessoa, por
+  // isso é recalculado — senão o novo item colidiria com o do antigo. Item que veio de
+  // uma troca de tarefas mantém o id do primeiro dono: recalcular dava o mesmo id, e o
+  // "criar" seguido do "excluir" apagava o item (revisão de segurança, 09/11/2026).
+  const comPessoaNoId = itens.filter((item) => item.id.includes(antigoId));
+  const semPessoaNoId = itens.filter((item) => !item.id.includes(antigoId));
+  const copiados = comPessoaNoId.map((item) => ({
     ...item,
     id: item.id.replace(antigoId, novoId),
     funcionario_id: novoId,
@@ -343,7 +347,8 @@ async function passarPosto(
     criado_em: agora,
   }));
   await emLotesFunc(copiados, (item) => ds.criar("modelos_rotina", item));
-  await emLotesFunc(itens, (item) => ds.excluir("modelos_rotina", item.id));
+  await emLotesFunc(comPessoaNoId, (item) => ds.excluir("modelos_rotina", item.id));
+  await emLotesFunc(semPessoaNoId, (item) => ds.atualizar("modelos_rotina", item.id, { funcionario_id: novoId }));
 
   // 2. só o que ainda é plano, e só daqui para a frente.
   const aTransferir = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");

@@ -4,7 +4,7 @@ import { ErroPermissao } from "@/services/erros";
 import { trocarTarefasDoDia } from "@/services/rotinasService";
 
 /**
- * POST { data, sede_id, a, b, confirmar?, forcar?, assinatura? } → troca as tarefas do dia
+ * POST { data, sede_id, a, b, confirmar?, forcar?, rota?, assinatura? } → troca as tarefas do dia
  * entre duas pessoas da sede. Sem `confirmar`, só devolve a proposta para a tela mostrar.
  */
 export async function POST(req: Request) {
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
         bId: corpo.b,
         confirmar: corpo.confirmar === true,
         forcar: corpo.forcar === true,
+        rota: corpo.rota === true,
         assinatura: corpo.assinatura,
       }),
     );
