@@ -174,8 +174,9 @@ export default function TrocarTarefas({
               <div style={{ fontWeight: 700, marginBottom: 4 }}>Na rota padrão não dá para trocar:</div>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {proposta.rotaRecusas.map((r) => (
-                  <li key={`${r.inicio}-${r.tarefa}-${r.para}`}>
-                    <span className="num">{r.inicio}</span> {r.tarefa} → {r.para}: {r.motivo}
+                  <li key={r.item_id}>
+                    <span className="num">{r.inicio}</span>
+                    {r.dias && ` (${r.dias})`} {r.tarefa} → {r.para}: {r.motivo}
                   </li>
                 ))}
               </ul>

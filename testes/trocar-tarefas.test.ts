@@ -233,12 +233,24 @@ describe("trocar as tarefas do dia", () => {
       await d.criar("modelos_rotina", item("ra-fachada", A, { tarefa_id: "fachada", inicio_planejado: "14:00" }));
       for (const id of ["a1", "a2", "b1", "b2"]) await d.excluir("rotinas_planejadas", id);
       const p = await (await pedir(troca({ b: "christus_f3" }))).json(); // Do Vale: sem a aptidão e masculino
-      expect(p.rotaRecusas).toEqual([expect.objectContaining({ tarefa: "Limpar fachada", inicio: "14:00" })]);
+      expect(p.rotaRecusas).toEqual([expect.objectContaining({ item_id: "ra-fachada", dias: "", tarefa: "Limpar fachada", inicio: "14:00" })]);
       expect(p.rotaRecusas[0].motivo).toMatch(/Altura|feminino|gênero/iu);
       const r = await pedir(troca({ b: "christus_f3", confirmar: true, rota: true, forcar: true, assinatura: p.assinatura }));
       expect(r.status).toBe(422);
       expect(await donoDoItem("ra-fachada")).toBe(A);
       expect(await donoDoItem("ra")).toBe(A);
+    });
+
+    it("a mesma tarefa recusada em duas camadas aparece duas vezes, cada uma com o id do item e os dias", async () => {
+      const d = await getDataSource();
+      const t1 = (await d.obter("tarefas", "christus_t1"))!;
+      await d.criar("tarefas", { ...t1, id: "wcfem", nome_tarefa: "WC feminino", requisitos: "", restricao_genero: "feminino" } as never);
+      await d.criar("modelos_rotina", item("wc-semana", A, { tarefa_id: "wcfem", inicio_planejado: "14:00", dias_semana: "1,2,3,4,5" }));
+      await d.criar("modelos_rotina", item("wc-sabado", A, { tarefa_id: "wcfem", inicio_planejado: "14:00", dias_semana: "6" }));
+      const p = await (await pedir(troca({ b: "christus_f3" }))).json(); // Do Vale: masculino
+      const wc = p.rotaRecusas.filter((r: { tarefa: string }) => r.tarefa === "WC feminino");
+      expect(wc.map((r: { item_id: string }) => r.item_id).sort()).toEqual(["wc-sabado", "wc-semana"]);
+      expect(new Set(wc.map((r: { dias: string }) => r.dias))).toEqual(new Set(["sáb", "seg, ter, qua, qui, sex"]));
     });
 
     it("depois da troca na rota, a substituição no posto leva o item para o substituto, sem apagá-lo", async () => {
@@ -247,8 +259,9 @@ describe("trocar as tarefas do dia", () => {
       await pedir(troca({ confirmar: true, rota: true, assinatura }));
       expect(await donoDoItem("ra")).toBe(B); // o id ainda carrega A
       await (await getDataSource()).atualizar("funcionarios", "christus_f4", { entrada: "07:00", saida: "17:00" });
-      await substituirNoPosto("christus_f4", B, DIA, "c@x.com");
+      const r = await substituirNoPosto("christus_f4", B, DIA, "c@x.com");
       expect(await donoDoItem("ra")).toBe("christus_f4");
+      expect(r.itensDeRota).toBe(1); // o item que só mudou de dono também conta
       expect(await (await getDataSource()).obter("modelos_rotina", "ra")).not.toBeNull();
     });
 

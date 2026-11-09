@@ -371,7 +371,8 @@ async function passarPosto(
   });
 
   return {
-    itensDeRota: copiados.length,
+    // Os recriados e os que só mudaram de dono (vindos de uma troca): os dois passaram.
+    itensDeRota: copiados.length + semPessoaNoId.length,
     blocosTransferidos: aTransferir.length,
     blocosPreservados: preservados,
     inativou: true,

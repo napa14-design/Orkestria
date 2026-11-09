@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-11-09 — Troca de tarefas: duas ressalvas da auditoria
+
+- O aviso de recusa da rota mostrava a mesma linha duas vezes quando a tarefa estava em duas
+  camadas (seg–sex e sábado), com a mesma chave no React. Cada recusa leva o id do item e os
+  dias da camada.
+- A substituição no posto contava em `itensDeRota` só os itens recriados: os que só mudaram de
+  dono (vindos de uma troca) ficavam de fora. Nenhuma tela mostra o número.
+
+Arquivos: `services/rotinasService.ts`, `services/funcionariosService.ts`,
+`components/agenda/TrocarTarefas.tsx`, `testes/trocar-tarefas.test.ts`.
+
+---
+
 ## 2026-11-09 — Troca de tarefas: também na rota padrão
 
 Pedido da coordenação: ao trocar no modal, poder atualizar a rota padrão com a troca, senão o

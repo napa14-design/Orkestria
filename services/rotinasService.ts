@@ -16,7 +16,7 @@ import {
   tempoVisualMin,
 } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { formatarDataBR, hhmmParaMin, minParaHHMM, somarDias } from "@/lib/dateUtils";
+import { formatarDataBR, hhmmParaMin, minParaHHMM, rotularDiasSemana, somarDias } from "@/lib/dateUtils";
 import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
@@ -593,7 +593,7 @@ export interface PropostaTroca {
   /** Itens da rota padrão de cada um, que trocam junto se a tela marcar "também na rota". */
   rota: { a: number; b: number };
   /** Itens da rota que quem recebe não pode fazer (requisito, validade, gênero): com eles, a rota não troca. */
-  rotaRecusas: { tarefa: string; para: string; inicio: string; motivo: string }[];
+  rotaRecusas: { item_id: string; dias: string; tarefa: string; para: string; inicio: string; motivo: string }[];
   /** O que a tela viu: confirmar com outra lista é recusado. */
   assinatura: string;
   gravados?: number;
@@ -744,6 +744,10 @@ export async function trocarTarefasDoDia(args: {
       }).filter((a) => a.nivel === "erro" && DA_PESSOA.has(a.codigo));
       if (motivos.length)
         rotaRecusas.push({
+          item_id: item.id,
+          // A mesma tarefa pode estar em duas camadas (seg–sex e sábado): sem os dias, o aviso
+          // mostrava a mesma linha duas vezes.
+          dias: item.dias_semana ? rotularDiasSemana(item.dias_semana) : "",
           tarefa: tarefa?.nome_tarefa ?? "Tarefa",
           para: destino.nome,
           inicio: item.inicio_planejado,
