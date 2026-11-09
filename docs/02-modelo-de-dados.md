@@ -87,7 +87,8 @@ sedes.
 
 ### tipos_local
 id · nome · **fator_intensidade** (0,8 leve · 1,0 normal · 1,5 densa) · descricao ·
-ativo · auditoria. **Catálogo global** (só administrador escreve; qualquer sessão
+ativo · auditoria · **epis_padrao** (CSV de ids de EPI do catálogo `requisitos`: tarefa
+nova sem EPI marcado nasce com eles; desde 09/11/2026). **Catálogo global** (só administrador escreve; qualquer sessão
 lê, porque o cadastro de Locais precisa da lista).
 
 Era lista fixa no código até 24/08/2026 — virou cadastro porque as 18 sedes vão de

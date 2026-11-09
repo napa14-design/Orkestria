@@ -7,6 +7,69 @@
 
 ---
 
+## 2026-11-09 — Trocar as tarefas do dia entre duas pessoas
+
+Pedido da coordenação: "o João faz as da Clara e a Clara as do João", que hoje era bloco a
+bloco, e cada arrasto esbarrava nos blocos que o outro ainda não tinha largado. No resumo do
+funcionário, na Agenda do dia, "⇄ Trocar tarefas com…" escolhe a outra pessoa, mostra o que
+cada uma passa a fazer e troca tudo de uma vez.
+
+- **Mesmos horários, outra pessoa.** Trocam só os blocos planejados (ou pendentes) sem
+  realizado registrado, conferido no registro e não só no status, que é gravado depois em
+  outra escrita. Cancelados e remanejados ficam onde estão, e a tela diz quantos.
+- **A autorização é da confirmação.** A proposta mostra sempre o que pede autorização, e
+  trocar de pessoa desmarca o "autorizar". A primeira versão, reprovada pela auditoria,
+  perdia a caixa ao marcar e levava a autorização para a próxima pessoa escolhida, gravando
+  "[Autorizado manualmente]" sem ninguém ter autorizado.
+- **A assinatura cobre horário, duração, situação e registro de todos os blocos dos dois**:
+  bloco que mudou de horário entre ver e confirmar dá 409, e a tela monta a troca de novo.
+- **Mesma régua do arrasto** (`validarAlocacao`), com as duas agendas já trocadas: expediente,
+  intervalo, sobreposição, requisitos e qualificações de quem recebe. Fora do expediente ou
+  no intervalo do outro pede autorização, como no arrasto, e fica "[Autorizado manualmente]"
+  no bloco. Requisito que falta bloqueia.
+- Recusa ausente, folga pela escala, pessoa de outra sede ou inativa. Com um dos dois sem
+  tarefa, vira passar as tarefas. Grava num lote só e confere que a agenda dos dois não mudou
+  desde que a troca foi montada (409, se mudou). Supervisor não vê o botão e a rota recusa.
+- Portão da doutrina: elimina os N arrastos de uma troca; é operação; o botão só existe no
+  resumo de quem foi selecionado; o caminho básico (arrastar) segue igual.
+- **Não faz:** trocar a semana inteira, nem só um trecho do dia. O tempo de cada bloco segue o
+  que estava, sem recalcular pelo tempo pessoal de quem recebe, como no arrasto; o fim gravado
+  é recalculado (início + previsto).
+- **Risco aceito:** a confirmação relê tudo e confere a assinatura, mas grava num lote sem
+  condição. Duas trocas da mesma sede no mesmo instante, envolvendo a mesma pessoa, podem
+  deixar blocos sobrepostos; o arrasto tem a mesma janela.
+
+Arquivos: `services/rotinasService.ts` (`trocarTarefasDoDia`), `app/api/rotinas/trocar/route.ts`,
+`components/agenda/TrocarTarefas.tsx`, `components/agenda/OccupancySummary.tsx`,
+`app/(app)/rotinas/page.tsx`, `testes/trocar-tarefas.test.ts`.
+
+---
+
+## 2026-11-09 — EPI padrão por tipo de local
+
+Pedido da coordenação: cadastrar o EPI por tipo de ambiente (banheiro, sala, auditório), em
+vez de tarefa por tarefa. O catálogo de tipos de local ganha "EPIs padrão" (`epis_padrao`), e a
+tarefa nova sem EPI marcado já nasce com os do tipo do local. EPI marcado à mão manda; editar
+não reaplica, e mudar o padrão não mexe nas tarefas que já existem. Só EPI do catálogo entra.
+
+- Medido em produção antes: 74% das tarefas estão em local do tipo "Outros", e 625 em locais
+  que não são um ambiente ("Geral", "Térreo", "5º Andar"). Por isso as tarefas atuais recebem
+  o EPI por uma carga única, a partir de uma planilha de revisão que classifica cada tarefa
+  pelo nome, pelo módulo, pelo tipo e pelo nome do local (1.451 com confiança alta, 250
+  média). A carga ainda não rodou: espera a planilha revisada.
+- Efeito na rotina: tarefa com EPI passa de "✓ Feita" a "✓ Feita · EPI", e os EPIs vão para a
+  ficha. As críticas seguem marcadas pelas coordenações.
+- A importação por planilha segue pela coluna de EPIs e não herda o padrão do tipo, nem em
+  local que já existe. "Nova tarefa rápida" da Agenda herda (passa pelo mesmo cadastro).
+- A lista é gravada limpa (sem espaço nem repetição), e EPI apagado do catálogo some ao salvar
+  o tipo, em vez de travar a edição. Local sem tipo não consulta o catálogo.
+
+Arquivos: `types/TipoLocalCatalogo.ts`, `lib/schema.ts`, `services/tiposLocalService.ts`,
+`services/tarefasService.ts`, `app/(app)/tipos-local/page.tsx`, `app/(app)/tarefas/page.tsx`,
+`testes/epi-por-tipo.test.ts`.
+
+---
+
 ## 2026-11-06 — Coordenador vê e edita coordenador; o código vai só por e-mail
 
 Relato da coordenação: a lista de Usuários vinha vazia, e trocar um supervisor para

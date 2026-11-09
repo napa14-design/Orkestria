@@ -1,9 +1,11 @@
 "use client";
 
+import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { useSessao } from "@/components/SessaoContexto";
+import { fetcher } from "@/lib/clientApi";
 import { podeCriarNoCatalogo, podeEditarItemDoCatalogo } from "@/lib/permissions";
-import type { TipoLocalCatalogo } from "@/types";
+import type { Requisito, TipoLocalCatalogo } from "@/types";
 
 /**
  * Catálogo de tipos de ambiente. Era lista fixa no código até 24/08/2026 —
@@ -20,6 +22,8 @@ const FAIXA = [
 
 export default function PaginaTiposLocal() {
   const sessao = useSessao();
+  const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
+  const epis = (requisitos ?? []).filter((r) => r.tipo === "epi" && r.ativo);
   return (
     <CrudManager<TipoLocalCatalogo>
       titulo="Tipos de local"
@@ -59,6 +63,15 @@ export default function PaginaTiposLocal() {
           dica: "O quanto este ambiente suja em relação ao normal. Só afeta tarefas calculadas POR M² ou POR UNIDADE — tarefa de tempo fixo já traz o tempo pronto e não é multiplicada. O valor digitado no próprio local, quando existe, sempre vence este.",
         },
         {
+          key: "epis_padrao",
+          rotulo: "EPIs padrão",
+          tipo: "multiselect",
+          inteira: true,
+          opcoes: epis.map((r) => ({ valor: r.id, rotulo: r.nome })),
+          ajuda: "Tarefa nova neste tipo, sem EPI marcado, já nasce com estes",
+          dica: "Vale para todas as sedes. Só afeta tarefas criadas depois de salvar; as que já existem não mudam. Cada tarefa pode acrescentar ou tirar EPI no próprio cadastro.",
+        },
+        {
           key: "descricao",
           rotulo: "Descrição",
           tipo: "textarea",
@@ -87,6 +100,12 @@ export default function PaginaTiposLocal() {
               </span>
             );
           },
+        },
+        {
+          key: "epis_padrao",
+          rotulo: "EPIs padrão",
+          render: (t) =>
+            (t.epis_padrao ?? "").split(",").filter(Boolean).map((id) => epis.find((r) => r.id === id)?.nome ?? "—").join(", ") || "—",
         },
         { key: "descricao", rotulo: "Descrição" },
         {

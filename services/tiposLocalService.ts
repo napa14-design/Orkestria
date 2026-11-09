@@ -29,6 +29,23 @@ function validar(dados: Partial<DadosTipoLocal>) {
     ]);
 }
 
+/**
+ * EPI padrão entra em toda tarefa nova do tipo: requisito que não é EPI é recusado. Devolve
+ * a lista limpa para gravar. Id que sumiu do catálogo cai calado: a tela reenvia a lista
+ * inteira e não mostra o apagado, então recusá-lo travaria o tipo para sempre.
+ */
+async function normalizarEpisPadrao(episPadrao: unknown): Promise<string | undefined> {
+  if (episPadrao === undefined || episPadrao === null) return undefined;
+  const recusa = () =>
+    new ErroValidacao([{ nivel: "erro", codigo: "TIPO_LOCAL_EPI_INVALIDO", mensagem: "Escolha os EPIs padrão na lista do catálogo." }]);
+  if (typeof episPadrao !== "string") throw recusa();
+  const ids = [...new Set(episPadrao.split(",").map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return "";
+  const catalogo = new Map((await (await getDataSource()).listar("requisitos")).map((r) => [r.id, r]));
+  if (ids.some((id) => catalogo.has(id) && catalogo.get(id)!.tipo !== "epi")) throw recusa();
+  return ids.filter((id) => catalogo.has(id)).join(",");
+}
+
 export async function getTiposLocal(): Promise<TipoLocalCatalogo[]> {
   const ds = await getDataSource();
   return ds.listar("tipos_local");
@@ -39,10 +56,12 @@ export async function createTipoLocal(
   autor: string,
 ): Promise<TipoLocalCatalogo> {
   validar(dados);
+  const epis_padrao = await normalizarEpisPadrao(dados.epis_padrao);
   const ds = await getDataSource();
   const agora = agoraISO();
   return ds.criar("tipos_local", {
     ...dados,
+    ...(epis_padrao !== undefined ? { epis_padrao } : {}),
     id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     criado_por: autor,
     criado_em: agora,
@@ -60,8 +79,10 @@ export async function updateTipoLocal(
   const atual = await ds.obter("tipos_local", id);
   if (!atual) throw new Error("Tipo de local não encontrado.");
   validar({ ...atual, ...mudancas });
+  const epis_padrao = await normalizarEpisPadrao(mudancas.epis_padrao);
   return ds.atualizar("tipos_local", id, {
     ...mudancas,
+    ...(epis_padrao !== undefined ? { epis_padrao } : {}),
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });

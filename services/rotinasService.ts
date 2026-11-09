@@ -21,7 +21,7 @@ import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
 import type { AlertaValidacao, Funcionario, RotinaPlanejada, StatusRotina } from "@/types";
 import { ausenteEm } from "./ausenciasService";
-import { ErroValidacao } from "./erros";
+import { ErroConflito, ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
 import { mapaFatorDoTipo } from "./tiposLocalService";
 import { getQualificacoesDoFuncionario } from "./qualificacoesService";
@@ -565,6 +565,185 @@ export async function updateRotina(
     atualizado_em: agoraISO(),
   });
   return { rotina, alertas };
+}
+
+/** Bloco que ainda pode trocar de dono: planejado, sem realizado registrado. */
+const TROCA_MOVEL: ReadonlySet<StatusRotina> = new Set(["planejada", "pendente"]);
+
+export interface BlocoTrocado {
+  rotina_id: string;
+  de: string;
+  para: string;
+  tarefa: string;
+  inicio: string;
+  fim: string;
+  alertas: AlertaValidacao[];
+}
+
+export interface PropostaTroca {
+  a: { id: string; nome: string; recebe: number };
+  b: { id: string; nome: string; recebe: number };
+  blocos: BlocoTrocado[];
+  /** Blocos dos dois que ficam onde estão: já têm realizado, foram cancelados ou remanejados. */
+  ficam: number;
+  /** Erro que nem autorizando passa (ex.: requisito que falta). */
+  bloqueia: boolean;
+  /** Há erro de horário que o coordenador pode autorizar, como no arrasto. */
+  pedeAutorizacao: boolean;
+  /** O que a tela viu: confirmar com outra lista é recusado. */
+  assinatura: string;
+  gravados?: number;
+}
+
+/**
+ * Troca as tarefas do dia entre duas pessoas: as de A vão para B e as de B para A, de
+ * uma vez. Antes era bloco a bloco, e cada arrasto esbarrava nos blocos que o outro
+ * ainda não tinha largado (pedido da coordenação, 09/11/2026). Simula as duas agendas
+ * já trocadas e valida cada bloco no destino com a mesma regra do arrasto; sem
+ * `confirmar`, só devolve a proposta. Com um lado vazio, vira passar as tarefas.
+ */
+export async function trocarTarefasDoDia(args: {
+  data: unknown;
+  sedeId: string;
+  aId: unknown;
+  bId: unknown;
+  confirmar?: boolean;
+  forcar?: boolean;
+  assinatura?: unknown;
+}): Promise<PropostaTroca> {
+  const { data, sedeId, aId, bId } = args;
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  if (typeof data !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(data) || typeof aId !== "string" || typeof bId !== "string")
+    throw recusa("TROCA_INVALIDA", "Informe a data e as duas pessoas.");
+  if (aId === bId) throw recusa("TROCA_MESMA_PESSOA", "Escolha outra pessoa para trocar.");
+  const ds = await getDataSource();
+  const [fa, fb] = await Promise.all([ds.obter("funcionarios", aId), ds.obter("funcionarios", bId)]);
+  if (!fa || !fb) throw recusa("TROCA_SEM_FUNCIONARIO", "Funcionário não encontrado.");
+  if (fa.sede_id !== sedeId || fb.sede_id !== sedeId)
+    throw recusa("SEDE_DIVERGENTE", "As duas pessoas precisam ser da sede aberta.");
+  for (const f of [fa, fb]) {
+    if (f.ativo !== true) throw recusa("FUNCIONARIO_INATIVO", `${f.nome} não está ativo.`);
+    await exigirPresenca(f.id, f.nome, data);
+    exigirEscala(f, data);
+  }
+
+  const [doDia, realizados] = await Promise.all([
+    getRotinasByData(data, sedeId),
+    ds.consultar("execucoes_realizadas", [
+      { campo: "sede_id", op: "==", valor: sedeId },
+      { campo: "data_execucao", op: "==", valor: data },
+    ]),
+  ]);
+  // O status da rotina é gravado depois do realizado, em outra escrita que pode falhar:
+  // bloco com registro fica com quem fez, mesmo se o status ainda disser "planejada".
+  const comRegistro = new Set(realizados.map((e) => e.rotina_id));
+  const movel = (r: RotinaPlanejada) => TROCA_MOVEL.has(r.status) && !comRegistro.has(r.id);
+  const dele = (id: string) => doDia.filter((r) => r.funcionario_id === id);
+  const [vaiDeA, vaiDeB] = [dele(aId).filter(movel), dele(bId).filter(movel)];
+  if (!vaiDeA.length && !vaiDeB.length)
+    throw recusa("TROCA_VAZIA", "Nenhum dos dois tem tarefa planejada para trocar neste dia.");
+  // Tudo o que entra na conta, dos dois: quem tem o bloco, horário, duração, situação e
+  // registro. Um bloco que muda de horário entre ver e confirmar mudaria os alertas.
+  const assinatura = [...dele(aId), ...dele(bId)]
+    .map((r) => [r.id, r.funcionario_id, r.inicio_planejado, r.tempo_previsto_min, r.status, comRegistro.has(r.id) ? "r" : ""].join("@"))
+    .sort()
+    .join(",");
+  if (args.confirmar && args.assinatura !== assinatura)
+    throw new ErroConflito("A agenda dos dois mudou desde que a troca foi montada. Confira de novo.");
+  // A autorização vale só na confirmação: a proposta mostra sempre o que pede autorização,
+  // senão a tela perdia a caixa e levava a autorização para a próxima pessoa escolhida.
+  const forcar = args.confirmar === true && args.forcar === true;
+
+  const todos = [...dele(aId), ...dele(bId)];
+  const [tarefas, locais, parametros, requisitosCatalogo, qualA, qualB] = await Promise.all([
+    Promise.all([...new Set(todos.map((r) => r.tarefa_id))].map((id) => ds.obter("tarefas", id))),
+    Promise.all([...new Set(todos.map((r) => r.local_id))].map((id) => ds.obter("locais", id))),
+    resolverParametros(sedeId),
+    ds.listar("requisitos"),
+    getQualificacoesDoFuncionario(aId),
+    getQualificacoesDoFuncionario(bId),
+  ]);
+  const tarefaPorId = new Map(tarefas.filter((t) => t !== null).map((t) => [t.id, t]));
+  const localPorId = new Map(locais.filter((l) => l !== null).map((l) => [l.id, l]));
+  const espera = new Set([...tarefaPorId.values()].filter((t) => t.espera).map((t) => t.id));
+
+  const blocos: BlocoTrocado[] = [];
+  const fimDe = new Map<string, string>();
+  const avaliar = (vao: RotinaPlanejada[], destino: Funcionario, ficaNoDestino: RotinaPlanejada[], qualificacoes: typeof qualA) => {
+    const funcNoDia = funcionarioNoDia(destino, data);
+    for (const r of vao) {
+      const outros = [...ficaNoDestino, ...vao.filter((x) => x.id !== r.id)].map((x) => ({ ...x, funcionario_id: destino.id }));
+      const tarefa = tarefaPorId.get(r.tarefa_id);
+      const inicioMin = hhmmParaMin(r.inicio_planejado);
+      const fimMin = fimPlanejadoMin(inicioMin, r.tempo_previsto_min);
+      fimDe.set(r.id, minParaHHMM(fimMin));
+      const brutos = validarAlocacao({
+        funcionario: funcNoDia,
+        rotinasExistentes: outros,
+        inicioMin,
+        fimMin,
+        tarefa,
+        local: localPorId.get(r.local_id),
+        parametros,
+        tempoPrevistoNovo: r.tempo_previsto_min,
+        requisitosCatalogo,
+        qualificacoesFuncionario: qualificacoes,
+        data,
+        tarefasEspera: espera,
+      });
+      blocos.push({
+        rotina_id: r.id,
+        de: r.funcionario_id,
+        para: destino.id,
+        tarefa: tarefa?.nome_tarefa ?? "Tarefa",
+        inicio: r.inicio_planejado,
+        fim: minParaHHMM(fimMin),
+        alertas: aplicarAutorizacaoManual(brutos, forcar).alertas,
+      });
+    }
+  };
+  // No destino ficam os blocos dele que não trocam, mais os que chegam.
+  avaliar(vaiDeA, fb, dele(bId).filter((r) => !movel(r)), qualB);
+  avaliar(vaiDeB, fa, dele(aId).filter((r) => !movel(r)), qualA);
+  blocos.sort((x, y) => x.inicio.localeCompare(y.inicio));
+
+  const erros = blocos.flatMap((b) => b.alertas.filter((a) => a.nivel === "erro"));
+  const proposta: PropostaTroca = {
+    a: { id: fa.id, nome: fa.nome, recebe: vaiDeB.length },
+    b: { id: fb.id, nome: fb.nome, recebe: vaiDeA.length },
+    blocos,
+    ficam: dele(aId).length + dele(bId).length - vaiDeA.length - vaiDeB.length,
+    bloqueia: erros.some((a) => !CODIGOS_AUTORIZAVEIS.has(a.codigo)),
+    pedeAutorizacao: erros.length > 0 && erros.every((a) => CODIGOS_AUTORIZAVEIS.has(a.codigo)),
+    assinatura,
+  };
+  if (!args.confirmar) return proposta;
+  if (erros.length) throw new ErroValidacao(erros);
+
+  const agora = agoraISO();
+  const porId = new Map(doDia.map((r) => [r.id, r]));
+  // Num lote só: ou os dois ficam trocados, ou nada muda.
+  await ds.gravarLote(
+    blocos.map((b) => {
+      const atual = porId.get(b.rotina_id)!;
+      const autorizado = b.alertas.some((a) => a.mensagem.endsWith("(autorizado manualmente)"));
+      return {
+        tipo: "atualizar" as const,
+        tabela: "rotinas_planejadas" as const,
+        id: b.rotina_id,
+        mudancas: {
+          funcionario_id: b.para,
+          // Como no arrasto: o fim gravado é o real, início + previsto.
+          fim_planejado: fimDe.get(b.rotina_id)!,
+          ...(autorizado && !atual.observacao?.includes("[Autorizado manualmente]")
+            ? { observacao: `${atual.observacao ?? ""} [Autorizado manualmente]`.trim() }
+            : {}),
+          atualizado_em: agora,
+        },
+      };
+    }),
+  );
+  return { ...proposta, gravados: blocos.length };
 }
 
 export async function deleteRotina(id: string): Promise<void> {

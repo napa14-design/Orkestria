@@ -1,4 +1,4 @@
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, getDataSource, novoId, type DataSource } from "@/lib/datasource";
 import { validarTarefa, temErro } from "@/lib/validations";
 import type { Tarefa } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -13,6 +13,23 @@ export async function getTarefas(sedeId?: string): Promise<Tarefa[]> {
   return sedeId
     ? ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: sedeId }])
     : ds.listar("tarefas");
+}
+
+/**
+ * Tarefa nova sem EPI marcado nasce com os EPIs padrão do tipo do local, para ninguém
+ * repetir à mão o que é de todo banheiro (pedido da coordenação, 06/11/2026). Só na
+ * criação: ao editar, tirar o EPI é decisão de quem tirou. EPI marcado no formulário manda.
+ */
+async function comEpisDoTipo(ds: DataSource, requisitos: string | undefined, tipoLocal: string): Promise<string | undefined> {
+  // Local sem tipo: `doc("")` derruba o Firestore. Requisito que não é texto segue como antes.
+  if (!tipoLocal || (requisitos != null && typeof requisitos !== "string")) return requisitos;
+  const padrao = (await ds.obter("tipos_local", tipoLocal))?.epis_padrao;
+  if (!padrao) return requisitos;
+  const catalogo = await ds.listar("requisitos");
+  const epis = new Set(catalogo.filter((r) => r.tipo === "epi" && r.ativo).map((r) => r.id));
+  const marcados = (requisitos ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (marcados.some((id) => epis.has(id))) return requisitos;
+  return [...marcados, ...padrao.split(",").map((id) => id.trim()).filter((id) => epis.has(id))].join(",");
 }
 
 /**
@@ -33,6 +50,7 @@ export async function createTarefa(dados: DadosTarefa, autor: string): Promise<T
     ...dados,
     id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sede_id: local.sede_id, // herdada do local
+    requisitos: await comEpisDoTipo(ds, dados.requisitos, local.tipo_local),
     criado_por: autor,
     criado_em: agora,
     atualizado_por: autor,

@@ -29,6 +29,12 @@ export interface TipoLocalCatalogo extends Auditoria {
    * tempo fixo já é explícito. Ausente ou ≤ 0 equivale a 1,0.
    */
   fator_intensidade?: number;
+  /**
+   * EPIs padrão do ambiente (CSV de ids do catálogo `requisitos`, só tipo "epi"). Tarefa
+   * nova neste tipo, sem EPI marcado, nasce com eles. Depois é da tarefa: mudar aqui não
+   * altera as que já existem.
+   */
+  epis_padrao?: string;
   /** Texto curto que ajuda quem cadastra a escolher. Opcional. */
   descricao?: string;
   ativo: boolean;

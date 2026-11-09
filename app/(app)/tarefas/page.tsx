@@ -343,7 +343,7 @@ export default function PaginaTarefas() {
           inteira: true,
           opcoes: (requisitos ?? []).filter((r) => r.ativo).map((r) => ({ valor: r.id, rotulo: r.nome })),
           ajuda: "Catálogo gerenciado em Requisitos (admin)",
-          dica: "Aptidões/treinamentos que o executante precisa ter (a agenda bloqueia quem não tem ou está vencido) e EPIs exigidos (lembrete). Selecione os que esta tarefa demanda.",
+          dica: "Aptidões/treinamentos que o executante precisa ter (a agenda bloqueia quem não tem ou está vencido) e EPIs exigidos (lembrete). Selecione os que esta tarefa demanda. Tarefa nova sem EPI marcado recebe os EPIs padrão do tipo do local; para tirar, edite depois.",
         },
         { key: "ativo", rotulo: "Ativa", tipo: "checkbox", padrao: true },
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },

@@ -68,6 +68,7 @@ export default function OccupancySummary({
   parametros,
   selecionadoId,
   aoSelecionar,
+  aoTrocar,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -79,6 +80,8 @@ export default function OccupancySummary({
   parametros: ParametrosResolvidos;
   selecionadoId: string | null;
   aoSelecionar: (id: string) => void;
+  /** Sem isto (supervisor, só leitura), o botão de troca nem aparece. */
+  aoTrocar?: (id: string) => void;
 }) {
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
 
@@ -124,6 +127,17 @@ export default function OccupancySummary({
               {selecionado.funcionario.entrada}–{selecionado.funcionario.saida} · intervalo{" "}
               {selecionado.funcionario.intervalo_inicio}–{selecionado.funcionario.intervalo_fim}
             </div>
+            {aoTrocar && (
+              <button
+                type="button"
+                className="btn btn-mini"
+                style={{ marginBottom: 12 }}
+                onClick={() => aoTrocar(selecionado.funcionario.id)}
+                title="Passa as tarefas do dia desta pessoa para outra e traz as da outra, de uma vez"
+              >
+                ⇄ Trocar tarefas com…
+              </button>
+            )}
 
             {!selecionado.soHoras && (
               <>

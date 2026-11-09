@@ -24,6 +24,7 @@ import OccupancySummary from "@/components/agenda/OccupancySummary";
 import PendenciasPanel from "@/components/agenda/PendenciasPanel";
 import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
+import TrocarTarefas from "@/components/agenda/TrocarTarefas";
 import Carregando from "@/components/Carregando";
 import { useSessao } from "@/components/SessaoContexto";
 import {
@@ -58,6 +59,8 @@ export default function PaginaRotinas() {
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [turno, setTurno] = useState("");
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  /** De quem é a troca de tarefas aberta; `null` = fechada. */
+  const [trocaDe, setTrocaDe] = useState<string | null>(null);
   const [alertas, setAlertas] = useState<AlertaValidacao[]>([]);
   const [planejamentoAberto, setPlanejamentoAberto] = useState(false);
   const [modo, setModo] = useState<"dia" | "semana">("dia");
@@ -1101,10 +1104,23 @@ export default function PaginaRotinas() {
               parametros={params}
               selecionadoId={selecionado}
               aoSelecionar={selecionarFuncionario}
+              aoTrocar={sessao && podeEscrever(sessao) ? setTrocaDe : undefined}
             />
           </div>
         </>
       )}
+
+      <TrocarTarefas
+        de={equipeDoDia.find((f) => f.id === trocaDe) ?? null}
+        colegas={equipeDoDia.filter((f) => f.id !== trocaDe && !ausentesMap.has(f.id))}
+        data={data}
+        sedeId={sedeId}
+        aoFechar={() => setTrocaDe(null)}
+        aoConcluir={() => {
+          setTrocaDe(null);
+          void mutateRotinas();
+        }}
+      />
 
       <ModalPlanejamento
         aberto={!somenteLeitura && planejamentoAberto}

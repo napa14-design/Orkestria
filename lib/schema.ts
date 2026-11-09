@@ -153,6 +153,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("descricao"),
     col("ativo", "boolean"),
     ...AUDITORIA,
+    // Colunas novas vão SEMPRE no fim: o Sheets grava por posição.
+    col("epis_padrao"),
   ],
   categorias: [
     col("id"),
