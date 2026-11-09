@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-11-09 — Troca de tarefas: a autorização não sobrevive à lista recarregada
+
+Achado da auditoria, reproduzido na versão publicada: com o "autorizar" marcado, se a lista de
+funcionários recarregasse (mutação do SWR), o modal montava uma proposta nova em silêncio e
+mantinha a caixa marcada; o "Trocar" então gravava sem 409, e a autorização dada antes cobria
+um conflito que a tela não tinha mostrado. Agora a proposta depende do id da pessoa, não do
+objeto, e toda proposta nova desmarca a autorização.
+
+Arquivos: `components/agenda/TrocarTarefas.tsx`, `testes/epi-por-tipo.test.ts` (título).
+
+---
+
 ## 2026-11-09 — Trocar as tarefas do dia entre duas pessoas
 
 Pedido da coordenação: "o João faz as da Clara e a Clara as do João", que hoje era bloco a

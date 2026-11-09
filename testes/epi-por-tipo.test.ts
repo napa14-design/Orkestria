@@ -67,7 +67,7 @@ describe("tarefa nova herda o EPI do tipo do local", () => {
 });
 
 describe("cadastro do EPI padrão no tipo", () => {
-  it("aceita só EPI do catálogo, nunca treinamento, id inexistente ou não-texto", async () => {
+  it("aceita só EPI do catálogo: recusa treinamento e não-texto (id que não existe cai, ver abaixo)", async () => {
     for (const epis_padrao of ["nr35", "luva,nr35", 5, ["luva"]])
       await expect(createTipoLocal({ nome: "X", fator_intensidade: 1, ativo: true, epis_padrao } as never, "a")).rejects.toThrow(/EPIs padrão/);
     await expect(updateTipoLocal("wc", { epis_padrao: "nr35" }, "a")).rejects.toThrow(/EPIs padrão/);

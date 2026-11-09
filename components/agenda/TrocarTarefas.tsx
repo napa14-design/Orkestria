@@ -41,18 +41,24 @@ export default function TrocarTarefas({
     setErro("");
   }, [de?.id, data]);
 
-  // Outra pessoa, outra autorização: a de antes não vale para ela.
-  useEffect(() => setForcar(false), [com]);
-
   // A proposta sai sempre sem autorização, para mostrar o que a pede; o "autorizar" só
-  // vai junto na confirmação. `rodada` refaz a proposta depois de um 409.
+  // vai junto na confirmação, e vale só para a proposta que está na tela: toda proposta
+  // nova (outra pessoa, 409, ou a lista de funcionários recarregada pela aba) desmarca.
+  // `rodada` refaz a proposta depois de um 409. Depende do id, não do objeto `de`, que o
+  // SWR troca a cada revalidação.
   const [rodada, setRodada] = useState(0);
+  const deId = de?.id;
   useEffect(() => {
-    if (!de || !com) return;
+    setForcar(false);
+    if (!deId || !com) return;
     let valendo = true;
     setEstado("montando");
-    apiPost<PropostaTroca>("/api/rotinas/trocar", { data, sede_id: sedeId, a: de.id, b: com })
-      .then((p) => valendo && setProposta(p))
+    apiPost<PropostaTroca>("/api/rotinas/trocar", { data, sede_id: sedeId, a: deId, b: com })
+      .then((p) => {
+        if (!valendo) return;
+        setForcar(false);
+        setProposta(p);
+      })
       .catch((e) => {
         if (!valendo) return;
         setProposta(null);
@@ -62,7 +68,7 @@ export default function TrocarTarefas({
     return () => {
       valendo = false;
     };
-  }, [de, com, data, sedeId, rodada]);
+  }, [deId, com, data, sedeId, rodada]);
 
   async function trocar() {
     if (!de || !proposta) return;
