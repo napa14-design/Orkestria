@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-11-09 — Agenda se atualiza ao voltar para a aba
+
+Relato da coordenação: uma colega gerou a semana, e para outra "apareceu como se não tivesse
+gerado". O histórico mostrou que ela abriu a Agenda antes da geração; e a tela não se
+atualizava sozinha, porque o app desliga a revalidação ao voltar para a aba para poupar
+leituras (`AppShell`). Agora, só na Agenda, os blocos do dia, os da semana e o realizado são
+buscados de novo quando a pessoa volta para a aba, no máximo uma vez por minuto
+(`AO_VOLTAR`). Custo: uma sede grande relê ~300 blocos a cada volta, com o limite de um
+minuto. O resto da tela (cadastros, parâmetros, rota) segue sem isso.
+
+Arquivos: `app/(app)/rotinas/useRotinaData.ts`, `testes/agenda-atualiza.test.ts`.
+
+---
+
 ## 2026-11-09 — Troca de tarefas: duas ressalvas da auditoria
 
 - O aviso de recusa da rota mostrava a mesma linha duas vezes quando a tarefa estava em duas

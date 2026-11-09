@@ -41,6 +41,15 @@ const ROTULO_AUSENCIA: Record<string, string> = {
   outro: "Ausente",
 };
 
+/**
+ * A agenda de quem deixou a aba aberta não via o dia que um colega gerou depois: o app
+ * todo desliga a revalidação ao voltar para a aba, para poupar leituras (`AppShell`), e a
+ * pessoa só via a mudança trocando de data ou recarregando (relato de 09/11/2026, a semana
+ * gerada que "não apareceu"). Aqui, só nos blocos e no realizado, ela volta a valer ao
+ * retomar a aba, no máximo uma vez por minuto: uma sede grande relê ~300 blocos por vez.
+ */
+export const AO_VOLTAR = { revalidateOnFocus: true, focusThrottleInterval: 60_000 } as const;
+
 /** Segunda-feira da semana que contém a data. */
 function segundaDaSemana(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
@@ -82,12 +91,20 @@ export function useRotinaData(
   const { data: requisitos } = useSWR<Requisito[]>("/api/requisitos", fetcher);
   const { data: qualificacoes } = useSWR<QualificacaoFuncionario[]>(sedeId ? `/api/qualificacoes?sede=${sedeId}` : null, fetcher);
   const { data: parametros } = useSWR<ParametrosResolvidos>(sedeId ? `/api/parametros?resolvidos=1&sede=${sedeId}` : null, fetcher);
-  const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null, fetcher);
+  const { data: rotinas, mutate: mutateRotinas } = useSWR<RotinaPlanejada[]>(
+    sedeId ? `/api/rotinas?data=${data}&sede=${sedeId}` : null,
+    fetcher,
+    AO_VOLTAR,
+  );
   // O eventual conta na ocupação do mostrador (poucos registros por dia).
   const { data: eventuais } = useSWR<ServicoEventual[]>(sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
   const { data: ausencias } = useSWR<Ausencia[]>(sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null, fetcher);
   // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
-  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
+  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(
+    sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null,
+    fetcher,
+    AO_VOLTAR,
+  );
   // Modelos da sede — saber se há "rota padrão" (gera o dia em 1 clique).
   const { data: modelos, mutate: mutateModelos } = useSWR<
     { nome_modelo: string; padrao: boolean; evento?: boolean }[]
@@ -121,6 +138,7 @@ export function useRotinaData(
   const { data: rotinasSemana, mutate: mutateSemana } = useSWR<RotinaPlanejada[]>(
     modo === "semana" && sedeId ? `/api/rotinas?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
     fetcher,
+    AO_VOLTAR,
   );
   const { data: eventuaisSemana } = useSWR<ServicoEventual[]>(
     modo === "semana" && sedeId ? `/api/servicos-eventuais?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
