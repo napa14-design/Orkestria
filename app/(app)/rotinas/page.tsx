@@ -16,6 +16,8 @@ import AjudaAgenda from "@/components/agenda/AjudaAgenda";
 import AlertPanel from "@/components/agenda/AlertPanel";
 import BarraPassosDoDia from "@/components/agenda/BarraPassosDoDia";
 import CoberturaPanel from "@/components/agenda/CoberturaPanel";
+import AvisosRemanejo from "@/components/AvisosRemanejo";
+import { avisosDeRemanejo } from "@/lib/remanejoAuto";
 import FiltersBar from "@/components/agenda/FiltersBar";
 import ModaisRotina, { type TextoConfirmacao } from "@/components/agenda/ModaisRotina";
 import ModalPlanejamento from "@/components/agenda/ModalPlanejamento";
@@ -981,6 +983,16 @@ export default function PaginaRotinas() {
             </div>
           )}
 
+          <AvisosRemanejo
+            avisos={avisosDeRemanejo(
+              (rotinas ?? []).filter((r) => r.status !== "cancelada"),
+              (id) => (funcionarios ?? []).find((f) => f.id === id)?.nome ?? "Pessoa indisponível",
+              (id) => (tarefas ?? []).find((t) => t.id === id)?.nome_tarefa ?? "Tarefa",
+            )}
+            aoMudar={() => void mutateRotinas()}
+            podeDesfazer={!!sessao && podeEscrever(sessao)}
+          />
+
           <CoberturaPanel
             funcionarios={equipeDoDia}
             ausencias={ausentesMap}
@@ -1000,6 +1012,7 @@ export default function PaginaRotinas() {
             historico={historico ?? []}
             data={data}
             periodos={periodosLetivos ?? []}
+            ausentes={ausentesMap}
           />
 
           {/* paginação de colunas — só aparece em sedes grandes */}

@@ -200,6 +200,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     ...AUDITORIA,
     // Campo novo no FIM (o Sheets grava por posição — ver nota acima).
     col("espera", "boolean"),
+    col("critica_dias"),
+    col("qualquer_horario", "boolean"),
   ],
   rotinas_planejadas: [
     col("id"),
@@ -222,6 +224,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("origem_item_id"),
     col("origem_inicio"),
     col("titular_id"),
+    col("remanejo_auto"),
   ],
   execucoes_realizadas: [
     col("id"),

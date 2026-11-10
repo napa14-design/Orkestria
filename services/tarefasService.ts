@@ -1,4 +1,5 @@
 import { agoraISO, getDataSource, novoId, type DataSource } from "@/lib/datasource";
+import { parseDiasSemana, serializarDiasSemana } from "@/lib/dateUtils";
 import { validarTarefa, temErro } from "@/lib/validations";
 import type { Tarefa } from "@/types";
 import { ErroValidacao } from "./erros";
@@ -36,7 +37,40 @@ async function comEpisDoTipo(ds: DataSource, requisitos: string | undefined, tip
  * Regras essenciais nº 2 e 3: tarefa sem local é bloqueada e a sede é
  * SEMPRE herdada do local — nunca informada manualmente.
  */
-export async function createTarefa(dados: DadosTarefa, autor: string): Promise<Tarefa> {
+/**
+ * Os dias da crítica chegam do formulário como CSV; o banco guarda só dias
+ * válidos (0–6), sem repetir, em ordem — qualquer outra coisa vira "todo dia".
+ */
+function diasDaCritica(d: Partial<DadosTarefa>): Pick<Tarefa, "critica_dias"> | Record<string, never> {
+  if (!("critica_dias" in d)) return {};
+  return { critica_dias: typeof d.critica_dias === "string" ? serializarDiasSemana(parseDiasSemana(d.critica_dias)) : "" };
+}
+
+/**
+ * "Qualquer horário" do formulário (10/11/2026): marcado, a tarefa não tem janela;
+ * desmarcado, a janela é obrigatória. Fica gravado porque é a ESCOLHA que importa:
+ * sem ela, o remanejo automático não muda a crítica de horário. Qualquer valor que
+ * não seja `true`/`false` não muda nada.
+ */
+function comHorario<D extends Partial<DadosTarefa>>(d: D): D {
+  const { qualquer_horario, ...resto } = d as D & { qualquer_horario?: unknown };
+  if (qualquer_horario === true) return { ...resto, qualquer_horario: true, janela_inicio: "", janela_fim: "" } as unknown as D;
+  if (qualquer_horario === false) {
+    if (!resto.janela_inicio || !resto.janela_fim)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "JANELA_OBRIGATORIA",
+          mensagem: "Sem \"Qualquer horário\", informe o início e o fim da janela em que a tarefa pode ser feita.",
+        },
+      ]);
+    return { ...resto, qualquer_horario: false } as unknown as D;
+  }
+  return resto as unknown as D;
+}
+
+export async function createTarefa(entrada: DadosTarefa, autor: string): Promise<Tarefa> {
+  const dados = comHorario(entrada);
   const alertas = validarTarefa(dados);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
   const ds = await getDataSource();
@@ -48,6 +82,7 @@ export async function createTarefa(dados: DadosTarefa, autor: string): Promise<T
   const agora = agoraISO();
   return ds.criar("tarefas", {
     ...dados,
+    ...diasDaCritica(dados),
     id: novoId(), // depois do spread: id do corpo não sobrescreve registro alheio
     sede_id: local.sede_id, // herdada do local
     requisitos: await comEpisDoTipo(ds, dados.requisitos, local.tipo_local),
@@ -60,9 +95,10 @@ export async function createTarefa(dados: DadosTarefa, autor: string): Promise<T
 
 export async function updateTarefa(
   id: string,
-  mudancas: Partial<DadosTarefa>,
+  entrada: Partial<DadosTarefa>,
   autor: string,
 ): Promise<Tarefa> {
+  const mudancas = comHorario(entrada);
   const ds = await getDataSource();
   const atual = await ds.obter("tarefas", id);
   if (!atual) throw new Error("Tarefa não encontrada.");
@@ -99,6 +135,7 @@ export async function updateTarefa(
 
   return ds.atualizar("tarefas", id, {
     ...mudancas,
+    ...diasDaCritica(mudancas),
     sede_id,
     atualizado_por: autor,
     atualizado_em: agoraISO(),

@@ -4,7 +4,7 @@
  * Cobertura de ausências: lista as tarefas planejadas de funcionários
  * ausentes ("órfãs") e sugere colegas para assumi-las, pela régua da Central.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { jornadaDoDia, ocupaHorario, resumoFuncionario } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
 import { avaliarCandidatos, type CandidatoAvaliado } from "@/lib/redistribuicao";
@@ -17,6 +17,8 @@ import type {
   RotinaPlanejada,
   Tarefa,
 } from "@/types";
+
+const CHAVE_MINIMIZADO = "orkestria:cobertura-minimizada";
 
 export default function CoberturaPanel({
   funcionarios,
@@ -41,6 +43,16 @@ export default function CoberturaPanel({
   /** Ausente = só leitura (supervisor): lista as órfãs, sem remanejar. */
   aoMover?: (rotinaId: string, funcionarioId: string, inicio: string) => void;
 }) {
+  // Minimizado fica lembrado neste navegador; lido depois de montar (o servidor
+  // não tem localStorage).
+  const [minimizado, setMinimizado] = useState(false);
+  useEffect(() => {
+    try {
+      setMinimizado(localStorage.getItem(CHAVE_MINIMIZADO) === "1");
+    } catch {
+      // Sem storage, abre sempre aberto.
+    }
+  }, []);
   const [destinos, setDestinos] = useState<Record<string, string>>({});
 
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
@@ -105,6 +117,17 @@ export default function CoberturaPanel({
 
   if (orfas.length === 0) return null;
 
+  const alternar = () => {
+    setMinimizado((m) => {
+      try {
+        localStorage.setItem(CHAVE_MINIMIZADO, m ? "0" : "1");
+      } catch {
+        // Sem storage, vale só enquanto a tela estiver aberta.
+      }
+      return !m;
+    });
+  };
+
   // O motivo vai na opção porque cada alerta dá numa coisa ao clicar em "Mover":
   // conflito pede autorização, sobrecarga só avisa depois e requisito é recusado.
   const opcao = ({ funcionario, alertas }: CandidatoAvaliado) => (
@@ -119,11 +142,16 @@ export default function CoberturaPanel({
       className="painel entra"
       style={{ marginBottom: 14, borderLeft: "6px solid var(--vermelho)" }}
     >
-      <div className="painel-cabecalho" style={{ padding: "10px 14px" }}>
-        <span className="rotulo" style={{ color: "var(--vermelho)" }}>
+      <div className="painel-cabecalho" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+        <span className="rotulo" style={{ color: "var(--vermelho)", flex: 1 }}>
           ⚠ Cobertura de ausência — {orfas.length} tarefa(s) sem responsável
         </span>
+        {/* Com muitas órfãs a lista empurra a agenda para baixo (pedido de 10/11/2026). */}
+        <button className="btn btn-mini" type="button" onClick={alternar} aria-expanded={!minimizado}>
+          {minimizado ? "Mostrar" : "Minimizar"}
+        </button>
       </div>
+      {!minimizado && (
       <div style={{ padding: "10px 14px", display: "grid", gap: 8 }}>
         {orfas.map((r) => {
           const tarefa = tarefaPorId.get(r.tarefa_id);
@@ -179,6 +207,7 @@ export default function CoberturaPanel({
           </p>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
  * último planejamento. Uma regra só para o painel da Agenda e para a Central: em
  * 04/11/2026 a Central dizia "em ordem" sem olhar nada disto.
  */
-import { coberturaPorHistorico, ocupaHorario, statusPeriodoLetivo } from "./calculations";
+import { coberturaPorHistorico, criticaNoDia, ocupaHorario, statusPeriodoLetivo } from "./calculations";
 import { diaDaSemana, parseDiasSemana } from "./dateUtils";
 import type { PeriodoLetivo, RotinaPlanejada, Tarefa } from "@/types";
 
@@ -22,9 +22,18 @@ export function pendenciasDoDia(args: {
   data: string;
   /** Períodos letivos cadastrados (calendário acadêmico por sede). */
   periodos: PeriodoLetivo[];
+  /**
+   * Quem não trabalha hoje (ausência ou folga). A crítica que só está no nome de
+   * alguém assim não está coberta: desde 10/11/2026 a geração a cria no ausente para
+   * o remanejo automático, e sem candidato ela ficava contada como alocada.
+   */
+  ausentes?: { has(id: string): boolean };
 }) {
-  const { tarefas, rotinasDoDia, historico, data, periodos } = args;
+  const { tarefas, rotinasDoDia, historico, data, periodos, ausentes } = args;
   const alocadasHoje = new Set(rotinasDoDia.filter(ocupaHorario).map((r) => r.tarefa_id));
+  const comQuemTrabalha = new Set(
+    rotinasDoDia.filter((r) => ocupaHorario(r) && !ausentes?.has(r.funcionario_id)).map((r) => r.tarefa_id),
+  );
   const dowHoje = diaDaSemana(data);
   const ultimaData = new Map<string, string>();
   for (const r of historico) {
@@ -39,7 +48,8 @@ export function pendenciasDoDia(args: {
   const periodicas: Array<{ tarefa: Tarefa; ultima: string | null }> = [];
   const semCal: Tarefa[] = [];
   for (const t of tarefas) {
-    if (!t.ativo || alocadasHoje.has(t.id)) continue;
+    if (!t.ativo) continue;
+    if (criticaNoDia(t, data) ? comQuemTrabalha.has(t.id) : alocadasHoje.has(t.id)) continue;
 
     // Calendário acadêmico: tarefas letivas só são cobradas em período letivo.
     let avisoSemCalendario = false;
@@ -78,7 +88,7 @@ export function pendenciasDoDia(args: {
     if (avisoSemCalendario) semCal.push(t);
 
     // tarefas críticas saem dos baldes normais e vão para o circuito essencial
-    if (t.critica) {
+    if (criticaNoDia(t, data)) {
       const motivo =
         regra === "diaria" ? "diária" : regra === "doDia" ? "dia fixo" : t.frequencia;
       criticas.push({ tarefa: t, motivo });

@@ -17,6 +17,7 @@ export default function PendenciasPanel({
   historico,
   data,
   periodos = [],
+  ausentes,
 }: {
   tarefas: Tarefa[];
   locais: Local[];
@@ -26,14 +27,16 @@ export default function PendenciasPanel({
   data: string;
   /** Períodos letivos cadastrados (calendário acadêmico por sede). */
   periodos?: PeriodoLetivo[];
+  /** Quem não trabalha hoje: a crítica só no nome dele não conta como coberta. */
+  ausentes?: ReadonlyMap<string, string> | ReadonlySet<string>;
 }) {
   const [aberto, setAberto] = useState(false);
 
   const localPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
 
   const { criticasSemCobertura, diariasFaltando, devidasHoje, periodicasVencidas, letivasSemCalendario } = useMemo(
-    () => pendenciasDoDia({ tarefas, rotinasDoDia, historico, data, periodos }),
-    [tarefas, rotinasDoDia, historico, data, periodos],
+    () => pendenciasDoDia({ tarefas, rotinasDoDia, historico, data, periodos, ausentes }),
+    [tarefas, rotinasDoDia, historico, data, periodos, ausentes],
   );
 
   const rotuloLocal = (t: Tarefa) => {

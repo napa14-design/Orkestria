@@ -8,6 +8,7 @@ import { podeCriarNoCatalogo, podeEscrever, sedesPermitidas } from "@/lib/permis
 import { nivelPrioridade, rotuloPrioridade, tempoPrevistoMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
+import { escolhaDoHorario } from "@/lib/remanejoAuto";
 import type {
   TipoLocalCatalogo, Categoria, Local, Requisito, Sede, Tarefa } from "@/types";
 
@@ -297,16 +298,38 @@ export default function PaginaTarefas() {
           dica: "Restringe quem pode executar a tarefa por gênero. Ex.: limpeza de banheiro feminino marcada como \"Apenas mulheres\" — a agenda bloqueia alocar essa tarefa para um homem. Deixe \"Sem restrição\" quando qualquer ASG pode fazer.",
         },
         {
+          key: "qualquer_horario",
+          rotulo: "Qualquer horário",
+          tipo: "checkbox",
+          padrao: true,
+          // Caixa que já vem marcada não é escolha (auditoria): a tarefa antiga sem
+          // escolha abre DESMARCADA e com `null`, que o servidor não grava. Só clicar
+          // grava. A tarefa nova vem marcada (`padrao`), como o dono desenhou.
+          valorInicial: escolhaDoHorario,
+          ajuda: (f) =>
+            f.qualquer_horario === null
+              ? "Ainda não escolhido. Até escolher, se alguém faltar, uma tarefa crítica só passa a outra pessoa no mesmo horário."
+              : f.critica === true && f.qualquer_horario === true
+                ? "Crítica em qualquer horário: se alguém faltar, o sistema pode passá-la a outra pessoa em outro horário do dia."
+                : "",
+          dica: "Marcado, a tarefa pode ser feita em qualquer hora do expediente. Desmarque para dizer a janela em que ela tem de ser feita (ex.: café entre 06:30 e 07:30). A agenda não deixa alocar fora da janela, e o remanejo automático da tarefa crítica também respeita: com janela, ela só muda de horário dentro dela; com \"qualquer horário\", pode ir para outro horário do dia.",
+        },
+        {
           key: "janela_inicio",
           rotulo: "Janela: início",
           tipo: "hora",
-          dica: "Se a tarefa só pode ocorrer num horário específico, informe o início da janela (ex.: 13:00 para limpar o refeitório só após o almoço). Deixe vazio se pode ser feita a qualquer hora do expediente.",
+          mostrarSe: (f) => f.qualquer_horario !== true,
+          // Obrigatória só com a caixa desmarcada de propósito (o servidor confere);
+          // na tarefa antiga ainda sem escolha, preencher é opcional.
+          ajuda: (f) => (f.qualquer_horario === false ? "Obrigatória: a tarefa não é de qualquer horário." : "Opcional enquanto não escolher."),
+          dica: "Se a tarefa só pode ocorrer num horário específico, informe o início da janela (ex.: 13:00 para limpar o refeitório só após o almoço).",
         },
         {
           key: "janela_fim",
           rotulo: "Janela: fim",
           tipo: "hora",
-          dica: "Fim da janela em que a tarefa pode ocorrer. A agenda bloqueia alocar a tarefa fora desse intervalo. Preencha junto com a Janela: início.",
+          mostrarSe: (f) => f.qualquer_horario !== true,
+          dica: "Fim da janela em que a tarefa pode ocorrer. A agenda bloqueia alocar a tarefa fora desse intervalo.",
         },
         {
           key: "tempo_referencia",
@@ -328,6 +351,15 @@ export default function PaginaTarefas() {
           tipo: "checkbox",
           padrao: false,
           dica: "Marque tarefas que NÃO podem deixar de ser feitas (ex.: higienização de banheiro). Quando uma crítica fica sem alocação no dia, o painel \"Ficou de fora hoje\" mostra um alerta de “Circuito essencial descoberto” em destaque máximo (vermelho), separado das demais pendências. Diferente de prioridade, que só ordena.",
+        },
+        {
+          key: "critica_dias",
+          rotulo: "Crítica em quais dias",
+          tipo: "dias_semana",
+          inteira: true,
+          mostrarSe: (f) => f.critica === true,
+          ajuda: "Sem marcar nenhum dia, é crítica todo dia.",
+          dica: "Marque só os dias em que a tarefa não pode faltar (ex.: refeitório só na sexta). Nos outros dias ela é uma tarefa comum: pode ceder lugar numa troca e não entra no circuito essencial. Quando alguém falta, a tarefa crítica do dia passa sozinha para outra pessoa, e a Central e a Agenda avisam quem assumiu.",
         },
         {
           key: "depende_calendario",
@@ -456,7 +488,18 @@ export default function PaginaTarefas() {
               )}
               {t.tempo_referencia && <span className="selo selo-cinza">referência</span>}
               {t.presenca && <span className="selo selo-azul">presença</span>}
-              {t.critica && <span className="selo selo-vermelho">⛔ crítica</span>}
+              {t.critica && (
+                <span className="selo selo-vermelho">⛔ crítica{t.critica_dias ? ` · ${rotularDiasSemana(t.critica_dias)}` : ""}</span>
+              )}
+              {/* Some quando alguém abre a tarefa e salva: aí o horário foi escolhido. */}
+              {t.critica && !(t.janela_inicio && t.janela_fim) && t.qualquer_horario !== true && (
+                <span
+                  className="selo selo-laranja"
+                  title="Ninguém disse se esta crítica pode mudar de horário. Até dizer, quando alguém falta o sistema só a passa a outra pessoa no mesmo horário. Abra a tarefa e escolha “Qualquer horário” ou a janela."
+                >
+                  horário a definir
+                </span>
+              )}
               {t.depende_calendario && <span className="selo selo-azul">📅 letiva</span>}
               {requisitosDe(t.requisitos).map((r) => (
                 <span key={r.id} className="selo selo-roxo" title={`Requisito: ${r.tipo}`}>

@@ -49,4 +49,34 @@ export interface RotinaPlanejada {
    * agenda não edita este campo.
    */
   titular_id?: string;
+  /**
+   * O sistema passou esta tarefa crítica para outra pessoa sozinho, porque o dono
+   * dela faltou (10/11/2026). JSON de `RemanejoAuto`: o que é preciso para avisar
+   * e para desfazer. Vazio = não houve. Só o servidor grava.
+   */
+  remanejo_auto?: string;
+}
+
+/** O que fica guardado no bloco remanejado automaticamente (`remanejo_auto`). */
+export interface RemanejoAuto {
+  /** Quem faltou — de quem a tarefa saiu neste remanejo. */
+  de: string;
+  /**
+   * O `titular_id` de antes. Quem cobria também pode faltar: a tarefa remaneja de
+   * novo, o dono original continua o titular, e o desfazer volta só um passo.
+   */
+  titular_antes?: string;
+  /** A marca do remanejo anterior (JSON), quando este é o segundo. */
+  anterior?: string;
+  /** O início antes do remanejo (a troca pode levar a tarefa a outro horário). */
+  inicio: string;
+  /** O fim antes do remanejo, para o desfazer devolver igual. */
+  fim?: string;
+  /** O coordenador desfez o remanejo seguinte a este: o automático não o refaz. */
+  desfeito_depois?: { desfeito_em: string; por: string };
+  /** Observação do bloco antes do remanejo, para o desfazer devolver igual. */
+  observacao: string;
+  /** O que quem assumiu deixou de fazer: o bloco, o registro "remanejada" e o status de antes. */
+  cedidas: { rotina_id: string; execucao_id: string; status: string; tarefa_nome: string }[];
+  em: string;
 }

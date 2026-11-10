@@ -73,4 +73,9 @@ export interface CentralDiaDados {
   };
   proxima: AcaoCentralDia;
   fila: AcaoCentralDia[];
+  /**
+   * Tarefas críticas de ausentes que o sistema passou para outra pessoa sozinho
+   * hoje (10/11/2026). A Central só avisa, com "desfazer": não é decisão pendente.
+   */
+  remanejos_auto: { rotina_id: string; data: string; texto: string; em: string }[];
 }

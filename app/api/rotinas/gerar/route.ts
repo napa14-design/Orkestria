@@ -33,10 +33,10 @@ export async function POST(req: Request) {
       if (limpas.length === 0) return ok({ erro: "Informe ao menos uma data." }, 400);
       if (limpas.length > MAX_DATAS)
         return ok({ erro: `No máximo ${MAX_DATAS} dias por vez.` }, 400);
-      return ok(await gerarPeriodoDaRotaPadrao(sede, limpas, sessao.id));
+      return ok(await gerarPeriodoDaRotaPadrao(sede, limpas, sessao.id, sessao));
     }
 
     if (!data) return ok({ erro: "Informe sede e data." }, 400);
-    return ok(await gerarDiaDaRotaPadrao(sede, data, sessao.id));
+    return ok(await gerarDiaDaRotaPadrao(sede, data, sessao.id, sessao));
   });
 }

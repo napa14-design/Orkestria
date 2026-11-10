@@ -1,5 +1,6 @@
 import {
   coberturaPorHistorico,
+  criticaNoDia,
   feriadoDoDia,
   fimPlanejadoMin,
   funcionarioNoDia,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/calculations";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
-import { agoraHHMM, diaDaSemana, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "@/lib/dateUtils";
+import { agoraHHMM, diaDaSemana, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM, somarDias } from "@/lib/dateUtils";
 import { pendenciasDoDia } from "@/lib/pendencias";
 import { avaliarCandidatos } from "@/lib/redistribuicao";
 import {
@@ -24,6 +25,7 @@ import {
   sedesPermitidas,
   type SessaoUsuario,
 } from "@/lib/permissions";
+import { avisosDeRemanejo, lerRemanejo, textoDoRemanejo, type AvisoRemanejo } from "@/lib/remanejoAuto";
 import { validarAlocacao } from "@/lib/validations";
 import type {
   AcaoCentralDia,
@@ -34,10 +36,11 @@ import type {
   QualificacaoFuncionario,
   Requisito,
   ResolucaoCentralDia,
+  RemanejoAuto,
   RotinaPlanejada,
   Tarefa,
 } from "@/types";
-import { getAusencias } from "./ausenciasService";
+import { ausenteEm, getAusencias } from "./ausenciasService";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { getExecucoes, registrarExecucao } from "./execucoesService";
 import { getFuncionarios } from "./funcionariosService";
@@ -46,7 +49,7 @@ import { getRotaPadrao } from "./modelosService";
 import { resolverParametros } from "./parametrosService";
 import { getPeriodosLetivos } from "./periodosLetivosService";
 import { getQualificacoes } from "./qualificacoesService";
-import { getRotinasByData, updateRotina } from "./rotinasService";
+import { getRotinasByData, updateRotina, type ResultadoRotina } from "./rotinasService";
 import { getTarefas } from "./tarefasService";
 
 /**
@@ -59,6 +62,16 @@ import { getTarefas } from "./tarefasService";
  */
 function minutosAgora(): number {
   return hhmmParaMin(agoraHHMM());
+}
+
+/**
+ * Até onde o dia já passou, para "só o que ainda vem": hoje é agora; um dia futuro
+ * está inteiro em aberto; um dia passado, inteiro fechado. A Central só olha hoje,
+ * mas o remanejo automático roda também nos dias já gerados à frente (10/11/2026).
+ */
+function minutosJaPassados(data: string): number {
+  const hoje = hojeISO();
+  return data > hoje ? 0 : data === hoje ? minutosAgora() : Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -88,6 +101,12 @@ async function proporRedistribuicao(args: {
   /** Blocos que já têm realizado — feito não se cede. */
   execucoesPorRotina: Set<string>;
   carregar: Carregador;
+  /**
+   * Só no horário que a tarefa já tem: nem "livre em outro horário", nem troca em
+   * outro horário. O remanejo automático usa para a crítica sem janela e sem
+   * "Qualquer horário" escolhido (decisão do dono, 10/11/2026).
+   */
+  soNoHorario?: boolean;
 }): Promise<ResolucaoCentralDia | undefined> {
   const { rotina, funcionarios, disponiveisIds, rotinasDoDia, carregar } = args;
   const ds = await getDataSource();
@@ -134,8 +153,8 @@ async function proporRedistribuicao(args: {
     // troca, que erra para o lado seguro.
     const buscar = (tarefasEspera: Set<string>) =>
       livreEmOutroHorario({ ...args, tarefa, local, parametros, requisitosCatalogo, qualificacoes, inicioMin, tarefasEspera });
-    let livre = buscar(new Set());
-    if (!livre && !tarefa.espera && nivelPrioridade(tarefa, local) > 1)
+    let livre = args.soNoHorario ? undefined : buscar(new Set());
+    if (!livre && !args.soNoHorario && !tarefa.espera && nivelPrioridade(tarefa, local, rotina.data) > 1)
       livre = buscar(
         new Set((await carregar("tarefas", () => getTarefas(rotina.sede_id))).filter((t) => t.espera).map((t) => t.id)),
       );
@@ -201,7 +220,7 @@ function livreEmOutroHorario(a: {
   tarefasEspera: Set<string>;
 }): { funcionario: Funcionario; inicio: number; fim: number } | undefined {
   const { rotina } = a;
-  const agoraMin = minutosAgora();
+  const agoraMin = minutosJaPassados(rotina.data);
   // "Agora" entra de dois jeitos: o próximo passo da grade, estável por um passo
   // inteiro, e o minuto exato — este SÓ quando o passo não cabe (o buraco curto
   // em andamento: 10:07, livre até 10:40, tarefa de 30 min). Com o minuto exato
@@ -290,11 +309,12 @@ async function proporTrocaPorPrioridade(a: {
   fimMin: number;
   origemNome: string;
   carregar: Carregador;
+  soNoHorario?: boolean;
 }): Promise<ResolucaoCentralDia | undefined> {
   const { rotina, tarefa, local } = a;
   // Tarefa de espera não disputa a pessoa: se não coube, o motivo é outro.
   if (tarefa.espera) return undefined;
-  const nivelFalta = nivelPrioridade(tarefa, local);
+  const nivelFalta = nivelPrioridade(tarefa, local, rotina.data);
   // Atalho, não regra: abaixo de baixa não há o que ceder — só poupa as leituras.
   if (nivelFalta <= 1) return undefined;
 
@@ -307,9 +327,9 @@ async function proporTrocaPorPrioridade(a: {
   const nivelDe = (r: RotinaPlanejada) => {
     const t = tarefaPorId.get(r.tarefa_id);
     // Tarefa que não se acha (apagada, outra sede) fecha a regra: nunca é cedida.
-    return t ? nivelPrioridade(t, localPorId.get(t.local_id)) : NIVEL_CRITICA;
+    return t ? nivelPrioridade(t, localPorId.get(t.local_id), rotina.data) : NIVEL_CRITICA;
   };
-  const agoraMin = minutosAgora();
+  const agoraMin = minutosJaPassados(rotina.data);
   const tarefasEspera = new Set(tarefas.filter((t) => t.espera).map((t) => t.id));
 
   /** Pode ser cedido: planejado, sem realizado, ainda não começou e de prioridade menor. */
@@ -338,10 +358,12 @@ async function proporTrocaPorPrioridade(a: {
       // valendo — quem confere é o `validarAlocacao`.
       const inicios = [
         a.inicioMin,
-        ...doDia
-          .filter((r) => cedivel(r) && !tarefasEspera.has(r.tarefa_id))
-          .map((r) => hhmmParaMin(r.inicio_planejado))
-          .filter((m) => m !== a.inicioMin),
+        ...(a.soNoHorario
+          ? []
+          : doDia
+              .filter((r) => cedivel(r) && !tarefasEspera.has(r.tarefa_id))
+              .map((r) => hhmmParaMin(r.inicio_planejado))
+              .filter((m) => m !== a.inicioMin)),
       ];
       return [...new Set(inicios)].flatMap((ini) => {
         // Em outro horário, o fim é o que o `updateRotina` vai gravar (início +
@@ -653,6 +675,7 @@ export async function getCentralDia(
         historico: [],
         data,
         periodos,
+        ausentes: new Set(funcionariosAtivos.filter((f) => !disponiveisIds.has(f.id)).map((f) => f.id)),
       });
       // Só a crítica vira decisão. A diária fora da agenda é crônica na maioria das
       // sedes (medido em 04/11/2026): como ação, a Central nunca sairia dela.
@@ -712,7 +735,16 @@ export async function getCentralDia(
   }
 
   const [proxima, ...fila] = acoes;
+  // Os nomes das tarefas só são lidos quando há aviso: no dia comum, nada a mais.
+  const comRemanejo = rotinas.filter((r) => r.remanejo_auto && ocupaHorario(r));
+  const nomesDasTarefas = comRemanejo.length && sedeId ? new Map((await getTarefas(sedeId)).map((t) => [t.id, t.nome_tarefa])) : new Map<string, string>();
+  const remanejos_auto = avisosDeRemanejo(
+    comRemanejo,
+    (id) => funcionarios.find((f) => f.id === id)?.nome ?? "Pessoa indisponível",
+    (id) => nomesDasTarefas.get(id) ?? "Tarefa",
+  );
   return {
+    remanejos_auto,
     data,
     atualizado_em: new Date().toISOString(),
     escopo: {
@@ -777,43 +809,466 @@ export async function resolverProximaExcecao(
   if (!podeAlterarSede(sessao, proposta.sede_id))
     throw new ErroPermissao("Coordenadores só redistribuem tarefas das sedes que operam.");
 
-  // Primeiro libera o horário (remanejado, com o motivo), depois move: ao
-  // contrário, a validação do `updateRotina` veria o choque e recusaria. Se o
-  // mover falhar, as cedidas voltam — ninguém perde a tarefa numa troca que não
-  // aconteceu (revisão de segurança).
+  return (await aplicarResolucao(proposta, central.data, sessao)).resultado;
+}
+
+/**
+ * Aplica uma proposta da Central. Primeiro libera o horário (remanejado, com o
+ * motivo), depois move: ao contrário, a validação do `updateRotina` veria o choque
+ * e recusaria. Se algo falhar, tudo volta — ninguém perde a tarefa numa troca que
+ * não aconteceu (revisão de segurança).
+ *
+ * Com `auto`, é o remanejo automático da crítica de quem faltou (10/11/2026): o
+ * bloco guarda de quem era (`titular_id`, como no "Feita por") e o que é preciso
+ * para avisar e desfazer (`remanejo_auto`).
+ */
+async function aplicarResolucao(
+  proposta: ResolucaoCentralDia,
+  data: string,
+  quem: Pick<SessaoUsuario, "id" | "perfil">,
+): Promise<{ resultado: ResultadoRotina; rotina: RotinaPlanejada; cedidas: RemanejoAuto["cedidas"] }>;
+async function aplicarResolucao(
+  proposta: ResolucaoCentralDia,
+  data: string,
+  quem: Pick<SessaoUsuario, "id" | "perfil">,
+  auto: DadosDoAuto,
+): Promise<{ resultado: ResultadoRotina; rotina: RotinaPlanejada; cedidas: RemanejoAuto["cedidas"] } | null>;
+async function aplicarResolucao(
+  proposta: ResolucaoCentralDia,
+  data: string,
+  quem: Pick<SessaoUsuario, "id" | "perfil">,
+  auto?: DadosDoAuto,
+): Promise<{ resultado: ResultadoRotina; rotina: RotinaPlanejada; cedidas: RemanejoAuto["cedidas"] } | null> {
   const ds = await getDataSource();
-  const feitas: { rotinaId: string; statusAntes: RotinaPlanejada["status"]; execucaoId: string }[] = [];
+  const agora = () => new Date().toISOString();
+  const estavel = (s: RotinaPlanejada["status"]) => s === "planejada" || s === "pendente";
+
+  // Remanejo automático: reserva a crítica ANTES de tudo, e só se ela ainda está
+  // como foi lida — dois lançamentos ao mesmo tempo faziam a mesma cedida ganhar
+  // dois registros "remanejada" (revisão de segurança, 10/11/2026). Quem perde a
+  // corrida desiste em silêncio: o outro já cuidou.
+  if (auto) {
+    const reservada = await ds.atualizarSe(
+      "rotinas_planejadas",
+      proposta.rotina_id,
+      (r) => r.funcionario_id === auto.de && (r.remanejo_auto ?? "") === auto.anterior && estavel(r.status),
+      { remanejo_auto: JSON.stringify({ reservado_em: agora() }) },
+    );
+    if (!reservada) return null;
+  }
+
+  const feitas: (RemanejoAuto["cedidas"][number] & { statusAntes: RotinaPlanejada["status"] })[] = [];
+  let moveu = false;
   try {
     for (const cedida of proposta.cedidas ?? []) {
       const antes = await ds.obter("rotinas_planejadas", cedida.rotina_id);
+      const statusAntes = antes?.status ?? "planejada";
+      // A cedida também: só se ainda está planejada. Ela fica "remanejada" aqui e o
+      // registro abaixo confirma; outra chamada no meio do caminho já não a pega.
+      if (auto) {
+        const tomada = await ds.atualizarSe("rotinas_planejadas", cedida.rotina_id, (r) => estavel(r.status), { status: "remanejada" });
+        if (!tomada) throw new DesistiuDoRemanejo();
+        feitas.push({ rotina_id: cedida.rotina_id, execucao_id: "", status: statusAntes, statusAntes, tarefa_nome: cedida.tarefa_nome });
+      }
       const execucao = await registrarExecucao(
         {
           rotina_id: cedida.rotina_id,
-          data_execucao: central.data,
+          data_execucao: data,
           status_realizado: "remanejada",
           inicio_real: "",
           fim_real: "",
           tempo_real_min: 0,
           justificativa: `Cedida para cobrir “${proposta.tarefa_nome}” (${proposta.tarefa_prioridade}), que era de ${proposta.funcionario_origem_nome}.`,
-          observacao: "Troca por prioridade na Central do dia.",
-          supervisor_id: sessao.id,
+          observacao: auto ? "Remanejo automático da tarefa crítica." : "Troca por prioridade na Central do dia.",
+          supervisor_id: quem.id,
           epis_confirmados: "",
         },
-        { perfil: sessao.perfil },
+        { perfil: quem.perfil },
       );
-      feitas.push({ rotinaId: cedida.rotina_id, statusAntes: antes?.status ?? "planejada", execucaoId: execucao.id });
+      if (auto) feitas[feitas.length - 1].execucao_id = execucao.id;
+      else feitas.push({ rotina_id: cedida.rotina_id, execucao_id: execucao.id, status: statusAntes, statusAntes, tarefa_nome: cedida.tarefa_nome });
     }
-    return await updateRotina(proposta.rotina_id, {
+    const resultado = await updateRotina(proposta.rotina_id, {
       funcionario_id: proposta.funcionario_id,
       // Troca em outro horário: a tarefa vai para onde as cedidas abriram espaço.
       ...(proposta.inicio_original ? { inicio_planejado: proposta.inicio_planejado } : {}),
       bloquearAlertas: true,
     });
+    moveu = true;
+    const cedidas = feitas.map(({ rotina_id, execucao_id, status, tarefa_nome }) => ({ rotina_id, execucao_id, status, tarefa_nome }));
+    const rotina = resultado.rotina;
+    if (!auto) return { resultado, rotina, cedidas };
+    const marca: RemanejoAuto = {
+      de: auto.de,
+      ...(auto.titularAntes ? { titular_antes: auto.titularAntes } : {}),
+      ...(auto.anterior ? { anterior: auto.anterior } : {}),
+      inicio: auto.inicioAntes,
+      fim: auto.fimAntes,
+      observacao: auto.observacaoAntes,
+      cedidas,
+      em: agora(),
+    };
+    // O dono original segue o titular: na segunda cobertura ele já estava lá.
+    const titular = auto.titularAntes || auto.de;
+    const observacao = [
+      auto.observacaoAntes,
+      `Coberta por ${proposta.funcionario_nome} — ${proposta.funcionario_origem_nome} ausente (remanejo automático)`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    await ds.atualizar("rotinas_planejadas", proposta.rotina_id, {
+      titular_id: titular,
+      observacao,
+      remanejo_auto: JSON.stringify(marca),
+      atualizado_em: agora(),
+    });
+    return { resultado, rotina: { ...rotina, titular_id: titular, observacao, remanejo_auto: JSON.stringify(marca) }, cedidas };
   } catch (erro) {
-    for (const f of feitas) {
-      await ds.excluir("execucoes_realizadas", f.execucaoId);
-      await ds.atualizar("rotinas_planejadas", f.rotinaId, { status: f.statusAntes });
-    }
+    // Cada volta numa tentativa própria: uma falha aqui não pode deixar as outras
+    // pela metade (revisão de segurança).
+    if (auto)
+      await tentar(async () => {
+        const atual = await ds.obter("rotinas_planejadas", proposta.rotina_id);
+        // Só volta se ainda é o que ESTE pedido deixou: outro pedido pode ter
+        // gravado depois, e voltar passaria por cima dele.
+        if (!atual) return;
+        if (moveu && atual.funcionario_id === proposta.funcionario_id && estavel(atual.status))
+          await ds.atualizar("rotinas_planejadas", proposta.rotina_id, {
+            funcionario_id: auto.de,
+            inicio_planejado: auto.inicioAntes,
+            fim_planejado: auto.fimAntes,
+            remanejo_auto: auto.anterior,
+            atualizado_em: agora(),
+          });
+        else if (!moveu && atual.funcionario_id === auto.de)
+          await ds.atualizar("rotinas_planejadas", proposta.rotina_id, { remanejo_auto: auto.anterior, atualizado_em: agora() });
+      });
+    for (const f of feitas)
+      await tentar(async () => {
+        if (f.execucao_id) await ds.excluir("execucoes_realizadas", f.execucao_id);
+        // O registro pode ter sido gravado sem o id chegar aqui (falha depois de
+        // gravar): a cedida estava planejada, então todo "remanejada" dela no dia é
+        // deste pedido (revisão de segurança, como no "Feita por").
+        else
+          for (const e of await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: f.rotina_id }]))
+            if (e.data_execucao === data && e.status_realizado === "remanejada") await ds.excluir("execucoes_realizadas", e.id);
+        await ds.atualizar("rotinas_planejadas", f.rotina_id, { status: f.statusAntes });
+      });
+    if (erro instanceof DesistiuDoRemanejo) return null;
     throw erro;
   }
+}
+
+/** O que o remanejo automático precisa saber do bloco como ele foi lido. */
+interface DadosDoAuto {
+  /** De quem a tarefa sai agora (quem faltou). */
+  de: string;
+  titularAntes: string;
+  /** A marca que o bloco tinha ("" = nenhuma): a reserva só vale se ainda for ela. */
+  anterior: string;
+  inicioAntes: string;
+  fimAntes: string;
+  observacaoAntes: string;
+}
+
+/** Outra chamada já pegou a cedida: este remanejo desiste e devolve o que reservou. */
+class DesistiuDoRemanejo extends Error {}
+
+async function tentar(fn: () => Promise<void>) {
+  try {
+    await fn();
+  } catch (e) {
+    console.error("Remanejo automático: falha ao desfazer uma etapa", e);
+  }
+}
+
+/** O coordenador desfez o remanejo deste bloco: o automático não o refaz. */
+function desfeitoPeloCoordenador(r: Pick<RotinaPlanejada, "remanejo_auto">): boolean {
+  if (!r.remanejo_auto) return false;
+  try {
+    const o = JSON.parse(r.remanejo_auto) as { desfeito_em?: string; desfeito_depois?: unknown };
+    return !!o.desfeito_em || !!o.desfeito_depois;
+  } catch {
+    return false;
+  }
+}
+
+/** A reserva que `aplicarResolucao` põe na crítica enquanto trabalha (ver acima). */
+function reservaRecente(r: Pick<RotinaPlanejada, "remanejo_auto">): boolean {
+  if (!r.remanejo_auto || lerRemanejo(r)) return false;
+  try {
+    const em = Date.parse((JSON.parse(r.remanejo_auto) as { reservado_em?: string }).reservado_em ?? "");
+    // Uma reserva esquecida (o processo caiu no meio) não trava a tarefa para sempre.
+    return Date.now() - em < 2 * 60_000;
+  } catch {
+    return false;
+  }
+}
+
+export type RemanejoFeito = AvisoRemanejo;
+
+/**
+ * Passa sozinha para outra pessoa a tarefa CRÍTICA de quem faltou (pedido da
+ * coordenação, 10/11/2026: "o sistema remaneja e apenas avisa quem assumiu a
+ * tarefa no lugar de qual tarefa"). Mesmas regras da Central, aplicadas sem
+ * perguntar: livre no horário, depois livre em outro horário, depois a troca por
+ * prioridade. Qualquer alerta (requisito, gênero, sobrecarga) e a tarefa fica onde
+ * está, destacada como hoje — decisão do dono.
+ *
+ * Roda ao lançar a ausência e ao gerar o dia. Só o que ainda vem; dia passado não.
+ */
+export async function remanejarCriticasDeAusentes(
+  sedeId: string,
+  data: string,
+  quem: Pick<SessaoUsuario, "id" | "perfil">,
+): Promise<RemanejoFeito[]> {
+  if (data < hojeISO()) return [];
+  const feitos: RemanejoFeito[] = [];
+  const tentadas = new Set<string>();
+  const carregar = criarCarregador();
+  const [funcionarios, tarefas] = await Promise.all([getFuncionarios(sedeId), getTarefas(sedeId)]);
+  const ativos = funcionarios.filter((f) => f.ativo);
+  const nome = (id: string) => funcionarios.find((f) => f.id === id)?.nome ?? "Pessoa indisponível";
+  const tarefaPorId = new Map(tarefas.map((t) => [t.id, t]));
+  // Uma por vez, relendo o dia: cada remanejo muda a agenda de quem assumiu, e a
+  // próxima proposta tem que ver isso. O limite só protege contra laço infinito.
+  for (let volta = 0; volta < 50; volta++) {
+    const [rotinas, execucoes, ausencias] = await Promise.all([
+      getRotinasByData(data, sedeId),
+      getExecucoes(data, data, sedeId),
+      getAusencias({ data, sedeId }),
+    ]);
+    const ausentesIds = new Set(ausencias.map((a) => a.funcionario_id));
+    const disponiveisIds = new Set(
+      ativos.filter((f) => jornadaDoDia(f, data).trabalha && !ausentesIds.has(f.id)).map((f) => f.id),
+    );
+    const validas = rotinas.filter(ocupaHorario);
+    const execucoesPorRotina = new Set(execucoes.map((e) => e.rotina_id));
+    const passou = minutosJaPassados(data);
+    const proxima = validas
+      .filter(
+        (r) =>
+          ausentesIds.has(r.funcionario_id) &&
+          !tentadas.has(r.id) &&
+          (r.status === "planejada" || r.status === "pendente") &&
+          !execucoesPorRotina.has(r.id) &&
+          hhmmParaMin(r.inicio_planejado) >= passou &&
+          !reservaRecente(r) &&
+          !desfeitoPeloCoordenador(r) &&
+          criticaNoDia(tarefaPorId.get(r.tarefa_id), data),
+      )
+      .sort((a, b) => a.inicio_planejado.localeCompare(b.inicio_planejado) || a.id.localeCompare(b.id))[0];
+    if (!proxima) break;
+    tentadas.add(proxima.id);
+    const tarefa = tarefaPorId.get(proxima.tarefa_id);
+    const proposta = await proporRedistribuicao({
+      rotina: proxima,
+      funcionarios: ativos,
+      disponiveisIds,
+      rotinasDoDia: validas,
+      execucoesPorRotina,
+      carregar,
+      // Sem janela e sem "Qualquer horário" escolhido, o sistema não sabe se a hora
+      // importa: troca a pessoa, nunca a hora. Com janela, a validação já a respeita.
+      soNoHorario: !(tarefa?.janela_inicio && tarefa?.janela_fim) && tarefa?.qualquer_horario !== true,
+    });
+    if (!proposta) continue;
+    // Uma falha num remanejo não pode derrubar quem chamou (a ausência já está
+    // salva, e um erro na tela levaria a lançá-la de novo) nem os próximos.
+    let aplicado: Awaited<ReturnType<typeof aplicarResolucao>> = null;
+    try {
+      aplicado = await aplicarResolucao(proposta, data, quem, {
+        de: proxima.funcionario_id,
+        titularAntes: proxima.titular_id ?? "",
+        anterior: proxima.remanejo_auto ?? "",
+        inicioAntes: proxima.inicio_planejado,
+        fimAntes: proxima.fim_planejado,
+        observacaoAntes: proxima.observacao ?? "",
+      });
+    } catch (e) {
+      console.error("Remanejo automático: não foi possível remanejar", proxima.id, e);
+    }
+    if (!aplicado) continue;
+    const { rotina, cedidas } = aplicado;
+    feitos.push({
+      rotina_id: rotina.id,
+      data,
+      em: lerRemanejo(rotina)?.em ?? "",
+      texto: textoDoRemanejo({
+        tarefa: proposta.tarefa_nome,
+        de: nome(proxima.funcionario_id),
+        para: proposta.funcionario_nome,
+        inicio: rotina.inicio_planejado,
+        inicioAntes: proxima.inicio_planejado,
+        cedidas: cedidas.map((c) => c.tarefa_nome),
+      }),
+    });
+  }
+  return feitos;
+}
+
+/**
+ * Ao lançar (ou mudar) uma ausência: o remanejo automático em cada dia dela que
+ * já tem agenda, de hoje em diante. Férias de um mês não leem 30 dias à toa: só
+ * as datas em que a pessoa tem bloco.
+ */
+export async function remanejarCriticasDaAusencia(
+  ausencia: { funcionario_id: string; data_inicio: string; data_fim: string },
+  quem: Pick<SessaoUsuario, "id" | "perfil">,
+): Promise<RemanejoFeito[]> {
+  const ds = await getDataSource();
+  const funcionario = await ds.obter("funcionarios", ausencia.funcionario_id);
+  if (!funcionario) return [];
+  const hoje = hojeISO();
+  const de = ausencia.data_inicio > hoje ? ausencia.data_inicio : hoje;
+  const feitos: RemanejoFeito[] = [];
+  // Até 31 dias à frente (a agenda raramente é gerada além disso; o resto a geração
+  // cuida). Contar custa uma leitura por dia; ler todos os blocos da pessoa custava
+  // o histórico inteiro dela (revisão de segurança: leitura é custo no Blaze).
+  for (let d = de, n = 0; d <= ausencia.data_fim && n < 31; d = somarDias(d, 1), n++) {
+    try {
+      const temAgenda = await ds.contar("rotinas_planejadas", [
+        { campo: "sede_id", op: "==", valor: funcionario.sede_id },
+        { campo: "data", op: "==", valor: d },
+      ]);
+      if (temAgenda > 0) feitos.push(...(await remanejarCriticasDeAusentes(funcionario.sede_id, d, quem)));
+    } catch (e) {
+      console.error("Remanejo automático: falhou no dia", d, e);
+    }
+  }
+  return feitos;
+}
+
+/**
+ * Desfaz um remanejo automático: a tarefa volta para quem faltou, no horário de
+ * antes, e o que o colega tinha cedido volta a ser dele. Recusa se a tarefa já tem
+ * realizado — aí o que aconteceu é fato, não plano.
+ */
+export async function desfazerRemanejoAutomatico(sessao: SessaoUsuario, rotinaId: string): Promise<RotinaPlanejada> {
+  if (!podeEscrever(sessao)) throw new ErroPermissao();
+  const ds = await getDataSource();
+  const rotina = await ds.obter("rotinas_planejadas", rotinaId);
+  if (!rotina) throw new ErroValidacao([{ nivel: "erro", codigo: "NAO_ENCONTRADA", mensagem: "Tarefa não encontrada." }]);
+  if (!podeAlterarSede(sessao, rotina.sede_id))
+    throw new ErroPermissao("Coordenadores só redistribuem tarefas das sedes que operam.");
+  const marca = lerRemanejo(rotina);
+  if (!marca)
+    throw new ErroValidacao([{ nivel: "erro", codigo: "SEM_REMANEJO", mensagem: "Esta tarefa não foi remanejada automaticamente." }]);
+  if (!(await podeVoltar(rotina)))
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "JA_REGISTRADA", mensagem: "Esta tarefa já tem realizado registrado — não dá para desfazer o remanejo." },
+    ]);
+  // O desfazer do coordenador FICA: sem esta nota, a próxima falta lançada ou a
+  // próxima geração do dia refaziam o remanejo que ele acabou de desfazer (auditoria).
+  return voltarUmPasso(rotina, marca, { desfeito_em: new Date().toISOString(), por: sessao.id });
+}
+
+/**
+ * A ausência foi apagada ou encurtada: nos dias em que a pessoa não falta mais, o
+ * remanejo automático das críticas dela é desfeito sozinho (decisão do dono,
+ * 10/11/2026), para o aviso não dizer "(ausente)" de quem veio trabalhar. Este
+ * desfazer não fixa nada: se a falta voltar, o automático remaneja de novo.
+ */
+export async function desfazerRemanejosSemFalta(funcionarioId: string, de: string, ate: string): Promise<number> {
+  const ds = await getDataSource();
+  const funcionario = await ds.obter("funcionarios", funcionarioId);
+  if (!funcionario) return 0;
+  const hoje = hojeISO();
+  let desfeitos = 0;
+  for (let d = de > hoje ? de : hoje, n = 0; d <= ate && n < 31; d = somarDias(d, 1), n++) {
+    try {
+      if (await ausenteEm(funcionarioId, d)) continue; // ainda falta neste dia
+      const temAgenda = await ds.contar("rotinas_planejadas", [
+        { campo: "sede_id", op: "==", valor: funcionario.sede_id },
+        { campo: "data", op: "==", valor: d },
+      ]);
+      if (!temAgenda) continue;
+      // Só o que ainda vem, a mesma régua do remanejo: a manhã já passou como
+      // ficou, e devolver a cedida faria o colega ser cobrado por ela (auditoria).
+      const passou = minutosJaPassados(d);
+      for (const r of await getRotinasByData(d, funcionario.sede_id)) {
+        const marca = lerRemanejo(r);
+        // Nem para o horário de antes, se ele já passou: voltaria como tarefa perdida (segurança).
+        if (
+          marca?.de !== funcionarioId ||
+          hhmmParaMin(r.inicio_planejado) < passou ||
+          hhmmParaMin(marca.inicio) < passou ||
+          !(await podeVoltar(r))
+        )
+          continue;
+        await voltarUmPasso(r, marca, null);
+        desfeitos++;
+      }
+    } catch (e) {
+      console.error("Remanejo automático: não foi possível desfazer no dia", d, e);
+    }
+  }
+  return desfeitos;
+}
+
+/** Só volta o que ainda é plano: sem realizado registrado e ainda planejado. */
+async function podeVoltar(rotina: RotinaPlanejada): Promise<boolean> {
+  const ds = await getDataSource();
+  const registros = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: rotina.id }]);
+  return registros.length === 0 && (rotina.status === "planejada" || rotina.status === "pendente");
+}
+
+/**
+ * Volta um passo do remanejo: a tarefa para quem ela saiu, no horário e com a
+ * observação de antes, e as cedidas para o colega. `fixar` deixa a nota de
+ * "desfeito" (o automático não refaz); `null` volta sem nota.
+ */
+async function voltarUmPasso(
+  rotina: RotinaPlanejada,
+  marca: RemanejoAuto,
+  fixar: { desfeito_em: string; por: string } | null,
+): Promise<RotinaPlanejada> {
+  const ds = await getDataSource();
+  const fim = marca.fim ?? minParaHHMM(hhmmParaMin(marca.inicio) + (rotina.tempo_previsto_min || 0));
+  const marcaQueVolta = marca.anterior
+    ? fixar
+      ? JSON.stringify({ ...JSON.parse(marca.anterior), desfeito_depois: fixar })
+      : marca.anterior
+    : fixar
+      ? JSON.stringify(fixar)
+      : "";
+  const agora = new Date().toISOString();
+  await ds.atualizar("rotinas_planejadas", rotina.id, {
+    funcionario_id: marca.de,
+    inicio_planejado: marca.inicio,
+    fim_planejado: fim,
+    titular_id: marca.titular_antes ?? "",
+    observacao: marca.observacao,
+    remanejo_auto: marcaQueVolta,
+    atualizado_em: agora,
+  });
+  // As cedidas voltam só se ainda estão como o remanejo deixou: quem mexeu nelas
+  // depois decidiu outra coisa, e o desfazer não passa por cima.
+  for (const c of marca.cedidas) {
+    const cedida = await ds.obter("rotinas_planejadas", c.rotina_id);
+    const registro = c.execucao_id ? await ds.obter("execucoes_realizadas", c.execucao_id) : null;
+    // Só a cedida do MESMO dia e sede, com o registro que é dela: uma marca que
+    // escapasse para outro dia não pode apagar o realizado de lá.
+    if (
+      !cedida ||
+      cedida.data !== rotina.data ||
+      cedida.sede_id !== rotina.sede_id ||
+      cedida.status !== "remanejada" ||
+      !registro ||
+      registro.rotina_id !== c.rotina_id ||
+      registro.status_realizado !== "remanejada"
+    )
+      continue;
+    await ds.excluir("execucoes_realizadas", c.execucao_id);
+    await ds.atualizar("rotinas_planejadas", c.rotina_id, { status: c.status as RotinaPlanejada["status"], atualizado_em: agora });
+  }
+  return {
+    ...rotina,
+    funcionario_id: marca.de,
+    inicio_planejado: marca.inicio,
+    fim_planejado: fim,
+    titular_id: marca.titular_antes ?? "",
+    observacao: marca.observacao,
+    remanejo_auto: marcaQueVolta,
+  };
 }

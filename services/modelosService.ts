@@ -30,7 +30,9 @@ import {
   projetarDiaDaRota,
 } from "@/lib/projecaoDia";
 import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
+import type { SessaoUsuario } from "@/lib/permissions";
 import type { ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
+import type { RemanejoFeito } from "./centralDiaService";
 import { ausenteEm } from "./ausenciasService";
 import { ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
@@ -537,6 +539,8 @@ export interface ResultadoGeracao {
    */
   comProblema?: number;
   detalhes: string[];
+  /** Tarefas críticas de ausentes que o sistema passou para outra pessoa sozinho. */
+  remanejos?: RemanejoFeito[];
 }
 
 /**
@@ -550,6 +554,8 @@ export async function gerarDiaDaRotaPadrao(
   sedeId: string,
   data: string,
   supervisorId: string,
+  /** Quem gera: com ele, a crítica de quem está ausente é remanejada sozinha. */
+  quem?: Pick<SessaoUsuario, "id" | "perfil">,
 ): Promise<ResultadoGeracao> {
   const carregado = await carregarRotaEContexto(sedeId, data);
   if (!carregado) return { semRota: true, geradas: 0, puladas: 0, detalhes: [] };
@@ -560,6 +566,8 @@ export async function gerarDiaDaRotaPadrao(
   const { itens, ctx, locais, params } = carregado;
   const previstoDoItem = ctx.duracaoDoItem;
 
+  // A crítica de quem está ausente vem em `materializar` (ver `projetarDiaDaRota`):
+  // nasce no nome dele e o remanejo automático, no fim, a passa a alguém.
   const { materializar, atualizar, descartados } = projetarDiaDaRota(itens, ctx);
 
   const res: ResultadoGeracao = {
@@ -642,6 +650,12 @@ export async function gerarDiaDaRotaPadrao(
     res.comProblema = problemas.length;
     res.detalhes.push(...resumirProblemas(problemas));
   }
+  // Import tardio: a Central já importa este módulo (ciclo).
+  if (quem && ctx.ausentes.size > 0) {
+    const { remanejarCriticasDeAusentes } = await import("./centralDiaService");
+    const remanejos = await remanejarCriticasDeAusentes(sedeId, data, quem);
+    if (remanejos.length) res.remanejos = remanejos;
+  }
   return res;
 }
 
@@ -656,6 +670,7 @@ export interface ResultadoPeriodo {
   /** "12/10 Nossa Senhora" — dias que a sede não opera, listados por data. */
   fechados: string[];
   detalhes: string[];
+  remanejos?: RemanejoFeito[];
 }
 
 /**
@@ -675,6 +690,7 @@ export async function gerarPeriodoDaRotaPadrao(
   sedeId: string,
   datas: string[],
   supervisorId: string,
+  quem?: Pick<SessaoUsuario, "id" | "perfil">,
 ): Promise<ResultadoPeriodo> {
   const res: ResultadoPeriodo = {
     diasGerados: 0,
@@ -685,7 +701,8 @@ export async function gerarPeriodoDaRotaPadrao(
     detalhes: [],
   };
   for (const data of datas) {
-    const dia = await gerarDiaDaRotaPadrao(sedeId, data, supervisorId);
+    const dia = await gerarDiaDaRotaPadrao(sedeId, data, supervisorId, quem);
+    if (dia.remanejos) res.remanejos = [...(res.remanejos ?? []), ...dia.remanejos];
     // Sem rota padrão a resposta é a mesma para todo dia: diz uma vez e para.
     if (dia.semRota) return { ...res, semRota: true };
     if (dia.fechado) {

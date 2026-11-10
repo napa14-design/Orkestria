@@ -127,6 +127,10 @@ local → fator do tipo no catálogo → `FATOR_POR_TIPO_LOCAL` (rede dos 12 ant
 | frequencia | enum | diaria · semanal · quinzenal · mensal · sob_demanda |
 | prioridade | enum | alta · media · baixa |
 | depende_calendario | boolean | quando true, só é exigida em período letivo da sede (ver `periodos_letivos`) |
+| critica | boolean | circuito essencial: não pode deixar de ser feita; nunca é cedida numa troca, e a de quem faltou é remanejada sozinha |
+| critica_dias | string | CSV (0=dom … 6=sáb) dos dias em que a crítica vale; vazio = todo dia. Fora deles a tarefa é comum. Leia por `criticaNoDia` |
+| janela_inicio, janela_fim | HH:mm | janela em que a tarefa pode ser feita: as duas pontas ou nenhuma (a validação recusa uma só ou invertida) |
+| qualquer_horario | boolean | "Qualquer horário" escolhido no cadastro (apaga a janela). Ausente = ninguém escolheu: a crítica sem janela só troca de pessoa no mesmo horário no remanejo automático, e a lista mostra "horário a definir" |
 | ativo, observacoes, auditoria | | |
 
 ### rotinas_planejadas
@@ -141,7 +145,8 @@ local → fator do tipo no catálogo → `FATOR_POR_TIPO_LOCAL` (rede dos 12 ant
 | status | enum | planejada · realizada · nao_realizada · remanejada · cancelada · pendente |
 | observacao, supervisor_id, criado_em, atualizado_em | | |
 | origem_item_id, origem_inicio | string | item da rota padrão que gerou o bloco, e o início que ela mandava (alinhamento da geração) |
-| titular_id | string | dono original quando a tarefa foi marcada "Feita por <colega>" no lugar de quem estava ausente; vazio = sem cobertura. Com ele, o supervisor só registra "feita". Só `registrarFeitaPor` grava; o PUT da agenda não edita |
+| titular_id | string | dono original quando a tarefa foi marcada "Feita por <colega>" no lugar de quem estava ausente; vazio = sem cobertura. Com ele, o supervisor só registra "feita". Só `registrarFeitaPor` e o remanejo automático gravam; o PUT da agenda não edita |
+| remanejo_auto | string | JSON (`RemanejoAuto`): a tarefa crítica foi passada sozinha para outra pessoa porque o dono faltou. Guarda de quem saiu, o início e a observação de antes, as cedidas (bloco, registro e status) e o remanejo anterior, se houve. É o que alimenta o aviso e o "Desfazer". Só o servidor grava |
 
 ### execucoes_realizadas (Fase 2)
 | Campo | Tipo | Observação |

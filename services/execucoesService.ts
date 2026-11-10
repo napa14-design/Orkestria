@@ -4,7 +4,8 @@
  * A estrutura completa (tipos, aba no Sheets, API) já existe no MVP para que
  * a Fase 2 seja apenas a construção da tela de acompanhamento.
  */
-import { cedidasNaCobertura, cobraDesvio, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
+import { cedidasNaCobertura, cobraDesvio, criticaNoDia, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
+import { lerRemanejo } from "@/lib/remanejoAuto";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, somarDias } from "@/lib/dateUtils";
 import type { ExecucaoRealizada, Perfil, RotinaPlanejada, StatusRealizado, StatusRotina } from "@/types";
@@ -231,7 +232,9 @@ export async function registrarExecucao(
     throw new ErroPermissao("Esta tarefa foi cancelada ou remanejada pelo coordenador — só ele altera.");
   // Coberta por colega ("Feita por"): o supervisor não a troca para "não feita"
   // — seria jogar uma falha em quem cobriu (revisão de segurança, 21/10/2026).
-  if (restrito && rotina.titular_id && STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] !== "realizada")
+  // O remanejo automático também grava o titular, mas ali o supervisor marca "não
+  // feita" normalmente: a trava é só do "Feita por" (decisão do dono, 10/11/2026).
+  if (restrito && rotina.titular_id && !lerRemanejo(rotina) && STATUS_ROTINA_POR_EXECUCAO[dados.status_realizado] !== "realizada")
     throw new ErroPermissao("Esta tarefa foi coberta por um colega — só o coordenador muda o registro.");
   // "Foi feita" antes de a tarefa terminar é afirmação sem lastro — mesma régua
   // do "fechar o dia" (`limite` em confirmarDiaComoPlanejado). Para o
@@ -416,7 +419,7 @@ export async function desfazerRegistro(
   if (!rotina) throw new Error("Rotina planejada não encontrada.");
   const registros = await ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: rotinaId }]);
   if (registros.length === 0 && rotina.status === "planejada") return { apagados: 0 };
-  if (rotina.titular_id)
+  if (rotina.titular_id && !lerRemanejo(rotina))
     throw new ErroValidacao([
       {
         nivel: "erro",
@@ -518,7 +521,7 @@ export async function registrarFeitaPor(
   // feita é o coordenador (decisão do dono, 21/10/2026).
   const critica = naFaixa.find(
     (r) =>
-      tarefasDaFaixa.get(r.tarefa_id)?.critica &&
+      criticaNoDia(tarefasDaFaixa.get(r.tarefa_id) ?? undefined, rotina.data) &&
       !tarefasDaFaixa.get(r.tarefa_id)?.espera &&
       hhmmParaMin(r.inicio_planejado) >= ini &&
       hhmmParaMin(r.fim_planejado) <= fim,

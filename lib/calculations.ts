@@ -21,7 +21,8 @@ import type {
   TipoLocal,
   TipoServico,
 } from "@/types";
-import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
+import { diaDaSemana, hhmmParaMin, minParaHHMM, parseDiasSemana } from "./dateUtils";
+import { cadeiaDoRemanejo } from "./remanejoAuto";
 import { sincronizarTrio } from "./intervalos";
 
 /**
@@ -283,8 +284,10 @@ export function ocupaHorario(r: { status?: StatusRotina }): boolean {
  */
 export function semCoberturas<
   R extends {
+    id?: string;
     funcionario_id: string;
     titular_id?: string;
+    remanejo_auto?: string;
     observacao?: string;
     status?: StatusRotina;
     inicio_planejado: string;
@@ -292,27 +295,45 @@ export function semCoberturas<
   },
 >(doDia: R[]): R[] {
   const cobertas = doDia.filter((r) => r.titular_id && ocupaHorario(r));
+  // O remanejo automático diz o que cedeu, mesmo o que só encosta na faixa.
+  const cedidasDoRemanejo = new Set(
+    doDia.flatMap((r) => cadeiaDoRemanejo(r).flatMap((m) => m.cedidas.map((c) => c.rotina_id))),
+  );
   const cedidaNumaCobertura = (r: R) =>
     r.status === "remanejada" &&
-    cobertas.some(
-      (c) =>
-        c.funcionario_id === r.funcionario_id &&
-        c.inicio_planejado <= r.inicio_planejado &&
-        r.fim_planejado <= c.fim_planejado,
-    );
+    ((!!r.id && cedidasDoRemanejo.has(r.id)) ||
+      cobertas.some(
+        (c) =>
+          c.funcionario_id === r.funcionario_id &&
+          c.inicio_planejado <= r.inicio_planejado &&
+          r.fim_planejado <= c.fim_planejado,
+      ));
   return doDia.map((r) => {
-    if (r.titular_id)
+    if (r.titular_id) {
+      // O remanejo automático pode ter mudado a tarefa de horário: na cópia ela
+      // volta ao horário do dono, o do primeiro remanejo da cadeia.
+      const cadeia = cadeiaDoRemanejo(r);
+      const inicio = cadeia.length ? cadeia[cadeia.length - 1].inicio : r.inicio_planejado;
+      const duracao = hhmmParaMin(r.fim_planejado) - hhmmParaMin(r.inicio_planejado);
       return {
         ...r,
         funcionario_id: r.titular_id,
         titular_id: "",
+        // O remanejo automático é do dia em que aconteceu: na cópia, o aviso e o
+        // "Desfazer" apontariam para outro dia.
+        ...(r.remanejo_auto
+          ? { remanejo_auto: "", inicio_planejado: inicio, fim_planejado: minParaHHMM(hhmmParaMin(inicio) + duracao) }
+          : {}),
         observacao: (r.observacao ?? "")
           .split(" · ")
           .filter((p) => !p.startsWith("Coberta por "))
           .join(" · "),
       };
-    if (cedidaNumaCobertura(r)) return { ...r, status: "planejada" as StatusRotina };
-    return r;
+    }
+    // Nenhuma marca do remanejo atravessa para outro dia — nem a de "desfeito".
+    const limpo = r.remanejo_auto ? { ...r, remanejo_auto: "" } : r;
+    if (cedidaNumaCobertura(r)) return { ...limpo, status: "planejada" as StatusRotina };
+    return limpo;
   });
 }
 
@@ -325,7 +346,11 @@ export function semCoberturas<
  */
 export function cedidasNaCobertura<
   R extends { inicio_planejado: string; fim_planejado: string; tarefa_id: string; status?: StatusRotina },
->(coberta: { inicio_planejado: string; fim_planejado: string }, doColega: R[], tarefa: (id: string) => { espera?: boolean; critica?: boolean } | undefined): R[] {
+>(
+  coberta: { inicio_planejado: string; fim_planejado: string; data?: string },
+  doColega: R[],
+  tarefa: (id: string) => Pick<Tarefa, "espera" | "critica" | "critica_dias"> | undefined,
+): R[] {
   const ini = hhmmParaMin(coberta.inicio_planejado);
   const fim = hhmmParaMin(coberta.fim_planejado);
   return doColega.filter((r) => {
@@ -333,7 +358,7 @@ export function cedidasNaCobertura<
     return (
       ocupaHorario(r) &&
       !t?.espera &&
-      !t?.critica &&
+      !criticaNoDia(t, coberta.data) &&
       hhmmParaMin(r.inicio_planejado) >= ini &&
       hhmmParaMin(r.fim_planejado) <= fim
     );
@@ -363,6 +388,21 @@ export const PRIORIDADE_POR_TIPO_LOCAL: Record<TipoLocal, Prioridade> = {
   auditorio: "baixa",
 };
 
+/**
+ * A tarefa é crítica NESTE dia? A crítica pode valer só em alguns dias da semana
+ * (`critica_dias`, pedido da coordenação em 10/11/2026); sem dias marcados, vale
+ * todo dia, como era antes do campo existir. Sem data, responde se é crítica em
+ * algum dia — serve à lista de tarefas, que não fala de um dia.
+ */
+export function criticaNoDia(
+  tarefa: Pick<Tarefa, "critica" | "critica_dias"> | undefined,
+  data?: string,
+): boolean {
+  if (!tarefa?.critica) return false;
+  const dias = parseDiasSemana(tarefa.critica_dias);
+  return !data || dias.length === 0 || dias.includes(diaDaSemana(data));
+}
+
 const NIVEL_PRIORIDADE: Record<Prioridade, number> = { baixa: 1, media: 2, alta: 3 };
 /** Nível da tarefa crítica ("circuito essencial"): acima de alta, e nunca cedida. */
 export const NIVEL_CRITICA = 4;
@@ -376,11 +416,13 @@ export const NIVEL_CRITICA = 4;
  * (para rebaixar, marque "baixa").
  */
 export function nivelPrioridade(
-  tarefa: Pick<Tarefa, "prioridade" | "critica"> | undefined,
+  tarefa: Pick<Tarefa, "prioridade" | "critica" | "critica_dias"> | undefined,
   local: Pick<Local, "tipo_local"> | undefined,
+  /** O dia em questão: a crítica pode valer só em alguns dias da semana. */
+  data?: string,
 ): number {
   if (!tarefa) return NIVEL_PRIORIDADE.media;
-  if (tarefa.critica) return NIVEL_CRITICA;
+  if (criticaNoDia(tarefa, data)) return NIVEL_CRITICA;
   if (tarefa.prioridade === "alta" || tarefa.prioridade === "baixa") return NIVEL_PRIORIDADE[tarefa.prioridade];
   const doTipo = local ? (PRIORIDADE_POR_TIPO_LOCAL as Record<string, Prioridade>)[local.tipo_local] : undefined;
   return NIVEL_PRIORIDADE[doTipo ?? "media"];

@@ -7,6 +7,81 @@
 
 ---
 
+## 2026-11-10 — Tarefa crítica por dia da semana, e remanejo automático da crítica de quem faltou
+
+Pedidos da coordenação: "tarefas serem críticas em dias específicos" e "o sistema remaneja e
+apenas avisa quem assumiu a tarefa no lugar de qual tarefa". Decisões do dono: remaneja ao
+lançar a falta e ao gerar o dia; avisa na Central e na Agenda, com "Desfazer"; se ninguém pode
+assumir sem alerta, não mexe e destaca; os dias da crítica ficam na própria tarefa.
+
+**Crítica por dia.** Campo novo `tarefas.critica_dias` (CSV 0–6; vazio = todo dia), lido sempre
+por `criticaNoDia` (`lib/calculations.ts`). Fora desses dias a tarefa é comum: cede lugar na troca
+por prioridade, não entra no circuito essencial e pode ser cedida no "Feita por". O cadastro
+mostra "Crítica em quais dias" quando a tarefa é crítica, e o selo da lista diz os dias.
+
+**Remanejo automático** (`services/centralDiaService.ts`). As mesmas regras da proposta da
+Central, aplicadas sem perguntar: alguém livre no horário, depois livre em outro horário, depois
+a troca por prioridade (cede só o que é de prioridade menor). Qualquer alerta (requisito, gênero,
+sobrecarga) e a tarefa fica onde está, destacada como antes.
+- Ao lançar ou mudar uma ausência: em cada dia dela com agenda, até 31 dias à frente.
+- Ao gerar o dia: a crítica do ausente passou a **nascer no nome dele** (antes era descartada),
+  só se passar em todas as outras regras da rota — num sábado em que ela não cabe, não nasce.
+  A regra mora em `projetarDiaDaRota`, então a geração sombra conta igual.
+- O bloco guarda de quem era (`titular_id`, como no "Feita por") e `remanejo_auto` (JSON: de
+  quem saiu, horário e observação de antes, cedidas com o registro, e o remanejo anterior, se
+  quem cobria também faltou).
+- **Desfazer** (`POST /api/central-dia/desfazer-remanejo`): a tarefa volta, as cedidas voltam ao
+  colega, e fica uma nota de "desfeito" para o automático não refazer na próxima falta ou geração.
+- Mão humana depois (arrastar, trocar tarefas) apaga a marca: o aviso e o desfazer deixariam de
+  dizer a verdade. Repetir o dia e salvar a rota devolvem a tarefa ao dono, no horário dele.
+- Corrida: a crítica e cada cedida são **reservadas** com `atualizarSe` antes de qualquer escrita;
+  quem perde a corrida desiste. Uma falha num remanejo não derruba o salvamento da ausência.
+- A crítica que só está no nome do ausente conta como descoberta nas pendências.
+
+**Aviso** "Feito automaticamente" na Central (`remanejos_auto`) e na Agenda
+(`components/AvisosRemanejo.tsx`), com "Desfazer" (quem planeja) e "Entendi" (guardado no
+navegador pela hora do remanejo, sem nome).
+
+**Painel "Cobertura de ausência" minimizável**, lembrado no navegador.
+
+**"Qualquer horário" no cadastro da tarefa** (coluna `qualquer_horario`). Checkbox marcado por
+padrão; desmarcado, mostra a janela (início e fim) e a exige. É o que o remanejo usa para não errar
+o horário: com janela, a crítica só muda de horário dentro dela; com "qualquer horário" escolhido,
+pode ir para outro horário do dia; **sem janela e sem escolha** (as 200 críticas que já existiam,
+das 207 da produção só 7 tinham janela), só troca de pessoa no mesmo horário. A lista de tarefas
+marca essas com "horário a definir". Na edição dessas, a caixa abre **desmarcada e vazia** (caixa
+que já vem marcada não é escolha — achado da auditoria): salvar sem mexer não grava nada, e o
+selo só some quando alguém marca a caixa ou preenche a janela. Tarefa nova vem marcada. A Central,
+onde alguém confirma, segue propondo outro horário como antes. A validação da tarefa passou a
+recusar janela com uma ponta só ou invertida (conferido: nenhuma na produção).
+
+**Ausência apagada ou encurtada** desfaz sozinha o remanejo dos dias que deixaram de ter falta
+(`desfazerRemanejosSemFalta`, nas rotas DELETE e PUT de `/api/ausencias/[id]`), só no que ainda
+vem: a manhã que já passou fica como ficou, e a tarefa não volta para um horário de antes que já
+passou. Esse desfazer não deixa nota: se a falta voltar, o
+automático remaneja de novo.
+
+**Supervisor** marca "não feita" no bloco remanejado automaticamente; a trava do titular ficou só
+no "Feita por". Decisões do dono, 10/11/2026.
+
+Pelo portão da doutrina: elimina a confirmação, uma a uma, da cobertura de crítica na Central;
+é operação; só aparece quando houve remanejo; o caminho básico não muda; a crítica por dia
+substitui a crítica "todo dia" que obrigava a desmarcar e remarcar.
+
+Revisões: segurança e auditoria pediram corrida, desfazer que fica, marca vencida, a crítica
+fantasma no sábado e a divergência da sombra — tudo corrigido com teste de regressão (que falha
+sem a correção). Testes: `testes/remanejo-automatico.test.ts` (25).
+
+Arquivos: `lib/calculations.ts`, `lib/projecaoDia.ts`, `lib/pendencias.ts`, `lib/remanejoAuto.ts`,
+`lib/schema.ts`, `services/centralDiaService.ts`, `services/modelosService.ts`,
+`services/rotinasService.ts`, `services/tarefasService.ts`, `services/execucoesService.ts`,
+`app/api/ausencias/*`, `app/api/rotinas/gerar/route.ts`, `app/api/central-dia/desfazer-remanejo/`,
+`components/AvisosRemanejo.tsx`, `components/CentralDoDia.tsx`, `components/agenda/CoberturaPanel.tsx`,
+`components/agenda/PendenciasPanel.tsx`, `app/(app)/rotinas/page.tsx`, `app/(app)/tarefas/page.tsx`,
+`app/(app)/remanejo/page.tsx`, `types/*`, `docs/02-modelo-de-dados.md`.
+
+---
+
 ## 2026-11-10 — DT 1 e DT 2: tarefas da rota tiradas de cima das pausas (correção de dado)
 
 Relato da coordenação: arrumou as tarefas para não ficarem em cima do intervalo, salvou uma

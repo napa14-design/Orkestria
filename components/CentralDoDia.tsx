@@ -6,9 +6,12 @@ import useSWR from "swr";
 import { fraseDoFeito } from "@/lib/agenda";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR } from "@/lib/dateUtils";
+import { podeEscrever } from "@/lib/permissions";
 import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type { CentralDiaDados, NivelCentralDia, ResolucaoCentralDia } from "@/types";
+import AvisosRemanejo from "./AvisosRemanejo";
 import Carregando from "./Carregando";
+import { useSessao } from "./SessaoContexto";
 
 const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
   critico: "Resolver primeiro",
@@ -17,6 +20,9 @@ const ROTULO_NIVEL: Record<NivelCentralDia, string> = {
 };
 
 export default function CentralDoDia({ nome }: { nome: string }) {
+  const sessao = useSessao();
+  // O supervisor de chão vê o aviso, mas desfazer é decisão de quem planeja.
+  const podeDesfazer = !!sessao && podeEscrever(sessao);
   const [resolvendo, setResolvendo] = useState(false);
   const [erroAcao, setErroAcao] = useState("");
   const [feito, setFeito] = useState("");
@@ -156,6 +162,8 @@ export default function CentralDoDia({ nome }: { nome: string }) {
           {erroAcao}
         </div>
       )}
+
+      <AvisosRemanejo avisos={data.remanejos_auto ?? []} aoMudar={() => void mutate()} podeDesfazer={podeDesfazer} />
 
       <main className={`central-proxima nivel-${data.proxima.nivel}`} data-tour="central-proxima">
         <div className="central-proxima-marca" aria-hidden="true">

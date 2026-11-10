@@ -64,6 +64,19 @@ export interface Tarefa extends Auditoria {
    */
   critica?: boolean;
   /**
+   * Dias da semana em que a crítica vale (CSV 0=dom … 6=sáb). Vazio = todo dia.
+   * Fora desses dias a tarefa é comum: cede na troca por prioridade e não entra no
+   * circuito essencial. Leia sempre por `criticaNoDia`, nunca `critica` sozinho.
+   */
+  critica_dias?: string;
+  /**
+   * "Qualquer horário" escolhido no cadastro: a tarefa pode ser feita em qualquer
+   * hora, e o remanejo automático pode mudá-la de horário. Ausente = ninguém
+   * escolheu (toda tarefa anterior a 10/11/2026): a crítica sem janela só troca de
+   * pessoa no mesmo horário. Com janela, a janela manda.
+   */
+  qualquer_horario?: boolean;
+  /**
    * Requisitos de execução exigidos (CSV de ids do catálogo `requisitos`):
    * aptidões/treinamentos que o executante precisa ter (bloqueiam a alocação) e
    * EPIs exigidos (exibidos como lembrete). Vazio = sem exigência.

@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
-import { jornadaDoDia, jornadaLiquidaMin, ocupaHorario } from "@/lib/calculations";
+import { criticaNoDia, jornadaDoDia, jornadaLiquidaMin, ocupaHorario } from "@/lib/calculations";
 import { apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO } from "@/lib/dateUtils";
 import type {
@@ -132,8 +132,8 @@ export default function PaginaRemanejo() {
     const ordenadas = [...orfas].sort((a, b) => {
       const ta = tarefaPorId.get(a.tarefa_id);
       const tb = tarefaPorId.get(b.tarefa_id);
-      const ca = ta?.critica ? 0 : 1;
-      const cb = tb?.critica ? 0 : 1;
+      const ca = criticaNoDia(ta, data) ? 0 : 1;
+      const cb = criticaNoDia(tb, data) ? 0 : 1;
       if (ca !== cb) return ca - cb; // críticas primeiro
       const pa = PESO[ta?.prioridade ?? "media"];
       const pb = PESO[tb?.prioridade ?? "media"];

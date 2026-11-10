@@ -556,8 +556,16 @@ export async function updateRotina(
       throw new ErroValidacao(alertas);
   }
 
+  // Mão humana depois do remanejo automático: a marca deixa de dizer a verdade (o
+  // aviso citaria quem não assumiu, e o "Desfazer" passaria por cima da decisão).
+  const mexeuNoRemanejo =
+    !!atual.remanejo_auto &&
+    ((dados.funcionario_id !== undefined && dados.funcionario_id !== atual.funcionario_id) ||
+      (dados.inicio_planejado !== undefined && dados.inicio_planejado !== atual.inicio_planejado) ||
+      (dados.data !== undefined && dados.data !== atual.data));
   const rotina = await ds.atualizar("rotinas_planejadas", id, {
     ...dados,
+    ...(mexeuNoRemanejo ? { remanejo_auto: "" } : {}),
     tempo_previsto_min: novoPrevisto,
     tempo_visual_min: novoVisual,
     blocos_ocupados: blocosOcupados(novoPrevisto, parametros.bloco_agenda_min),
@@ -806,6 +814,8 @@ export async function trocarTarefasDoDia(args: {
           funcionario_id: b.para,
           // Como no arrasto: o fim gravado é o real, início + previsto.
           fim_planejado: fimDe.get(b.rotina_id)!,
+          // Trocar quem faz é decisão humana: a marca do remanejo automático deixa de valer.
+          ...(atual.remanejo_auto ? { remanejo_auto: "" } : {}),
           ...(autorizado && !atual.observacao?.includes("[Autorizado manualmente]")
             ? { observacao: `${atual.observacao ?? ""} [Autorizado manualmente]`.trim() }
             : {}),

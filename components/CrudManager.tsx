@@ -59,6 +59,11 @@ export interface CampoForm {
   /** Exibe o campo só quando a condição (sobre o estado atual do form) for verdadeira. */
   mostrarSe?: (form: Record<string, unknown>) => boolean;
   /**
+   * Valor ao abrir a edição, quando não é uma coluna do registro (o "Qualquer
+   * horário" da tarefa sai de a janela estar vazia). Sem isto, o valor gravado.
+   */
+  valorInicial?: (item: Record<string, unknown>) => unknown;
+  /**
    * Atalho "criar na hora" para campo que aponta para outro cadastro.
    *
    * Nasceu de uma observação do dono do produto: *"a pessoa ta cadastrando um
@@ -633,7 +638,8 @@ export default function CrudManager<T extends Registro>({
     // `__antes`: o registro como está gravado, para os campos decidirem por ele e não pelo
     // que já foi digitado. Como `__novo`, não vai para o servidor.
     const inicial: Record<string, unknown> = { __antes: item };
-    for (const c of campos) inicial[c.key] = valorDe(item, c.key) ?? "";
+    for (const c of campos)
+      inicial[c.key] = c.valorInicial ? c.valorInicial(item as unknown as Record<string, unknown>) : (valorDe(item, c.key) ?? "");
     setForm(inicial);
     setEditando(item);
     setErro("");

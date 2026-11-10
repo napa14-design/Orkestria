@@ -306,6 +306,18 @@ export function validarTarefa(t: Partial<Tarefa>): AlertaValidacao[] {
       codigo: "SEM_TEMPO_PREVISTO",
       mensagem: "Tempo base deve ser maior que zero.",
     });
+  // Janela de horário: as duas pontas ou nenhuma. Com uma só, a agenda ignorava a
+  // janela e a tarefa parecia ter horário sem ter (10/11/2026: o remanejo automático
+  // da crítica respeita a janela, e precisa dela inteira).
+  const ini = t.janela_inicio ?? "";
+  const fim = t.janela_fim ?? "";
+  const hora = /^([01]\d|2[0-3]):[0-5]\d$/u;
+  if (ini || fim) {
+    if (!hora.test(ini) || !hora.test(fim))
+      alertas.push({ nivel: "erro", codigo: "JANELA_INCOMPLETA", mensagem: "Informe o início e o fim da janela de horário (HH:mm)." });
+    else if (hhmmParaMin(fim) <= hhmmParaMin(ini))
+      alertas.push({ nivel: "erro", codigo: "JANELA_INVERTIDA", mensagem: "O fim da janela de horário precisa ser depois do início." });
+  }
   return alertas;
 }
 
