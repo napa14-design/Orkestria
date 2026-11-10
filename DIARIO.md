@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-11-10 — DT 1 e DT 2: tarefas da rota tiradas de cima das pausas (correção de dado)
+
+Relato da coordenação: arrumou as tarefas para não ficarem em cima do intervalo, salvou uma
+rota nova, e ao gerar o dia elas voltaram. A geração não desfez nada. As pausas de quase todas
+as pessoas foram mudadas no cadastro em 26/10, e a rota ficou com os horários antigos: o buraco
+de almoço e de lanche da rota estava onde era a pausa antiga. Na DT 1, a rota foi salva hoje a
+partir do dia 10, que só tinha 5 tarefas mudadas de lugar. Na DT 2, nenhuma rota foi salva
+desde 03/11, e os dias arrumados à mão nunca viraram rota.
+
+O que foi feito, na camada seg–sex, autorizado pelo dono:
+- **4 pessoas da DT 2 receberam o dia que a própria coordenação já tinha arrumado** (03/11 e
+  09/11), lido dos blocos daquele dia. Uma delas com um ajuste: uma revisão de 20 min passou
+  para os 10 min livres antes do lanche.
+- **4 pessoas (DT 1 e DT 2) pela regra:** mesma ordem e mesmos minutos; a tarefa que atravessa
+  a pausa é partida; o deslocamento se desfaz no primeiro buraco.
+- **Ficaram de fora** quem teria o dia passando da saída (a rota já tinha mais tarefa que a
+  jornada) e quem tem tarefa presa a horário da escola (levar as crianças, portão durante as
+  aulas). Isso é decisão da coordenação.
+- **Dias já gerados (DT 1, 11–13/11):** os blocos de rota dessas pessoas foram refeitos.
+
+**Conferido lendo de volta:** as 8 pessoas com zero item em cima da pausa e os mesmos minutos;
+a geração sombra de 11–13/11 sem nada a gerar ou realinhar. Itens em cima de pausa: DT 1 de 18
+para 13, DT 2 de 18 para 4. Cópia das duas rotas antes da mudança em
+`Downloads/backup-rota-christus_dt*-2026-11-10.json`.
+
+⚠ A geração descarta só o que sai do expediente, não o que cai na pausa; e salvar a rota não
+avisa quando há tarefa em cima de pausa. É assim que isso passou despercebido.
+
+---
+
+## 2026-11-10 — Cobertura de ausência: a lista "remanejar para" não estoura mais a tela
+
+Relato da coordenação da Sul 2 com print: o painel de cobertura saía torto, a lista de destino
+ia além da tela e o botão "Mover" caía numa linha sozinho. A opção da lista leva o alerta
+inteiro do candidato (até ~135 caracteres), e sem largura a caixa crescia até o texto mais
+comprido. Agora a caixa tem 260 px; aberta, a lista mostra o texto inteiro. Conferido na tela
+local com uma falta de teste: 19 linhas, caixa e botão na mesma linha, painel dentro da tela.
+
+Arquivo: `components/agenda/CoberturaPanel.tsx`.
+
+---
+
 ## 2026-11-10 — Seletor de dia e de sede no topo da Agenda e do Acompanhamento
 
 O dono achou "muito ruim" o filtro de data e sede: o campo de data do navegador obrigava a

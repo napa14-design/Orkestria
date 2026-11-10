@@ -151,7 +151,10 @@ export default function CoberturaPanel({
                   <select
                     value={destino}
                     onChange={(e) => setDestinos((d) => ({ ...d, [r.id]: e.target.value }))}
-                    style={{ fontSize: 12, padding: 4 }}
+                    // Largura fixa: a opção leva o alerta inteiro, e sem limite a caixa
+                    // crescia até o texto mais longo, estourava a tela e empurrava o
+                    // "Mover" para outra linha (Sul 2, 10/11/2026). Aberta, mostra tudo.
+                    style={{ fontSize: 12, padding: 4, width: 260, maxWidth: "100%" }}
                   >
                     <option value="">— remanejar para —</option>
                     {semAlerta.length > 0 && <optgroup label="Sem alerta">{semAlerta.map(opcao)}</optgroup>}
