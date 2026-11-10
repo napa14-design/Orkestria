@@ -37,18 +37,6 @@ avisa quando há tarefa em cima de pausa. É assim que isso passou despercebido.
 
 ---
 
-## 2026-11-10 — Cobertura de ausência: a lista "remanejar para" não estoura mais a tela
-
-Relato da coordenação da Sul 2 com print: o painel de cobertura saía torto, a lista de destino
-ia além da tela e o botão "Mover" caía numa linha sozinho. A opção da lista leva o alerta
-inteiro do candidato (até ~135 caracteres), e sem largura a caixa crescia até o texto mais
-comprido. Agora a caixa tem 260 px; aberta, a lista mostra o texto inteiro. Conferido na tela
-local com uma falta de teste: 19 linhas, caixa e botão na mesma linha, painel dentro da tela.
-
-Arquivo: `components/agenda/CoberturaPanel.tsx`.
-
----
-
 ## 2026-11-10 — Seletor de dia e de sede no topo da Agenda e do Acompanhamento
 
 O dono achou "muito ruim" o filtro de data e sede: o campo de data do navegador obrigava a
