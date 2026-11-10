@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-11-10 — Seletor de dia e de sede no topo da Agenda e do Acompanhamento
+
+O dono achou "muito ruim" o filtro de data e sede: o campo de data do navegador obrigava a
+abrir o calendário para cada troca de dia e não dizia o dia da semana, que passou a importar
+com sábado de horário e rota próprios. Agora:
+
+- **`SeletorDia`**: `‹ Terça 10/11 ›`. As setas andam um dia (ou uma semana, na visão da
+  semana); clicar no dia abre o calendário do navegador (`showPicker`, com o campo nativo
+  invisível por baixo); o ano só aparece quando não é o corrente; "Hoje" só aparece fora de hoje.
+- **`SeletorSede`**: lista com a seta da casa; quem opera uma sede só vê o nome dela, sem lista.
+- O Turno da Agenda ganhou a mesma seta, para não destoar ao lado da sede.
+- O passo do tutorial que apontava o campo de data fala das setas.
+
+Ficaram como estavam as telas de período ("de… até…": Painel, Panorama, Produtividade) e as
+outras com data (Remanejo, Importar).
+
+Arquivos: `components/SeletorDia.tsx`, `components/SeletorSede.tsx`, `app/globals.css`,
+`components/agenda/FiltersBar.tsx`, `app/(app)/acompanhamento/page.tsx`,
+`lib/tutorial/trilha.ts`, `testes/seletores-topo.test.ts`.
+
+---
+
+## 2026-11-10 — Pré Jovita: a rota da semana também no sábado (correção de dado)
+
+O sábado saiu vazio, como combinado na entrada abaixo, e o dono pediu as mesmas tarefas da
+semana, mantendo o sábado curto (07:00–11:15) e só o que couber. Os 55 itens da rota padrão
+passaram a valer de segunda a sábado (`dias_semana = 1,2,3,4,5,6`).
+
+**Geração sombra do sábado 14/11:** 22 blocos a gerar e 33 descartados por estarem fora do
+horário do sábado. Quatro dos 22 cruzavam o lanche de sábado (09:00–09:15), porque a geração
+descarta só o que sai do expediente, não o que bate na pausa. Por isso o lanche de sábado foi
+para o horário em que não bate em tarefa: 08:45 e 08:25 (os mesmos da semana) e 11:00 para quem
+entra às 09:05. Conferido: nenhum item do sábado cruza o lanche novo. O sábado 14/11 já tinha
+sido gerado (22 blocos) e segue valendo, porque o lanche é lido da pessoa.
+
+---
+
 ## 2026-11-10 — Pré Jovita de segunda a sábado (correção de dado)
 
 A planilha não dizia nada sobre o sábado, e a importação deixou as três pessoas de segunda a

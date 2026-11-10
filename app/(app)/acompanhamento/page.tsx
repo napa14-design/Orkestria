@@ -10,6 +10,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
+import SeletorDia from "@/components/SeletorDia";
+import SeletorSede from "@/components/SeletorSede";
 import { useSessao } from "@/components/SessaoContexto";
 import {
   cedidasNaCobertura,
@@ -619,22 +621,8 @@ export default function PaginaAcompanhamento() {
             ⬇ Exportar CSV
           </button>
         )}
-        <label className="campo">
-          <span className="rotulo">Data</span>
-          <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
-        </label>
-        <label className="campo">
-          <span className="rotulo">Sede</span>
-          <select value={sedeId} onChange={(e) => setSedeEscolhida(e.target.value)}>
-            {(sedes ?? [])
-              .filter((s) => s.ativo)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome_sede}
-                </option>
-              ))}
-          </select>
-        </label>
+        <SeletorDia data={data} aoMudar={setData} />
+        <SeletorSede sedes={sedes ?? []} valor={sedeId} aoMudar={setSedeEscolhida} />
         {ehSupervisor && (
           <>
             <label className="campo">

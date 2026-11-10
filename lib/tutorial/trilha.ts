@@ -354,7 +354,7 @@ export const TRILHA: EtapaTutorial[] = [
         alvo: "campo-data",
         titulo: "Primeiro, escolha o dia que quer montar",
         texto:
-          "Troque a data aqui para um dia que ainda está vazio — amanhã, por exemplo. O botão de gerar só aparece em dia vazio, para não passar por cima de um dia que você já montou.",
+          "Use a seta › (ou clique no dia para abrir o calendário) e vá para um dia que ainda está vazio — amanhã, por exemplo. O botão de gerar só aparece em dia vazio, para não passar por cima de um dia que você já montou.",
         avancarEm: "leitura",
       },
       {

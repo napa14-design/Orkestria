@@ -142,6 +142,71 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .campo textarea { resize: vertical; min-height: 64px; }
 
+/* Seletor de dia (‹ Terça 10/11 ›) e de sede, no topo das telas do dia. */
+.seletor-linha { display: flex; align-items: center; gap: 8px; }
+.seletor-dia {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--cartao);
+  border: 1.5px solid var(--tinta);
+  border-radius: var(--raio);
+}
+.seletor-dia > button {
+  border: 0;
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  cursor: pointer;
+}
+.seletor-dia > button:not(.seletor-dia-atual) { padding: 0 10px; font-size: 18px; line-height: 1; font-weight: 700; }
+.seletor-dia > button:first-child { border-right: 1.5px solid var(--tinta); }
+.seletor-dia > button:nth-child(3) { border-left: 1.5px solid var(--tinta); }
+.seletor-dia > button:hover { background: var(--papel-2); }
+.seletor-dia > button:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.seletor-dia > .seletor-dia-atual {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  font-weight: 700;
+  min-width: 132px;
+  justify-content: center;
+}
+.seletor-dia-atual .num { font-weight: 500; font-size: 13px; color: var(--tinta-2); }
+/* O campo nativo só serve ao calendário: invisível, sob o seletor, para o calendário abrir ali. */
+.campo .seletor-dia input[type="date"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+}
+.seletor-lista { position: relative; display: block; }
+.campo .seletor-lista select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-weight: 700;
+  padding-right: 30px;
+  cursor: pointer;
+}
+.seletor-lista::after {
+  content: "▾";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--tinta);
+}
+.seletor-sede-unica {
+  padding: 8px 10px;
+  font-weight: 700;
+  border: 1.5px dashed var(--linha);
+  border-radius: var(--raio);
+}
+
 /* ── cartões e painéis ────────────────────────────────────────────── */
 .painel {
   background: var(--cartao);

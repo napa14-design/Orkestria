@@ -1,6 +1,8 @@
 "use client";
 
 /** Topo da tela de rotina: contexto que define qual agenda está aberta. */
+import SeletorDia from "@/components/SeletorDia";
+import SeletorSede from "@/components/SeletorSede";
 import type { Sede } from "@/types";
 
 export default function FiltersBar({
@@ -77,33 +79,21 @@ export default function FiltersBar({
         </div>
       </div>
 
-      <label className="campo" data-tour="campo-data">
-        <span className="rotulo">Data</span>
-        <input type="date" value={data} onChange={(e) => aoMudarData(e.target.value)} />
-      </label>
+      <SeletorDia data={data} aoMudar={aoMudarData} passo={modo === "semana" ? 7 : 1} tour="campo-data" />
 
-      <label className="campo">
-        <span className="rotulo">Sede</span>
-        <select value={sedeId} onChange={(e) => aoMudarSede(e.target.value)}>
-          {sedes
-            .filter((s) => s.ativo)
-            .map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome_sede}
-              </option>
-            ))}
-        </select>
-      </label>
+      <SeletorSede sedes={sedes} valor={sedeId} aoMudar={aoMudarSede} />
 
       <label className="campo">
         <span className="rotulo">Turno</span>
-        <select value={turno} onChange={(e) => aoMudarTurno(e.target.value)}>
-          <option value="">Todos</option>
-          <option value="manha">Manhã</option>
-          <option value="tarde">Tarde</option>
-          <option value="noite">Noite</option>
-          <option value="integral">Integral</option>
-        </select>
+        <span className="seletor-lista">
+          <select value={turno} onChange={(e) => aoMudarTurno(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
+            <option value="noite">Noite</option>
+            <option value="integral">Integral</option>
+          </select>
+        </span>
       </label>
 
       <label className="campo">
