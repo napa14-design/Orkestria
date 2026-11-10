@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-11-10 — Pré Jovita importado (correção de dado, sem mudança de código)
+
+A sede estava vazia. A planilha da coordenação ("Rota de Trabalho ASG") não segue o modelo:
+não tem coluna de local, e o lanche e o intervalo vêm como linhas de tarefa. Foi convertida
+para o modelo da importação e gravada pelo mesmo caminho da tela Importar
+(`analisarRota` → `aplicarImportacao`), no dia 11/11, salvando como rota padrão.
+
+- **3 pessoas** (escala seg–sex), **38 locais**, **46 tarefas**, **55 itens** de rota e 55 blocos
+  em 11/11. Cada pessoa fica com 475 min de tarefa em 475 min de jornada líquida (100%), sem
+  buraco nem sobreposição.
+- **Lanche e intervalo** viraram as pausas da pessoa, não tarefas.
+- **Os locais foram deduzidos do nome da tarefa.** Quando a tarefa cobre mais de um lugar, ele
+  é um local que junta os dois ("WCs femininos do térreo", "Sala MED e Extensivo 1"). A
+  "Sala de descanso" e a "Sala de descanso da Infraestrutura" ficaram separadas, por decisão
+  do dono.
+- **7 tarefas aparecem com duas durações** ("Turma 2" com 10 min de manhã e 35 à tarde). O item
+  da rota guarda o horário da planilha; o tempo padrão da tarefa ficou o da primeira vez.
+- **Ficaram vazios:** EPI, categoria e gênero. O tipo dos locais ficou "outros".
+
+**Conferido lendo de volta:** 197 registros no histórico (3 + 38 + 46 + 55 + 55), nenhum aviso
+de validação do dia. A geração sombra dá 55 a gerar em 12, 13 e 16/11 sem descarte, 55
+preservados em 11/11 e folga no sábado.
+
+⚠ Nenhum coordenador ou supervisor tem o Pré Jovita entre as sedes: por ora só o
+administrador vê a sede.
+
+---
+
 ## 2026-11-09 — Agenda se atualiza ao voltar para a aba
 
 Relato da coordenação: uma colega gerou a semana, e para outra "apareceu como se não tivesse
