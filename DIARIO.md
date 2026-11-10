@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-11-10 — Pré Jovita de segunda a sábado (correção de dado)
+
+A planilha não dizia nada sobre o sábado, e a importação deixou as três pessoas de segunda a
+sexta. O dono pediu segunda a sábado, "igual às outras sedes". Ficou como no Pré Sul:
+
+- **Escala `seg_sab`**, com sábado das 07:00 às 11:15 e lanche das 09:00 às 09:15
+  (`entrada_sabado`, `saida_sabado`, `intervalos_sabado`), pelo `updateFuncionario`.
+- **A rota padrão passou a valer só de segunda a sexta** (`dias_semana = 1,2,3,4,5` nos 55
+  itens). O sábado é montado na Agenda até a coordenação mandar a rota dele. Sem isso, a rota
+  de 06:35–16:30 cairia num sábado de 4h: ficaria só o que coubesse no horário.
+
+Os ids dos itens não mudaram, então os blocos de 11/11 seguem ligados à rota. **Geração
+sombra depois:** 11/11 com 55 preservados; 12 e 16/11 com 55 a gerar e nenhum descarte;
+sábado 14/11 sem nada a gerar (55 itens são "de outro dia").
+
+---
+
 ## 2026-11-10 — Pré Jovita importado (correção de dado, sem mudança de código)
 
 A sede estava vazia. A planilha da coordenação ("Rota de Trabalho ASG") não segue o modelo:
