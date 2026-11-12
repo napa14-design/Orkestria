@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-11-12 — Silva Paulet no ar (carga da planilha) + sábado validado com o horário do sábado
+
+**Carga (dado, não código).** A sede Silva Paulet estava vazia. Entrou a planilha de alocação de
+nov/2026, uma aba por pessoa: 27 pessoas, 5 postos vagos (ficha desligada com a rota guardada,
+para o "Assume o posto de"), 30 locais, 198 tarefas e a rota padrão em duas camadas:
+"Rota padrão · seg, ter, qua, qui, sex" (240 itens) e "Rota padrão · sáb" (42 itens, "Limpeza
+geral" 07:00–09:00 e 09:15–11:15, lanche às 09:00, para quem tinha sábado na planilha). Quatro
+horários impossíveis da planilha foram corrigidos pela leitura mais provável, e a lista foi
+para a coordenação conferir. Sombra: segunda gera 200 blocos, sábado gera 32, sem problemas.
+Nenhum dia foi gerado: quem gera é a coordenação.
+
+**Conserto.** `validarDia` (o relatório de "blocos que a agenda manual teria recusado", da
+geração, da importação e da cópia) validava o sábado com a ficha crua, ou seja, com o horário e
+as pausas da SEMANA. Quem tem lanche às 08:45 na semana e às 09:00 no sábado levava "conflito
+com o intervalo (08:45–09:00)" em todo sábado, e um bloco dentro do lanche de verdade do sábado
+passava. Agora usa `funcionarioNoDia`, como o arrasto manual já fazia. Aparecia em toda sede com
+sábado próprio.
+
+Teste: `testes/validacao-dia.test.ts` (falhava antes do conserto).
+
+Arquivos: `lib/validacaoDoDia.ts`, `testes/validacao-dia.test.ts`.
+
+---
+
 ## 2026-11-12 — CESIU: sábado de quem entra às 12:00 (correção de dado)
 
 A rota da CESIU é uma camada só, de todo dia. Uma das pessoas entra às 12:00 na semana, e o sábado

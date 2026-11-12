@@ -49,6 +49,22 @@ describe("validarDia", () => {
     expect(rodar([bloco("07:00", "07:10"), bloco("07:10", "07:20")])).toEqual([]);
   });
 
+  it("no sábado valem o horário e as pausas DO SÁBADO, não as da semana", () => {
+    // Silva Paulet, 12/11/2026: lanche 08:45 na semana e 09:00 no sábado. O
+    // sábado acusava "conflito com o intervalo (08:45–09:00)" num bloco 07:00–09:00
+    // e deixava passar um bloco dentro do lanche de verdade.
+    const sabado = "2026-08-22";
+    const comSabado = pessoa({
+      escala: "seg_sab", intervalos: "08:45-09:00;12:00-13:30",
+      entrada_sabado: "07:00", saida_sabado: "11:15", intervalos_sabado: "09:00-09:15",
+    });
+    const no = (blocos: BlocoDoDia[]) =>
+      rodar(blocos, { funcionarios: new Map([["f1", comSabado]]), data: sabado }).map((x) => x.codigo);
+    expect(no([bloco("07:00", "09:00"), bloco("09:15", "11:15")])).toEqual([]);
+    expect(no([bloco("09:00", "09:15")])).toEqual(["INTERVALO"]);
+    expect(no([bloco("11:00", "11:30")])).toEqual(["PASSA_DA_SAIDA"]);
+  });
+
   it("pega sobreposição entre dois blocos NOVOS (nenhum gravado ainda)", () => {
     // Era o furo da geração: ela criava os dois de uma vez e ninguém comparava
     // um com o outro.

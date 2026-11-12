@@ -16,7 +16,7 @@
  * é **contar e nomear** o que a agenda manual teria recusado, para aparecer no
  * resultado da geração/importação em vez de virar exceção às 7h da manhã.
  */
-import { ocupaHorario } from "./calculations";
+import { funcionarioNoDia, ocupaHorario } from "./calculations";
 import { validarAlocacao } from "./validations";
 import { hhmmParaMin } from "./dateUtils";
 import type {
@@ -85,8 +85,11 @@ export function validarDia(args: {
   }
 
   for (const [funcionarioId, doDia] of porFuncionario) {
-    const funcionario = funcionarios.get(funcionarioId);
-    if (!funcionario) continue; // pessoa de outra sede ou removida: não é caso daqui
+    const ficha = funcionarios.get(funcionarioId);
+    if (!ficha) continue; // pessoa de outra sede ou removida: não é caso daqui
+    // Com o horário DAQUELE dia: no sábado, as pausas e a saída do sábado. A ficha
+    // crua acusava o lanche da semana num sábado sem ele (12/11/2026).
+    const funcionario = funcionarioNoDia(ficha, data);
     const quali = (args.qualificacoes ?? []).filter((q) => q.funcionario_id === funcionarioId);
 
     for (const bloco of doDia) {
