@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-11-12 — Gerar o dia com alguém ausente cria as tarefas dele, para a cobertura
+
+Relato da coordenação da CESIU: a falta foi lançada e o dia gerado em seguida; quem abriu a Agenda
+não viu nada para remanejar, enquanto outra pessoa tinha visto a lista (num dia já gerado antes da
+falta). A geração pulava quem estava ausente, e a tarefa simplesmente não nascia — só aparecia
+como diária "Ficou de fora hoje", sem a lista de "Cobertura de ausência".
+
+Agora (decisão do dono) a tarefa do ausente nasce no nome dele e cai na cobertura, igual a quando
+a falta é lançada depois de gerar. A crítica, além disso, o remanejo automático passa a alguém. As
+outras regras da rota (horário de sábado, horário ocupado) valem como para quem está presente. O
+resultado da geração diz "Fulano: ausente — N tarefa(s) esperando quem cubra". A regra mora em
+`projetarDiaDaRota`, então a geração sombra conta igual. "Repetir o dia" segue pulando o ausente.
+
+Testes que registravam o comportamento antigo passaram a afirmar o novo
+(`testes/projecao.test.ts`, `testes/remanejo-automatico.test.ts`).
+
+Arquivos: `lib/projecaoDia.ts`, `services/modelosService.ts`.
+
+---
+
 ## 2026-11-10 — Tarefa crítica por dia da semana, e remanejo automático da crítica de quem faltou
 
 Pedidos da coordenação: "tarefas serem críticas em dias específicos" e "o sistema remaneja e

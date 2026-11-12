@@ -547,8 +547,9 @@ export interface ResultadoGeracao {
  * Gera o dia a partir da rota padrão da sede. A rota é dado já validado, então
  * a reproduzimos **fielmente** (tempo exato, sem re-encaixar na grade de 15 min —
  * o que criaria sobreposições artificiais em rotas finas de 5/10 min). Idempotente
- * (não recria item já existente). Adapta: pula ausentes, dias de folga (escala) e
- * tarefas que dependem do calendário fora do período letivo.
+ * (não recria item já existente). Adapta: pula dias de folga (escala) e tarefas
+ * que dependem do calendário fora do período letivo. Quem está ausente tem as
+ * tarefas criadas no nome dele, para a cobertura (12/11/2026).
  */
 export async function gerarDiaDaRotaPadrao(
   sedeId: string,
@@ -631,6 +632,12 @@ export async function gerarDiaDaRotaPadrao(
   for (const r of aCriar) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: r });
   await ds.gravarLote(escritas);
   res.geradas = aCriar.length;
+  // Diz o que nasceu no nome de quem falta: sem isto, a geração "deu certo" e
+  // ninguém olhava a cobertura.
+  const deAusentes = new Map<string, number>();
+  for (const r of aCriar) if (ctx.ausentes.has(r.funcionario_id)) deAusentes.set(r.funcionario_id, (deAusentes.get(r.funcionario_id) ?? 0) + 1);
+  for (const [fid, n] of deAusentes)
+    res.detalhes.push(`${ctx.funcionarios.get(fid)?.nome ?? "Pessoa"}: ausente — ${n} tarefa(s) esperando quem cubra, em "Cobertura de ausência"`);
 
   // Confere o dia com as MESMAS regras do arrasto manual. A premissa antiga
   // ("a rota é dado já validado") não vale quando a rota nasceu de importação,

@@ -10,7 +10,7 @@
  * A ORDEM dos testes é significativa: o motivo relatado é o primeiro que se
  * aplica. Mexer na ordem muda o texto que o supervisor lê.
  */
-import { criticaNoDia, jornadaDoDia, ocupaHorario } from "./calculations";
+import { jornadaDoDia, ocupaHorario } from "./calculations";
 import { diaDaSemana, hhmmParaMin, parseDiasSemana } from "./dateUtils";
 import { noQuadro } from "./desligamento";
 import type { Funcionario, ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
@@ -212,15 +212,12 @@ export function projetarDiaDaRota(
       descartar(item, "folga_pela_escala");
       continue;
     }
-    // A crítica de quem está ausente segue pelas outras regras e, se passar, nasce
-    // no nome dele para o remanejo automático passá-la a alguém (10/11/2026). Se
-    // outra regra a descarta (horário de sábado, horário ocupado), nada nasce: a
-    // rota não monta esse dia para ninguém. A tarefa comum do ausente sai aqui.
-    const ausente = ctx.ausentes.has(item.funcionario_id);
-    if (ausente && !criticaNoDia(tarefa, ctx.data)) {
-      descartar(item, "pessoa_ausente");
-      continue;
-    }
+    // Quem está ausente NÃO é motivo de descarte (decisão do dono, 12/11/2026): a
+    // tarefa nasce no nome dele e aparece em "Cobertura de ausência" para o
+    // coordenador remanejar — igual a quando a falta é lançada depois de gerar. Antes
+    // ela simplesmente não nascia, e quem gerava com a falta já lançada ficava sem a
+    // lista. A crítica, além disso, o remanejo automático passa a alguém. As outras
+    // regras (sábado, horário ocupado) valem como para quem está presente.
     const inicio = hhmmParaMin(item.inicio_planejado);
     const fim = inicio + ctx.duracaoDoItem(item);
     if (dow === 6 && funcionario.entrada_sabado && funcionario.saida_sabado) {

@@ -329,14 +329,15 @@ describe("ao gerar o dia", () => {
     expect(critica[0]).toMatchObject({ funcionario_id: "fc", titular_id: "fa" });
   });
 
-  it("sem quem gera (rotina interna), a crítica fica no ausente para a Central decidir", async () => {
+  it("sem quem gera (rotina interna), a crítica fica no ausente para a Central decidir; a comum também nasce nele", async () => {
     const amanha = await rotaComFaltaAmanha();
     const res = await gerarDiaDaRotaPadrao(SEDE, amanha, "c1");
     expect(res.remanejos).toBeUndefined();
     const doDia = await (await ds()).consultar("rotinas_planejadas", [{ campo: "data", op: "==", valor: amanha }]);
     expect(doDia.filter((r) => r.tarefa_id === "tCritica").map((r) => r.funcionario_id)).toEqual(["fa"]);
-    // A tarefa comum de quem falta continua sem nascer, como sempre.
-    expect(doDia.some((r) => r.funcionario_id === "fa" && r.tarefa_id !== "tCritica")).toBe(false);
+    // A tarefa comum de quem falta nasce no nome dele, para a cobertura (12/11/2026).
+    expect(doDia.filter((r) => r.funcionario_id === "fa" && r.tarefa_id === "tSala")).toHaveLength(1);
+    expect(res.detalhes.some((d) => d.includes("esperando quem cubra"))).toBe(true);
   });
 });
 

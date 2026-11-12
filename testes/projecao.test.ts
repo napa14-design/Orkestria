@@ -288,9 +288,11 @@ describe("projetarDiaDaRota", () => {
     );
   });
 
-  it("pula quem está ausente", () => {
+  it("quem está ausente tem a tarefa criada no nome dele, para a cobertura (12/11/2026)", () => {
     const ctx = contexto({ ausentes: new Set(["f1"]) });
-    expect(projetarDiaDaRota([item()], ctx).descartados[0].motivo).toBe("pessoa_ausente");
+    const p = projetarDiaDaRota([item()], ctx);
+    expect(p.materializar.map((i) => i.funcionario_id)).toEqual(["f1"]);
+    expect(p.descartados).toEqual([]);
   });
 
   it("a ordem dos motivos é estável: 'já no dia' vence os outros", () => {
@@ -381,19 +383,19 @@ describe("projetarDiaDaRota", () => {
     expect(p.materializar.map((i) => i.id)).toEqual(["a", "b"]);
   });
 
-  it("ausência e folga continuam sendo o motivo relatado antes de horário ocupado", () => {
+  it("ausente com bloco manual no horário: vale o horário ocupado, como para quem está presente", () => {
     const manual = rotina({ id: "manual", tarefa_id: "t9", inicio_planejado: "08:00" });
     expect(
       projetarDiaDaRota([item()], contexto({ blocosDoDia: [manual], ausentes: new Set(["f1"]) })).descartados[0]
         .motivo,
-    ).toBe("pessoa_ausente");
+    ).toBe("horario_ocupado");
   });
 
   it("preserva a ordem da rota nos descartes (o texto na tela segue essa ordem)", () => {
-    const ctx = contexto({ ausentes: new Set(["f1", "f2"]) });
-    ctx.funcionarios.set("f2", funcionario({ id: "f2", nome: "Ana" }));
+    // Dois descartes pelo mesmo motivo (cadastro sumido), em pessoas diferentes.
+    const ctx = contexto();
     const p = projetarDiaDaRota(
-      [item({ id: "a", inicio_planejado: "07:00" }), item({ id: "b", funcionario_id: "f2" })],
+      [item({ id: "a", inicio_planejado: "07:00", funcionario_id: "sumiu1" }), item({ id: "b", funcionario_id: "sumiu2" })],
       ctx,
     );
     expect(p.descartados.map((d) => d.item.id)).toEqual(["a", "b"]);
