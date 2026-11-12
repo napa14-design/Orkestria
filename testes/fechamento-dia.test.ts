@@ -223,4 +223,25 @@ describe("confirmarDiaComoPlanejado", () => {
     somaFecha(res, 0);
     expect(res.epis_declarados).toEqual([]);
   });
+
+  it("\"Confirmar as marcadas\": só as escolhidas, com as mesmas regras; id de outro dia é ignorado (12/11/2026)", async () => {
+    const t = await tarefaSemEpi("t-sem-epi");
+    await bloco("m1", ONTEM, "07:00", "07:10", t);
+    await bloco("m2", ONTEM, "08:00", "08:10", t);
+    await bloco("m3", ONTEM, "09:00", "09:10", t);
+    await bloco("m4", ONTEM, "10:00", "10:10", TAREFA_COM_EPI);
+    await bloco("outroDia", FUTURO, "07:00", "07:10", t);
+
+    const res = await confirmarDiaComoPlanejado(
+      { sedeId: SEDE, data: ONTEM, somente: ["m1", "m3", "m4", "outroDia"] },
+      "sup",
+      "coordenador",
+    );
+    expect(res.confirmadas).toBe(2);
+    expect(res.sem_declaracao).toBe(1); // m4 exige EPI e não houve declaração
+    somaFecha(res, 3); // as 3 do dia que foram marcadas; a de outro dia nem entra
+    const confirmadas = (await getExecucoes(ONTEM, ONTEM, SEDE)).map((e) => e.rotina_id).sort();
+    expect(confirmadas).toEqual(["m1", "m3"]);
+    expect(await getExecucoes(FUTURO, FUTURO, SEDE)).toHaveLength(0);
+  });
 });

@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-11-12 — CESIU: sábado de quem entra às 12:00 (correção de dado)
+
+A rota da CESIU é uma camada só, de todo dia. Uma das pessoas entra às 12:00 na semana, e o sábado
+de todos é 07:00–11:00: no sábado as tarefas dela caíam fora do horário e eram descartadas, e
+ela ficava sem nada. Decisão do dono: as 4 primeiras horas da rota dela (12:00–16:00, 21 itens,
+230 min) foram para 07:00–11:00, na mesma ordem, numa camada nova **"Rota padrão · sáb"** (dias 6,
+acrescenta). As tarefas da tarde e da noite ficam só para a semana. A geração sombra dos sábados
+14 e 21/11 passou de 33 para 54 blocos.
+
+---
+
+## 2026-11-12 — Acompanhamento: "Confirmar as marcadas"
+
+Pedido da coordenação da CESIU: ela confere tarefa por tarefa e não pode fechar o dia inteiro de
+uma vez; tocar "✓" em ~150 blocos, esperando o salvamento de cada um, não fecha. Agora cada
+tarefa que o fechamento alcançaria (já passou do horário, sem registro, não é de quem faltou) tem
+uma caixinha, no computador e no celular. No painel do fechamento, "todas de: Fulana (n)" marca as
+de uma pessoa, e "✓ Confirmar as marcadas (N)" grava num clique.
+
+O servidor é o mesmo do "Fechar o dia" (`confirmarDiaComoPlanejado`), com `somente` = os ids
+marcados: as mesmas regras (horário, ausente, EPI com declaração); id de outro dia ou sede é
+ignorado; a rota recusa lista vazia, que não seja de textos ou maior que 1000. O que fica de fora
+(EPI sem a declaração) continua marcado para o segundo clique.
+
+Visto na tela local: 13 marcadas → 5 confirmadas e 8 com EPI esperando; marcada a declaração →
+as 8 confirmadas, 13 registros. Teste em `testes/fechamento-dia.test.ts`.
+
+Arquivos: `services/execucoesService.ts`, `app/api/execucoes/confirmar-dia/route.ts`,
+`app/(app)/acompanhamento/page.tsx`, `app/globals.css`.
+
+---
+
 ## 2026-11-12 — Gerar o dia com alguém ausente cria as tarefas dele, para a cobertura
 
 Relato da coordenação da CESIU: a falta foi lançada e o dia gerado em seguida; quem abriu a Agenda

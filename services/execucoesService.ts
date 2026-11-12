@@ -88,17 +88,29 @@ export interface ResultadoFechamentoDia {
  * contados, nunca confirmados em silêncio.
  */
 export async function confirmarDiaComoPlanejado(
-  opts: { sedeId: string; data: string; declararEpi?: boolean },
+  opts: {
+    sedeId: string;
+    data: string;
+    declararEpi?: boolean;
+    /**
+     * Só estas tarefas — as que a pessoa conferiu e marcou (12/11/2026: na CESIU a
+     * coordenação confere uma por uma e não pode fechar o dia inteiro). Mesmas
+     * regras do fechamento; id que não é do dia e da sede é ignorado.
+     */
+    somente?: string[];
+  },
   supervisorId: string,
   perfil: Perfil,
 ): Promise<ResultadoFechamentoDia> {
   const ds = await getDataSource();
-  const [rotinas, execucoes, requisitos, tarefas] = await Promise.all([
+  const escolhidas = opts.somente ? new Set(opts.somente) : null;
+  const [todasDoDia, execucoes, requisitos, tarefas] = await Promise.all([
     getRotinasByData(opts.data, opts.sedeId),
     getExecucoes(opts.data, opts.data, opts.sedeId),
     ds.listar("requisitos"),
     ds.consultar("tarefas", [{ campo: "sede_id", op: "==", valor: opts.sedeId }]),
   ]);
+  const rotinas = escolhidas ? todasDoDia.filter((r) => escolhidas.has(r.id)) : todasDoDia;
   // Por funcionário, como o `ausenteEm`: pela sede gravada na ausência, quem foi
   // transferido depois dela escapava e voltava a ser creditado (revisão de segurança).
   const funcsDoDia = [...new Set(rotinas.map((r) => r.funcionario_id))];

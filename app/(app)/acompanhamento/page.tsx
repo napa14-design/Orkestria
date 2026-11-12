@@ -84,6 +84,29 @@ const FORM_VAZIO: FormExecucao = {
   epis: [],
 };
 
+interface ResultadoFechamento {
+  confirmadas: number;
+  ja_registradas: number;
+  aguardando_horario: number;
+  sem_declaracao: number;
+  de_ausentes: number;
+  epis_declarados: string[];
+}
+
+/** O que o fechamento fez — o mesmo texto para "Fechar o dia" e "Confirmar as marcadas". */
+function textoDoFechamento(r: ResultadoFechamento): string {
+  return (
+    `${r.confirmadas} tarefa(s) confirmadas como planejado` +
+    (r.epis_declarados.length > 0 ? ` (EPIs declarados: ${r.epis_declarados.join(", ")})` : "") +
+    (r.sem_declaracao > 0
+      ? ` · ${r.sem_declaracao} exigem EPI e ficaram de fora — registre uma a uma ou marque a declaração`
+      : "") +
+    (r.de_ausentes > 0 ? ` · ${r.de_ausentes} são de quem faltou — use "Feita por…" ou "Não feita"` : "") +
+    (r.aguardando_horario > 0 ? ` · ${r.aguardando_horario} ainda não terminaram` : "") +
+    "."
+  );
+}
+
 export default function PaginaAcompanhamento() {
   const [data, setData] = useState(hojeISO());
   const [sedeEscolhida, setSedeEscolhida] = useState("");
@@ -180,6 +203,11 @@ export default function PaginaAcompanhamento() {
   const lembrarMarcada = (id: string) => setMarcadasAgora((atual) => new Set(atual).add(id));
   // Outro dia ou outra sede é outra lista: o que foi marcado antes já pode sair.
   useEffect(() => setMarcadasAgora(new Set()), [data, sedeId]);
+  // "Confirmar as marcadas" (12/11/2026): quem confere uma por uma marca as caixinhas
+  // e grava tudo num clique, em vez de esperar o salvamento de cada "✓".
+  const [escolhidas, setEscolhidas] = useState<Set<string>>(() => new Set());
+  useEffect(() => setEscolhidas(new Set()), [data, sedeId]);
+  const [confirmandoEscolhidas, setConfirmandoEscolhidas] = useState(false);
   /** Fechamento do dia: dois toques (o segundo confirma) e declaração de EPI à parte. */
   const [declararEpi, setDeclararEpi] = useState(false);
   const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
@@ -255,8 +283,67 @@ export default function PaginaAcompanhamento() {
       if (nomes.length > 0) comEpi++;
       for (const n of nomes) epis.add(n);
     }
-    return { total: alvos.length, deAusentes: passadas.length - alvos.length, comEpi, epis: [...epis].sort() };
-  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia, ausentes]);
+    return {
+      total: alvos.length,
+      deAusentes: passadas.length - alvos.length,
+      comEpi,
+      epis: [...epis].sort(),
+      /** O que pode ser marcado para "Confirmar as marcadas": os mesmos alvos do fechamento. */
+      alvos: new Set(alvos.map((r) => r.id)),
+      porPessoa: [...new Set(alvos.map((r) => r.funcionario_id))].map((id) => ({
+        id,
+        nome: funcPorId.get(id)?.nome ?? "?",
+        ids: alvos.filter((r) => r.funcionario_id === id).map((r) => r.id),
+      })),
+    };
+  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia, ausentes, funcPorId]);
+  // Só conta o que ainda pode ser confirmado (o que já ganhou registro sai sozinho).
+  const marcadas = [...escolhidas].filter((id) => fechamento.alvos.has(id));
+  const marcadasComEpi = marcadas.filter((id) => {
+    const r = linhas.find((x) => x.id === id);
+    return !!r && tarefaExigeEpi(r.tarefa_id);
+  }).length;
+  const alternarEscolha = (ids: string[], marcar: boolean) =>
+    setEscolhidas((atual) => {
+      const novo = new Set(atual);
+      for (const id of ids) {
+        if (marcar) novo.add(id);
+        else novo.delete(id);
+      }
+      return novo;
+    });
+  /** Caixinha da tarefa — só nas que o fechamento alcança. */
+  const caixaDe = (r: RotinaPlanejada) =>
+    fechamento.alvos.has(r.id) ? (
+      <input
+        type="checkbox"
+        aria-label="Marcar como feita"
+        checked={escolhidas.has(r.id)}
+        onChange={(e) => alternarEscolha([r.id], e.target.checked)}
+        style={{ width: 18, height: 18, accentColor: "var(--acento)", flex: "none" }}
+      />
+    ) : null;
+
+  async function confirmarEscolhidas() {
+    setMensagem(null);
+    setConfirmandoEscolhidas(true);
+    try {
+      const r = await apiPost<ResultadoFechamento>("/api/execucoes/confirmar-dia", {
+        sede: sedeId,
+        data,
+        declarar_epi: declararEpi,
+        rotinas: marcadas,
+      });
+      await Promise.all([mutateRotinas(), mutateExecucoes()]);
+      // Não limpa: as confirmadas saem sozinhas (ganharam registro); as que ficaram de
+      // fora (EPI sem declaração) continuam marcadas para o segundo clique.
+      setMensagem({ texto: textoDoFechamento(r) });
+    } catch (err) {
+      setMensagem({ texto: err instanceof ErroApi ? err.message : "Não foi possível confirmar as marcadas.", erro: true });
+    } finally {
+      setConfirmandoEscolhidas(false);
+    }
+  }
 
   async function fecharDia() {
     if (!confirmandoFechamento) {
@@ -267,29 +354,10 @@ export default function PaginaAcompanhamento() {
     setMensagem(null);
     setFechando(true);
     try {
-      const r = await apiPost<{
-        confirmadas: number;
-        ja_registradas: number;
-        aguardando_horario: number;
-        sem_declaracao: number;
-        de_ausentes: number;
-        epis_declarados: string[];
-      }>("/api/execucoes/confirmar-dia", { sede: sedeId, data, declarar_epi: declararEpi });
+      const r = await apiPost<ResultadoFechamento>("/api/execucoes/confirmar-dia", { sede: sedeId, data, declarar_epi: declararEpi });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
       setDeclararEpi(false);
-      setMensagem({
-        texto:
-          `${r.confirmadas} tarefa(s) confirmadas como planejado` +
-          (r.epis_declarados.length > 0 ? ` (EPIs declarados: ${r.epis_declarados.join(", ")})` : "") +
-          (r.sem_declaracao > 0
-            ? ` · ${r.sem_declaracao} exigem EPI e ficaram de fora — registre uma a uma ou marque a declaração`
-            : "") +
-          (r.de_ausentes > 0
-            ? ` · ${r.de_ausentes} são de quem faltou — use "Feita por…" ou "Não feita"`
-            : "") +
-          (r.aguardando_horario > 0 ? ` · ${r.aguardando_horario} ainda não terminaram` : "") +
-          ".",
-      });
+      setMensagem({ texto: textoDoFechamento(r) });
     } catch (err) {
       setMensagem({
         texto: err instanceof ErroApi ? err.message : "Não foi possível fechar o dia.",
@@ -736,6 +804,36 @@ export default function PaginaAcompanhamento() {
               </span>
             )}
           </div>
+          {/* Uma por uma, num clique: marque as caixinhas na lista (ou todas de uma pessoa
+              aqui) e confirme. As mesmas regras do fechamento valem para as marcadas. */}
+          <div className="acomp-escolha">
+            <span className="rotulo">Ou marque uma por uma na lista · todas de:</span>
+            {fechamento.porPessoa.map((p) => {
+              const todas = p.ids.every((id) => escolhidas.has(id));
+              return (
+                <label key={p.id} className="acomp-escolha-pessoa">
+                  <input type="checkbox" checked={todas} onChange={(e) => alternarEscolha(p.ids, e.target.checked)} />
+                  {p.nome} <span className="num">({p.ids.length})</span>
+                </label>
+              );
+            })}
+            <button
+              className="btn btn-primario"
+              disabled={marcadas.length === 0 || confirmandoEscolhidas}
+              onClick={() => void confirmarEscolhidas()}
+              title="Confirma como planejado só as tarefas marcadas"
+            >
+              {confirmandoEscolhidas ? "Confirmando…" : `✓ Confirmar as marcadas (${marcadas.length})`}
+            </button>
+            {marcadas.length > 0 && (
+              <button className="btn btn-mini btn-fantasma" onClick={() => setEscolhidas(new Set())}>
+                desmarcar
+              </button>
+            )}
+            {!declararEpi && marcadasComEpi > 0 && (
+              <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>{marcadasComEpi} marcada(s) com EPI ficarão de fora</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -787,6 +885,7 @@ export default function PaginaAcompanhamento() {
             <div key={r.id} className="painel acomp-cartao">
               <div style={{ minWidth: 0 }}>
                 <div className="acomp-cartao-topo">
+                  {caixaDe(r)}
                   <span className="num">
                     {r.inicio_planejado}–{r.fim_planejado}
                   </span>
@@ -880,6 +979,7 @@ export default function PaginaAcompanhamento() {
         <table className="tabela">
           <thead>
             <tr>
+              <th style={{ width: 28 }} aria-label="Marcar" />
               <th>Funcionário</th>
               <th>Tarefa / Local</th>
               <th>Planejado</th>
@@ -893,7 +993,7 @@ export default function PaginaAcompanhamento() {
           <tbody>
             {visiveis.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--tinta-3)" }}>
+                <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--tinta-3)" }}>
                   {linhas.length > 0 ? "Tudo marcado por aqui." : "Nenhuma rotina planejada para esta data/sede."}
                 </td>
               </tr>
@@ -912,6 +1012,7 @@ export default function PaginaAcompanhamento() {
                   : null;
               return (
                 <tr key={r.id}>
+                  <td>{caixaDe(r)}</td>
                   <td style={{ fontWeight: 600 }}>
                     {funcPorId.get(r.funcionario_id)?.nome ?? "?"}
                     {ausentes.has(r.funcionario_id) && (

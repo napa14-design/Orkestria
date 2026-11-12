@@ -460,6 +460,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .acomp-lista { gap: 6px; }
 .acomp-cartao-acoes { display: flex; flex-direction: column; gap: 4px; }
 .acomp-cartao-acoes > .btn { justify-content: center; min-height: 34px; white-space: nowrap; }
+/* "Confirmar as marcadas" (12/11/2026): todas de uma pessoa + o botão, numa linha que quebra. */
+.acomp-escolha { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding-top: 8px; border-top: 1px dashed var(--linha); }
+.acomp-escolha-pessoa { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.acomp-escolha-pessoa input { width: 16px; height: 16px; accent-color: var(--acento); }
 
 /* ── barra de progresso de ocupação ───────────────────────────────── */
 .barra-trilho {
