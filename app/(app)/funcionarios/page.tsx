@@ -14,7 +14,7 @@ import {
   rotularIntervalos,
   totalIntervaloMin,
 } from "@/lib/intervalos";
-import { cargaSemanalMin, jornadaLiquidaMin } from "@/lib/calculations";
+import { cargaSemanalMin, intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
@@ -159,6 +159,31 @@ export default function PaginaFuncionarios() {
     } catch (e) {
       setAviso({ tipo: "aviso", texto: e instanceof ErroApi ? e.message : "Não foi possível falar com o SGCP." });
     }
+  };
+
+  /**
+   * Prévia do ajuste de horário (13/11/2026): a rota anda junto com a entrada de quem
+   * assume — ver `lib/rotaNoHorario.ts`. Dito antes de salvar, não depois.
+   */
+  const horarioDoPosto = (form: Record<string, unknown>) => {
+    const antigo = (equipe ?? []).find((f) => f.id === form.substitui);
+    const de = hhmmParaMin(antigo?.entrada ?? "");
+    const para = hhmmParaMin(String(form.entrada ?? ""));
+    if (!antigo || Number.isNaN(de) || Number.isNaN(para)) return "";
+    if (de === para) {
+      // Mesma entrada, pausas diferentes: a rota também se mexe (contorna as pausas novas).
+      // Pelo mesmo leitor das pausas que a regra usa: ficha antiga guarda a pausa em
+      // `intervalo_inicio`/`intervalo_fim`, não em `intervalos`.
+      const pausas = (f: Partial<Funcionario>) =>
+        intervalosDoFuncionario({ intervalos: f.intervalos ?? "", intervalo_inicio: f.intervalo_inicio ?? "", intervalo_fim: f.intervalo_fim ?? "" })
+          .map((p) => `${p.inicio}-${p.fim}`)
+          .join(";");
+      return pausas(antigo) !== pausas(form as Partial<Funcionario>)
+        ? ` As pausas de ${antigo.nome} eram outras: a tarefa que cair numa pausa desta pessoa vai para logo depois dela, na mesma ordem.`
+        : "";
+    }
+    const quanto = formatarDuracao(Math.abs(para - de));
+    return ` ${antigo.nome} entrava ${antigo.entrada} e esta pessoa entra ${form.entrada}: a rota anda ${quanto} mais ${para < de ? "cedo" : "tarde"}, na mesma ordem, contornando as pausas dela. O que não couber fica depois da saída, marcado na agenda.`;
   };
 
   /**
@@ -351,9 +376,10 @@ export default function PaginaFuncionarios() {
           // edição, a rota que a pessoa já tiver é TROCADA pela do posto.
           mostrarSe: (f) => candidatos(f).length > 0,
           ajuda: (f) =>
-            f.__novo === true
+            (f.__novo === true
               ? "Opcional. A rota padrão de quem sai passa para quem entra."
-              : "Opcional. A rota padrão de quem sai passa para esta pessoa — se ela já tiver rota, a dela é trocada pela do posto (o que já foi feito não muda).",
+              : "Opcional. A rota padrão de quem sai passa para esta pessoa — se ela já tiver rota, a dela é trocada pela do posto (o que já foi feito não muda).") +
+            horarioDoPosto(f),
           dica:
             "A rota é do posto, não da pessoa. Ao salvar, a rota padrão de quem sai é copiada " +
             "para quem entra, os dias ainda não realizados a partir da data abaixo trocam de " +

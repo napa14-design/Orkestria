@@ -79,14 +79,21 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
   // Faixa de horário por grupo, em minutos (o fim usa a duração quando o
   // modelo a preservou; sem ela, o próprio início é o melhor palpite).
   const faixa = new Map<string, { ini: number; fim: number }>();
+  // Dias da camada = a UNIÃO dos dias dos itens (item sem dias = todo dia). Era o
+  // do último item lido: a camada de todo dia que ganhou um item só de sábado (o
+  // "Assume o posto de" com outro horário) aparecia como "Sáb" (auditoria, 13/11/2026).
+  const diasDaCamada = new Map<string, Set<number> | "todos">();
   for (const item of itens) {
     const chave = `${item.sede_id}::${item.nome_modelo}`;
+    const d = parseDiasSemana(item.dias_semana);
+    const acc = diasDaCamada.get(chave);
+    if (!d.length || acc === "todos") diasDaCamada.set(chave, "todos");
+    else diasDaCamada.set(chave, new Set([...(acc ?? []), ...d]));
     const atual = grupos.get(chave);
     if (atual) {
       atual.itens++;
       if (item.padrao) atual.padrao = true;
       if (item.evento) atual.evento = true;
-      if (item.dias_semana) atual.dias_semana = item.dias_semana;
       if (item.substitui) atual.substitui = true;
     } else
       grupos.set(chave, {
@@ -116,6 +123,9 @@ export async function getModelos(sedeId?: string): Promise<ResumoModelo[]> {
     }
   }
   for (const [chave, g] of grupos) {
+    const dias = diasDaCamada.get(chave);
+    // Os 7 dias, mesmo vindos de itens separados, é "todo dia".
+    g.dias_semana = !dias || dias === "todos" || dias.size === 7 ? "" : serializarDiasSemana([...dias]);
     const f = faixa.get(chave);
     if (f) {
       g.inicio = minParaHHMM(f.ini);

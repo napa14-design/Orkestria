@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-11-13 — "Assume o posto de": a rota anda junto com o horário de quem assume
+
+Pedido do dono: na CESIU, quem vai assumir o posto de alguém que entra às 12:00 entra às 09:00, e
+a rota vinha com os horários de quem saiu — manhã vazia, tarde passando da saída. Decisões do
+dono: **deslocar tudo** (12:00 vira 09:00, na mesma ordem) e o que não couber **fica depois da
+saída**, marcado. Regra em `lib/rotaNoHorario.ts` (pura):
+
+- desloca pela diferença de entrada (semana e sábado, cada um com o seu); contorna as pausas de
+  quem assume (a tarefa que cai numa pausa vai para o fim dela, e as seguintes andam até a folga
+  absorver); tarefas que se sobrepunham de propósito mantêm a distância; evento não mexe;
+- **sábado**: o item de todo dia que quem saiu não fazia no sábado continua sem valer no sábado
+  (deslocado, passaria a caber e somaria com a camada de sábado); se fazia, vira cópia só de
+  sábado (`<id>-sab`), pelo horário de sábado. No sábado, passar da saída é ser descartado pela
+  geração, então nada é empurrado para lá: fica por cima da pausa ou, se o sábado de quem
+  assume é mais curto, é puxado para terminar na saída — a agenda acusa e a coordenação
+  resolve. Só some o item maior que o sábado inteiro (contado em `naoCabemNoSabado`). Isso vale
+  só para o que quem saiu fazia no sábado: o que já caía fora continua fora. Puxado para a
+  saída, um item longo pode começar antes do anterior — nada some, a agenda acusa;
+- **blocos já gerados à frente** apontam para o item novo e andam junto, inclusive os sem vínculo
+  (dia aplicado de modelo, à mão, importado) e os ligados a item que já não existe; movido à mão
+  só troca de dono. Sem isso, gerar o dia de novo duplicava.
+
+A tela de Funcionários avisa no próprio "Assume o posto de", antes de salvar ("a rota anda 3h
+mais cedo…", ou que as pausas eram outras). `getModelos` passou a mostrar os dias da camada como
+a união dos itens (era o do último item lido; os 7 dias = "todo dia"). Auditoria em rodadas: 7
+defeitos achados e consertados, cada um com teste que falha sem o conserto.
+
+Arquivos: `lib/rotaNoHorario.ts`, `services/funcionariosService.ts`, `services/modelosService.ts`,
+`app/(app)/funcionarios/page.tsx`, `testes/rota-no-horario.test.ts`.
+
+---
+
 ## 2026-11-12 — Silva Paulet no ar (carga da planilha) + sábado validado com o horário do sábado
 
 **Carga (dado, não código).** A sede Silva Paulet estava vazia. Entrou a planilha de alocação de

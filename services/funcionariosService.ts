@@ -1,11 +1,14 @@
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { hojeISO } from "@/lib/dateUtils";
+import { hhmmParaMin, hojeISO, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
+import { mapaFatorDoTipo } from "./tiposLocalService";
+import { tempoPrevistoMin } from "@/lib/calculations";
+import { rotaNoHorario } from "@/lib/rotaNoHorario";
 import { comAtivoDoDia, motivoAbreVaga, pedidoDeVaga, validarDesligamento } from "@/lib/desligamento";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { normalizarMatricula } from "@/lib/quadroInfra";
 import { minhaChave } from "@/lib/chaves";
 import { validarFuncionario, temErro } from "@/lib/validations";
-import type { Funcionario } from "@/types";
+import type { Funcionario, Local, ModeloRotinaItem, Tarefa } from "@/types";
 import { ErroValidacao } from "./erros";
 
 type DadosFuncionario = Omit<
@@ -214,6 +217,8 @@ export interface ResultadoSubstituicao {
   blocosTransferidos: number;
   blocosPreservados: number;
   inativou: boolean;
+  /** Presente quando a rota mudou de horário para caber no de quem assumiu. */
+  ajusteHorario?: { minutos: number; minutosSabado: number; passamDaSaida: number; naoCabemNoSabado: number };
 }
 
 /**
@@ -333,29 +338,109 @@ async function passarPosto(
     ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: antigoId }]),
   ]);
 
+  // 0. a rota anda junto com a entrada de quem assume (13/11/2026) — ver `rotaNoHorario`.
+  // Item antigo sem duração gravada: o tempo da tarefa com local e fator do tipo,
+  // exatamente como na geração (`carregarRotaEContexto`). Sem o local, tarefa por m²
+  // saía com 0 min e o bloco caía dentro do almoço (auditoria, 13/11/2026).
+  const semDuracao = itens.filter((i) => i.duracao_min == null);
+  const mapaTarefas = new Map<string, Tarefa>();
+  const mapaLocais = new Map<string, Local>();
+  let fatorDoTipo: Awaited<ReturnType<typeof mapaFatorDoTipo>> | undefined;
+  if (semDuracao.length) {
+    const [ts, ls, fator] = await Promise.all([
+      Promise.all([...new Set(semDuracao.map((i) => i.tarefa_id))].map((id) => ds.obter("tarefas", id))),
+      Promise.all([...new Set(semDuracao.map((i) => i.local_id))].map((id) => ds.obter("locais", id))),
+      mapaFatorDoTipo(),
+    ]);
+    for (const t of ts) if (t) mapaTarefas.set(t.id, t);
+    for (const l of ls) if (l) mapaLocais.set(l.id, l);
+    fatorDoTipo = fator;
+  }
+  const ajuste = rotaNoHorario(itens, antigo, novo, (i) => {
+    const t = mapaTarefas.get(i.tarefa_id);
+    return i.duracao_min ?? (t ? tempoPrevistoMin(t, mapaLocais.get(i.local_id), fatorDoTipo) : 0);
+  });
+  const noHorario = new Map(ajuste.itens.map((a) => [a.item.id, a]));
+  const mudouHorario = ajuste.itens.some((a) => a.inicio !== a.item.inicio_planejado || a.dias_semana !== undefined || a.inicioSabado);
+  const comHorarioNovo = (item: ModeloRotinaItem) => {
+    const a = noHorario.get(item.id)!;
+    return { inicio_planejado: a.inicio, ...(a.dias_semana !== undefined ? { dias_semana: a.dias_semana } : {}) };
+  };
+
   // 1. a rota do posto passa a ser do novo. O id do item costuma carregar a pessoa, por
   // isso é recalculado — senão o novo item colidiria com o do antigo. Item que veio de
   // uma troca de tarefas mantém o id do primeiro dono: recalcular dava o mesmo id, e o
   // "criar" seguido do "excluir" apagava o item (revisão de segurança, 09/11/2026).
   const comPessoaNoId = itens.filter((item) => item.id.includes(antigoId));
   const semPessoaNoId = itens.filter((item) => !item.id.includes(antigoId));
+  const idNovo = (item: ModeloRotinaItem) => (item.id.includes(antigoId) ? item.id.replace(antigoId, novoId) : item.id);
   const copiados = comPessoaNoId.map((item) => ({
     ...item,
-    id: item.id.replace(antigoId, novoId),
+    id: idNovo(item),
     funcionario_id: novoId,
+    ...comHorarioNovo(item),
     criado_por: autor,
     criado_em: agora,
   }));
-  await emLotesFunc(copiados, (item) => ds.criar("modelos_rotina", item));
+  // O item de todo dia que quem saiu fazia no sábado vira, também, um item só de sábado.
+  const copiasSabado = itens
+    .filter((item) => noHorario.get(item.id)?.inicioSabado)
+    .map((item) => ({
+      ...item,
+      id: `${idNovo(item)}-sab`,
+      funcionario_id: novoId,
+      inicio_planejado: noHorario.get(item.id)!.inicioSabado!,
+      dias_semana: "6",
+      criado_por: autor,
+      criado_em: agora,
+    }));
+  await emLotesFunc([...copiados, ...copiasSabado], (item) => ds.criar("modelos_rotina", item));
   await emLotesFunc(comPessoaNoId, (item) => ds.excluir("modelos_rotina", item.id));
-  await emLotesFunc(semPessoaNoId, (item) => ds.atualizar("modelos_rotina", item.id, { funcionario_id: novoId }));
+  await emLotesFunc(semPessoaNoId, (item) =>
+    ds.atualizar("modelos_rotina", item.id, { funcionario_id: novoId, ...comHorarioNovo(item) }),
+  );
 
-  // 2. só o que ainda é plano, e só daqui para a frente.
+  // 2. só o que ainda é plano, e só daqui para a frente. O bloco aponta para o item
+  // NOVO (senão a geração não o reconhece e cria outro ao lado) e, se ainda está onde
+  // a rota o pôs, vai para o horário novo junto com ele. Movido à mão fica onde está.
   const aTransferir = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");
   const preservados = blocos.filter((b) => b.data >= aPartirDe && b.status !== "planejada").length;
-  await emLotesFunc(aTransferir, (b) =>
-    ds.atualizar("rotinas_planejadas", b.id, { funcionario_id: novoId, atualizado_em: agora }),
-  );
+  const porId = new Map(itens.map((i) => [i.id, i]));
+  await emLotesFunc(aTransferir, (b) => {
+    const dow = new Date(`${b.data}T12:00:00`).getDay();
+    // Bloco sem vínculo (dia montado por "aplicar modelo", à mão ou importado): é da
+    // rota se casa com um item dela na tarefa, no horário e no dia — a mesma chave com
+    // que a geração o reconhece. Senão ficava no horário velho e a geração criava
+    // outro no novo, ao lado (auditoria, 13/11/2026).
+    // Vale também para vínculo com item que já não existe (rota salva de novo com
+    // outra chave) e só olha a rota padrão: casar com modelo de EVENTO, que não anda,
+    // deixava o bloco no horário velho (reauditoria, 13/11/2026).
+    const item =
+      (b.origem_item_id ? porId.get(b.origem_item_id) : undefined) ??
+      itens.find(
+        (i) =>
+          i.padrao &&
+          !i.evento &&
+          i.tarefa_id === b.tarefa_id &&
+          i.inicio_planejado === b.inicio_planejado &&
+          (parseDiasSemana(i.dias_semana).length === 0 || parseDiasSemana(i.dias_semana).includes(dow)),
+      );
+    const a = item ? noHorario.get(item.id) : undefined;
+    if (!item || !a) return ds.atualizar("rotinas_planejadas", b.id, { funcionario_id: novoId, atualizado_em: agora });
+    const sabado = dow === 6;
+    const viraCopia = sabado && !!a.inicioSabado;
+    const inicio = viraCopia ? a.inicioSabado! : a.inicio;
+    const noLugar = (!b.origem_inicio || b.origem_inicio === b.inicio_planejado) && b.inicio_planejado === item.inicio_planejado;
+    const dur = hhmmParaMin(b.fim_planejado) - hhmmParaMin(b.inicio_planejado);
+    return ds.atualizar("rotinas_planejadas", b.id, {
+      funcionario_id: novoId,
+      origem_item_id: viraCopia ? `${idNovo(item)}-sab` : idNovo(item),
+      ...(noLugar && inicio !== b.inicio_planejado
+        ? { inicio_planejado: inicio, fim_planejado: minParaHHMM(hhmmParaMin(inicio) + dur), origem_inicio: inicio }
+        : {}),
+      atualizado_em: agora,
+    });
+  });
 
   // 3. quem saiu, saiu: some da agenda e das listas, o histórico fica inteiro.
   await ds.atualizar("funcionarios", antigoId, {
@@ -376,6 +461,16 @@ async function passarPosto(
     blocosTransferidos: aTransferir.length,
     blocosPreservados: preservados,
     inativou: true,
+    ...(mudouHorario
+      ? {
+          ajusteHorario: {
+            minutos: ajuste.minutos,
+            minutosSabado: ajuste.minutosSabado,
+            passamDaSaida: ajuste.passamDaSaida,
+            naoCabemNoSabado: ajuste.naoCabemNoSabado,
+          },
+        }
+      : {}),
   };
 }
 
