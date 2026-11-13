@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-11-13 — Funcionários: desligados fora da lista, com "ver desligados (N)"
+
+Pedido do dono: a lista de Funcionários misturava quem saiu (desligado ou transferido) com a
+equipe. Agora quem já saiu não aparece; quem está em aviso prévio continua até a data. Um
+link discreto no fim, "ver desligados (N)", mostra os que saíram — é na linha deles que fica
+o "Abrir vaga" do SGCP. O posto vago continua no "Assume o posto de" (outra lista).
+`CrudManager` ganhou a opção `ocultos` (o que sai por padrão e o nome do link).
+
+Visto na tela local: um desligado some da lista, o link aparece com 1, e ao clicar ele volta
+com o "Abrir vaga".
+
+Arquivos: `components/CrudManager.tsx`, `app/(app)/funcionarios/page.tsx`.
+
+---
+
 ## 2026-11-13 — "Assume o posto de": a rota anda junto com o horário de quem assume
 
 Pedido do dono: na CESIU, quem vai assumir o posto de alguém que entra às 12:00 entra às 09:00, e

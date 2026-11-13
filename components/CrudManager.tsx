@@ -500,6 +500,7 @@ export default function CrudManager<T extends Registro>({
   vazio,
   porSede,
   acimaDaTabela,
+  ocultos,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -527,6 +528,11 @@ export default function CrudManager<T extends Registro>({
   porSede?: boolean;
   /** Entre o cabeçalho e a tabela, com a sede que a tabela está mostrando ("" = todas). */
   acimaDaTabela?: (sedeId: string) => React.ReactNode;
+  /**
+   * Linhas que saem da lista por padrão (ex.: desligados), com um link discreto no
+   * fim — "ver desligados (N)" — para quando precisar. `nome` vai no link.
+   */
+  ocultos?: { quando: (item: T) => boolean; nome: string };
 }) {
   const sessao = useSessao();
   const { data: sedes } = useSWR<Sede[]>(porSede ? "/api/sedes" : null, fetcher);
@@ -608,14 +614,17 @@ export default function CrudManager<T extends Registro>({
   }
   const esconderDica = () => setTip(null);
 
+  const [verOcultos, setVerOcultos] = useState(false);
+  const qtdOcultos = useMemo(() => (ocultos && data ? data.filter(ocultos.quando).length : 0), [data, ocultos]);
   const itens = useMemo(() => {
     if (!data) return [];
+    const base = ocultos && !verOcultos ? data.filter((item) => !ocultos.quando(item)) : data;
     const q = busca.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter((item) =>
+    if (!q) return base;
+    return base.filter((item) =>
       Object.values(item).some((v) => String(v).toLowerCase().includes(q)),
     );
-  }, [data, busca]);
+  }, [data, busca, ocultos, verOcultos]);
 
   function abrirNovo() {
     // `__novo` marca o formulário de criação para o `mostrarSe` dos campos —
@@ -796,7 +805,7 @@ export default function CrudManager<T extends Registro>({
               <tr>
                 <td colSpan={colunas.length + 1} style={{ textAlign: "center", padding: "40px 16px", color: "var(--tinta-3)" }}>
                   {data && data.length > 0 ? (
-                    <>Nada encontrado para “{busca}”.</>
+                    busca.trim() ? <>Nada encontrado para “{busca}”.</> : <>Só há {ocultos?.nome ?? "itens ocultos"} aqui.</>
                   ) : (
                     <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
                       <div style={{ fontSize: 26 }}>📋</div>
@@ -856,6 +865,13 @@ export default function CrudManager<T extends Registro>({
           </tbody>
         </table>
       </div>
+      {ocultos && qtdOcultos > 0 && (
+        <div style={{ marginTop: 8, textAlign: "right" }}>
+          <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setVerOcultos((v) => !v)}>
+            {verOcultos ? `esconder ${ocultos.nome}` : `ver ${ocultos.nome} (${qtdOcultos})`}
+          </button>
+        </div>
+      )}
 
       <Modal
         titulo={editando ? `Editar — ${titulo}` : `Novo — ${titulo}`}

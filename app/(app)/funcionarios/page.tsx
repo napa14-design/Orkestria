@@ -244,6 +244,10 @@ export default function PaginaFuncionarios() {
       vazio="Adicione a equipe (ASGs): horário, sede e escala. Depois é só montar a rotina arrastando tarefas."
       // Funcionário não se exclui, se desliga: com data, motivo e vaga no SGCP.
       permissao={{ excluir: false }}
+      // Quem já saiu (desligado ou transferido) sai da lista; quem está em aviso
+      // prévio continua até a data. "ver desligados (N)" no fim, para quando
+      // precisar — o "Abrir vaga" mora na linha deles (pedido do dono, 13/11/2026).
+      ocultos={{ quando: (f) => Boolean(f.desligado_em && f.desligado_em <= hojeISO()), nome: "desligados" }}
       acoesExtra={(f) =>
         !f.desligado_em ? (
           <>
