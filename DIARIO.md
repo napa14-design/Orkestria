@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-11-13 — Funcionários: "Nome completo" e "Apelido (aparece na agenda)"
+
+Pedido do dono: a coordenação punha um nome só. O formulário agora pede primeiro o **Nome
+completo** (do RH) e depois o **Apelido (aparece na agenda)** — que é o campo `nome` de sempre,
+só com o rótulo que diz para que serve. Na lista, a coluna virou "Apelido", com o nome completo
+em letra menor embaixo. Visto na tela local.
+
+Dado (não código): a conferência pós-carga achou 6 fichas criadas em duplicidade (pessoa que já
+existia com o apelido escrito de outro jeito); o dono confirmou, os dados foram para a ficha
+antiga (a que tem rota) e as novas foram excluídas — sem rota nem agenda ligadas a elas. Mais 4
+fichas antigas completadas. A trava da carga não aplicava "matrícula sem empresa colide com
+qualquer empresa" (a do sistema aplica); o script de ajuste já confere com a régua completa.
+
+Arquivos: `app/(app)/funcionarios/page.tsx`.
+
+---
+
 ## 2026-11-13 — Dados do RH obrigatórios (matrícula, empresa, nome completo, admissão) + carga da folha
 
 **Regra (pedido do dono).** Quem está no quadro precisa de **nome completo**, **matrícula**,

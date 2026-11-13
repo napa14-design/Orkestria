@@ -283,14 +283,16 @@ export default function PaginaFuncionarios() {
         ) : null
       }
       campos={[
+        // O RH dá o nome completo; a agenda mostra o apelido (pedido do dono, 13/11/2026:
+        // "eles colocam 1 nome só"). A coluna continua `nome`.
+        { key: "nome_completo", rotulo: "Nome completo", tipo: "texto", obrigatorio: noQuadro },
         {
           key: "nome",
-          rotulo: "Nome",
+          rotulo: "Apelido (aparece na agenda)",
           tipo: "texto",
           obrigatorio: true,
-          dica: "Como a equipe chama a pessoa — é este que aparece nas colunas da agenda.",
+          dica: "Como a equipe chama a pessoa (ex.: \"Gisele\"). É este que aparece nas colunas da agenda e nas listas.",
         },
-        { key: "nome_completo", rotulo: "Nome completo", tipo: "texto", obrigatorio: noQuadro },
         {
           key: "sede_id",
           rotulo: "Sede",
@@ -438,7 +440,18 @@ export default function PaginaFuncionarios() {
         },
       ]}
       colunas={[
-        { key: "nome", rotulo: "Nome" },
+        {
+          key: "nome",
+          rotulo: "Apelido",
+          render: (f) => (
+            <>
+              {f.nome}
+              {f.nome_completo && f.nome_completo !== f.nome && (
+                <div style={{ fontSize: 11, color: "var(--tinta-3)" }}>{f.nome_completo}</div>
+              )}
+            </>
+          ),
+        },
         { key: "sede_id", rotulo: "Sede", render: (f) => nomeSede(f.sede_id) },
         {
           key: "turno",
