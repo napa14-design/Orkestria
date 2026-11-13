@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessaoUsuario } from "@/lib/permissions";
 import { getDataSource } from "@/lib/datasource";
 import { reiniciarBanco } from "@/lib/memoryStore";
+import { rh } from "./fixtures";
 
 let sessao: SessaoUsuario | null = null;
 vi.mock("@/lib/session", () => ({
@@ -27,7 +28,7 @@ const put = (id: string, corpo: unknown) =>
 async function pessoa(id: string, nome: string, extra: Record<string, unknown> = {}) {
   const ds = await getDataSource();
   const base = await ds.obter("funcionarios", "christus_f1");
-  await ds.criar("funcionarios", { ...base!, id, nome, matricula: "", desligado_em: "", observacoes: "", ...extra });
+  await ds.criar("funcionarios", { ...base!, id, nome, ...rh(), desligado_em: "", observacoes: "", ...extra });
 }
 async function item(id: string, funcionario_id: string, inicio: string) {
   const ds = await getDataSource();

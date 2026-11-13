@@ -15,6 +15,7 @@ import {
   totalIntervaloMin,
 } from "@/lib/intervalos";
 import { cargaSemanalMin, intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
+import { empresaAmbigua, normalizarEmpresa } from "@/lib/empresas";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
@@ -161,6 +162,15 @@ export default function PaginaFuncionarios() {
     }
   };
 
+  /** Quem está no quadro precisa dos dados do RH; desligado e posto vago, não. */
+  const noQuadro = (form: Record<string, unknown>) => {
+    // A mesma régua do servidor (`validarFuncionario`): desligado OU inativo dispensa.
+    const antes = form.__antes as Funcionario | undefined;
+    return !antes?.desligado_em && antes?.ativo !== false;
+  };
+  /** As empresas de todas as sedes, na grafia do Chromos (sugestões do campo Empresa). */
+  const { data: empresas } = useSWR<string[]>("/api/funcionarios/empresas", fetcher);
+
   /**
    * Prévia do ajuste de horário (13/11/2026): a rota anda junto com a entrada de quem
    * assume — ver `lib/rotaNoHorario.ts`. Dito antes de salvar, não depois.
@@ -273,7 +283,14 @@ export default function PaginaFuncionarios() {
         ) : null
       }
       campos={[
-        { key: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
+        {
+          key: "nome",
+          rotulo: "Nome",
+          tipo: "texto",
+          obrigatorio: true,
+          dica: "Como a equipe chama a pessoa — é este que aparece nas colunas da agenda.",
+        },
+        { key: "nome_completo", rotulo: "Nome completo", tipo: "texto", obrigatorio: noQuadro },
         {
           key: "sede_id",
           rotulo: "Sede",
@@ -358,12 +375,33 @@ export default function PaginaFuncionarios() {
           dica: "Pausas SÓ do sábado, no formato HH:mm-HH:mm. Ex.: lanche de 15 min \"09:00-09:15\". Deixe vazio se no sábado não há pausa.",
         },
         { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
+        // Dados do RH: obrigatórios desde 13/11/2026 para quem está no quadro.
+        // Desligado e posto vago editam sem eles (o servidor tem a mesma regra).
         {
           key: "matricula",
           rotulo: "Matrícula",
           tipo: "texto",
-          dica: "Matrícula do RH. Opcional — é por ela que outros sistemas da Infraestrutura encontram a pessoa, porque nome pode repetir.",
+          obrigatorio: noQuadro,
+          dica: "Matrícula do RH. É por ela que outros sistemas da Infraestrutura encontram a pessoa, porque nome pode repetir.",
         },
+        {
+          key: "empresa",
+          rotulo: "Empresa",
+          // Como no Quadro da Infra (pedido do dono, 13/11/2026): texto com a lista das
+          // empresas já usadas por baixo. Lista FECHADA travava empresa nova — e o
+          // servidor já grava na grafia padrão ("Apel - Matriz" → "APEL MATRIZ").
+          tipo: "texto",
+          obrigatorio: noQuadro,
+          sugestoes: empresas ?? [],
+          ajuda: (f) => {
+            const e = normalizarEmpresa(f.empresa);
+            if (!e) return "";
+            if (empresaAmbigua(e)) return `"${e}" não diz qual filial — escolha a empresa certa.`;
+            return (empresas ?? []).includes(e) ? "" : `Empresa nova: vai ser gravada como "${e}".`;
+          },
+          dica: "A empresa que registra a pessoa (APEL MATRIZ, APEL 7, IPADE…). Escolha da lista ou digite; ela é gravada na mesma grafia do Quadro da Infra. Cada empresa numera a sua matrícula.",
+        },
+        { key: "data_admissao", rotulo: "Data de admissão", tipo: "data", obrigatorio: noQuadro },
         // Sem checkbox "Ativo": desmarcar era o caminho antigo de saída, sem data,
         // sem motivo e sem vaga. Quem sai, sai pelo "Desligar" (13/10/2026).
         { key: "observacoes", rotulo: "Observações", tipo: "textarea", inteira: true },

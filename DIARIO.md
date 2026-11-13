@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-11-13 — Dados do RH obrigatórios (matrícula, empresa, nome completo, admissão) + carga da folha
+
+**Regra (pedido do dono).** Quem está no quadro precisa de **nome completo**, **matrícula**,
+**empresa** e **data de admissão** — ao cadastrar e ao editar. Desligado, posto vago e ficha
+inativa ficam dispensados. O `nome` continua sendo o curto da agenda; `nome_completo` e
+`data_admissao` são colunas novas. O supervisor de chão não recebe os dois campos novos.
+
+**Empresa: o dono do dado passou a ser o Orkestria** (daqui ela vai para o Chromos). Era só do
+"Vincular" e o cadastro recusava; agora se edita, e é sempre gravada na grafia do Quadro da
+Infra (`lib/empresas.ts`, a régua do Chromos + traços Unicode, ponto, invisíveis e zero à
+esquerda: "Apel - Matriz" → "APEL MATRIZ", "IPADE - Filial 07" → "IPADE 7"). A tela oferece as
+empresas já usadas como sugestão (como o Chromos) e aceita nova. A matrícula é única **por
+empresa**, comparada na grafia padrão — a revisão de segurança passou a mesma matrícula seis
+vezes variando a grafia antes disso. "APEL FILIAL" sem número é recusada.
+
+**Outras travas.** O POST de cadastro recusa os campos do desligamento (um `desligado_em` no
+corpo dispensava os dados e criava ficha que nunca saía do quadro). A transferência limpa a
+cópia com a mesma régua do cadastro antes de desligar a origem. A importação de rota ganhou
+as colunas Nome completo, Matrícula, Empresa e Admissão: quem ela cadastra precisa delas, e
+sem elas a importação inteira é recusada antes de gravar.
+
+**Carga (dado, não código).** Pela relação de ASGs do RH (com o Quadro de Funcionários, a
+premiação do 3º trimestre e o Quadro do Chromos para achar a sede de quem só tinha centro de
+custo genérico): ~140 fichas completadas, 125 pessoas cadastradas com o horário mais comum da
+sede ("horário a confirmar") e toda empresa convertida para a grafia padrão. Sede do Orkestria
+vale sobre o centro de custo. CPF, RG e situação de afastamento não entram. Ficaram pendentes
+para a coordenação as pessoas sem sede em nenhuma fonte e os casamentos ambíguos.
+
+Revisões: segurança LIBERA (v3); auditor APROVADO COM RESSALVAS (v3) — normalizador daqui já
+difere do do Chromos (precisa igualar lá quando a empresa for enviada); "S.A." × "SA".
+
+Arquivos: `lib/empresas.ts` (novo), `lib/validations.ts`, `lib/schema.ts`, `types/Funcionario.ts`,
+`lib/quadroInfra.ts`, `lib/importacaoRota.ts`, `services/funcionariosService.ts`,
+`services/importacaoService.ts`, `services/quadroInfraService.ts`, `components/CrudManager.tsx`
+(`obrigatorio` como função, `sugestoes`), `app/(app)/funcionarios/page.tsx`,
+`app/api/funcionarios/route.ts`, `app/api/funcionarios/empresas/route.ts` (novo),
+`app/api/importar/analisar/route.ts`, `docs/02-modelo-de-dados.md`; testes `dados-rh`,
+`importacao-rh` e ajustes nos de transferência, Quadro e substituição.
+
+---
+
 ## 2026-11-13 — Funcionários: desligados fora da lista, com "ver desligados (N)"
 
 Pedido do dono: a lista de Funcionários misturava quem saiu (desligado ou transferido) com a

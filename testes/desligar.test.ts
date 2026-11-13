@@ -34,7 +34,7 @@ import {
 import { salvarModelo } from "@/services/modelosService";
 import { createRotina } from "@/services/rotinasService";
 import type { ModeloRotinaItem } from "@/types";
-import { funcionario, tarefa } from "./fixtures";
+import { funcionario, rh, tarefa } from "./fixtures";
 
 const SEDE = "christus_dt";
 const PESSOA = "christus_f1"; // Aurilene, do seed
@@ -174,7 +174,7 @@ describe("desligarFuncionario", () => {
     await salvarModelo("Rota padrão", ANTES, SEDE, "t@t.com", { padrao: true, comDuracao: true });
     await desligarFuncionario(PESSOA, { data: DATA, motivo: "Pedido de demissão" }, "t@t.com", SOLICITANTE);
     const novo = await createFuncionario(
-      { nome: "Jorge", sede_id: SEDE, turno: "integral", entrada: "06:00", saida: "16:00", ativo: true } as never,
+      { nome: "Jorge", ...rh(), sede_id: SEDE, turno: "integral", entrada: "06:00", saida: "16:00", ativo: true } as never,
       "t@t.com",
     );
     const r = await substituirNoPosto(novo.id, PESSOA, DATA, "t@t.com");
@@ -194,7 +194,7 @@ describe("desligarFuncionario", () => {
 
   it("cadastro novo entra ativo mesmo sem o campo (o checkbox saiu do formulário)", async () => {
     const novo = await createFuncionario(
-      { nome: "Sem checkbox", sede_id: SEDE, turno: "integral", entrada: "07:00", saida: "16:00" } as never,
+      { nome: "Sem checkbox", ...rh(), sede_id: SEDE, turno: "integral", entrada: "07:00", saida: "16:00" } as never,
       "t@t.com",
     );
     expect(novo.ativo).toBe(true);

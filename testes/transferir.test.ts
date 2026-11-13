@@ -40,7 +40,8 @@ describe("transferir de sede", () => {
     const ds = await getDataSource();
     const base = await ds.obter("funcionarios", "christus_f1");
     await ds.criar("funcionarios", {
-      ...base!, id: "f-vai", nome: "Pessoa Que Vai", matricula: "321", empresa: "EMPRESA A", desligado_em: "",
+      ...base!, id: "f-vai", nome: "Pessoa Que Vai", nome_completo: "Pessoa Que Vai da Silva", data_admissao: "2024-01-15",
+      matricula: "321", empresa: "EMPRESA A", desligado_em: "",
       entrada_sabado: "07:00", saida_sabado: "11:15", intervalos_sabado: "09:00-09:15", escala: "seg_sab",
     });
     await ds.criar("modelos_rotina", {
@@ -64,6 +65,7 @@ describe("transferir de sede", () => {
     const lá = await ds.obter("funcionarios", novo.id);
     expect(lá).toMatchObject({
       nome: "Pessoa Que Vai", sede_id: "christus_ald", matricula: "321", empresa: "EMPRESA A", transferido_de: "f-vai", ativo: true,
+      nome_completo: "Pessoa Que Vai da Silva", data_admissao: "2024-01-15",
       entrada: origem?.entrada, saida: origem?.saida, escala: "seg_sab", entrada_sabado: "07:00", intervalos_sabado: "09:00-09:15",
     });
     expect(lá?.observacoes).toContain("Transferida de");
@@ -102,15 +104,40 @@ describe("transferir de sede", () => {
     expect((await ds.obter("funcionarios", "f-vai"))?.desligado_em).toBe("");
   });
 
-  it("matrícula ativa em ficha de OUTRA empresa: recusa antes de desligar a origem (revisão de segurança)", async () => {
+  it("matrícula ativa na MESMA empresa em outra ficha: recusa antes de desligar a origem (revisão de segurança)", async () => {
+    // Desde 13/11/2026 a empresa é sempre preenchida, e cada empresa numera a sua: a
+    // colisão é matrícula + empresa (ficha de OUTRA empresa é outra pessoa).
     const ds = await getDataSource();
     const base = await ds.obter("funcionarios", "christus_f1");
-    await ds.criar("funcionarios", { ...base!, id: "f-outra-empresa", nome: "Outra", sede_id: "christus_dt", matricula: "321", empresa: "EMPRESA B", desligado_em: "" });
+    await ds.criar("funcionarios", { ...base!, id: "f-mesma-empresa", nome: "Outra", sede_id: "christus_dt", matricula: "321", empresa: "EMPRESA A", desligado_em: "" });
     expect((await transferir(corpo({ sede_id: "christus_ald", data: HOJE, abrirVaga: true }), ctx("f-vai"))).status).toBe(422);
     const origem = await ds.obter("funcionarios", "f-vai");
     expect(origem?.desligado_em).toBe("");
     expect(origem?.transferido_para ?? "").toBe("");
     expect(origem?.vaga_sgcp ?? "").toBe("");
+  });
+
+  it("empresa da origem em outra grafia não desliga e deixa sem ficha: recusa ANTES (auditoria e segurança, 13/11/2026)", async () => {
+    const ds = await getDataSource();
+    const base = await ds.obter("funcionarios", "christus_f1");
+    await ds.atualizar("funcionarios", "f-vai", { empresa: "Empresa  -  A" }); // como podia vir do Vincular
+    await ds.criar("funcionarios", { ...base!, id: "f-mesma", nome: "Outra", sede_id: "christus_dt", matricula: "321", empresa: "EMPRESA A", desligado_em: "" });
+    expect((await transferir(corpo({ sede_id: "christus_ald", data: HOJE }), ctx("f-vai"))).status).toBe(422);
+    const origem = await ds.obter("funcionarios", "f-vai");
+    expect(origem?.desligado_em).toBe("");
+    expect(origem?.transferido_para ?? "").toBe("");
+  });
+
+  it("supervisor não recebe nome completo nem admissão na lista (revisão de segurança, 13/11/2026)", async () => {
+    sessao = { ...COORD_DUAS, perfil: "supervisor" };
+    const lista = (await (await listar(new Request("http://x/api/funcionarios?sede=christus_dt"))).json()) as Funcionario[];
+    const vai = lista.find((f) => f.id === "f-vai");
+    expect(vai).toBeTruthy();
+    expect(vai?.nome_completo ?? "").toBe("");
+    expect(vai?.data_admissao ?? "").toBe("");
+    sessao = COORD_DUAS;
+    const completa = (await (await listar(new Request("http://x/api/funcionarios?sede=christus_dt"))).json()) as Funcionario[];
+    expect(completa.find((f) => f.id === "f-vai")?.nome_completo).toBe("Pessoa Que Vai da Silva");
   });
 
   it("a vaga no SGCP só é tentada quando pedida", async () => {

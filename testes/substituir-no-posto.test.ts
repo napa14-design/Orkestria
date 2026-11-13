@@ -19,6 +19,7 @@ import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { createFuncionario, substituirNoPosto } from "@/services/funcionariosService";
 import { createRotina } from "@/services/rotinasService";
 import { salvarModelo } from "@/services/modelosService";
+import { rh } from "./fixtures";
 
 const SEDE = "christus_dt";
 const ANTIGO = "christus_f1"; // Aurilene, do seed — faz o papel do "Assis"
@@ -48,6 +49,7 @@ async function criarSubstituto(nome = "Jorge") {
   return createFuncionario(
     {
       nome,
+      ...rh(),
       sede_id: SEDE,
       turno: "integral",
       entrada: "06:00",
@@ -147,7 +149,7 @@ describe("substituirNoPosto", () => {
 
   it("recusa substituição entre sedes diferentes", async () => {
     const deOutraSede = await createFuncionario(
-      { nome: "Fora", sede_id: "christus_ald", turno: "integral", entrada: "06:00", saida: "16:00", ativo: true } as never,
+      { nome: "Fora", ...rh(), sede_id: "christus_ald", turno: "integral", entrada: "06:00", saida: "16:00", ativo: true } as never,
       "t@t.com",
     );
     await expect(substituirNoPosto(deOutraSede.id, ANTIGO, CORTE, "t@t.com")).rejects.toThrow();

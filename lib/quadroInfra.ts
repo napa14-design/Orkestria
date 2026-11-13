@@ -10,6 +10,7 @@
  * de alguém da Universidade e leria a sede e o desligamento dessa pessoa
  * (revisão de segurança, 23/10/2026). Sem o nome, a resposta é só "não confere".
  */
+import { normalizarEmpresa } from "./empresas";
 
 /** As duas únicas mensagens de falha que chegam à tela (a tela esconde a primeira). */
 export const QUADRO_NAO_CONFIGURADO = "A integração com o Quadro da Infra não está configurada.";
@@ -185,7 +186,9 @@ function vinculada(f: FuncionarioCruzado, sedeDoCadastro: string | undefined, qu
   return quadro.find(
     (p) =>
       p.matricula === m &&
-      (!f.empresa || p.empresa === f.empresa) &&
+      // Pela forma padrão dos dois lados: desde 13/11/2026 a empresa daqui é sempre
+      // preenchida, e "Apel - Matriz" × "APEL MATRIZ" tirava a pessoa do Quadro.
+      (!normalizarEmpresa(f.empresa) || normalizarEmpresa(p.empresa) === normalizarEmpresa(f.empresa)) &&
       (p.sede === sedeDoCadastro ? nomeConfereNaSede(f.nome, p.nome) : nomeConfere(f.nome, p.nome)),
   );
 }

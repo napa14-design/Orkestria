@@ -12,6 +12,7 @@ import { createFuncionario, substituirNoPosto } from "@/services/funcionariosSer
 import { gerarDiaDaRotaPadrao, getModelos, salvarModelo } from "@/services/modelosService";
 import { createRotina } from "@/services/rotinasService";
 import type { Funcionario, ModeloRotinaItem } from "@/types";
+import { rh } from "./fixtures";
 
 const ficha = (p: Partial<Funcionario>) =>
   ({ intervalos: "", intervalo_inicio: "", intervalo_fim: "", intervalo_min: 0, escala: "seg_sab", ...p }) as Funcionario;
@@ -154,7 +155,7 @@ describe("substituirNoPosto com outro horário", () => {
     await salvarModelo("Rota padrão", ANTES, SEDE, "t@t.com", { padrao: true, comDuracao: true });
     expect((await gerarDiaDaRotaPadrao(SEDE, DEPOIS, "u1")).geradas).toBe(1);
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
       "t@t.com",
     );
 
@@ -185,7 +186,7 @@ describe("substituirNoPosto com outro horário", () => {
       "t@t.com",
     );
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
       "t@t.com",
     );
     await substituirNoPosto(nova.id, ANTIGO, CORTE, "t@t.com");
@@ -212,7 +213,7 @@ describe("substituirNoPosto com outro horário", () => {
     await ds.criar("modelos_rotina", { ...velho, id: `outra-chave-${ANTIGO}` } as never);
     expect((await gerarDiaDaRotaPadrao(SEDE, DEPOIS, "u1")).geradas).toBe(0); // controle: ainda casa pela chave
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
       "t@t.com",
     );
     await substituirNoPosto(nova.id, ANTIGO, CORTE, "t@t.com");
@@ -240,7 +241,7 @@ describe("substituirNoPosto com outro horário", () => {
       "t@t.com",
     );
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
       "t@t.com",
     );
     await substituirNoPosto(nova.id, ANTIGO, CORTE, "t@t.com");
@@ -260,7 +261,7 @@ describe("substituirNoPosto com outro horário", () => {
       local_id: "christus_l1", inicio_planejado: "08:30", padrao: true, criado_por: "t", criado_em: "",
     } as never);
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", intervalos: "12:00-13:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", intervalos: "12:00-13:00", ativo: true } as never,
       "t@t.com",
     );
     await substituirNoPosto(nova.id, ANTIGO, CORTE, "t@t.com");
@@ -300,7 +301,7 @@ describe("substituirNoPosto com outro horário", () => {
     ]);
     await ds.atualizar("rotinas_planejadas", gerado.id, { inicio_planejado: "08:00", fim_planejado: "08:55" });
     const nova = await createFuncionario(
-      { nome: "Quem assume", sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
+      { nome: "Quem assume", ...rh(), sede_id: SEDE, turno: "integral", entrada: "09:00", saida: "19:00", ativo: true } as never,
       "t@t.com",
     );
     await substituirNoPosto(nova.id, ANTIGO, CORTE, "t@t.com");

@@ -33,16 +33,25 @@ export interface Funcionario extends Auditoria {
   intervalos_sabado?: string;
   cargo: string;
   /**
+   * Nome completo, como no RH. O `nome` continua sendo como a equipe chama a
+   * pessoa (é ele que aparece nas colunas da agenda). Obrigatório desde
+   * 13/11/2026 em quem está no quadro (ver `validarFuncionario`).
+   */
+  nome_completo?: string;
+  /**
    * Matrícula do RH — a chave com que outros sistemas (o Chromos) acham a pessoa.
-   * O nome não serve: há homônimos ativos. Vazio = ainda não informada.
+   * O nome não serve: há homônimos ativos. Obrigatória desde 13/11/2026.
    */
   matricula?: string;
   /**
-   * Empresa do Quadro da Infra (Chromos), gravada pelo "Vincular" junto com a
-   * matrícula — cada empresa numera a sua, então matrícula sozinha não é única
-   * lá. Não se edita no cadastro; trocar a matrícula à mão a apaga.
+   * Empresa que registra a pessoa ("Apel - Matriz", "Ipade"…): cada empresa numera
+   * a sua, então matrícula sozinha não é única. Desde 13/11/2026 o dono do dado é
+   * o Orkestria (decisão do dono: daqui ela vai para o Chromos); obrigatória e
+   * editável no cadastro.
    */
   empresa?: string;
+  /** Data de admissão (AAAA-MM-DD). Obrigatória desde 13/11/2026. */
+  data_admissao?: string;
   /**
    * Desligamento (AAAA-MM-DD): a partir deste dia a pessoa sai da geração e da
    * agenda. Pode ser futuro (aviso prévio). Ver `lib/desligamento.ts`.

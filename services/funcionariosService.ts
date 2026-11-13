@@ -6,6 +6,7 @@ import { rotaNoHorario } from "@/lib/rotaNoHorario";
 import { comAtivoDoDia, motivoAbreVaga, pedidoDeVaga, validarDesligamento } from "@/lib/desligamento";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { normalizarMatricula } from "@/lib/quadroInfra";
+import { normalizarEmpresa } from "@/lib/empresas";
 import { minhaChave } from "@/lib/chaves";
 import { validarFuncionario, temErro } from "@/lib/validations";
 import type { Funcionario, Local, ModeloRotinaItem, Tarefa } from "@/types";
@@ -40,29 +41,56 @@ export async function exigirMatriculaLivre(matricula: string, empresa: string | 
   const mesmas = await ds.consultar("funcionarios", [{ campo: "matricula", op: "==", valor: matricula }]);
   // Desligado não segura a matrícula: transferir é desligar numa sede e
   // cadastrar de novo na outra, com a mesma matrícula (auditoria, 23/10/2026).
-  if (mesmas.some((o) => o.id !== exceto && !o.desligado_em && (!o.empresa || !empresa || o.empresa === empresa)))
+  // Empresa comparada pela forma padrão (a do Chromos): "APEL - MATRIZ", "Apel-Matriz"
+  // e "Apél​ Matriz" são a mesma, e passavam a mesma matrícula seis vezes (revisão de
+  // segurança, 13/11/2026).
+  const alvo = normalizarEmpresa(empresa);
+  if (mesmas.some((o) => o.id !== exceto && !o.desligado_em && (!normalizarEmpresa(o.empresa) || !alvo || normalizarEmpresa(o.empresa) === alvo)))
     throw new ErroValidacao([
       { nivel: "erro", codigo: "MATRICULA_REPETIDA", mensagem: "Esta matrícula já está em outro cadastro." },
     ]);
+}
+
+/**
+ * Dados do RH limpos, com a empresa na forma padrão do Chromos ("APEL MATRIZ") — é
+ * assim que ela é gravada e é assim que vai para lá. Só os que vieram: a edição
+ * manda parte da ficha.
+ */
+function dadosDoRh(d: Partial<Funcionario>): Partial<Pick<Funcionario, "nome_completo" | "empresa" | "data_admissao">> {
+  const limpo = (v: unknown) => String(v ?? "").replace(/\p{Cf}/gu, "").replace(/\s+/g, " ").trim();
+  return {
+    ...(d.nome_completo !== undefined ? { nome_completo: limpo(d.nome_completo) } : {}),
+    ...(d.empresa !== undefined ? { empresa: normalizarEmpresa(d.empresa) } : {}),
+    ...(d.data_admissao !== undefined ? { data_admissao: limpo(d.data_admissao) } : {}),
+  };
 }
 
 export async function createFuncionario(
   dados: DadosFuncionario,
   autor: string,
 ): Promise<Funcionario> {
-  if ("empresa" in dados)
+  // Cadastro novo nasce no quadro: nenhum campo do desligamento/transferência vem do
+  // corpo. `desligado_em` no POST dispensava os dados do RH e gerava ficha "ativa"
+  // que nunca saía do quadro (revisão de segurança, 13/11/2026). `ativo: true` passa
+  // (é o padrão, e a transferência o manda).
+  const doDesligamento = Object.keys(dados).filter(
+    (k) => CAMPOS_DO_DESLIGAMENTO.has(k) && !(k === "ativo" && (dados as Record<string, unknown>)[k] === true),
+  );
+  if (doDesligamento.length)
     throw new ErroValidacao([
-      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
+      {
+        nivel: "erro",
+        codigo: "CAMPO_NAO_EDITAVEL",
+        mensagem: `Cadastro novo não leva: ${doDesligamento.join(", ")}. Desligamento e transferência têm botão próprio.`,
+      },
     ]);
-  if ("transferido_para" in dados || "transferido_de" in dados || "transferido_setor" in dados)
-    throw new ErroValidacao([
-      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A transferência se faz pelo botão \"Transferir\"." },
-    ]);
+  // Empresa se edita aqui desde 13/11/2026: o dono do dado passou a ser o Orkestria.
   const matricula = normalizarMatricula(dados.matricula);
-  await exigirMatriculaLivre(matricula, undefined);
-  const comIntervalos = { ...dados, matricula, intervalos: csvDoTrio(dados) };
-  const alertas = validarFuncionario(comIntervalos);
-  if (temErro(alertas)) throw new ErroValidacao(alertas);
+  const rh = dadosDoRh(dados);
+  const comIntervalos = { ...dados, ...rh, matricula, intervalos: csvDoTrio(dados) };
+  const alertas0 = validarFuncionario(comIntervalos);
+  if (temErro(alertas0)) throw new ErroValidacao(alertas0);
+  await exigirMatriculaLivre(matricula, rh.empresa);
   const ds = await getDataSource();
   const sede = await ds.obter("sedes", dados.sede_id);
   if (!sede)
@@ -121,22 +149,19 @@ export async function updateFuncionario(
         mensagem: `Campo(s) que só mudam pelo "Desligar" ou pelo "Assume o posto de": ${proibidos.join(", ")}.`,
       },
     ]);
-  if ("empresa" in mudancas)
-    throw new ErroValidacao([
-      { nivel: "erro", codigo: "CAMPO_NAO_EDITAVEL", mensagem: "A empresa vem do Quadro da Infra, pelo \"Vincular\"." },
-    ]);
   const ds = await getDataSource();
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
-  if (mudancas.matricula !== undefined) {
+  if (mudancas.matricula !== undefined)
     mudancas = { ...mudancas, matricula: normalizarMatricula(String(mudancas.matricula)) };
-    // Matrícula trocada à mão desfaz o vínculo: a empresa era da pessoa de antes.
-    if (mudancas.matricula !== normalizarMatricula(atual.matricula)) {
-      await exigirMatriculaLivre(mudancas.matricula ?? "", undefined, id);
-      if (atual.empresa) mudancas = { ...mudancas, empresa: "" };
-    }
-  }
+  mudancas = { ...mudancas, ...dadosDoRh(mudancas) };
   const destino = { ...atual, ...mudancas };
+  // Matrícula ou empresa trocada: a dupla tem de estar livre (cada empresa numera a sua).
+  if (
+    normalizarMatricula(destino.matricula) !== normalizarMatricula(atual.matricula) ||
+    (destino.empresa ?? "") !== (atual.empresa ?? "")
+  )
+    await exigirMatriculaLivre(normalizarMatricula(destino.matricula), destino.empresa || undefined, id);
   // Duas situações diferentes que é fácil confundir:
   //  - o formulário **mandou** `intervalos` (mesmo vazio) → vale o que ele mandou;
   //    apagar todos os intervalos precisa apagar de verdade.
@@ -697,17 +722,24 @@ export async function transferirFuncionario(
       intervalos_sabado: atual.intervalos_sabado ?? "",
       cargo: atual.cargo,
       matricula: atual.matricula ?? "",
+      // Os dados do RH vão junto: a ficha nova é a mesma pessoa.
+      nome_completo: atual.nome_completo ?? "",
+      empresa: atual.empresa ?? "",
+      data_admissao: atual.data_admissao ?? "",
       ativo: true,
       observacoes: `Transferida de ${sedeOrigem?.nome_sede ?? "outra sede"} em ${data.split("-").reverse().join("/")}.`,
   } as DadosFuncionario;
+  // Os dados do RH limpos AQUI, como o `createFuncionario` vai limpar: régua diferente
+  // entre a checagem e o cadastro desligava a origem e deixava a pessoa sem ficha no
+  // destino (auditoria e segurança, 13/11/2026).
+  Object.assign(copia, dadosDoRh(copia));
   // O que o cadastro novo recusaria, recusa ANTES de desligar a origem.
   const alertas = validarFuncionario(copia);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
-  // A MESMA régua do `createFuncionario` (empresa indefinida = colide com
-  // qualquer ficha ativa): com a empresa da origem, outra ficha de mesma
-  // matrícula e empresa diferente passava aqui e era recusada lá — depois de a
-  // origem já estar desligada (revisão de segurança, 27/10/2026).
-  await exigirMatriculaLivre(normalizarMatricula(copia.matricula), undefined, id);
+  // A MESMA régua do `createFuncionario`, com a mesma empresa que ele vai usar:
+  // régua diferente aqui deixava passar o que lá é recusado — depois de a origem
+  // já estar desligada (revisão de segurança, 27/10/2026).
+  await exigirMatriculaLivre(normalizarMatricula(copia.matricula), copia.empresa || undefined, id);
 
   const desligamento = await desligarFuncionario(
     id,
@@ -717,12 +749,9 @@ export async function transferirFuncionario(
     { transferido_para: destino.id },
   );
   const novo = await createFuncionario(copia, autor);
-  // Empresa e o elo com a origem não entram pelo cadastro comum (ver as travas
-  // de `createFuncionario`): só por aqui.
-  const ligado = await ds.atualizar("funcionarios", novo.id, {
-    transferido_de: id,
-    ...(atual.empresa ? { empresa: atual.empresa } : {}),
-  });
+  // O elo com a origem não entra pelo cadastro comum (ver as travas de
+  // `createFuncionario`): só por aqui.
+  const ligado = await ds.atualizar("funcionarios", novo.id, { transferido_de: id });
   return { ...desligamento, novo: ligado };
 }
 

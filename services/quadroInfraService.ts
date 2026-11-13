@@ -10,6 +10,7 @@
 import { agoraISO, getDataSource } from "@/lib/datasource";
 import { hojeISO } from "@/lib/dateUtils";
 import { comAtivoDoDia } from "@/lib/desligamento";
+import { normalizarEmpresa } from "@/lib/empresas";
 import { minhaChave } from "@/lib/chaves";
 import {
   cruzar,
@@ -155,7 +156,8 @@ export async function vincularAoQuadro(
   await exigirMatriculaLivre(p.matricula, p.empresa, f.id);
   return ds.atualizar("funcionarios", f.id, {
     matricula: p.matricula,
-    empresa: p.empresa,
+    // Na forma padrão, como todo cadastro daqui (13/11/2026).
+    empresa: normalizarEmpresa(p.empresa),
     atualizado_por: autor,
     atualizado_em: agoraISO(),
   });

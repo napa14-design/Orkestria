@@ -15,6 +15,7 @@ import { createFuncionario } from "@/services/funcionariosService";
 import { createLocal } from "@/services/locaisService";
 import { createRotina } from "@/services/rotinasService";
 import { somarDias } from "@/lib/dateUtils";
+import { rh } from "./fixtures";
 
 const ALVO = "christus_f1"; // Aurilene, do seed — sede christus_dt
 
@@ -25,7 +26,7 @@ describe("create* ignora o id do corpo", () => {
     const ds = await getDataSource();
     const antes = await ds.obter("funcionarios", ALVO);
     const novo = await createFuncionario(
-      { id: ALVO, nome: "SEQUESTRADO", sede_id: "christus_ald", turno: "integral", entrada: "07:00", saida: "16:00" } as never,
+      { id: ALVO, nome: "SEQUESTRADO", ...rh(), sede_id: "christus_ald", turno: "integral", entrada: "07:00", saida: "16:00" } as never,
       "atacante@x.com",
     );
     expect(novo.id).not.toBe(ALVO);

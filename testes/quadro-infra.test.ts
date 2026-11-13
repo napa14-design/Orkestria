@@ -141,6 +141,14 @@ describe("regras puras", () => {
     expect(d.foraDoOrkestria).toBeNull();
   });
 
+  it("empresa daqui casa com a de lá em qualquer grafia; empresa diferente não casa (13/11/2026)", () => {
+    const q = [pessoa({ id: "q1", nome: "MARIA APARECIDA SOUZA", sede: "DT1", matricula: "100", empresa: "APEL MATRIZ" })];
+    const igual = func({ id: "f1", nome: "Maria Souza", matricula: "100", empresa: "Apel - Matriz" });
+    expect(cruzar({ sedeNoChromos: "DT1", daSede: [igual], todos: [igual], quadro: q, mapa: MAPA }).naoConfere).toEqual([]);
+    const outra = func({ id: "f1", nome: "Maria Souza", matricula: "100", empresa: "IPADE" });
+    expect(cruzar({ sedeNoChromos: "DT1", daSede: [outra], todos: [outra], quadro: q, mapa: MAPA }).naoConfere).toHaveLength(1);
+  });
+
   it("O18: matrícula de outra sede com nome diferente → só \"não confere\", nada da pessoa de lá", () => {
     const f = func({ id: "f1", nome: "Rita Nunes", matricula: "300" }); // a 300 é JOANA, da BEN, desligada
     const d = cruzar({ sedeNoChromos: "DT1", daSede: [f], todos: [f], quadro: QUADRO, mapa: MAPA });
@@ -256,6 +264,9 @@ const pedirGet = (sede?: string) => getDivergencias(new Request(`http://x/api/qu
 const json = (corpo: unknown, metodo = "POST") =>
   new Request("http://x/api", { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+
+/** Nome completo e admissão: com matrícula e empresa, os dados do RH que o PUT exige (13/11/2026). */
+const RH_OK = { nome_completo: "Pessoa Completa de Teste", data_admissao: "2024-01-15" };
 
 async function cadastro(id: string, nome: string, extra: Record<string, unknown> = {}) {
   const ds = await getDataSource();
@@ -429,7 +440,7 @@ describe("rotas do Quadro", () => {
     // E à mão também: outro cadastro novo pega a matrícula de quem saiu.
     await cadastro("f-outro", "Outra Pessoa", { sede_id: "christus_ald", matricula: "777", desligado_em: "2026-09-01" });
     await cadastro("f-mao", "Mais Uma");
-    expect((await putFuncionario(json({ matricula: "777" }, "PUT"), ctx("f-mao"))).status).toBe(200);
+    expect((await putFuncionario(json({ ...RH_OK, matricula: "777", empresa: "EMPRESA A" }, "PUT"), ctx("f-mao"))).status).toBe(200);
   });
 
   it("já vinculado ou desligado não se vincula de novo", async () => {
@@ -439,23 +450,29 @@ describe("rotas do Quadro", () => {
     expect((await postVincular(json({ funcionario_id: "f-2", quadro_id: "q1" }))).status).toBe(422);
   });
 
-  it("O27/O28: o PUT do cadastro não grava empresa nem desligamento", async () => {
-    await cadastro("f-dt", "Maria Souza");
-    for (const corpo of [{ empresa: "EMPRESA A" }, { matricula: "1", ativo: false }, { desligado_em: "2026-01-01" }]) {
+  it("O27/O28: o PUT do cadastro não grava desligamento (a empresa, desde 13/11/2026, sim)", async () => {
+    await cadastro("f-dt", "Maria Souza", { ...RH_OK, matricula: "900", empresa: "EMPRESA A" });
+    for (const corpo of [{ matricula: "1", ativo: false }, { desligado_em: "2026-01-01" }]) {
       expect((await putFuncionario(json(corpo, "PUT"), ctx("f-dt"))).status).toBe(422);
     }
+    // O Orkestria passou a ser o dono da empresa (decisão do dono): edita no cadastro.
+    expect((await putFuncionario(json({ empresa: "EMPRESA B" }, "PUT"), ctx("f-dt"))).status).toBe(200);
+    // Sem os dados do RH, o cadastro novo é recusado.
     expect((await postFuncionario(json({ nome: "Nova Pessoa", sede_id: "christus_dt", empresa: "X" }))).status).toBe(422);
   });
 
-  it("matrícula única também no cadastro; trocar a matrícula à mão apaga a empresa do vínculo", async () => {
-    await cadastro("f-1", "Maria Souza", { matricula: "100", empresa: "EMPRESA A" });
-    await cadastro("f-2", "Outra Pessoa");
+  it("matrícula única por EMPRESA; trocar a matrícula à mão mantém a empresa (13/11/2026)", async () => {
+    await cadastro("f-1", "Maria Souza", { ...RH_OK, matricula: "100", empresa: "EMPRESA A" });
+    await cadastro("f-2", "Outra Pessoa", { ...RH_OK, matricula: "200", empresa: "EMPRESA A" });
+    // Mesma empresa: recusa, inclusive com a matrícula escrita de outro jeito.
     expect((await putFuncionario(json({ matricula: "100.0" }, "PUT"), ctx("f-2"))).status).toBe(422);
-    expect((await putFuncionario(json({ matricula: "100" }, "PUT"), ctx("f-1"))).status).toBe(200);
+    // Outra empresa numera a sua: a mesma matrícula é de outra pessoa.
+    expect((await putFuncionario(json({ matricula: "100", empresa: "EMPRESA B" }, "PUT"), ctx("f-2"))).status).toBe(200);
+    // E trocar a empresa para a de quem já tem a matrícula é recusado.
+    expect((await putFuncionario(json({ empresa: "EMPRESA A" }, "PUT"), ctx("f-2"))).status).toBe(422);
     const ds = await getDataSource();
-    expect((await ds.obter("funcionarios", "f-1"))?.empresa).toBe("EMPRESA A");
     expect((await putFuncionario(json({ matricula: "101" }, "PUT"), ctx("f-1"))).status).toBe(200);
-    expect(await ds.obter("funcionarios", "f-1")).toMatchObject({ matricula: "101", empresa: "" });
+    expect(await ds.obter("funcionarios", "f-1")).toMatchObject({ matricula: "101", empresa: "EMPRESA A" });
   });
 
   it("O45: nenhuma variável do Chromos é pública", async () => {

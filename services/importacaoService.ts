@@ -13,6 +13,10 @@ import type { Analise } from "@/lib/importacaoRota";
 import type { Funcionario, Local, RotinaPlanejada, Tarefa } from "@/types";
 import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
 import { ErroValidacao } from "./erros";
+import { exigirMatriculaLivre } from "./funcionariosService";
+import { normalizarEmpresa } from "@/lib/empresas";
+import { normalizarMatricula } from "@/lib/quadroInfra";
+import { validarFuncionario } from "@/lib/validations";
 import { resolverParametros } from "./parametrosService";
 import { getRotinasByData, idMaterializacao } from "./rotinasService";
 import { salvarModelo } from "./modelosService";
@@ -154,6 +158,12 @@ export async function aplicarImportacao(
     idFunc.set(chave(f.nome), id);
     novosFuncs.push({
       id, sede_id: sedeId, nome: f.nome, genero: f.genero || "",
+      // Dados do RH (13/11/2026): quem a importação cadastra nasce com eles — a
+      // mesma limpeza e a mesma empresa padrão do cadastro (ver `funcionariosService`).
+      nome_completo: (f.nome_completo ?? "").replace(/\p{Cf}/gu, "").replace(/\s+/g, " ").trim(),
+      matricula: normalizarMatricula(f.matricula),
+      empresa: normalizarEmpresa(f.empresa),
+      data_admissao: f.data_admissao ?? "",
       turno: turnoDoHorario(f.entrada, f.saida),
       entrada: f.entrada, saida: f.saida,
       intervalos: f.intervalos, intervalo_min: intMin,
@@ -164,6 +174,30 @@ export async function aplicarImportacao(
     });
     res.funcionarios.criados++;
   }
+  // Recusa ANTES de gravar qualquer coisa (o lote é um só): quem faltar dado do RH,
+  // matrícula repetida na planilha ou já em uso no sistema.
+  const semDados: string[] = [];
+  const naPlanilha = new Set<string>();
+  for (const x of novosFuncs) {
+    const erros = validarFuncionario(x).filter((a) => a.nivel === "erro" && ["DADOS_DO_RH", "EMPRESA_AMBIGUA", "ADMISSAO_INVALIDA"].includes(a.codigo));
+    if (erros.length) { semDados.push(`${x.nome}: ${erros.map((e) => e.mensagem).join(" ")}`); continue; }
+    const k = `${x.matricula}|${x.empresa}`;
+    if (naPlanilha.has(k)) { semDados.push(`${x.nome}: a matrícula ${x.matricula} (${x.empresa}) aparece para duas pessoas na planilha.`); continue; }
+    naPlanilha.add(k);
+    try {
+      await exigirMatriculaLivre(x.matricula ?? "", x.empresa);
+    } catch {
+      semDados.push(`${x.nome}: a matrícula ${x.matricula} (${x.empresa}) já está em outro cadastro.`);
+    }
+  }
+  if (semDados.length)
+    throw new ErroValidacao(
+      semDados.map((mensagem) => ({
+        nivel: "erro" as const,
+        codigo: "IMPORT_SEM_DADOS_RH",
+        mensagem: `Pessoa nova na sede precisa das colunas do RH (Nome completo, Matrícula, Empresa, Admissão). ${mensagem}`,
+      })),
+    );
   for (const x of novosFuncs) escritas.push({ tipo: "criar", tabela: "funcionarios", registro: x });
 
   // ── rotinas do dia (id determinístico → reimportar não duplica) ────────

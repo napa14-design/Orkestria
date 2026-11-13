@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { comSessao, ok } from "@/lib/api";
 import { podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
-import { analisarRota, COLUNAS, COLUNAS_HORA, textoDaCelula, type LinhaPlanilha } from "@/lib/importacaoRota";
+import { analisarRota, COLUNAS, textoDaColuna, type LinhaPlanilha } from "@/lib/importacaoRota";
 
 /**
  * POST /api/importar/analisar (multipart: arquivo) — lê a planilha (.xlsx/.csv),
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       row.eachCell({ includeEmpty: true }, (cel, i) => {
         const k = idxParaChave.get(i);
         if (!k) return;
-        l[k] = textoDaCelula(cel.value, COLUNAS_HORA.has(k));
+        l[k] = textoDaColuna(k, cel.value);
       });
       linhas.push(l);
     });

@@ -22,6 +22,10 @@ export interface OpcaoCampo {
   rotulo: string;
 }
 
+/** O campo é obrigatório neste formulário? */
+const exigido = (c: CampoForm, form: Record<string, unknown>) =>
+  typeof c.obrigatorio === "function" ? c.obrigatorio(form) : Boolean(c.obrigatorio);
+
 export interface CampoForm {
   key: string;
   rotulo: string;
@@ -42,7 +46,8 @@ export interface CampoForm {
    * fora da escala oferecida.
    */
   opcoes?: OpcaoCampo[] | ((form: Record<string, unknown>) => OpcaoCampo[]);
-  obrigatorio?: boolean;
+  /** Como função, decide pelo formulário (ex.: desligado dispensa os dados do RH). */
+  obrigatorio?: boolean | ((form: Record<string, unknown>) => boolean);
   padrao?: unknown;
   inteira?: boolean; // ocupa a linha toda do formulário
   passo?: string; // step para campos numéricos
@@ -63,6 +68,11 @@ export interface CampoForm {
    * horário" da tarefa sai de a janela estar vazia). Sem isto, o valor gravado.
    */
   valorInicial?: (item: Record<string, unknown>) => unknown;
+  /**
+   * Sugestões de um campo de texto (`<datalist>`): mostra as conhecidas e aceita
+   * valor novo — como a empresa no Quadro da Infra (13/11/2026).
+   */
+  sugestoes?: string[];
   /**
    * Atalho "criar na hora" para campo que aponta para outro cadastro.
    *
@@ -297,7 +307,7 @@ function CamposDoFormulario({
               <span className="rotulo" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span>
                   {c.rotulo}
-                  {c.obrigatorio ? " *" : ""}
+                  {exigido(c, form) ? " *" : ""}
                 </span>
                 {c.dica && (
                   <button
@@ -335,7 +345,7 @@ function CamposDoFormulario({
                   style={{ flex: 1, minWidth: 0 }}
                   value={String(form[c.key] ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
-                  required={c.obrigatorio}
+                  required={exigido(c, form)}
                 >
                   {/* O campo pode trazer a própria opção de valor vazio, com
                       rótulo que explica o que "vazio" significa (ex.: "herdar
@@ -474,9 +484,17 @@ function CamposDoFormulario({
                   step={c.passo}
                   value={String(form[c.key] ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))}
-                  required={c.obrigatorio}
+                  required={exigido(c, form)}
+                  list={c.sugestoes?.length ? `sug-${c.key}` : undefined}
                 />
               )}
+              {c.sugestoes?.length ? (
+                <datalist id={`sug-${c.key}`}>
+                  {c.sugestoes.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              ) : null}
               {ajudaDe(c, form) && (
                 <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>{ajudaDe(c, form)}</span>
               )}

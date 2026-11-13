@@ -62,8 +62,10 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | intervalo_inicio, intervalo_fim | HH:mm | bloqueado na agenda |
 | entrada_sabado, saida_sabado | HH:mm | horário próprio de sábado (os dois ou nenhum) |
 | intervalos_sabado | CSV "HH:mm-HH:mm;…" | intervalos do sábado, dentro do horário de sábado; vazio = sem pausa (desde 23/10/2026) |
-| matricula | string | opcional — matrícula do RH, chave do Chromos (o nome tem homônimos). **Única** (por empresa) desde 23/10/2026 |
-| empresa | string | empresa do Quadro da Infra (Chromos), gravada pelo "Vincular" com a matrícula; não se edita no cadastro, e trocar a matrícula à mão a apaga |
+| nome_completo | string | nome completo do RH; o `nome` segue sendo como a equipe chama (vai na agenda). **Obrigatório** desde 13/11/2026 em quem está no quadro |
+| matricula | string | matrícula do RH, chave do Chromos (o nome tem homônimos). **Única por empresa** entre fichas não desligadas. **Obrigatória** desde 13/11/2026 |
+| empresa | string | empresa que registra a pessoa ("Apel - Matriz", "Ipade"…). Desde 13/11/2026 o dono do dado é o Orkestria (daqui vai para o Chromos): edita no cadastro, sem espaço sobrando. **Obrigatória** |
+| data_admissao | string | AAAA-MM-DD, não futura. **Obrigatória** desde 13/11/2026. Desligado e posto vago ficam dispensados dos quatro |
 | desligado_em | AAAA-MM-DD | desligamento; a partir deste dia sai da geração e da agenda (pode ser futuro — aviso prévio) |
 | motivo_desligamento | string | um de `MOTIVOS_DESLIGAMENTO` (`lib/desligamento.ts`) |
 | vaga_sgcp | string | código da vaga de substituição aberta no SGCP; vazio = não abriu |

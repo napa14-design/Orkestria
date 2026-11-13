@@ -13,6 +13,16 @@ const auditoria = {
   atualizado_em: "2026-01-01T00:00:00.000Z",
 };
 
+let seqRh = 0;
+/**
+ * Dados do RH, obrigatórios desde 13/11/2026 em quem está no quadro. Fictícios;
+ * a matrícula muda a cada chamada para não esbarrar na trava de matrícula única.
+ */
+export function rh(): Pick<Funcionario, "nome_completo" | "matricula" | "empresa" | "data_admissao"> {
+  seqRh++;
+  return { nome_completo: `Pessoa de Teste ${seqRh}`, matricula: `T${seqRh}`, empresa: "Empresa de Teste", data_admissao: "2024-01-15" };
+}
+
 /** Jornada 06:00–16:00 com 1h de almoço → 540 min líquidos. */
 export function funcionario(parcial: Partial<Funcionario> = {}): Funcionario {
   return {

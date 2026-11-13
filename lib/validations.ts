@@ -21,7 +21,12 @@ import {
   ocupacaoPercentual,
   tempoPlanejadoMin,
 } from "./calculations";
-import { hhmmParaMin, intervalosSobrepoem, minParaHHMM } from "./dateUtils";
+import { hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM } from "./dateUtils";
+import { empresaAmbigua, normalizarEmpresa } from "./empresas";
+
+/** "2026-02-30" tem o formato e não é dia: só passa a data que existe no calendário. */
+const dataRealISO = (s: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T12:00:00Z`)) && new Date(`${s}T12:00:00Z`).toISOString().slice(0, 10) === s;
 import { problemaNosIntervalos } from "./intervalos";
 
 /** Valida a alocação de um bloco [inicioMin, fimMin) na agenda do funcionário. */
@@ -221,6 +226,28 @@ export function validarFuncionario(f: Partial<Funcionario>): AlertaValidacao[] {
       codigo: "FUNCIONARIO_SEM_SEDE",
       mensagem: "Todo funcionário precisa estar vinculado a uma sede.",
     });
+  // Dados do RH, obrigatórios desde 13/11/2026 (pedido do dono) em quem está no
+  // quadro. Desligado e posto vago ficam dispensados: a ficha é histórico, e o
+  // posto vago nem é uma pessoa.
+  // Ficha inativa (quem já passou o posto adiante, o antigo "Ativo" desmarcado) também
+  // fica dispensada (decisão do dono). O cadastro novo não escolhe isso: o POST recusa
+  // `ativo: false` e `desligado_em` (ver `createFuncionario`).
+  if (!f.desligado_em && f.ativo !== false) {
+    const faltam = [
+      !f.nome_completo?.replace(/\p{Cf}/gu, "").trim() && "nome completo",
+      !String(f.matricula ?? "").trim() && "matrícula",
+      !normalizarEmpresa(f.empresa) && "empresa",
+      !f.data_admissao && "data de admissão",
+    ].filter(Boolean);
+    if (faltam.length)
+      alertas.push({ nivel: "erro", codigo: "DADOS_DO_RH", mensagem: `Preencha ${faltam.join(", ")}.` });
+    else if (empresaAmbigua(f.empresa))
+      alertas.push({ nivel: "erro", codigo: "EMPRESA_AMBIGUA", mensagem: `Empresa "${f.empresa}": ${empresaAmbigua(f.empresa)}. Escolha a empresa certa da lista.` });
+    else if (!dataRealISO(f.data_admissao!))
+      alertas.push({ nivel: "erro", codigo: "ADMISSAO_INVALIDA", mensagem: "Data de admissão inválida: esse dia não existe." });
+    else if (f.data_admissao! > hojeISO())
+      alertas.push({ nivel: "erro", codigo: "ADMISSAO_INVALIDA", mensagem: "Data de admissão não pode ser no futuro." });
+  }
   if (Number.isNaN(hhmmParaMin(f.entrada ?? "")) || Number.isNaN(hhmmParaMin(f.saida ?? "")))
     alertas.push({
       nivel: "erro",

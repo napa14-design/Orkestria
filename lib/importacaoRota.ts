@@ -23,6 +23,12 @@ export const COLUNAS: ColunaModelo[] = [
   { chave: "intervalos", rotulo: "Intervalos", obrigatorio: false, exemplo: "09:00-09:15;11:30-13:00;15:00-15:15", ajuda: "Pausas do dia (lanche/almoço), separadas por ponto e vírgula.", largura: 34 },
   { chave: "escala", rotulo: "Escala", obrigatorio: false, exemplo: "seg_sex", ajuda: "seg_sex ou seg_sab. Vazio = seg_sex.", largura: 10 },
   { chave: "genero", rotulo: "Gênero", obrigatorio: false, exemplo: "feminino", ajuda: "feminino ou masculino — só usado em tarefas com restrição de gênero.", largura: 12 },
+  // Dados do RH (13/11/2026): obrigatórios para quem a importação CADASTRA; quem já
+  // está no sistema não precisa (a ficha já tem). Uma vez por pessoa basta.
+  { chave: "nome_completo", rotulo: "Nome completo", obrigatorio: false, exemplo: "Maria Aurilene da Silva", ajuda: "Nome completo do RH. Obrigatório para quem ainda não está cadastrado.", largura: 30 },
+  { chave: "matricula", rotulo: "Matrícula", obrigatorio: false, exemplo: "1234", ajuda: "Matrícula do RH. Obrigatória para quem ainda não está cadastrado.", largura: 11 },
+  { chave: "empresa", rotulo: "Empresa", obrigatorio: false, exemplo: "APEL MATRIZ", ajuda: "Empresa do RH (APEL MATRIZ, APEL 7, IPADE…). Obrigatória para quem ainda não está cadastrado.", largura: 16 },
+  { chave: "admissao", rotulo: "Admissão", obrigatorio: false, exemplo: "15/03/2024", ajuda: "Data de admissão (dd/mm/aaaa). Obrigatória para quem ainda não está cadastrado.", largura: 12 },
   { chave: "inicio", rotulo: "Início da tarefa", obrigatorio: true, exemplo: "06:05", ajuda: "Hora em que a tarefa começa (HH:mm).", largura: 15 },
   { chave: "fim", rotulo: "Fim da tarefa", obrigatorio: true, exemplo: "07:00", ajuda: "Hora em que termina. A DURAÇÃO sai daqui (fim − início).", largura: 15 },
   { chave: "tarefa", rotulo: "Tarefa", obrigatorio: true, exemplo: "Varrer a frente da escola", ajuda: "Nome da tarefa.", largura: 40 },
@@ -75,6 +81,31 @@ export interface FuncionarioImp {
   intervalos: string;
   escala: string;
   genero: string;
+  /** Dados do RH: só valem (e só são exigidos) para quem a importação cadastra. */
+  nome_completo: string;
+  matricula: string;
+  empresa: string;
+  /** AAAA-MM-DD, ou "" quando a planilha não trouxe. */
+  data_admissao: string;
+}
+
+/** Colunas de data: célula de data vira AAAA-MM-DD (não hora). */
+export const COLUNAS_DATA = new Set(["admissao"]);
+
+/** "15/03/2024", "2024-03-15" → "2024-03-15"; outra forma → null. Não confere se o dia existe. */
+export function dataDaPlanilha(s: string): string | null {
+  const t = (s ?? "").trim();
+  let m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? t : null;
+}
+
+/** O texto de uma célula conforme a coluna: data, hora ou texto. */
+export function textoDaColuna(chave: string, v: unknown): string {
+  // O Excel guarda data como Date à meia-noite UTC: o dia é o da data, não a hora.
+  if (COLUNAS_DATA.has(chave) && v instanceof Date) return v.toISOString().slice(0, 10);
+  return textoDaCelula(v, COLUNAS_HORA.has(chave));
 }
 export interface LocalImp {
   nome_local: string;
@@ -161,6 +192,10 @@ export function analisarRota(linhas: LinhaPlanilha[]): Analise {
         linhaOk = false;
       }
     }
+    if (l.admissao && !dataDaPlanilha(l.admissao)) {
+      erros.push({ linha: n, campo: "Admissão", mensagem: `"${l.admissao}" não é uma data (use dd/mm/aaaa, ex.: 15/03/2024).` });
+      linhaOk = false;
+    }
     if (!linhaOk) return;
 
     const ini = min(l.inicio);
@@ -190,9 +225,19 @@ export function analisarRota(linhas: LinhaPlanilha[]): Analise {
         intervalos: l.intervalos,
         escala: l.escala || "seg_sex",
         genero: l.genero,
+        nome_completo: l.nome_completo,
+        matricula: l.matricula,
+        empresa: l.empresa,
+        data_admissao: l.admissao ? (dataDaPlanilha(l.admissao) ?? "") : "",
       });
-    } else if (jaF.entrada !== l.entrada || jaF.saida !== l.saida) {
-      avisos.push({ linha: n, campo: "entrada", mensagem: `${l.funcionario} aparece com jornadas diferentes (${jaF.entrada}–${jaF.saida} e ${l.entrada}–${l.saida}). Usei a primeira.` });
+    } else {
+      if (jaF.entrada !== l.entrada || jaF.saida !== l.saida)
+        avisos.push({ linha: n, campo: "entrada", mensagem: `${l.funcionario} aparece com jornadas diferentes (${jaF.entrada}–${jaF.saida} e ${l.entrada}–${l.saida}). Usei a primeira.` });
+      // Os dados do RH podem vir em qualquer linha da pessoa: vale o primeiro preenchido.
+      if (!jaF.nome_completo && l.nome_completo) jaF.nome_completo = l.nome_completo;
+      if (!jaF.matricula && l.matricula) jaF.matricula = l.matricula;
+      if (!jaF.empresa && l.empresa) jaF.empresa = l.empresa;
+      if (!jaF.data_admissao && l.admissao) jaF.data_admissao = dataDaPlanilha(l.admissao) ?? "";
     }
 
     // local
