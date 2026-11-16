@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-11-16 — UniBenfica: sede própria; sigla do SGCP da Benfica volta a ser "BN"
+
+- **Sigla no SGCP:** o SGCP recebe a Benfica só como **"BN"** (dono). A troca antiga `BN → "UBN"`
+  existia porque a "Benfica" daqui fazia as vezes da Universidade; com a sede **UniBenfica (UBN)**
+  criada hoje, ela vai como "BN" e a Benfica também. Teste em `testes/desligar.test.ts`.
+- **Dados (sem código):** 4 ASG transferidos BN → UBN a partir de 17/11 pela Transferência, com a
+  rota padrão junto (local e tarefas copiados para a UBN; não ficou posto vago na BN); dias 17–19
+  gerados na UBN. Também hoje: rota da Pré Nunes (6 fichas, seg–sex + camada de sábado) e rota nova
+  de uma ASG da PQL 1.
+- **Chromos:** o feed manda os códigos do Orkestria; lá "BN" casa com BEN pelos apelidos, mas
+  "UBN" e "PN" ainda não (sessão do Chromos, só leitura). Até alguém acrescentar os apelidos em
+  Configuração → Sedes do Chromos, esses eventos caem na conferência manual de lá — nada é
+  aplicado errado.
+
+Arquivos: `lib/desligamento.ts`, `testes/desligar.test.ts`.
+
+---
+
 ## 2026-11-16 — Eventos do Quadro para o Chromos; cadastro de Empresas; tipo no Desligar
 
 **Contrato** "Orkestria → Cromos — contrato de eventos do Quadro (v1)" (vault, com as emendas

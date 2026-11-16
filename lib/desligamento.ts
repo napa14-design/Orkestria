@@ -128,12 +128,12 @@ export function validarDesligamento(d: { data?: unknown; motivo?: unknown }, opc
  *  - a DT 2 é divisão daqui: lá é tudo "DIONISIO TORRES";
  *  - a CESIU aqui tem código "CES", que lá não casa com nada — no SGCP ela é
  *    "CESIU" (nome e sigla). Confirmado pelo time do SGCP em 16/10/2026;
- *  - a Benfica daqui é a da UNIVERSIDADE (no quadro de pessoal as quatro estão
- *    como UNIBEN). "BN" no SGCP é a BENFICA do Colégio — a vaga cairia para o RH
- *    errado. Lá a da Universidade é UNIBENFICA [UBN].
+ *  - Benfica: o SGCP recebe só "BN" (dono, 16/11/2026). A UniBenfica ganhou sede
+ *    própria aqui ("UBN") nesse dia e vai como "BN" também; a Benfica daqui, que
+ *    antes ia como "UBN", passa a ir como "BN".
  * Conferido contra o cadastro de sedes do SGCP em 16/10/2026: as 19 casam.
  */
-const SIGLA_NO_SGCP: Record<string, string> = { DT2: "DT", CES: "CESIU", BN: "UBN" };
+const SIGLA_NO_SGCP: Record<string, string> = { DT2: "DT", CES: "CESIU", UBN: "BN" };
 
 export function siglaNoSgcp(sede: Pick<Sede, "codigo" | "nome_sede">): string {
   const codigo = (sede.codigo ?? "").trim();

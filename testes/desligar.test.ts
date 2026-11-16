@@ -91,8 +91,9 @@ describe("regras puras", () => {
     expect(siglaNoSgcp({ codigo: "DT2", nome_sede: "Dionísio Torres 2" })).toBe("DT");
     // "CES" não casa com nada no SGCP: lá a CESIU é "CESIU" (nome e sigla).
     expect(siglaNoSgcp({ codigo: "CES", nome_sede: "CESIU" })).toBe("CESIU");
-    // A Benfica daqui é a da Universidade: "BN" lá é a do Colégio.
-    expect(siglaNoSgcp({ codigo: "BN", nome_sede: "Benfica" })).toBe("UBN");
+    // O SGCP recebe a Benfica só como "BN" — a daqui e a UniBenfica (16/11/2026).
+    expect(siglaNoSgcp({ codigo: "BN", nome_sede: "Benfica" })).toBe("BN");
+    expect(siglaNoSgcp({ codigo: "UBN", nome_sede: "UniBenfica" })).toBe("BN");
     expect(siglaNoSgcp({ codigo: "SUL 1", nome_sede: "Sul 1" })).toBe("SUL 1");
     expect(siglaNoSgcp({ codigo: "", nome_sede: "Benfica" })).toBe("Benfica");
   });
