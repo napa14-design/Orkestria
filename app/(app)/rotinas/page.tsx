@@ -31,6 +31,7 @@ import Carregando from "@/components/Carregando";
 import { useSessao } from "@/components/SessaoContexto";
 import {
   blocosOcupados,
+  feriadoDoDia,
   funcionarioNoDia,
   PARAMETROS_PADRAO,
   tempoPrevistoMin,
@@ -606,7 +607,7 @@ export default function PaginaRotinas() {
           {
             nivel: "alerta",
             codigo: "GERAR",
-            mensagem: `Hoje a sede não opera: ${r.fechado}. Nada a montar. Se houver trabalho nesta data, ajuste em Estrutura › Feriados e recessos.`,
+            mensagem: `Em ${formatarDataBR(data)} a sede não opera: ${r.fechado}. Nada a montar. Se houver trabalho nesta data, ajuste em Estrutura › Feriados e recessos.`,
           },
         ]);
       } else {
@@ -841,6 +842,9 @@ export default function PaginaRotinas() {
   }
 
   const temRotinas = (rotinas?.length ?? 0) > 0;
+  // Feriado/recesso da sede na data aberta: avisa ao abrir o dia, sem esperar o
+  // "Gerar o dia" recusar, e some com o que cobra trabalho (16/11/2026).
+  const feriadoDaData = sedeId ? feriadoDoDia(feriados ?? [], sedeId, data) : null;
 
   return (
     <div>
@@ -955,7 +959,21 @@ export default function PaginaRotinas() {
         </div>
       ) : (
         <>
-          {!somenteLeitura && !temRotinas && temRotaPadrao && (
+          {feriadoDaData && (
+            <div className="painel entra agenda-proximo-passo" role="status">
+              <span style={{ flex: 1, minWidth: 220 }}>
+                <strong>
+                  {formatarDataBR(data)} · {feriadoDaData.nome}.
+                </strong>{" "}
+                A sede não opera nesta data: a rota padrão não é gerada e nada é cobrado como pendente.
+                {temRotinas &&
+                  ` Este dia já tem ${(rotinas ?? []).length} tarefa${(rotinas ?? []).length === 1 ? "" : "s"} na agenda — confira se a sede vai mesmo abrir.`}{" "}
+                Se houver trabalho, ajuste em Estrutura › Feriados e recessos.
+              </span>
+            </div>
+          )}
+
+          {!somenteLeitura && !feriadoDaData && !temRotinas && temRotaPadrao && (
             <div
               className="painel entra agenda-proximo-passo"
             >
@@ -969,7 +987,7 @@ export default function PaginaRotinas() {
             </div>
           )}
 
-          {!somenteLeitura && !temRotinas && !temRotaPadrao && fonteRepetir && (
+          {!somenteLeitura && !feriadoDaData && !temRotinas && !temRotaPadrao && fonteRepetir && (
             <div
               className="painel entra agenda-proximo-passo"
             >
@@ -1005,6 +1023,7 @@ export default function PaginaRotinas() {
             aoMover={somenteLeitura ? undefined : mover}
           />
 
+          {!feriadoDaData && (
           <PendenciasPanel
             tarefas={tarefas ?? []}
             locais={locais ?? []}
@@ -1014,6 +1033,7 @@ export default function PaginaRotinas() {
             periodos={periodosLetivos ?? []}
             ausentes={ausentesMap}
           />
+          )}
 
           {/* paginação de colunas — só aparece em sedes grandes */}
           {funcionariosVisiveis.length > FUNC_POR_PAGINA && (

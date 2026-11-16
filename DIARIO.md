@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-11-16 — Agenda avisa o feriado ao abrir o dia
+
+Antes, o feriado só aparecia quando alguém clicava em "Gerar o dia" (e a mensagem dizia
+"Hoje a sede não opera" para qualquer data). Agora, ao abrir na agenda uma data que é
+feriado ou recesso da sede, aparece o aviso com o nome, e somem o "Gerar o dia", o
+"Repetir o dia anterior" e o painel "Ficou de fora hoje" (nada é cobrado em dia fechado).
+Se o dia já tiver tarefas, o aviso diz quantas, para conferir se a sede vai abrir. A
+recusa do servidor ao gerar segue igual, com a data certa na mensagem.
+
+Arquivos: `app/(app)/rotinas/page.tsx`.
+
+---
+
 ## 2026-11-16 — Sobrecarga por apoio a outro setor; desvio reabre com o que foi escrito
 
 Pedido da coordenação da UniBenfica: a equipe tem a rota cheia, é puxada para montar e
