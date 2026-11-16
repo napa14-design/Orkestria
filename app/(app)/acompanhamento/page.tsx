@@ -14,6 +14,7 @@ import SeletorDia from "@/components/SeletorDia";
 import SeletorSede from "@/components/SeletorSede";
 import { useSessao } from "@/components/SessaoContexto";
 import {
+  CATEGORIA_APOIO_OUTRO_SETOR,
   cedidasNaCobertura,
   cobraDesvio,
   desvioPercentual,
@@ -30,6 +31,7 @@ import {
   hhmmParaMin,
   hojeISO,
 } from "@/lib/dateUtils";
+import { podeEscrever } from "@/lib/permissions";
 import { sedeDaTela } from "@/lib/sedeDaTela";
 import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type {
@@ -112,6 +114,9 @@ export default function PaginaAcompanhamento() {
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [rotinaAberta, setRotinaAberta] = useState<RotinaPlanejada | null>(null);
   const [form, setForm] = useState<FormExecucao>(FORM_VAZIO);
+  // Atalho do apoio a outro setor (16/11/2026): no próprio registro do desvio, sem ir a
+  // Serviços eventuais redigitar pessoa, dia, horário e motivo. Nasce desmarcado sempre.
+  const [apoio, setApoio] = useState({ marcado: false, inicio: "", fim: "" });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [processandoRapido, setProcessandoRapido] = useState<Set<string>>(() => new Set());
@@ -571,6 +576,7 @@ export default function PaginaAcompanhamento() {
             epis,
           },
     );
+    setApoio({ marcado: false, inicio: rotina.inicio_planejado, fim: rotina.fim_planejado });
     setErro("");
     setRotinaAberta(rotina);
   }
@@ -619,7 +625,13 @@ export default function PaginaAcompanhamento() {
   const desvioAtual = rotinaAberta
     ? desvioPercentual(form.tempo_real_min, rotinaAberta.tempo_previsto_min)
     : 0;
+  // Só no desvio que diz "fez a tarefa mal ou não fez" e só para quem lança eventual
+  // (o supervisor de chão registra o realizado, mas não lança eventual).
+  const podeLancarApoio =
+    !!sessao && podeEscrever(sessao) && ["com_atraso", "parcial", "nao_realizada"].includes(form.status_realizado);
+  const lancaApoio = podeLancarApoio && apoio.marcado;
   const precisaJustificar =
+    lancaApoio ||
     statusCritico ||
     (rotinaAberta !== null &&
       !ehReferencia &&
@@ -658,7 +670,12 @@ export default function PaginaAcompanhamento() {
     e.preventDefault();
     if (!rotinaAberta) return;
     setErro("");
+    if (lancaApoio) {
+      if (!form.justificativa.trim()) return setErro("Escreva na justificativa o que a pessoa foi fazer: é a descrição do apoio.");
+      if (!(hhmmParaMin(apoio.fim) > hhmmParaMin(apoio.inicio))) return setErro("O fim do apoio precisa ser depois do início.");
+    }
     setSalvando(true);
+    let execucaoGravada = false;
     try {
       await apiPost("/api/execucoes", {
         rotina_id: rotinaAberta.id,
@@ -671,10 +688,31 @@ export default function PaginaAcompanhamento() {
         observacao: form.observacao,
         epis_confirmados: statusCritico ? "" : form.epis.join(", "),
       });
+      execucaoGravada = true;
+      if (lancaApoio)
+        await apiPost("/api/servicos-eventuais", {
+          sede_id: rotinaAberta.sede_id,
+          funcionario_id: rotinaAberta.funcionario_id,
+          local_id: "",
+          categoria_id: CATEGORIA_APOIO_OUTRO_SETOR,
+          data,
+          tipo: "eventual",
+          descricao: form.justificativa.trim(),
+          inicio: apoio.inicio,
+          fim: apoio.fim,
+          tempo_min: hhmmParaMin(apoio.fim) - hhmmParaMin(apoio.inicio),
+          observacao: `Lançado no registro da tarefa "${tarefaPorId.get(rotinaAberta.tarefa_id)?.nome_tarefa ?? ""}".`,
+        });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
       setRotinaAberta(null);
     } catch (err) {
-      setErro(err instanceof ErroApi ? err.message : "Erro ao registrar.");
+      const msg = err instanceof ErroApi ? err.message : "Erro ao registrar.";
+      if (execucaoGravada) {
+        // A execução já foi: o que falhou foi só o apoio. Desmarca para um novo clique não regravar à toa.
+        await Promise.all([mutateRotinas(), mutateExecucoes()]);
+        setApoio((a) => ({ ...a, marcado: false }));
+        setErro(`A tarefa foi registrada, mas o apoio não foi lançado: ${msg} Lance em Serviços eventuais.`);
+      } else setErro(msg);
     } finally {
       setSalvando(false);
     }
@@ -1244,6 +1282,38 @@ export default function PaginaAcompanhamento() {
                       desmarcar acima substitui essa lista.
                     </div>
                   )}
+              </div>
+            )}
+
+            {podeLancarApoio && (
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12 }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", flex: "1 1 100%" }}>
+                  <input
+                    type="checkbox"
+                    checked={apoio.marcado}
+                    onChange={(e) => setApoio((a) => ({ ...a, marcado: e.target.checked }))}
+                  />
+                  <span>
+                    Foi puxado(a) para outro setor (ex.: evento do colégio) — lançar como{" "}
+                    <strong>Apoio a outro setor</strong>
+                  </span>
+                </label>
+                {apoio.marcado && (
+                  <>
+                    <label className="campo">
+                      <span className="rotulo">Apoio · início</span>
+                      <input type="time" value={apoio.inicio} onChange={(e) => setApoio((a) => ({ ...a, inicio: e.target.value }))} required />
+                    </label>
+                    <label className="campo">
+                      <span className="rotulo">Apoio · fim</span>
+                      <input type="time" value={apoio.fim} onChange={(e) => setApoio((a) => ({ ...a, fim: e.target.value }))} required />
+                    </label>
+                    <span style={{ flex: "1 1 200px", fontSize: 13, opacity: 0.75 }}>
+                      A justificativa vira a descrição. Conta no Painel em “Apoio a outro setor” e, com a tarefa feita com
+                      atraso ou parcial, na sobrecarga.
+                    </span>
+                  </>
+                )}
               </div>
             )}
 

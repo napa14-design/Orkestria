@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-11-16 — Atalho do apoio a outro setor no registro da execução
+
+No formulário "Registrar execução", com status **com atraso**, **parcial** ou **não
+realizada**, coordenador e administrador veem a caixa "Foi puxado(a) para outro setor".
+Marcada, mostra início e fim do apoio (nascem com o horário da tarefa), torna a
+justificativa obrigatória e, ao registrar, cria junto o serviço eventual de **Apoio a
+outro setor** (mesma pessoa, dia e sede; a justificativa vira a descrição). Elimina ir a
+Serviços eventuais redigitar tudo. Não aparece no "Feita"/conforme nem para o perfil
+supervisor (que não lança eventual). Nasce desmarcada, inclusive ao reabrir; se o apoio
+falhar depois da execução gravada, a tela diz que só o apoio faltou.
+
+Arquivos: `app/(app)/acompanhamento/page.tsx`.
+
+---
+
 ## 2026-11-16 — Agenda avisa o feriado ao abrir o dia
 
 Antes, o feriado só aparecia quando alguém clicava em "Gerar o dia" (e a mensagem dizia
