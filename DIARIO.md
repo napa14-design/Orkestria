@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-11-16 — Eventos do Quadro para o Chromos; cadastro de Empresas; tipo no Desligar
+
+**Contrato** "Orkestria → Cromos — contrato de eventos do Quadro (v1)" (vault, com as emendas
+do `seguranca`): para a função **ASG**, quem entra, sai e muda de sede nasce no Orkestria, e o
+Chromos lê os eventos e aplica no Quadro da Infra (sozinho quando é seguro; o resto vai para a
+conferência de lá).
+
+- **Eventos** `adm_`/`desl_`/`transf_` gravados **no mesmo lote** da mudança (cadastro de ASG,
+  "Saiu da empresa", Transferir entre sedes ou para setor, importação). Coleção
+  `eventos_quadro` só de inclusão (trava no decorator + `create` no lote). Evento montado da
+  ficha gravada, nunca do corpo; ficha e evento vão primeiro no lote. `funcao` sai "ASG".
+- **Feed** `GET /api/chromos/eventos-quadro?desde=AAAA-MM-DD`, com a `CHAVE_CROMOS` que já
+  existia (decisão do dono: nenhuma chave nova). `desde` estrito (≤ 60 dias, Fortaleza), teto de
+  500 eventos / 512 KB (413, nunca lista cortada), só os campos do contrato, `no-store`, 405.
+  **Retenção (LGPD):** eventos com mais de 90 dias são apagados uma vez por dia quando o feed é
+  lido com sucesso — único caminho que exclui.
+- **Empresas: lista fechada com cadastro** (decisão do dono). Tela Sistema › Empresas (só
+  administrador): cadastrar e desativar; não renomeia nem exclui. O campo Empresa do funcionário
+  virou lista só com as ativas; o servidor recusa empresa fora do cadastro (também no Vincular).
+- **Desligar pergunta o tipo:** "Saiu da empresa" (como antes + evento; motivos = os 6 do Chromos
+  com a grafia de lá + Término de experiência, Acordo, Aposentadoria, Abandono de emprego, Outros;
+  "Transferência" saiu da lista) e "Saiu do posto" (a pessoa continua ativa na sede, sem rota; a
+  rota vira um posto vago "Posto de X"; sem evento; só hoje ou para trás).
+- **Travas:** mudar de sede só pelo Transferir; "Assume o posto de" só de posto vago; trocar o
+  cargo de/para ASG só pelo RH; ficha que já gerou evento não se exclui; nome com fórmula
+  (`= + - @`) ou caractere de controle é recusado, inclusive na importação.
+
+Revisões: `seguranca` e `auditor` em rodadas (ver a sessão); recusas de regra saem 422 (padrão
+do sistema), não 400.
+
+Arquivos: `lib/eventosQuadro.ts`, `services/eventosQuadroService.ts`,
+`services/empresasService.ts`, `app/api/chromos/eventos-quadro/route.ts`,
+`app/api/empresas/route.ts`, `app/(app)/empresas/page.tsx` (novos); `lib/chaves.ts`,
+`lib/desligamento.ts`, `lib/empresas.ts`, `lib/historico.ts`, `lib/firebaseClient.ts`,
+`lib/memoryStore.ts`, `lib/datasource.ts`, `lib/schema.ts`, `lib/validations.ts`,
+`services/funcionariosService.ts`, `services/importacaoService.ts`,
+`services/quadroInfraService.ts`, `app/api/funcionarios/[id]/desligar/route.ts`,
+`app/(app)/funcionarios/page.tsx`, `components/AppShell.tsx`, `docs/02-modelo-de-dados.md`;
+removida `app/api/funcionarios/empresas`. Testes: `testes/eventos-quadro.test.ts` e ajustes.
+
+---
+
 ## 2026-11-13 — Funcionários: "Nome completo" e "Apelido (aparece na agenda)"
 
 Pedido do dono: a coordenação punha um nome só. O formulário agora pede primeiro o **Nome

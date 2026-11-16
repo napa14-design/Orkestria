@@ -66,7 +66,12 @@ export function ordenarELimitar<T extends Record<string, unknown>>(registros: T[
  * registro de auditoria no MESMO commit.
  */
 export type OperacaoLote =
-  | { tipo: "criar"; tabela: NomeTabela; registro: MapaTabelas[NomeTabela] }
+  /**
+   * `exigirNovo`: o lote inteiro falha se o id já existe (`create` do Firestore, não `set`).
+   * Para registro de id determinístico que dois pedidos simultâneos podem tentar criar.
+   * Nas tabelas só de inclusão vale sempre.
+   */
+  | { tipo: "criar"; tabela: NomeTabela; registro: MapaTabelas[NomeTabela]; exigirNovo?: boolean }
   | { tipo: "atualizar"; tabela: NomeTabela; id: string; mudancas: Partial<MapaTabelas[NomeTabela]> }
   | { tipo: "excluir"; tabela: NomeTabela; id: string };
 

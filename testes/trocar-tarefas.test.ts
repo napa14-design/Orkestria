@@ -259,6 +259,8 @@ describe("trocar as tarefas do dia", () => {
       await pedir(troca({ confirmar: true, rota: true, assinatura }));
       expect(await donoDoItem("ra")).toBe(B); // o id ainda carrega A
       await (await getDataSource()).atualizar("funcionarios", "christus_f4", { entrada: "07:00", saida: "17:00" });
+      // Só posto vago se assume (decisão do dono, 16/11/2026): B sai antes.
+      await (await getDataSource()).atualizar("funcionarios", B, { desligado_em: DIA });
       const r = await substituirNoPosto("christus_f4", B, DIA, "c@x.com");
       expect(await donoDoItem("ra")).toBe("christus_f4");
       expect(r.itensDeRota).toBe(1); // o item que só mudou de dono também conta

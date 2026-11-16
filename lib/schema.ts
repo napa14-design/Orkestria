@@ -19,6 +19,8 @@ import type {
   RegistroHistorico,
   CacheResumo,
   UsoTela,
+  Empresa,
+  EventoQuadro,
   Requisito,
   RotinaPlanejada,
   Sede,
@@ -50,6 +52,8 @@ export interface MapaTabelas {
   historico: RegistroHistorico;
   cache_resumo: CacheResumo;
   uso_telas: UsoTela;
+  empresas: Empresa;
+  eventos_quadro: EventoQuadro;
 }
 
 export type NomeTabela = keyof MapaTabelas;
@@ -124,6 +128,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("transferido_setor"),
     col("nome_completo"),
     col("data_admissao"),
+    col("identidade_alterada_em"),
   ],
   sedes: [
     col("id"),
@@ -351,7 +356,34 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
   ],
   cache_resumo: [col("id"), col("corpo"), col("expira_em"), col("criado_em")],
   uso_telas: [col("id"), col("dia"), col("perfil"), col("sede_id"), col("tela")],
+  empresas: [col("id"), col("nome"), col("ativo", "boolean"), ...AUDITORIA],
+  // camelCase de propósito: é o formato do contrato com o Chromos (ver types/EventoQuadro.ts).
+  eventos_quadro: [
+    col("id"),
+    col("tipo"),
+    col("dataEfetiva"),
+    col("registradoEm"),
+    col("matricula"),
+    col("empresa"),
+    col("nome"),
+    col("admissao"),
+    col("funcao"),
+    col("identidadeAlteradaEm"),
+    col("sedeDe"),
+    col("sedePara"),
+    col("motivo"),
+    col("autor"),
+    col("funcionarioId"),
+  ],
 };
+
+/**
+ * Tabelas SÓ DE INCLUSÃO: atualizar ou excluir lança erro, e criar com id que já existe
+ * também (seria sobrescrever). A trava vale para todo banco porque mora no decorator
+ * (`lib/historico.ts`); o Firestore e o banco de memória ainda recusam o id repetido
+ * DENTRO do lote (`create` em vez de `set`), o que fecha a corrida de dois cliques.
+ */
+export const TABELAS_SO_DE_INCLUSAO: ReadonlySet<NomeTabela> = new Set<NomeTabela>(["eventos_quadro"]);
 
 /** Converte uma linha crua do Sheets (strings) no objeto tipado da tabela. */
 export function linhaParaObjeto<K extends NomeTabela>(

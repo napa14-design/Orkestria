@@ -64,10 +64,11 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | intervalos_sabado | CSV "HH:mm-HH:mm;…" | intervalos do sábado, dentro do horário de sábado; vazio = sem pausa (desde 23/10/2026) |
 | nome_completo | string | nome completo do RH; o `nome` segue sendo como a equipe chama (vai na agenda). **Obrigatório** desde 13/11/2026 em quem está no quadro |
 | matricula | string | matrícula do RH, chave do Chromos (o nome tem homônimos). **Única por empresa** entre fichas não desligadas. **Obrigatória** desde 13/11/2026 |
-| empresa | string | empresa que registra a pessoa ("Apel - Matriz", "Ipade"…). Desde 13/11/2026 o dono do dado é o Orkestria (daqui vai para o Chromos): edita no cadastro, sem espaço sobrando. **Obrigatória** |
+| empresa | string | empresa que registra a pessoa, na grafia de `normalizarEmpresa` ("APEL MATRIZ"). Desde 13/11/2026 o dono do dado é o Orkestria (daqui vai para o Chromos). **Lista fechada**: só empresa ativa da tabela `empresas` (no cadastro, na edição que a troca, na transferência e na importação). **Obrigatória** |
 | data_admissao | string | AAAA-MM-DD, não futura. **Obrigatória** desde 13/11/2026. Desligado e posto vago ficam dispensados dos quatro |
+| identidade_alterada_em | ISO 8601 | instante da última troca de matrícula, empresa ou nome completo (inclusive de vazio para preenchido). Só o servidor grava; vai no evento do Quadro como `identidadeAlteradaEm` |
 | desligado_em | AAAA-MM-DD | desligamento; a partir deste dia sai da geração e da agenda (pode ser futuro — aviso prévio) |
-| motivo_desligamento | string | um de `MOTIVOS_DESLIGAMENTO` (`lib/desligamento.ts`) |
+| motivo_desligamento | string | um de `MOTIVOS_DESLIGAMENTO` (`lib/desligamento.ts`: os 6 do Chromos + 5 daqui). Só o "Transferir" grava "Transferência"; a ficha-posto do "saiu do posto" leva "Saiu do posto". Fichas antigas podem ter "Pedido de demissão", "Demissão sem justa causa" ou "Demissão por justa causa" (continuam valendo no "Abrir vaga") |
 | vaga_sgcp | string | código da vaga de substituição aberta no SGCP; vazio = não abriu |
 | substituido_por | string | id de quem assumiu o posto; preenchido = não é mais posto vago |
 | posto_extinto | boolean | no desligamento o posto deixou de existir (quadro reduzido): a rota foi apagada |
@@ -80,6 +81,56 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 
 > Jornada líquida não é armazenada — é sempre calculada:
 > `jornada_liquida = saida − entrada − intervalo_min`.
+
+> **Sede não muda pela edição** (13/11/2026): troca de sede só pelo "Transferir", que gera
+> o evento `transf_`. **Cargo**: entrar ou sair da função ASG não se faz pela edição (16/11/2026);
+> entre outros cargos, livre. **Saiu do posto** (Desligar com `tipo: "saiu_do_posto"`, data de
+> hoje ou passada): a pessoa continua ativa, sem rota; a rota vai para uma ficha-posto nova
+> (id `posto_<id da pessoa>_<data>`, gravada com `create`; "Posto de <apelido>", desligada na
+> data, sem dados do RH), que o "Assume o posto de" lista como posto vago. **"Assume o posto
+> de" só vale para posto vago** (16/11/2026): `desligado_em` preenchido, sem `substituido_por`
+> e sem `posto_extinto`.
+
+### empresas
+Cadastro fechado de empresas (decisão do dono, 13/11/2026), mantido pelo administrador
+(`/api/empresas`). Não se renomeia nem se exclui; desativar tira da lista sem apagar.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| id | string | `emp_<nome com _ no lugar do espaço>` (`idDaEmpresa`) |
+| nome | string | sempre a saída de `normalizarEmpresa` ("APEL MATRIZ", "IPADE 7"); único |
+| ativo | boolean | só as ativas valem para o funcionário |
+| criado_por, criado_em, atualizado_por, atualizado_em | auditoria | |
+
+### eventos_quadro
+Eventos do ciclo de vida do ASG que o Chromos lê em `GET /api/chromos/eventos-quadro`
+(contrato "Orkestria → Cromos (v1)", vault). **Só de inclusão**: atualizar, excluir ou
+regravar um id lança erro em qualquer banco (`lib/historico.ts`; no Firestore o lote usa
+`create`). Gravado no **mesmo lote** da mudança e montado da ficha gravada. Só cargo ASG
+(`ehAsg`). Campos em **camelCase** de propósito — é o formato do contrato. Fora do `historico`.
+Na frente do lote: a ficha e o evento vão nas primeiras escritas (o Firestore parte lote acima
+de 500). **Retenção de 90 dias** (16/11/2026): sem cron nem segredo novo, o próprio feed
+(`GET /api/chromos/eventos-quadro`, que o Chromos lê uma vez por dia), depois de montar uma
+resposta 200, apaga o que tem `registradoEm` antes de 00:00 de Fortaleza de hoje − 90 dias — no
+máximo uma vez por dia por instância (data guardada em memória), pelo único método que exclui
+(`HistoricoDataSource.expurgarEventosQuadroAntigos`), com uma linha no `historico`. Falha no
+expurgo só vai ao log; a resposta do feed não muda.
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| id | string | `adm_<funcionarioId>`, `desl_<funcionarioId>`, `transf_<id da origem>` |
+| tipo | enum | admissao · desligamento · transferencia |
+| dataEfetiva | AAAA-MM-DD | admissão, desligamento ou dia da transferência |
+| registradoEm | ISO 8601 | instante da gravação (UTC) |
+| matricula, empresa | string | da ficha gravada |
+| nome | string | o nome **completo** |
+| admissao | AAAA-MM-DD | só no tipo admissao |
+| funcao | string | o cargo |
+| identidadeAlteradaEm | ISO 8601 ou "" | `identidade_alterada_em` da ficha |
+| sedeDe, sedePara | string | `sedes.codigo`. Admissão: só `sedePara`; desligamento: só `sedeDe`; transferência para setor: `sedePara = "setor"` |
+| motivo | string | só no desligamento: um dos 6 do Chromos como está, ou "" (os 5 daqui) |
+| autor | string | e-mail da sessão |
+| funcionarioId | string | UUID da ficha (na transferência, o da origem) |
 
 ### sedes
 id · nome_sede · cidade · endereco · **tipo_sede** (educacao_infantil · escola ·
@@ -312,7 +363,8 @@ precisa logar manualmente.
 | criado_em | ISO 8601 | |
 
 Não registra as próprias linhas nem as de `cache_resumo` (dado derivado que o
-sistema regrava sozinho).
+sistema regrava sozinho), `uso_telas` e `eventos_quadro` (já é um registro imutável
+com autor e instante).
 
 ### cache_resumo
 Resumo do Chromos (`/api/chromos/resumo`) já calculado, para não reler o mês

@@ -7,7 +7,8 @@ import DivergenciasQuadro from "@/components/funcionarios/DivergenciasQuadro";
 import Modal from "@/components/Modal";
 import { apiPost, ErroApi } from "@/lib/clientApi";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
-import { MOTIVOS_DESLIGAMENTO, motivoAbreVaga } from "@/lib/desligamento";
+import { MOTIVOS_DESLIGAMENTO, motivoAbreVaga, motivoParaOCromos } from "@/lib/desligamento";
+import { normalizarEmpresa } from "@/lib/empresas";
 import {
   csvDoTrio,
   resumoIntervalos,
@@ -15,7 +16,6 @@ import {
   totalIntervaloMin,
 } from "@/lib/intervalos";
 import { cargaSemanalMin, intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
-import { empresaAmbigua, normalizarEmpresa } from "@/lib/empresas";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
@@ -49,6 +49,8 @@ export default function PaginaFuncionarios() {
   const { mutate } = useSWRConfig();
   const [paraDesligar, setParaDesligar] = useState<Funcionario | null>(null);
   const [desligamento, setDesligamento] = useState({
+    /** Obrigatório desde 13/11/2026 (contrato com o Chromos): só "saiu da empresa" vai para lá. */
+    tipo: "" as "" | "saiu_da_empresa" | "saiu_do_posto",
     data: hojeISO(),
     motivo: "",
     abrirVaga: true,
@@ -114,10 +116,11 @@ export default function PaginaFuncionarios() {
   /** `data`: a do Quadro da Infra, quando o Desligar vem de lá. */
   const abrirDesligar = (f: Funcionario, data = hojeISO()) => {
     setParaDesligar(f);
-    setDesligamento({ data, motivo: "", abrirVaga: true, extinguirPosto: false });
+    setDesligamento({ tipo: "", data, motivo: "", abrirVaga: true, extinguirPosto: false });
     setErro("");
   };
 
+  const saiuDoPosto = desligamento.tipo === "saiu_do_posto";
   const confirmarDesligamento = async () => {
     if (!paraDesligar) return;
     setEnviando(true);
@@ -125,21 +128,42 @@ export default function PaginaFuncionarios() {
     try {
       const r = await apiPost<{
         blocosRemovidos: number;
-        itensDeRotaApagados: number;
-        vaga: { aberta: boolean; codigo?: string; motivo?: string };
-      }>(`/api/funcionarios/${paraDesligar.id}/desligar`, {
-        ...desligamento,
-        // Só vale sem vaga: com vaga aberta, o posto continua por definição.
-        extinguirPosto: !desligamento.abrirVaga && desligamento.extinguirPosto,
-      });
-      setAviso({
-        tipo: r.vaga.aberta ? "ok" : "aviso",
-        texto:
-          `${paraDesligar.nome} desligado(a) a partir de ${dataBR(desligamento.data)}` +
-          (r.blocosRemovidos ? ` · ${r.blocosRemovidos} bloco(s) planejado(s) saíram da agenda` : "") +
-          (r.itensDeRotaApagados ? ` · posto extinto: ${r.itensDeRotaApagados} item(ns) da rota apagado(s)` : "") +
-          `. ${fraseDaVaga(r.vaga)}`,
-      });
+        itensDeRotaApagados?: number;
+        /** Ausente no "saiu do posto": a pessoa continua na empresa, não há vaga. */
+        vaga?: { aberta: boolean; codigo?: string; motivo?: string };
+        /** Só no "saiu do posto": a ficha-posto criada (null se a pessoa não tinha rota). */
+        postoVagoId?: string | null;
+        itensDeRotaMovidos?: number;
+      }>(
+        `/api/funcionarios/${paraDesligar.id}/desligar`,
+        saiuDoPosto
+          ? { tipo: "saiu_do_posto", data: desligamento.data }
+          : {
+              ...desligamento,
+              // Só vale sem vaga: com vaga aberta, o posto continua por definição.
+              extinguirPosto: !desligamento.abrirVaga && desligamento.extinguirPosto,
+            },
+      );
+      setAviso(
+        saiuDoPosto
+          ? {
+              tipo: "ok",
+              texto:
+                `${paraDesligar.nome} saiu do posto a partir de ${dataBR(desligamento.data)} e continua na sede, sem rota` +
+                (r.blocosRemovidos ? ` · ${r.blocosRemovidos} bloco(s) planejado(s) saíram da agenda` : "") +
+                (r.postoVagoId
+                  ? `. A rota (${r.itensDeRotaMovidos ?? 0} item(ns)) ficou como "Posto de ${paraDesligar.nome}" — escolha quem assume em "Assume o posto de".`
+                  : ". Não havia rota para guardar."),
+            }
+          : {
+              tipo: r.vaga?.aberta ? "ok" : "aviso",
+              texto:
+                `${paraDesligar.nome} desligado(a) a partir de ${dataBR(desligamento.data)}` +
+                (r.blocosRemovidos ? ` · ${r.blocosRemovidos} bloco(s) planejado(s) saíram da agenda` : "") +
+                (r.itensDeRotaApagados ? ` · posto extinto: ${r.itensDeRotaApagados} item(ns) da rota apagado(s)` : "") +
+                `. ${r.vaga ? fraseDaVaga(r.vaga) : ""}`,
+            },
+      );
       setParaDesligar(null);
       await recarregar();
     } catch (e) {
@@ -168,8 +192,8 @@ export default function PaginaFuncionarios() {
     const antes = form.__antes as Funcionario | undefined;
     return !antes?.desligado_em && antes?.ativo !== false;
   };
-  /** As empresas de todas as sedes, na grafia do Chromos (sugestões do campo Empresa). */
-  const { data: empresas } = useSWR<string[]>("/api/funcionarios/empresas", fetcher);
+  /** As empresas ATIVAS do cadastro (Sistema › Empresas): a lista fechada do campo Empresa. */
+  const { data: empresas } = useSWR<string[]>("/api/empresas", fetcher);
 
   /**
    * Prévia do ajuste de horário (13/11/2026): a rota anda junto com a entrada de quem
@@ -200,22 +224,20 @@ export default function PaginaFuncionarios() {
    * Quem pode ter o posto assumido na sede escolhida: quem está lá hoje e os
    * POSTOS VAGOS — desligados cuja rota ninguém assumiu ainda.
    */
+  // Só POSTO VAGO (decisão do dono, 16/11/2026): tomar o posto de quem está ativo tirava
+  // a pessoa do quadro sem desligamento — e sem aviso ao Quadro da Infra. Quem sai,
+  // sai pelo "Desligar" (da empresa ou do posto); aí o posto fica vago para assumir.
   const candidatos = (form: Record<string, unknown>) =>
     (equipe ?? [])
       .filter(
         (f) =>
           f.sede_id === form.sede_id &&
           f.id !== form.id && // na edição, a própria pessoa não é candidata
+          Boolean(f.desligado_em) &&
           !f.substituido_por &&
-          !f.posto_extinto &&
-          (f.ativo !== false || Boolean(f.desligado_em)),
+          !f.posto_extinto,
       )
-      .map((f) => ({
-        valor: f.id,
-        rotulo: f.desligado_em
-          ? `${f.nome} — posto vago desde ${dataBR(f.desligado_em)}`
-          : `${f.nome} (${f.entrada}–${f.saida})`,
-      }));
+      .map((f) => ({ valor: f.id, rotulo: `${f.nome} — posto vago desde ${dataBR(f.desligado_em!)}` }));
 
   return (
     <>
@@ -299,6 +321,10 @@ export default function PaginaFuncionarios() {
           tipo: "select",
           obrigatorio: true,
           opcoes: (sedes ?? []).map((s) => ({ valor: s.id, rotulo: s.nome_sede })),
+          // Escolhe-se só ao cadastrar: trocar de sede é pelo "Transferir", que avisa o
+          // Quadro da Infra (contrato com o Chromos, 13/11/2026). Na edição o valor segue
+          // no formulário, sem campo para mudar.
+          mostrarSe: (f) => f.__novo === true,
         },
         {
           key: "genero",
@@ -389,19 +415,23 @@ export default function PaginaFuncionarios() {
         {
           key: "empresa",
           rotulo: "Empresa",
-          // Como no Quadro da Infra (pedido do dono, 13/11/2026): texto com a lista das
-          // empresas já usadas por baixo. Lista FECHADA travava empresa nova — e o
-          // servidor já grava na grafia padrão ("Apel - Matriz" → "APEL MATRIZ").
-          tipo: "texto",
+          // Lista FECHADA com cadastro (decisão do dono, 13/11/2026): as empresas vêm de
+          // Sistema › Empresas, mantido pelo administrador. Empresa nova entra por lá.
+          // Ficha gravada em outra grafia ("Apel - Matriz") abre já na do cadastro.
+          valorInicial: (item) => normalizarEmpresa(item.empresa),
+          tipo: "select",
           obrigatorio: noQuadro,
-          sugestoes: empresas ?? [],
-          ajuda: (f) => {
-            const e = normalizarEmpresa(f.empresa);
-            if (!e) return "";
-            if (empresaAmbigua(e)) return `"${e}" não diz qual filial — escolha a empresa certa.`;
-            return (empresas ?? []).includes(e) ? "" : `Empresa nova: vai ser gravada como "${e}".`;
+          opcoes: (f) => {
+            const atual = normalizarEmpresa(f.empresa);
+            // Ficha antiga com empresa fora do cadastro: aparece para não sumir, marcada.
+            const fora = atual && !(empresas ?? []).includes(atual) ? [{ valor: atual, rotulo: `${atual} (fora do cadastro)` }] : [];
+            return [...(empresas ?? []).map((e) => ({ valor: e, rotulo: e })), ...fora];
           },
-          dica: "A empresa que registra a pessoa (APEL MATRIZ, APEL 7, IPADE…). Escolha da lista ou digite; ela é gravada na mesma grafia do Quadro da Infra. Cada empresa numera a sua matrícula.",
+          ajuda: (f) =>
+            f.empresa && !(empresas ?? []).includes(normalizarEmpresa(f.empresa))
+              ? "Esta empresa não está no cadastro: escolha uma da lista. Se faltar alguma, o administrador cadastra em Sistema › Empresas."
+              : "",
+          dica: "A empresa que registra a pessoa (APEL MATRIZ, APEL 7, IPADE…), na mesma grafia do Quadro da Infra. Cada empresa numera a sua matrícula. Faltou alguma? O administrador cadastra em Sistema › Empresas.",
         },
         { key: "data_admissao", rotulo: "Data de admissão", tipo: "data", obrigatorio: noQuadro },
         // Sem checkbox "Ativo": desmarcar era o caminho antigo de saída, sem data,
@@ -557,20 +587,57 @@ export default function PaginaFuncionarios() {
       aoFechar={() => setParaDesligar(null)}
       larguraMax={460}
     >
-      <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)", marginTop: 0 }}>
-        A partir da data, {paraDesligar?.nome} sai da agenda e da geração do dia. Os dias
-        já trabalhados continuam no nome de quem trabalhou, e a rota padrão fica guardada
-        como posto vago para quem for contratado assumir.
-      </p>
+      {/* Tipo obrigatório (contrato com o Chromos, 13/11/2026): só "saiu da empresa"
+          desliga lá; "saiu do posto" fica aqui — a pessoa continua na sede, sem rota. */}
+      <fieldset style={{ border: 0, padding: 0, margin: "0 0 12px", display: "grid", gap: 8, fontSize: 13.5 }}>
+        <legend className="rotulo" style={{ marginBottom: 6 }}>O que aconteceu?</legend>
+        <label style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+          <input
+            type="radio"
+            name="tipo-desligamento"
+            checked={desligamento.tipo === "saiu_da_empresa"}
+            onChange={() => setDesligamento((d) => ({ ...d, tipo: "saiu_da_empresa" }))}
+          />
+          <span>
+            <strong>Saiu da empresa</strong> — demissão, fim de contrato… Vai também para o Quadro da Infra.
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+          <input
+            type="radio"
+            name="tipo-desligamento"
+            checked={desligamento.tipo === "saiu_do_posto"}
+            onChange={() => setDesligamento((d) => ({ ...d, tipo: "saiu_do_posto" }))}
+          />
+          <span>
+            <strong>Saiu do posto</strong> — continua na empresa e na sede, mas sem esta rota.
+          </span>
+        </label>
+      </fieldset>
+      {desligamento.tipo && (
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)", marginTop: 0 }}>
+          {saiuDoPosto
+            ? `A partir da data, ${paraDesligar?.nome ?? ""} fica sem rota (continua na sede e na lista). A rota vira um posto vago, para quem for assumir pelo "Assume o posto de". Nada muda no Quadro da Infra.`
+            : `A partir da data, ${paraDesligar?.nome ?? ""} sai da agenda e da geração do dia. Os dias já trabalhados continuam no nome de quem trabalhou, e a rota padrão fica guardada como posto vago para quem for contratado assumir.`}
+        </p>
+      )}
+      {desligamento.tipo && (
       <div className="form-grade">
         <label className="campo">
-          <span className="rotulo">Data do desligamento</span>
+          <span className="rotulo">{saiuDoPosto ? "A partir de" : "Data do desligamento"}</span>
           <input
             type="date"
             value={desligamento.data}
+            // "Saiu do posto" só hoje ou para trás: com data futura a rota sairia na
+            // hora e a pessoa ficaria sem agenda até a data (auditoria, 16/11/2026).
+            max={saiuDoPosto ? hojeISO() : undefined}
             onChange={(e) => setDesligamento((d) => ({ ...d, data: e.target.value }))}
           />
         </label>
+        {saiuDoPosto && desligamento.data > hojeISO() && (
+          <p style={{ fontSize: 12.5, color: "var(--vermelho)", margin: 0 }}>Tirar do posto vale de hoje para trás.</p>
+        )}
+        {!saiuDoPosto && (
         <label className="campo">
           <span className="rotulo">Motivo</span>
           <select
@@ -585,13 +652,20 @@ export default function PaginaFuncionarios() {
             ))}
           </select>
         </label>
+        )}
       </div>
-      {desligamento.data > hojeISO() && (
+      )}
+      {desligamento.tipo === "saiu_da_empresa" && desligamento.motivo && !motivoParaOCromos(desligamento.motivo) && (
+        <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
+          Este motivo não existe no Quadro da Infra: lá o desligamento fica para alguém conferir.
+        </p>
+      )}
+      {desligamento.tipo === "saiu_da_empresa" && desligamento.data > hojeISO() && (
         <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
           Data futura (aviso prévio): até lá, a pessoa segue na agenda normalmente.
         </p>
       )}
-      {desligamento.motivo === "Abandono de emprego" ? (
+      {desligamento.tipo !== "saiu_da_empresa" ? null : desligamento.motivo === "Abandono de emprego" ? (
         <p style={{ fontSize: 12.5, color: "var(--tinta-3)", margin: "10px 0 0" }}>
           Abandono não abre vaga por aqui: depois de 15 dias de falta o Chromos avisa a Coordenação, que pede a vaga por lá.
         </p>
@@ -605,7 +679,7 @@ export default function PaginaFuncionarios() {
           Abrir vaga de substituição no SGCP
         </label>
       )}
-      {!desligamento.abrirVaga && desligamento.motivo !== "Abandono de emprego" && (
+      {desligamento.tipo === "saiu_da_empresa" && !desligamento.abrirVaga && desligamento.motivo !== "Abandono de emprego" && (
         <fieldset style={{ border: 0, padding: 0, margin: "10px 0 0 22px", display: "grid", gap: 6, fontSize: 13.5 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
             <input
@@ -640,9 +714,12 @@ export default function PaginaFuncionarios() {
           type="button"
           className="btn btn-primario"
           onClick={() => void confirmarDesligamento()}
-          disabled={enviando || !desligamento.data || !desligamento.motivo}
+          disabled={
+            enviando || !desligamento.tipo || !desligamento.data || (!saiuDoPosto && !desligamento.motivo) ||
+            (saiuDoPosto && desligamento.data > hojeISO())
+          }
         >
-          {enviando ? "Desligando…" : "Desligar"}
+          {enviando ? "Gravando…" : saiuDoPosto ? "Tirar do posto" : "Desligar"}
         </button>
       </div>
     </Modal>

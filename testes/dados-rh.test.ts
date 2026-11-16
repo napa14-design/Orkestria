@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getDataSource } from "@/lib/datasource";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { validarFuncionario } from "@/lib/validations";
-import { empresaAmbigua, empresasConhecidas, normalizarEmpresa } from "@/lib/empresas";
+import { empresaAmbigua, normalizarEmpresa } from "@/lib/empresas";
 import { createFuncionario, updateFuncionario } from "@/services/funcionariosService";
 import { funcionario, rh } from "./fixtures";
 
@@ -24,7 +24,6 @@ describe("normalizarEmpresa: a grafia do Quadro da Infra", () => {
     ];
     for (const [de, para] of casos) expect([de, normalizarEmpresa(de)]).toEqual([de, para]);
     expect(empresaAmbigua("Apel Filial")).toBe("não diz qual filial");
-    expect(empresasConhecidas([{ empresa: "Apel - Matriz" }, { empresa: "APEL MATRIZ" }, { empresa: "Apel Filial" }, { empresa: "" }])).toEqual(["APEL MATRIZ"]);
   });
 });
 

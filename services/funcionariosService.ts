@@ -1,16 +1,31 @@
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, getDataSource, novoId, type OperacaoLote } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
 import { mapaFatorDoTipo } from "./tiposLocalService";
 import { tempoPrevistoMin } from "@/lib/calculations";
 import { rotaNoHorario } from "@/lib/rotaNoHorario";
-import { comAtivoDoDia, motivoAbreVaga, pedidoDeVaga, validarDesligamento } from "@/lib/desligamento";
+import {
+  comAtivoDoDia,
+  MOTIVO_SAIU_DO_POSTO,
+  MOTIVO_TRANSFERENCIA,
+  motivoAbreVaga,
+  pedidoDeVaga,
+  validarDataDeSaida,
+  validarDesligamento,
+} from "@/lib/desligamento";
+import { ehAsg, idDoEvento, montarEvento, SEDE_SETOR } from "@/lib/eventosQuadro";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { normalizarMatricula } from "@/lib/quadroInfra";
 import { normalizarEmpresa } from "@/lib/empresas";
 import { minhaChave } from "@/lib/chaves";
 import { validarFuncionario, temErro } from "@/lib/validations";
-import type { Funcionario, Local, ModeloRotinaItem, Tarefa } from "@/types";
-import { ErroValidacao } from "./erros";
+import type { EventoQuadro, Funcionario, Local, ModeloRotinaItem, Sede, Tarefa } from "@/types";
+import { exigirEmpresaDoCadastro } from "./empresasService";
+import { ErroConflito, ErroValidacao } from "./erros";
+
+type Ds = Awaited<ReturnType<typeof getDataSource>>;
+
+/** A operação de lote que grava um evento do Quadro (`lib/eventosQuadro.ts`). */
+const criarEvento = (evento: EventoQuadro): OperacaoLote => ({ tipo: "criar", tabela: "eventos_quadro", registro: evento });
 
 type DadosFuncionario = Omit<
   Funcionario,
@@ -65,10 +80,38 @@ function dadosDoRh(d: Partial<Funcionario>): Partial<Pick<Funcionario, "nome_com
   };
 }
 
+/**
+ * Cadastro novo. Se é ASG, o evento `adm_` vai NO MESMO LOTE da ficha (contrato do
+ * Quadro, 13/11/2026): ficha sem evento, ou evento sem ficha, não pode existir.
+ */
 export async function createFuncionario(
   dados: DadosFuncionario,
   autor: string,
 ): Promise<Funcionario> {
+  const { ficha, sede } = await montarFichaNova(dados, autor);
+  const ds = await getDataSource();
+  await ds.gravarLote([
+    { tipo: "criar", tabela: "funcionarios", registro: ficha },
+    ...(ehAsg(ficha.cargo)
+      ? [criarEvento(montarEvento({
+          tipo: "admissao", funcionario: ficha, dataEfetiva: ficha.data_admissao ?? "",
+          sedeDe: "", sedePara: sede.codigo ?? "", autor, registradoEm: ficha.criado_em,
+        }))]
+      : []),
+  ]);
+  return ficha;
+}
+
+/**
+ * A ficha nova, conferida e pronta para gravar — sem gravar. O cadastro e a
+ * transferência passam por aqui: a mesma régua nos dois (a transferência a confere
+ * ANTES de encerrar a origem). `exceto`: a ficha de origem, que ainda segura a matrícula.
+ */
+async function montarFichaNova(
+  dados: DadosFuncionario,
+  autor: string,
+  exceto?: string,
+): Promise<{ ficha: Funcionario; sede: Sede }> {
   // Cadastro novo nasce no quadro: nenhum campo do desligamento/transferência vem do
   // corpo. `desligado_em` no POST dispensava os dados do RH e gerava ficha "ativa"
   // que nunca saía do quadro (revisão de segurança, 13/11/2026). `ativo: true` passa
@@ -90,7 +133,9 @@ export async function createFuncionario(
   const comIntervalos = { ...dados, ...rh, matricula, intervalos: csvDoTrio(dados) };
   const alertas0 = validarFuncionario(comIntervalos);
   if (temErro(alertas0)) throw new ErroValidacao(alertas0);
-  await exigirMatriculaLivre(matricula, rh.empresa);
+  // Lista fechada (decisão do dono, 13/11/2026): só empresa ativa do cadastro.
+  await exigirEmpresaDoCadastro(rh.empresa);
+  await exigirMatriculaLivre(matricula, rh.empresa, exceto);
   const ds = await getDataSource();
   const sede = await ds.obter("sedes", dados.sede_id);
   if (!sede)
@@ -98,7 +143,7 @@ export async function createFuncionario(
       { nivel: "erro", codigo: "FUNCIONARIO_SEM_SEDE", mensagem: "Sede informada não existe." },
     ]);
   const agora = agoraISO();
-  return ds.criar("funcionarios", {
+  const ficha: Funcionario = {
     // `intervalos` é a fonte; o trio antigo sai derivado dela, para os dois
     // nunca mais discordarem (ver `lib/intervalos.ts`).
     ...sincronizarTrio(comIntervalos),
@@ -112,7 +157,8 @@ export async function createFuncionario(
     criado_em: agora,
     atualizado_por: autor,
     atualizado_em: agora,
-  });
+  };
+  return { ficha, sede };
 }
 
 /**
@@ -133,7 +179,12 @@ const CAMPOS_DO_DESLIGAMENTO: ReadonlySet<string> = new Set([
   "transferido_para",
   "transferido_de",
   "transferido_setor",
+  // Só o servidor carimba (troca de matrícula, empresa ou nome completo); vai no evento do Quadro.
+  "identidade_alterada_em",
 ]);
+
+/** Limpeza do nome completo — a mesma de `dadosDoRh`, para comparar antes × depois. */
+const nomeLimpo = (v: unknown) => String(v ?? "").replace(/\p{Cf}/gu, "").replace(/\s+/g, " ").trim();
 
 export async function updateFuncionario(
   id: string,
@@ -156,12 +207,36 @@ export async function updateFuncionario(
     mudancas = { ...mudancas, matricula: normalizarMatricula(String(mudancas.matricula)) };
   mudancas = { ...mudancas, ...dadosDoRh(mudancas) };
   const destino = { ...atual, ...mudancas };
+  // Troca de sede só pelo "Transferir", que gera o evento `transf_` (decisão do dono,
+  // 13/11/2026, para todo cargo). Antes, sem vínculos, o PUT mudava a sede em silêncio.
+  if (destino.sede_id !== atual.sede_id)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "SEDE_SO_PELO_TRANSFERIR",
+        mensagem: "A sede não muda pela edição: use o botão \"Transferir\".",
+      },
+    ]);
+  // Entrar ou sair da função ASG muda o que vai para o Chromos (só ASG gera evento): é do
+  // RH, não da edição (decisão do dono, 16/11/2026). Entre outros cargos, segue livre.
+  if (mudancas.cargo !== undefined && ehAsg(destino.cargo) !== ehAsg(atual.cargo))
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "CARGO_SO_PELO_RH",
+        mensagem: "Entrar ou sair da função ASG não se faz pela edição: fale com o RH.",
+      },
+    ]);
+  const empresaMudou = normalizarEmpresa(destino.empresa) !== normalizarEmpresa(atual.empresa);
+  // Empresa trocada: só para uma ativa do cadastro (lista fechada, 13/11/2026).
+  if (empresaMudou && normalizarEmpresa(destino.empresa)) await exigirEmpresaDoCadastro(destino.empresa);
+  const matriculaMudou = normalizarMatricula(destino.matricula) !== normalizarMatricula(atual.matricula);
   // Matrícula ou empresa trocada: a dupla tem de estar livre (cada empresa numera a sua).
-  if (
-    normalizarMatricula(destino.matricula) !== normalizarMatricula(atual.matricula) ||
-    (destino.empresa ?? "") !== (atual.empresa ?? "")
-  )
+  if (matriculaMudou || (destino.empresa ?? "") !== (atual.empresa ?? ""))
     await exigirMatriculaLivre(normalizarMatricula(destino.matricula), destino.empresa || undefined, id);
+  // Identidade trocada (inclusive de vazio para preenchida): carimbo para o evento do
+  // Quadro — troca recente manda o evento para a conferência no Chromos (emenda 5).
+  const identidadeMudou = matriculaMudou || empresaMudou || nomeLimpo(destino.nome_completo) !== nomeLimpo(atual.nome_completo);
   // Duas situações diferentes que é fácil confundir:
   //  - o formulário **mandou** `intervalos` (mesmo vazio) → vale o que ele mandou;
   //    apagar todos os intervalos precisa apagar de verdade.
@@ -173,46 +248,43 @@ export async function updateFuncionario(
   const alertas = validarFuncionario(destino);
   if (temErro(alertas)) throw new ErroValidacao(alertas);
 
-  if (destino.sede_id !== atual.sede_id) {
-    const [sede, rotinas, modelos, ausencias, qualificacoes, tempos, eventuais] = await Promise.all([
-      ds.obter("sedes", destino.sede_id),
-      ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
-      ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
-      ds.consultar("ausencias", [{ campo: "funcionario_id", op: "==", valor: id }]),
-      ds.consultar("qualificacoes_funcionario", [{ campo: "funcionario_id", op: "==", valor: id }]),
-      ds.consultar("tempos_personalizados", [{ campo: "funcionario_id", op: "==", valor: id }]),
-      ds.consultar("servicos_eventuais", [{ campo: "funcionario_id", op: "==", valor: id }]),
-    ]);
-    if (!sede)
-      throw new ErroValidacao([
-        { nivel: "erro", codigo: "FUNCIONARIO_SEM_SEDE", mensagem: "Sede informada não existe." },
-      ]);
-    const vinculos =
-      rotinas.length + modelos.length + ausencias.length + qualificacoes.length + tempos.length + eventuais.length;
-    if (vinculos > 0)
-      throw new ErroValidacao([
-        {
-          nivel: "erro",
-          codigo: "FUNCIONARIO_SEDE_COM_VINCULOS",
-          mensagem: `Este funcionário tem ${vinculos} vínculo(s) operacional(is) e não pode mudar de sede sem uma migração assistida.`,
-        },
-      ]);
-  }
   // Sem intervalo nenhum o trio também tem de zerar — senão sobra o par velho
   // no registro e `csvDoTrio` o traria de volta no próximo salvamento.
   const trio = destino.intervalos
     ? sincronizarTrio({ ...mudancas, intervalos: destino.intervalos })
     : { ...mudancas, intervalos: "", intervalo_inicio: "", intervalo_fim: "", intervalo_min: 0 };
+  const agora = agoraISO();
   return ds.atualizar("funcionarios", id, {
     ...trio,
+    ...(identidadeMudou ? { identidade_alterada_em: agora } : {}),
     atualizado_por: autor,
-    atualizado_em: agoraISO(),
+    atualizado_em: agora,
   });
 }
 
 /** Bloqueado quando há histórico — inativar preserva relatórios antigos. */
 export async function deleteFuncionario(id: string): Promise<void> {
   const ds = await getDataSource();
+  // A ficha que já foi ao Quadro (admissão, ou a ficha nova de uma transferência) não
+  // se apaga: o Chromos ficaria com uma pessoa que aqui sumiu, sem evento de saída
+  // (emenda 2 do contrato do Quadro, 13/11/2026). O caminho é o "Desligar".
+  const atual = await ds.obter("funcionarios", id);
+  const [adm, transf] = await Promise.all([
+    ds.obter("eventos_quadro", idDoEvento("admissao", id)),
+    atual?.transferido_de ? ds.obter("eventos_quadro", idDoEvento("transferencia", atual.transferido_de)) : null,
+  ]);
+  // ASG no quadro também não se apaga, com ou sem evento guardado: o evento expira em 90
+  // dias (retenção), e a trava não pode expirar junto — a pessoa sairia do Orkestria sem
+  // `desl_` e o Chromos ficaria com ela ativa (seguranca e auditor, 16/11/2026).
+  const asgNoQuadro = !!atual && ehAsg(atual.cargo) && !atual.desligado_em;
+  if (adm || transf || asgNoQuadro)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "FICHA_JA_NO_QUADRO",
+        mensagem: "Esta ficha já foi enviada ao Quadro da Infra: não pode ser excluída. Use \"Desligar\".",
+      },
+    ]);
   // Consulta pela FK (índice de campo único) → lê só os vínculos DESTE
   // funcionário, não as coleções inteiras (que crescem sem limite no tempo).
   const [rotinas, modelos, ausencias, qualificacoes, tempos, eventuais] = await Promise.all([
@@ -345,6 +417,17 @@ async function conferirSubstituicao(novoId: string, antigoId: string, aPartirDe:
       },
     ]);
   }
+  // Só POSTO VAGO se assume (decisão do dono, 16/11/2026): desligado (inclusive a ficha-posto
+  // do "saiu do posto"), sem posto extinto. Assumir o posto de quem está ativo o inativava
+  // sem desligamento — uma ASG fora do quadro sem evento para o Chromos (revisão de segurança).
+  if (!antigo.desligado_em || antigo.posto_extinto)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "POSTO_NAO_VAGO",
+        mensagem: `${antigo.nome}: desligue ou tire do posto antes; só um posto vago pode ser assumido.`,
+      },
+    ]);
   return { novo, antigo };
 }
 
@@ -565,6 +648,26 @@ export interface ResultadoDesligamento {
  * lá). O desligamento não espera por ela: fica gravado, e a tela oferece abrir
  * a vaga de novo.
  */
+export interface ResultadoSaidaDoPosto {
+  /** A ficha-posto criada para a rota (posto vago), ou `null` se a pessoa não tinha rota. */
+  postoVagoId: string | null;
+  itensDeRotaMovidos: number;
+  blocosRemovidos: number;
+  blocosPreservados: number;
+}
+
+const semTipo = () =>
+  new ErroValidacao([
+    { nivel: "erro", codigo: "DESLIGAMENTO_SEM_TIPO", mensagem: "Diga se a pessoa saiu da empresa ou só saiu do posto." },
+  ]);
+
+/**
+ * POST /desligar. `tipo` é obrigatório (decisão do dono, 13/11/2026), e a rota despacha:
+ *  - "saiu_da_empresa" (aqui): o desligamento de sempre + o evento `desl_` do Quadro no
+ *    mesmo lote (se ASG). O motivo é da lista do Desligar — "Transferência" é recusada.
+ *  - "saiu_do_posto" (`sairDoPosto`): a pessoa CONTINUA na sede, sem rota; a rota vira
+ *    posto vago. Não gera evento: o Chromos não muda nada.
+ */
 export async function desligarFuncionario(
   id: string,
   /**
@@ -572,16 +675,15 @@ export async function desligarFuncionario(
    * `extinguirPosto: true` (só sem vaga): o quadro diminui — a rota é apagada em vez
    * de virar posto vago. Caso real: o Pré Sul, de 4 para 3 (13/10/2026).
    */
-  dados: { data?: unknown; motivo?: unknown; abrirVaga?: unknown; extinguirPosto?: unknown },
+  dados: { tipo?: unknown; data?: unknown; motivo?: unknown; abrirVaga?: unknown; extinguirPosto?: unknown },
   autor: string,
   solicitante: { nome: string; email?: string },
-  /**
-   * O destino da transferência, gravado JUNTO com o encerramento e antes do SGCP:
-   * em duas escritas, uma falha na segunda deixava a ficha encerrada sem destino e
-   * sem conserto (revisão, 04/11/2026). Não vem de `dados`, que é o corpo cru do /desligar.
-   */
-  destino: Pick<Funcionario, "transferido_para" | "transferido_setor"> = {},
 ): Promise<ResultadoDesligamento> {
+  if (dados.tipo !== "saiu_da_empresa") throw semTipo();
+  if (dados.motivo === MOTIVO_TRANSFERENCIA)
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DESLIGAMENTO_INVALIDO", mensagem: "Transferência é pelo botão \"Transferir\", não pelo Desligar." },
+    ]);
   const erro = validarDesligamento(dados);
   if (erro) throw new ErroValidacao([{ nivel: "erro", codigo: "DESLIGAMENTO_INVALIDO", mensagem: erro }]);
   const data = dados.data as string;
@@ -590,14 +692,7 @@ export async function desligarFuncionario(
   const ds = await getDataSource();
   const atual = await ds.obter("funcionarios", id);
   if (!atual) throw new Error("Funcionário não encontrado.");
-  if (atual.desligado_em)
-    throw new ErroValidacao([
-      {
-        nivel: "erro",
-        codigo: "JA_DESLIGADO",
-        mensagem: `${atual.nome} já está desligado(a) desde ${atual.desligado_em.split("-").reverse().join("/")}.`,
-      },
-    ]);
+  exigirNaoDesligado(atual);
 
   // Posto extinto e vaga aberta se contradizem: a vaga é para repor o posto.
   const extinguir = dados.extinguirPosto === true;
@@ -610,54 +705,233 @@ export async function desligarFuncionario(
       },
     ]);
 
+  const agora = agoraISO();
+  const enc = await encerramento(ds, atual, { data, motivo, extinguir, destino: {}, autor, agora });
+  const sede = ehAsg(atual.cargo) ? await ds.obter("sedes", atual.sede_id) : null;
+  await ds.gravarLote([
+    enc.ficha,
+    // O evento sai da ficha como ela fica gravada neste lote — nunca do corpo do pedido.
+    ...(ehAsg(atual.cargo)
+      ? [criarEvento(montarEvento({
+          tipo: "desligamento", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+          sedeDe: sede?.codigo ?? "", sedePara: "", autor, registradoEm: agora,
+        }))]
+      : []),
+    ...enc.resto,
+  ]);
+
+  const vaga = await decidirVaga(id, motivo, extinguir, dados.abrirVaga !== false, solicitante);
+  return { ...enc.resultado, vaga };
+}
+
+function exigirNaoDesligado(atual: Funcionario) {
+  if (atual.desligado_em)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "JA_DESLIGADO",
+        mensagem: `${atual.nome} já está desligado(a) desde ${atual.desligado_em.split("-").reverse().join("/")}.`,
+      },
+    ]);
+}
+
+/**
+ * O encerramento da ficha como operações de lote, sem gravar: data e motivo, os blocos
+ * só planejados da data em diante saem, e a rota sai se o posto acaba. Desligar e
+ * transferir o põem no MESMO lote do resto (ficha nova, evento do Quadro).
+ */
+async function encerramento(
+  ds: Ds,
+  atual: Funcionario,
+  a: {
+    data: string;
+    motivo: string;
+    extinguir: boolean;
+    /**
+     * O destino da transferência, gravado JUNTO com o encerramento e antes do SGCP:
+     * em duas escritas, uma falha na segunda deixava a ficha encerrada sem destino e
+     * sem conserto (revisão, 04/11/2026). Nunca vem do corpo cru do /desligar.
+     */
+    destino: Pick<Funcionario, "transferido_para" | "transferido_setor">;
+    autor: string;
+    agora: string;
+  },
+) {
+  const { data, motivo, extinguir } = a;
   const [blocos, rota] = await Promise.all([
-    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: atual.id }]),
     extinguir
-      ? ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }])
+      ? ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: atual.id }])
       : Promise.resolve([]),
   ]);
   const daData = blocos.filter((b) => b.data >= data);
   const remover = daData.filter((b) => b.status === "planejada");
+  const mudancas: Partial<Funcionario> = {
+    desligado_em: data,
+    motivo_desligamento: motivo,
+    // Data futura (aviso prévio): segue ativo até lá — a listagem e a geração
+    // tiram a pessoa sozinhas quando a data chega.
+    ...(data <= hojeISO() ? { ativo: false } : {}),
+    ...(extinguir ? { posto_extinto: true } : {}),
+    ...a.destino,
+    observacoes: [
+      atual.observacoes,
+      `Desligado(a) em ${data.split("-").reverse().join("/")} — ${motivo}${extinguir ? " · posto extinto" : ""}.`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    atualizado_por: a.autor,
+    atualizado_em: a.agora,
+  };
+  return {
+    /**
+     * A ficha separada do resto: quem monta o lote põe a ficha e o evento NA FRENTE. O
+     * Firestore parte lote acima de 500 escritas em pedaços atômicos entre si, e o 1º
+     * pedaço tem de levar ficha + evento juntos (revisão de segurança, 16/11/2026).
+     */
+    ficha: { tipo: "atualizar", tabela: "funcionarios", id: atual.id, mudancas } as OperacaoLote,
+    resto: [
+      ...remover.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })),
+      ...rota.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
+    ] as OperacaoLote[],
+    mudancas,
+    resultado: {
+      blocosRemovidos: remover.length,
+      blocosPreservados: daData.length - remover.length,
+      itensDeRotaApagados: rota.length,
+    },
+  };
+}
+
+/** A vaga no SGCP, DEPOIS do lote: a parte que pode falhar não desfaz o desligamento. */
+async function decidirVaga(
+  id: string,
+  motivo: string,
+  extinguir: boolean,
+  pedida: boolean,
+  solicitante: { nome: string; email?: string },
+): Promise<ResultadoVaga> {
+  if (!motivoAbreVaga(motivo))
+    return { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos, que avisa depois de 15 dias de falta." };
+  if (extinguir) return { aberta: false, motivo: "o posto deixou de existir." };
+  if (!pedida) return { aberta: false, motivo: "não foi pedida no desligamento. Dá para abrir depois pelo botão \"Abrir vaga\"." };
+  return abrirVagaNoSgcp(id, solicitante);
+}
+
+/**
+ * "Saiu do posto" (decisão do dono, 13/11/2026): a pessoa CONTINUA ativa na sede, sem
+ * rota. A rota padrão dela vai SEMPRE para um posto vago — uma ficha-posto ("Posto de
+ * <apelido>", desligada na data, sem dados do RH) que o "Assume o posto de" já lista
+ * como posto vago. Os blocos só planejados dela da data em diante saem da agenda. Tudo
+ * num lote só; sem evento do Quadro (o Chromos não muda nada) e sem vaga no SGCP.
+ */
+export async function sairDoPosto(
+  id: string,
+  dados: { tipo?: unknown; data?: unknown; abrirVaga?: unknown; extinguirPosto?: unknown },
+  autor: string,
+): Promise<ResultadoSaidaDoPosto> {
+  if (dados.tipo !== "saiu_do_posto") throw semTipo();
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  const erroData = validarDataDeSaida(dados.data);
+  if (erroData) throw recusa("DESLIGAMENTO_INVALIDO", erroData);
+  // Só hoje ou passado (revisão de segurança, 16/11/2026): a rota sai na hora, e com data
+  // futura a pessoa ficaria sem rota até lá — e os blocos até a data, sem dono no posto.
+  if ((dados.data as string) > hojeISO())
+    throw recusa("SAIU_DO_POSTO_DATA_FUTURA", "A saída do posto vale de hoje para trás; para data futura, registre no dia.");
+  // A rota vira SEMPRE posto vago, e a pessoa não saiu da empresa: os dois pedidos contradizem o tipo.
+  if (dados.extinguirPosto === true)
+    throw recusa("SAIU_DO_POSTO_SEM_EXTINGUIR", "Quem só saiu do posto deixa a rota como posto vago: o posto não é extinto aqui.");
+  if (dados.abrirVaga === true)
+    throw recusa("SAIU_DO_POSTO_SEM_VAGA", "Quem só saiu do posto continua na empresa: não há vaga a abrir no SGCP.");
+  const data = dados.data as string;
+
+  const ds = await getDataSource();
+  const atual = await ds.obter("funcionarios", id);
+  if (!atual) throw new Error("Funcionário não encontrado.");
+  exigirNaoDesligado(atual);
+  if (comAtivoDoDia(atual, hojeISO()).ativo === false || atual.substituido_por)
+    throw recusa("FORA_DO_QUADRO", `${atual.nome} não está no quadro: não há posto a deixar.`);
+
+  const [itens, blocos] = await Promise.all([
+    ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
+    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
+  ]);
+  const daData = blocos.filter((b) => b.data >= data);
+  const remover = daData.filter((b) => b.status === "planejada");
   const agora = agoraISO();
-  await ds.gravarLote([
-    {
-      tipo: "atualizar",
-      tabela: "funcionarios",
-      id,
-      mudancas: {
+  const dataBR = data.split("-").reverse().join("/");
+  const ops: OperacaoLote[] = [];
+
+  // Sem rota, não há posto a guardar: uma ficha-posto vazia só sujaria a lista de postos vagos.
+  const posto: Funcionario | null = itens.length
+    ? {
+        // Determinístico por pessoa + data, gravado com `create`: dois pedidos simultâneos
+        // dão um posto só — o segundo lote falha inteiro (revisão de segurança, 16/11/2026).
+        id: `posto_${id}_${data}`,
+        nome: `Posto de ${atual.nome}`,
+        genero: atual.genero,
+        sede_id: atual.sede_id,
+        turno: atual.turno,
+        entrada: atual.entrada,
+        saida: atual.saida,
+        intervalo_min: atual.intervalo_min,
+        intervalo_inicio: atual.intervalo_inicio,
+        intervalo_fim: atual.intervalo_fim,
+        intervalos: csvDoTrio(atual),
+        escala: atual.escala ?? "seg_sex",
+        entrada_sabado: atual.entrada_sabado ?? "",
+        saida_sabado: atual.saida_sabado ?? "",
+        intervalos_sabado: atual.intervalos_sabado ?? "",
+        cargo: atual.cargo,
+        // Desligada na data: é assim que o "Assume o posto de" reconhece o posto vago.
+        // Sem dados do RH — não é uma pessoa (desligado é dispensado em `validarFuncionario`).
+        ativo: false,
         desligado_em: data,
-        motivo_desligamento: motivo,
-        // Data futura (aviso prévio): segue ativo até lá — a listagem e a geração
-        // tiram a pessoa sozinhas quando a data chega.
-        ...(data <= hojeISO() ? { ativo: false } : {}),
-        ...(extinguir ? { posto_extinto: true } : {}),
-        ...destino,
-        observacoes: [
-          atual.observacoes,
-          `Desligado(a) em ${data.split("-").reverse().join("/")} — ${motivo}${extinguir ? " · posto extinto" : ""}.`,
-        ]
-          .filter(Boolean)
-          .join(" · "),
+        motivo_desligamento: MOTIVO_SAIU_DO_POSTO,
+        observacoes: `Rota de ${atual.nome}, que saiu do posto em ${dataBR} e continua na sede.`,
+        criado_por: autor,
+        criado_em: agora,
         atualizado_por: autor,
         atualizado_em: agora,
-      },
+      }
+    : null;
+  if (posto) {
+    ops.push({ tipo: "criar", tabela: "funcionarios", registro: posto, exigirNovo: true });
+    // O id do item costuma carregar a pessoa (`idItemDeRota`): recalculado para o posto,
+    // senão a próxima rota dela geraria o mesmo id e regravaria o item do posto.
+    for (const item of itens) {
+      if (item.id.includes(id)) {
+        ops.push({ tipo: "criar", tabela: "modelos_rotina", registro: { ...item, id: item.id.replace(id, posto.id), funcionario_id: posto.id } });
+        ops.push({ tipo: "excluir", tabela: "modelos_rotina", id: item.id });
+      } else ops.push({ tipo: "atualizar", tabela: "modelos_rotina", id: item.id, mudancas: { funcionario_id: posto.id } });
+    }
+  }
+  ops.push(...remover.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })));
+  ops.push({
+    tipo: "atualizar",
+    tabela: "funcionarios",
+    id,
+    mudancas: {
+      observacoes: [atual.observacoes, `Saiu do posto em ${dataBR}${posto ? " (a rota ficou como posto vago)" : ""}.`]
+        .filter(Boolean)
+        .join(" · "),
+      atualizado_por: autor,
+      atualizado_em: agora,
     },
-    ...remover.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })),
-    ...rota.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
-  ]);
-
-  const vaga: ResultadoVaga = !motivoAbreVaga(motivo)
-    ? { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos, que avisa depois de 15 dias de falta." }
-    : extinguir
-      ? { aberta: false, motivo: "o posto deixou de existir." }
-      : dados.abrirVaga === false
-        ? { aberta: false, motivo: "não foi pedida no desligamento. Dá para abrir depois pelo botão \"Abrir vaga\"." }
-        : await abrirVagaNoSgcp(id, solicitante);
+  });
+  try {
+    await ds.gravarLote(ops);
+  } catch (e) {
+    // O outro pedido chegou antes: nada deste foi gravado.
+    if (posto && (await ds.obter("funcionarios", posto.id)))
+      throw new ErroConflito("Esta saída do posto já foi registrada (outro pedido chegou antes).");
+    throw e;
+  }
   return {
+    postoVagoId: posto?.id ?? null,
+    itensDeRotaMovidos: itens.length,
     blocosRemovidos: remover.length,
     blocosPreservados: daData.length - remover.length,
-    itensDeRotaApagados: rota.length,
-    vaga,
   };
 }
 
@@ -671,9 +945,9 @@ export interface ResultadoTransferencia extends ResultadoDesligamento {
  * só para o que antes eram dois — desligar na origem com motivo
  * "Transferência" e cadastrar de novo no destino:
  *
- *  1. encerra a ficha de origem pelo `desligarFuncionario` (motivo
- *     "Transferência"; a rota fica como posto vago na origem; vaga no SGCP só
- *     se pedida — decisão do dono: desmarcada por padrão);
+ *  1. encerra a ficha de origem (`encerramento`, motivo "Transferência"; a rota
+ *     fica como posto vago na origem; vaga no SGCP só se pedida — decisão do
+ *     dono: desmarcada por padrão);
  *  2. marca nela `transferido_para` (a tela mostra "Transferida para X");
  *  3. cria a ficha no destino copiando nome, matrícula, empresa, horário e
  *     escala, com `transferido_de`. Lá a coordenação escolhe o posto pelo
@@ -701,8 +975,7 @@ export async function transferirFuncionario(
   if (destino.id === atual.sede_id) throw recusa("TRANSFERENCIA_MESMA_SEDE", "A pessoa já é desta sede.");
   if (atual.desligado_em || atual.ativo === false)
     throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a): não há o que transferir.`);
-  const erroData = validarDesligamento({ data: dados.data, motivo: "Transferência" });
-  if (erroData) throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
+  if (validarDataDeSaida(dados.data)) throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
   const data = dados.data as string;
   const sedeOrigem = await ds.obter("sedes", atual.sede_id);
   const copia = {
@@ -729,30 +1002,37 @@ export async function transferirFuncionario(
       ativo: true,
       observacoes: `Transferida de ${sedeOrigem?.nome_sede ?? "outra sede"} em ${data.split("-").reverse().join("/")}.`,
   } as DadosFuncionario;
-  // Os dados do RH limpos AQUI, como o `createFuncionario` vai limpar: régua diferente
-  // entre a checagem e o cadastro desligava a origem e deixava a pessoa sem ficha no
-  // destino (auditoria e segurança, 13/11/2026).
-  Object.assign(copia, dadosDoRh(copia));
-  // O que o cadastro novo recusaria, recusa ANTES de desligar a origem.
-  const alertas = validarFuncionario(copia);
-  if (temErro(alertas)) throw new ErroValidacao(alertas);
-  // A MESMA régua do `createFuncionario`, com a mesma empresa que ele vai usar:
-  // régua diferente aqui deixava passar o que lá é recusado — depois de a origem
-  // já estar desligada (revisão de segurança, 27/10/2026).
-  await exigirMatriculaLivre(normalizarMatricula(copia.matricula), copia.empresa || undefined, id);
+  // A MESMA régua do cadastro (`montarFichaNova`: dados do RH, empresa do cadastro,
+  // matrícula livre), conferida ANTES de qualquer escrita — régua diferente aqui deixava
+  // passar o que o cadastro recusa (revisão de segurança, 27/10 e 13/11/2026).
+  const { ficha } = await montarFichaNova(copia, autor, id);
+  const novo: Funcionario = {
+    ...ficha,
+    // O elo com a origem não entra pelo cadastro comum (ver as travas de `montarFichaNova`): só por aqui.
+    transferido_de: id,
+    // A mesma pessoa: a última troca de identidade dela continua valendo.
+    ...(atual.identidade_alterada_em ? { identidade_alterada_em: atual.identidade_alterada_em } : {}),
+  };
 
-  const desligamento = await desligarFuncionario(
-    id,
-    { data, motivo: "Transferência", abrirVaga: dados.abrirVaga === true, extinguirPosto: false },
-    autor,
-    solicitante,
-    { transferido_para: destino.id },
-  );
-  const novo = await createFuncionario(copia, autor);
-  // O elo com a origem não entra pelo cadastro comum (ver as travas de
-  // `createFuncionario`): só por aqui.
-  const ligado = await ds.atualizar("funcionarios", novo.id, { transferido_de: id });
-  return { ...desligamento, novo: ligado };
+  // A transferência INTEIRA num lote só (emenda 2 do contrato do Quadro, 13/11/2026):
+  // encerrar a origem, criar o destino e o evento `transf_`. Falha no meio: nada gravado.
+  const agora = agoraISO();
+  const enc = await encerramento(ds, atual, {
+    data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_para: destino.id }, autor, agora,
+  });
+  await ds.gravarLote([
+    enc.ficha,
+    { tipo: "criar", tabela: "funcionarios", registro: novo },
+    ...(ehAsg(atual.cargo)
+      ? [criarEvento(montarEvento({
+          tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+          sedeDe: sedeOrigem?.codigo ?? "", sedePara: destino.codigo ?? "", autor, registradoEm: agora,
+        }))]
+      : []),
+    ...enc.resto,
+  ]);
+  const vaga = await decidirVaga(id, MOTIVO_TRANSFERENCIA, false, dados.abrirVaga === true, solicitante);
+  return { ...enc.resultado, vaga, novo };
 }
 
 /** O nome do setor aparece no selo da lista; não é campo de observação. */
@@ -784,16 +1064,27 @@ export async function transferirParaSetor(
     throw recusa("TRANSFERENCIA_SEM_DESTINO", "Informe o setor para onde a pessoa vai.");
   if (atual.desligado_em || atual.ativo === false)
     throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a): não há o que transferir.`);
-  if (validarDesligamento({ data: dados.data, motivo: "Transferência" }))
-    throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
+  if (validarDataDeSaida(dados.data)) throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de até 1 ano à frente.");
+  const data = dados.data as string;
 
-  return desligarFuncionario(
-    id,
-    { data: dados.data, motivo: "Transferência", abrirVaga: dados.abrirVaga === true, extinguirPosto: false },
-    autor,
-    solicitante,
-    { transferido_setor: setor },
-  );
+  const agora = agoraISO();
+  const enc = await encerramento(ds, atual, {
+    data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_setor: setor }, autor, agora,
+  });
+  const sede = ehAsg(atual.cargo) ? await ds.obter("sedes", atual.sede_id) : null;
+  await ds.gravarLote([
+    enc.ficha,
+    // O setor vai só como "setor": o texto livre não sai daqui (emenda 5).
+    ...(ehAsg(atual.cargo)
+      ? [criarEvento(montarEvento({
+          tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+          sedeDe: sede?.codigo ?? "", sedePara: SEDE_SETOR, autor, registradoEm: agora,
+        }))]
+      : []),
+    ...enc.resto,
+  ]);
+  const vaga = await decidirVaga(id, MOTIVO_TRANSFERENCIA, false, dados.abrirVaga === true, solicitante);
+  return { ...enc.resultado, vaga };
 }
 
 /**
@@ -811,8 +1102,11 @@ export async function abrirVagaNoSgcp(
   if (f.vaga_sgcp) return { aberta: true, codigo: f.vaga_sgcp };
   if (!f.desligado_em) return { aberta: false, motivo: "Só se abre vaga de quem foi desligado." };
   if (f.posto_extinto) return { aberta: false, motivo: "O posto deixou de existir no desligamento — não há o que repor." };
-  // Revalida o que está gravado: o motivo vai para o SGCP, e só um da lista vai.
-  if (validarDesligamento({ data: f.desligado_em, motivo: f.motivo_desligamento }))
+  if (f.motivo_desligamento === MOTIVO_SAIU_DO_POSTO)
+    return { aberta: false, motivo: "Posto vago de quem continua na sede: não há vaga a abrir no SGCP." };
+  // Revalida o que está gravado: o motivo vai para o SGCP, e só um da lista vai. Os
+  // motivos antigos e a transferência continuam valendo para fichas já gravadas.
+  if (validarDesligamento({ data: f.desligado_em, motivo: f.motivo_desligamento }, { gravado: true }))
     return { aberta: false, motivo: "O desligamento gravado está incompleto (data ou motivo fora da lista)." };
   if (!motivoAbreVaga(f.motivo_desligamento ?? ""))
     return { aberta: false, motivo: "Abandono de emprego: a vaga é pedida pela Coordenação no Chromos." };

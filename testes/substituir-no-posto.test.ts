@@ -16,7 +16,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { getDataSource } from "@/lib/datasource";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
-import { createFuncionario, substituirNoPosto } from "@/services/funcionariosService";
+import { createFuncionario, substituirNoPosto as substituirDeVerdade } from "@/services/funcionariosService";
+import { comoPostoVago } from "./fixtures";
+
+/**
+ * Desde 16/11/2026 só se assume POSTO VAGO (decisão do dono): estes casos desligam o
+ * antigo na data de corte antes de passar o posto, como a coordenação faria.
+ */
+const substituirNoPosto = comoPostoVago(substituirDeVerdade);
 import { createRotina } from "@/services/rotinasService";
 import { salvarModelo } from "@/services/modelosService";
 import { rh } from "./fixtures";

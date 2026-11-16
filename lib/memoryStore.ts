@@ -13,8 +13,9 @@ import {
   type OpcoesConsulta,
   ordenarELimitar,
 } from "./datasource";
-import type { MapaTabelas, NomeTabela } from "./schema";
+import { TABELAS_SO_DE_INCLUSAO, type MapaTabelas, type NomeTabela } from "./schema";
 import { hojeISO } from "./dateUtils";
+import { idDaEmpresa } from "./empresas";
 import { exigirId, semUndefined } from "./semUndefined";
 import { hashSenha } from "./senha";
 
@@ -214,6 +215,10 @@ function seed(): Banco {
     historico: [],
     cache_resumo: [],
     uso_telas: [],
+    // Catálogo de empresas (13/11/2026): a carga de produção é do dono; aqui, o
+    // bastante para cadastrar no modo memória.
+    empresas: ["APEL MATRIZ", "APEL 7", "IPADE"].map((nome) => ({ id: idDaEmpresa(nome), nome, ativo: true, ...aud })),
+    eventos_quadro: [],
     ausencias: [],
     periodos_letivos: [],
     feriados: [],
@@ -245,6 +250,9 @@ function banco(): Banco {
 export function reiniciarBanco(): void {
   globalComBanco.__orkestriaDb = seed();
 }
+
+/** Fila dos lotes do banco de memória (ver `gravarLote`). */
+let filaDeLotes: Promise<unknown> = Promise.resolve();
 
 export class MemoryDataSource implements DataSource {
   async listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]> {
@@ -335,11 +343,29 @@ export class MemoryDataSource implements DataSource {
    * no teste e só quebraria em produção.
    */
   async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    // Um lote de cada vez, como o commit do Firestore. Dois lotes intercalados nos
+    // `await` desfaziam um ao outro: o que falhava restaurava uma cópia tirada ANTES de o
+    // outro gravar, e apagava o lote que deu certo (achado no teste dos dois cliques no
+    // Desligar, 16/11/2026).
+    const minha = filaDeLotes.then(() => this.gravarLoteAgora(operacoes));
+    filaDeLotes = minha.catch(() => undefined);
+    return minha;
+  }
+
+  private async gravarLoteAgora(operacoes: OperacaoLote[]): Promise<void> {
     const b = banco() as Record<string, unknown[]>;
     const tocadas = [...new Set(operacoes.map((o) => o.tabela))];
     const copia = new Map(tocadas.map((t) => [t, [...b[t]]]));
     try {
       for (const op of operacoes) {
+        // Como o `create` do lote do Firestore (ver `TABELAS_SO_DE_INCLUSAO`): id
+        // repetido em tabela só de inclusão derruba o lote inteiro.
+        if (
+          op.tipo === "criar" &&
+          (op.exigirNovo || TABELAS_SO_DE_INCLUSAO.has(op.tabela)) &&
+          (b[op.tabela] as Array<{ id: string }>).some((r) => r.id === (op.registro as { id: string }).id)
+        )
+          throw new Error(`Registro ${(op.registro as { id: string }).id} já existe em ${op.tabela} (só de inclusão).`);
         if (op.tipo === "criar") await this.criar(op.tabela, op.registro);
         else if (op.tipo === "atualizar") await this.atualizar(op.tabela, op.id, op.mudancas);
         else await this.excluir(op.tabela, op.id);

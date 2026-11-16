@@ -9,9 +9,11 @@
  * (o "А" cirílico) passa — só de propósito; não lê dado de ninguém (o nome segue
  * sendo a trava no cruzamento com o Quadro).
  *
- * Não existe catálogo fixo: a lista oferecida na tela sai do próprio cadastro.
- * Normaliza o que é inequívoco ("Apel - Matriz" → "APEL MATRIZ", "Apel Filial 7"
- * → "APEL 7") e recusa o que é decisão de RH ("APEL FILIAL" sem número).
+ * Desde 13/11/2026 a empresa é LISTA FECHADA com cadastro (tabela `empresas`, mantida
+ * pelo administrador — `services/empresasService.ts`); o nome do cadastro é sempre a
+ * saída de `normalizarEmpresa`. Normaliza o que é inequívoco ("Apel - Matriz" →
+ * "APEL MATRIZ", "Apel Filial 7" → "APEL 7") e recusa o que é decisão de RH ("APEL
+ * FILIAL" sem número).
  *
  * Puro: usado na validação, na trava de matrícula única, no cruzamento com o Quadro
  * e na tela.
@@ -48,12 +50,11 @@ export function empresaAmbigua(valor: unknown): string | null {
   return AMBIGUAS[normalizada] ?? null;
 }
 
-/** As empresas já vistas no cadastro, sem as ambíguas — oferecê-las seria ensinar o erro. */
-export function empresasConhecidas(registros: { empresa?: string }[]): string[] {
-  const vistas = new Set<string>();
-  for (const r of registros) {
-    const normalizada = normalizarEmpresa(r.empresa);
-    if (normalizada && !empresaAmbigua(normalizada)) vistas.add(normalizada);
-  }
-  return [...vistas].sort();
+/**
+ * Id do registro no cadastro de empresas, a partir do nome JÁ normalizado: dois
+ * cadastros simultâneos da mesma empresa caem no mesmo documento. O normalizado não
+ * tem "_" (vira espaço), então a troca de espaço por "_" não colide.
+ */
+export function idDaEmpresa(nomeNormalizado: string): string {
+  return `emp_${nomeNormalizado.replace(/ /g, "_")}`;
 }

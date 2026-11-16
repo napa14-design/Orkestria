@@ -216,10 +216,25 @@ export function validarAlocacao(args: {
   return alertas;
 }
 
+/** Controle (\p{Cc}) em qualquer ponto, ou = + - @ no começo (depois de espaço e invisível). */
+export function nomeTraicoeiro(valor: unknown): boolean {
+  if (typeof valor !== "string") return false;
+  return /\p{Cc}/u.test(valor) || /^[=+\-@]/u.test(valor.replace(/\p{Cf}/gu, "").trimStart());
+}
+
 export function validarFuncionario(f: Partial<Funcionario>): AlertaValidacao[] {
   const alertas: AlertaValidacao[] = [];
   if (!f.nome?.trim())
     alertas.push({ nivel: "erro", codigo: "NOME", mensagem: "Nome é obrigatório." });
+  // O nome vai para o Chromos e para planilhas: caractere de controle, ou começar com
+  // = + - @ (fórmula numa planilha), é recusado (emenda 10 do contrato do Quadro, 13/11/2026).
+  for (const [campo, rotulo] of [["nome", "Apelido"], ["nome_completo", "Nome completo"]] as const)
+    if (nomeTraicoeiro(f[campo]))
+      alertas.push({
+        nivel: "erro",
+        codigo: "NOME_INVALIDO",
+        mensagem: `${rotulo}: não pode ter caractere de controle nem começar com = + - @.`,
+      });
   if (!f.sede_id)
     alertas.push({
       nivel: "erro",

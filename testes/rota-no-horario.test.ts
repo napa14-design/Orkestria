@@ -8,7 +8,14 @@ import { getDataSource } from "@/lib/datasource";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { rotaNoHorario } from "@/lib/rotaNoHorario";
-import { createFuncionario, substituirNoPosto } from "@/services/funcionariosService";
+import { createFuncionario, substituirNoPosto as substituirDeVerdade } from "@/services/funcionariosService";
+import { comoPostoVago } from "./fixtures";
+
+/**
+ * Desde 16/11/2026 só se assume POSTO VAGO (decisão do dono): estes casos desligam o
+ * antigo na data de corte antes de passar o posto, como a coordenação faria.
+ */
+const substituirNoPosto = comoPostoVago(substituirDeVerdade);
 import { gerarDiaDaRotaPadrao, getModelos, salvarModelo } from "@/services/modelosService";
 import { createRotina } from "@/services/rotinasService";
 import type { Funcionario, ModeloRotinaItem } from "@/types";

@@ -14,6 +14,8 @@ import type { Funcionario, Local, RotinaPlanejada, Tarefa } from "@/types";
 import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
 import { ErroValidacao } from "./erros";
 import { exigirMatriculaLivre } from "./funcionariosService";
+import { exigirEmpresaDoCadastro } from "./empresasService";
+import { ehAsg, montarEvento } from "@/lib/eventosQuadro";
 import { normalizarEmpresa } from "@/lib/empresas";
 import { normalizarMatricula } from "@/lib/quadroInfra";
 import { validarFuncionario } from "@/lib/validations";
@@ -107,6 +109,7 @@ export async function aplicarImportacao(
   // fim. É o conserto da importação pela metade de 18/08 (86 locais criados,
   // nenhuma tarefa) — agora ou a sede inteira entra, ou não entra nada.
   const escritas: OperacaoLote[] = [];
+  const fichasEEventos: OperacaoLote[] = [];
   for (const x of novosLocais) escritas.push({ tipo: "criar", tabela: "locais", registro: x });
 
   // ── tarefas (únicas por nome + local) ─────────────────────────────────
@@ -177,28 +180,52 @@ export async function aplicarImportacao(
   // Recusa ANTES de gravar qualquer coisa (o lote é um só): quem faltar dado do RH,
   // matrícula repetida na planilha ou já em uso no sistema.
   const semDados: string[] = [];
+  const foraDoCadastro: string[] = [];
   const naPlanilha = new Set<string>();
   for (const x of novosFuncs) {
-    const erros = validarFuncionario(x).filter((a) => a.nivel === "erro" && ["DADOS_DO_RH", "EMPRESA_AMBIGUA", "ADMISSAO_INVALIDA"].includes(a.codigo));
+    const erros = validarFuncionario(x).filter((a) => a.nivel === "erro" && ["DADOS_DO_RH", "EMPRESA_AMBIGUA", "ADMISSAO_INVALIDA", "NOME_INVALIDO"].includes(a.codigo));
     if (erros.length) { semDados.push(`${x.nome}: ${erros.map((e) => e.mensagem).join(" ")}`); continue; }
     const k = `${x.matricula}|${x.empresa}`;
     if (naPlanilha.has(k)) { semDados.push(`${x.nome}: a matrícula ${x.matricula} (${x.empresa}) aparece para duas pessoas na planilha.`); continue; }
     naPlanilha.add(k);
+    // Empresa fora do cadastro (lista fechada, 13/11/2026): recusa própria, com o código do cadastro.
+    try {
+      await exigirEmpresaDoCadastro(x.empresa);
+    } catch (e) {
+      if (e instanceof ErroValidacao) foraDoCadastro.push(`${x.nome}: ${e.message}`);
+      else throw e;
+      continue;
+    }
     try {
       await exigirMatriculaLivre(x.matricula ?? "", x.empresa);
     } catch {
       semDados.push(`${x.nome}: a matrícula ${x.matricula} (${x.empresa}) já está em outro cadastro.`);
     }
   }
-  if (semDados.length)
-    throw new ErroValidacao(
-      semDados.map((mensagem) => ({
+  if (semDados.length || foraDoCadastro.length)
+    throw new ErroValidacao([
+      ...semDados.map((mensagem) => ({
         nivel: "erro" as const,
         codigo: "IMPORT_SEM_DADOS_RH",
         mensagem: `Pessoa nova na sede precisa das colunas do RH (Nome completo, Matrícula, Empresa, Admissão). ${mensagem}`,
       })),
-    );
-  for (const x of novosFuncs) escritas.push({ tipo: "criar", tabela: "funcionarios", registro: x });
+      ...foraDoCadastro.map((mensagem) => ({ nivel: "erro" as const, codigo: "EMPRESA_FORA_DO_CADASTRO", mensagem })),
+    ]);
+  // Quem a importação cadastra é ASG (cargo fixo acima): o `adm_` do Quadro vai no MESMO
+  // lote da ficha (emenda 2 do contrato do Quadro, 13/11/2026). O código da sede é um só.
+  const codigoSede = novosFuncs.length ? ((await ds.obter("sedes", sedeId))?.codigo ?? "") : "";
+  for (const x of novosFuncs) {
+    fichasEEventos.push({ tipo: "criar", tabela: "funcionarios", registro: x });
+    if (ehAsg(x.cargo))
+      fichasEEventos.push({
+        tipo: "criar",
+        tabela: "eventos_quadro",
+        registro: montarEvento({
+          tipo: "admissao", funcionario: x, dataEfetiva: x.data_admissao ?? "",
+          sedeDe: "", sedePara: codigoSede, autor, registradoEm: agora,
+        }),
+      });
+  }
 
   // ── rotinas do dia (id determinístico → reimportar não duplica) ────────
   const jaTem = new Set(
@@ -227,7 +254,9 @@ export async function aplicarImportacao(
     res.rotinas.criadas++;
   }
   for (const x of novasRotinas) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: x });
-  await ds.gravarLote(escritas);
+  // Fichas e eventos NA FRENTE: lote acima de 500 escritas é partido no Firestore, e o 1º
+  // pedaço tem de levar ficha + `adm_` juntos (revisão de segurança, 16/11/2026).
+  await ds.gravarLote([...fichasEEventos, ...escritas]);
 
   // Mesmas regras do arrasto manual, sobre o dia inteiro: o que já existia mais
   // o que acabou de entrar.

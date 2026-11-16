@@ -129,7 +129,7 @@ describe("desligarFuncionario", () => {
     const noDia = await bloco(DATA);
     const depois = await bloco(DEPOIS);
 
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Pedido de demissão" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Pedido de demissão — trabalhado" }, "t@t.com", SOLICITANTE);
 
     const ds = await getDataSource();
     expect(await ds.obter("rotinas_planejadas", antes.id)).not.toBeNull();
@@ -137,7 +137,7 @@ describe("desligarFuncionario", () => {
     expect(await ds.obter("rotinas_planejadas", depois.id)).toBeNull();
     expect(r.blocosRemovidos).toBe(2);
     const f = await ds.obter("funcionarios", PESSOA);
-    expect(f).toMatchObject({ desligado_em: DATA, motivo_desligamento: "Pedido de demissão", ativo: true });
+    expect(f).toMatchObject({ desligado_em: DATA, motivo_desligamento: "Pedido de demissão — trabalhado", ativo: true });
     expect(f?.observacoes).toContain("Desligado(a) em");
   });
 
@@ -145,13 +145,13 @@ describe("desligarFuncionario", () => {
     const feito = await bloco(DEPOIS);
     const ds = await getDataSource();
     await ds.atualizar("rotinas_planejadas", feito.id, { status: "realizada" });
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(await ds.obter("rotinas_planejadas", feito.id)).not.toBeNull();
     expect(r.blocosPreservados).toBe(1);
   });
 
   it("data de hoje ou passada: inativo na hora, e as telas já o veem fora", async () => {
-    await desligarFuncionario(PESSOA, { data: hojeISO(), motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: hojeISO(), motivo: "Outros" }, "t@t.com", SOLICITANTE);
     const ds = await getDataSource();
     expect((await ds.obter("funcionarios", PESSOA))?.ativo).toBe(false);
     expect((await getFuncionarios(SEDE)).find((f) => f.id === PESSOA)?.ativo).toBe(false);
@@ -163,7 +163,7 @@ describe("desligarFuncionario", () => {
     const ds = await getDataSource();
     const rota = () => ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: PESSOA }]);
     const antes = (await rota()).length;
-    await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(antes).toBeGreaterThan(0);
     expect((await rota()).length).toBe(antes);
     expect((await ds.obter("funcionarios", PESSOA))?.nome).toBe("Aurilene");
@@ -172,7 +172,7 @@ describe("desligarFuncionario", () => {
   it("posto vago: quem for contratado assume a rota, e o posto deixa de ser vago", async () => {
     await bloco(ANTES);
     await salvarModelo("Rota padrão", ANTES, SEDE, "t@t.com", { padrao: true, comDuracao: true });
-    await desligarFuncionario(PESSOA, { data: DATA, motivo: "Pedido de demissão" }, "t@t.com", SOLICITANTE);
+    await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Pedido de demissão — trabalhado" }, "t@t.com", SOLICITANTE);
     const novo = await createFuncionario(
       { nome: "Jorge", ...rh(), sede_id: SEDE, turno: "integral", entrada: "06:00", saida: "16:00", ativo: true } as never,
       "t@t.com",
@@ -201,9 +201,9 @@ describe("desligarFuncionario", () => {
   });
 
   it("recusa desligar duas vezes e motivo inválido", async () => {
-    await expect(desligarFuncionario(PESSOA, { data: DATA, motivo: "Sumiu" }, "t@t.com", SOLICITANTE)).rejects.toThrow();
-    await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
-    await expect(desligarFuncionario(PESSOA, { data: DEPOIS, motivo: "Outros" }, "t@t.com", SOLICITANTE)).rejects.toThrow(/já está desligad/);
+    await expect(desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Sumiu" }, "t@t.com", SOLICITANTE)).rejects.toThrow();
+    await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    await expect(desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DEPOIS, motivo: "Outros" }, "t@t.com", SOLICITANTE)).rejects.toThrow(/já está desligad/);
   });
 });
 
@@ -231,7 +231,7 @@ describe("vaga no SGCP", () => {
   it("abre a vaga com o token, guarda o código, e não chama de novo", async () => {
     // A sede do seed não tem código; em produção a DT tem "DT".
     await (await getDataSource()).atualizar("sedes", SEDE, { codigo: "DT" });
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Pedido de demissão" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Pedido de demissão — trabalhado" }, "t@t.com", SOLICITANTE);
     expect(r.vaga).toEqual({ aberta: true, codigo: "2147180600" });
     expect(chamadas).toHaveLength(1);
     expect(chamadas[0].url).toBe("https://sgcp.test/api/vagas-externas");
@@ -247,7 +247,7 @@ describe("vaga no SGCP", () => {
 
   it("SGCP recusa: o desligamento fica gravado, a vaga não, e dá para tentar de novo", async () => {
     respostaSgcp = () => Response.json({ erro: 'Sede "CESIU" não está no cadastro de sedes do SGPC.' }, { status: 400 });
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(r.vaga).toEqual({ aberta: false, motivo: expect.stringMatching(/recusou.*CESIU/) });
     const ds = await getDataSource();
     expect((await ds.obter("funcionarios", PESSOA))?.desligado_em).toBe(DATA);
@@ -259,7 +259,7 @@ describe("vaga no SGCP", () => {
 
   it("quem desliga pode não querer a vaga: desliga igual, não chama o SGCP, e pode abrir depois", async () => {
     const r = await desligarFuncionario(
-      PESSOA, { data: DATA, motivo: "Transferência", abrirVaga: false }, "t@t.com", SOLICITANTE,
+      PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros", abrirVaga: false }, "t@t.com", SOLICITANTE,
     );
     expect(r.vaga.aberta).toBe(false);
     expect(chamadas).toHaveLength(0);
@@ -275,7 +275,7 @@ describe("vaga no SGCP", () => {
     await salvarModelo("Rota padrão", ANTES, SEDE, "t@t.com", { padrao: true, comDuracao: true });
     const r = await desligarFuncionario(
       PESSOA,
-      { data: DATA, motivo: "Demissão sem justa causa", abrirVaga: false, extinguirPosto: true },
+      { tipo: "saiu_da_empresa", data: DATA, motivo: "Dispensa sem justa causa", abrirVaga: false, extinguirPosto: true },
       "t@t.com",
       SOLICITANTE,
     );
@@ -290,32 +290,32 @@ describe("vaga no SGCP", () => {
 
   it("posto extinto com vaga se contradizem: recusa sem gravar nada", async () => {
     await expect(
-      desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros", extinguirPosto: true }, "t@t.com", SOLICITANTE),
+      desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros", extinguirPosto: true }, "t@t.com", SOLICITANTE),
     ).rejects.toThrow(/posto deixa de existir/);
     expect((await (await getDataSource()).obter("funcionarios", PESSOA))?.desligado_em).toBeUndefined();
   });
 
   it("URL do SGCP sem https não recebe o token", async () => {
     vi.stubEnv("SGCP_VAGAS_URL", "http://sgcp.test/api/vagas-externas");
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(r.vaga).toEqual({ aberta: false, motivo: expect.stringMatching(/https/) });
     expect(chamadas).toHaveLength(0);
   });
 
   it("justa causa não vai para o SGCP: o pedido leva só 'Desligamento'", async () => {
-    await desligarFuncionario(PESSOA, { data: DATA, motivo: "Demissão por justa causa" }, "t@t.com", SOLICITANTE);
+    await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Dispensa por justa causa" }, "t@t.com", SOLICITANTE);
     expect(JSON.parse(String(chamadas[0].init.body)).motivo).toBe("Desligamento");
   });
 
   it("abandono de emprego não chama o SGCP", async () => {
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Abandono de emprego" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Abandono de emprego" }, "t@t.com", SOLICITANTE);
     expect(r.vaga.aberta).toBe(false);
     expect(chamadas).toHaveLength(0);
   });
 
   it("sem a integração configurada: desliga e diz que a vaga não abriu", async () => {
     vi.stubEnv("CHAVE_ORKESTRIA", "");
-    const r = await desligarFuncionario(PESSOA, { data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
+    const r = await desligarFuncionario(PESSOA, { tipo: "saiu_da_empresa", data: DATA, motivo: "Outros" }, "t@t.com", SOLICITANTE);
     expect(r.vaga).toEqual({ aberta: false, motivo: expect.stringMatching(/não está configurada/) });
     expect(chamadas).toHaveLength(0);
   });

@@ -24,6 +24,7 @@ import {
   type PessoaQuadro,
 } from "@/lib/quadroInfra";
 import { esquecerQuadro } from "@/services/quadroInfraService";
+import { cadastrarEmpresas } from "./fixtures";
 
 let sessao: SessaoUsuario | null = null;
 vi.mock("@/lib/session", () => ({
@@ -278,6 +279,8 @@ async function cadastro(id: string, nome: string, extra: Record<string, unknown>
 describe("rotas do Quadro", () => {
   beforeEach(async () => {
     reiniciarBanco();
+    // Lista fechada (13/11/2026): as empresas destes casos entram no catálogo.
+    await cadastrarEmpresas("EMPRESA A", "EMPRESA B");
     esquecerQuadro();
     sessao = COORD_DT;
     chamadas = [];
@@ -408,6 +411,21 @@ describe("rotas do Quadro", () => {
     // Vinculada, sai do "sem vínculo".
     const corpo = await (await pedirGet("christus_dt")).json();
     expect(corpo.semVinculo).toEqual([]);
+  });
+
+  it("Vincular com empresa do Quadro fora do cadastro ATIVO daqui: recusado, nada gravado (revisão de segurança, 16/11/2026)", async () => {
+    await cadastro("f-dt", "Maria Souza");
+    const ds = await getDataSource();
+    await ds.atualizar("empresas", "emp_EMPRESA_A", { ativo: false });
+    const r = await postVincular(json({ funcionario_id: "f-dt", quadro_id: "q1" }));
+    expect(r.status).toBe(422);
+    expect((await r.json()).alertas[0].codigo).toBe("EMPRESA_FORA_DO_CADASTRO");
+    const f = await ds.obter("funcionarios", "f-dt");
+    expect([f?.matricula, f?.empresa ?? "", f?.identidade_alterada_em ?? ""]).toEqual(["", "", ""]);
+    // Reativada, o mesmo Vincular passa e carimba a troca de identidade.
+    await ds.atualizar("empresas", "emp_EMPRESA_A", { ativo: true });
+    expect((await postVincular(json({ funcionario_id: "f-dt", quadro_id: "q1" }))).status).toBe(200);
+    expect((await ds.obter("funcionarios", "f-dt"))?.identidade_alterada_em).toBeTruthy();
   });
 
   it("O29/O23: pessoa do Quadro de outra sede, nome que não confere ou funcionário de sede alheia → recusado, nada gravado", async () => {

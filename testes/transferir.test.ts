@@ -11,6 +11,7 @@ import { validarDesligamento } from "@/lib/desligamento";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { gerarDiaDaRotaPadrao } from "@/services/modelosService";
 import type { Funcionario } from "@/types";
+import { cadastrarEmpresas } from "./fixtures";
 
 let sessao: SessaoUsuario | null = null;
 vi.mock("@/lib/session", () => ({
@@ -36,6 +37,7 @@ describe("transferir de sede", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-27T12:00:00Z"));
     reiniciarBanco();
+    await cadastrarEmpresas("EMPRESA A"); // lista fechada (13/11/2026)
     sessao = COORD_DUAS;
     const ds = await getDataSource();
     const base = await ds.obter("funcionarios", "christus_f1");

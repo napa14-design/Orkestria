@@ -89,6 +89,7 @@ const GRUPOS: Grupo[] = [
       { href: "/parametros", rotulo: "Parâmetros" },
       { href: "/historico", rotulo: "Histórico", ocultarCoordenador: true },
       { href: "/usuarios", rotulo: "Usuários", apenasGestao: true },
+      { href: "/empresas", rotulo: "Empresas", apenasAdmin: true },
     ],
   },
 ];

@@ -16,11 +16,38 @@ const auditoria = {
 let seqRh = 0;
 /**
  * Dados do RH, obrigatórios desde 13/11/2026 em quem está no quadro. Fictícios;
- * a matrícula muda a cada chamada para não esbarrar na trava de matrícula única.
+ * a matrícula muda a cada chamada para não esbarrar na trava de matrícula única. A
+ * empresa é uma do catálogo do seed (lista fechada desde 13/11/2026).
  */
 export function rh(): Pick<Funcionario, "nome_completo" | "matricula" | "empresa" | "data_admissao"> {
   seqRh++;
-  return { nome_completo: `Pessoa de Teste ${seqRh}`, matricula: `T${seqRh}`, empresa: "Empresa de Teste", data_admissao: "2024-01-15" };
+  return { nome_completo: `Pessoa de Teste ${seqRh}`, matricula: `T${seqRh}`, empresa: "APEL MATRIZ", data_admissao: "2024-01-15" };
+}
+
+/**
+ * "Assume o posto de" só vale para POSTO VAGO (decisão do dono, 16/11/2026). Para os
+ * testes da passagem do posto: antes de chamar, desliga o antigo na data de corte (se ainda
+ * não foi desligado), como a coordenação faz na tela.
+ */
+export function comoPostoVago<R>(substituir: (novo: string, antigo: string, data: string, autor: string) => Promise<R>) {
+  return async (novo: string, antigo: string, data: string, autor: string): Promise<R> => {
+    const { getDataSource } = await import("@/lib/datasource");
+    const ds = await getDataSource();
+    const f = await ds.obter("funcionarios", antigo);
+    if (f && !f.desligado_em && novo !== antigo) await ds.atualizar("funcionarios", antigo, { desligado_em: data });
+    return substituir(novo, antigo, data, autor);
+  };
+}
+
+/** Põe empresas no catálogo do banco de memória (as dos testes que não estão no seed). */
+export async function cadastrarEmpresas(...nomes: string[]) {
+  const { getDataSource } = await import("@/lib/datasource");
+  const { idDaEmpresa, normalizarEmpresa } = await import("@/lib/empresas");
+  const ds = await getDataSource();
+  for (const bruto of nomes) {
+    const nome = normalizarEmpresa(bruto);
+    await ds.criar("empresas", { id: idDaEmpresa(nome), nome, ativo: true, ...auditoria });
+  }
 }
 
 /** Jornada 06:00–16:00 com 1h de almoço → 540 min líquidos. */

@@ -12,8 +12,10 @@
  * atomicidade perfeita, mas a requisição não termina antes da auditoria.
  */
 import { usuarioAtual } from "./contextoUsuario";
+import { hojeISO } from "./dateUtils";
+import { limiteDoExpurgo } from "./eventosQuadro";
 import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
-import type { MapaTabelas, NomeTabela } from "./schema";
+import { TABELAS_SO_DE_INCLUSAO, type MapaTabelas, type NomeTabela } from "./schema";
 
 /**
  * Tabelas que NÃO entram no histórico: o próprio histórico (recursão) e dado
@@ -22,7 +24,19 @@ import type { MapaTabelas, NomeTabela } from "./schema";
  * temporária e precisa sumir inteira: no log imutável, sobreviveria ao apagamento,
  * com o e-mail de quem abriu a tela.
  */
-const SEM_HISTORICO: ReadonlySet<NomeTabela> = new Set<NomeTabela>(["historico", "cache_resumo", "uso_telas"]);
+const SEM_HISTORICO: ReadonlySet<NomeTabela> = new Set<NomeTabela>([
+  "historico",
+  "cache_resumo",
+  "uso_telas",
+  // O evento do Quadro já é um registro imutável com autor e instante; repeti-lo aqui
+  // copiaria o nome completo para outro log que também não se apaga.
+  "eventos_quadro",
+]);
+
+/** A recusa de toda escrita que não seja inclusão nova numa tabela só de inclusão. */
+function soInclusao(tabela: NomeTabela, acao: string): never {
+  throw new Error(`${tabela} é só de inclusão: ${acao} não é permitido.`);
+}
 
 /** Campos usados como "nome" do registro no resumo, na ordem de preferência. */
 const CAMPOS_NOME = [
@@ -67,6 +81,8 @@ export class HistoricoDataSource implements DataSource {
   }
 
   async criar<K extends NomeTabela>(tabela: K, registro: MapaTabelas[K]): Promise<MapaTabelas[K]> {
+    if (TABELAS_SO_DE_INCLUSAO.has(tabela) && (await this.interno.obter(tabela, (registro as { id: string }).id)))
+      soInclusao(tabela, "regravar um registro que já existe");
     const resultado = await this.interno.criar(tabela, registro);
     await this.logar(
       tabela,
@@ -82,6 +98,7 @@ export class HistoricoDataSource implements DataSource {
     id: string,
     mudancas: Partial<MapaTabelas[K]>,
   ): Promise<MapaTabelas[K]> {
+    if (TABELAS_SO_DE_INCLUSAO.has(tabela)) soInclusao(tabela, "atualizar");
     const resultado = await this.interno.atualizar(tabela, id, mudancas);
     const campos = Object.keys(mudancas)
       .filter((c) => !["atualizado_por", "atualizado_em"].includes(c))
@@ -96,6 +113,7 @@ export class HistoricoDataSource implements DataSource {
     condicao: (atual: MapaTabelas[K]) => boolean,
     mudancas: Partial<MapaTabelas[K]>,
   ): Promise<MapaTabelas[K] | null> {
+    if (TABELAS_SO_DE_INCLUSAO.has(tabela)) soInclusao(tabela, "atualizar");
     const resultado = await this.interno.atualizarSe(tabela, id, condicao, mudancas);
     if (!resultado) return null; // Não gravou: não há o que registrar.
     const campos = Object.keys(mudancas)
@@ -106,6 +124,7 @@ export class HistoricoDataSource implements DataSource {
   }
 
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
+    if (TABELAS_SO_DE_INCLUSAO.has(tabela)) soInclusao(tabela, "excluir");
     await this.interno.excluir(tabela, id);
     await this.logar(tabela, id, "excluir", "");
   }
@@ -120,6 +139,21 @@ export class HistoricoDataSource implements DataSource {
    * arquivo previa: batch com dado + log, em vez de voltar a fire-and-forget.
    */
   async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    // Só de inclusão, ANTES de gravar qualquer coisa do lote. O id repetido é conferido
+    // aqui para todo banco (o Sheets não tem `create`); no Firestore e na memória o
+    // próprio lote também recusa, fechando a corrida entre esta leitura e o commit.
+    const novosSoInclusao = new Set<string>();
+    for (const op of operacoes) {
+      const soInclusaoAqui = TABELAS_SO_DE_INCLUSAO.has(op.tabela);
+      if (!soInclusaoAqui && !(op.tipo === "criar" && op.exigirNovo)) continue;
+      if (op.tipo !== "criar") soInclusao(op.tabela, op.tipo);
+      const id = (op.registro as { id: string }).id;
+      if (novosSoInclusao.has(`${op.tabela}/${id}`) || (await this.interno.obter(op.tabela, id))) {
+        if (soInclusaoAqui) soInclusao(op.tabela, "regravar um registro que já existe");
+        throw new Error(`Registro ${id} já existe em ${op.tabela}.`);
+      }
+      novosSoInclusao.add(`${op.tabela}/${id}`);
+    }
     const agora = new Date().toISOString();
     const usuario = usuarioAtual();
     const logs: OperacaoLote[] = [];
@@ -149,6 +183,38 @@ export class HistoricoDataSource implements DataSource {
       });
     }
     await this.interno.gravarLote([...operacoes, ...logs]);
+  }
+
+  /**
+   * O ÚNICO caminho que apaga evento do Quadro (retenção de 90 dias, decisão do dono,
+   * 16/11/2026), chamado só pelo feed do Chromos, uma vez por dia (`expurgarUmaVezPorDia`).
+   * Só lê os vencidos (`registradoEm <= limite`). O limite é calculado AQUI, de hoje em
+   * Fortaleza — quem chama não escolhe a data, então não há como apagar evento novo. As
+   * exclusões e o registro do expurgo no histórico vão num lote só. Devolve quantos saíram.
+   */
+  async expurgarEventosQuadroAntigos(): Promise<number> {
+    const limite = limiteDoExpurgo(hojeISO());
+    const velhos = (
+      await this.interno.consultar("eventos_quadro", [{ campo: "registradoEm", op: "<=", valor: limite }])
+    ).filter((e) => typeof e.registradoEm === "string" && e.registradoEm < limite);
+    if (!velhos.length) return 0;
+    await this.interno.gravarLote([
+      ...velhos.map((e) => ({ tipo: "excluir" as const, tabela: "eventos_quadro" as const, id: e.id })),
+      {
+        tipo: "criar",
+        tabela: "historico",
+        registro: {
+          id: crypto.randomUUID(),
+          tabela: "eventos_quadro",
+          registro_id: "expurgo",
+          acao: "excluir",
+          resumo: `expurgo de ${velhos.length} evento(s) registrados antes de ${limite}`,
+          usuario: usuarioAtual(),
+          criado_em: new Date().toISOString(),
+        } as MapaTabelas["historico"],
+      },
+    ]);
+    return velhos.length;
   }
 
   private async logar(

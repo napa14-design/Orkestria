@@ -27,7 +27,11 @@ describe("importação de rota × dados do RH", () => {
     await expect(aplicarImportacao(SEDE, DATA, analise, "t@t.com")).rejects.toThrow(/colunas do RH/);
     expect((await doSede()).length).toBe(antes);
     const ds = await getDataSource();
-    expect(await ds.consultar("rotinas_planejadas", [{ campo: "data", op: "==", valor: DATA }])).toEqual([]);
+    // Só os blocos da importação: o seed monta a agenda de HOJE, e DATA pode ser hoje.
+    const daImportacao = (await ds.consultar("rotinas_planejadas", [{ campo: "data", op: "==", valor: DATA }]))
+      .filter((r) => r.observacao === "Importada da planilha");
+    expect(daImportacao).toEqual([]);
+    expect(await ds.listar("eventos_quadro")).toEqual([]);
   });
 
   it("pessoa nova com as colunas: cadastra com os dados limpos e a empresa na grafia do Chromos", async () => {

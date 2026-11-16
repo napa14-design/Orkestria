@@ -53,6 +53,12 @@ export interface Funcionario extends Auditoria {
   /** Data de admissão (AAAA-MM-DD). Obrigatória desde 13/11/2026. */
   data_admissao?: string;
   /**
+   * Instante (ISO) da última troca de matrícula, empresa ou nome completo. Só o
+   * servidor grava; vai no evento do Quadro como `identidadeAlteradaEm` — troca
+   * recente manda o evento para a conferência no Chromos (emenda 5, 13/11/2026).
+   */
+  identidade_alterada_em?: string;
+  /**
    * Desligamento (AAAA-MM-DD): a partir deste dia a pessoa sai da geração e da
    * agenda. Pode ser futuro (aviso prévio). Ver `lib/desligamento.ts`.
    */

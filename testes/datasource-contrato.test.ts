@@ -43,7 +43,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { DataSource } from "@/lib/datasource";
 import { MemoryDataSource } from "@/lib/memoryStore";
-import type { Feriado, Sede } from "@/types";
+import type { EventoQuadro, Feriado, Sede } from "@/types";
 
 /** Prefixo próprio: o contrato nunca olha nem mexe em registro que não criou. */
 const P = "contrato-teste-";
@@ -79,7 +79,7 @@ const feriado = (id: string, inicio: string, sedeId = ""): Feriado => ({
 function contrato(nome: string, montar: () => Promise<DataSource>) {
   describe(`DataSource: ${nome}`, () => {
     let ds: DataSource;
-    const sujeira: Array<["sedes" | "feriados", string]> = [];
+    const sujeira: Array<["sedes" | "feriados" | "eventos_quadro", string]> = [];
 
     const criarSede = async (s: Sede) => {
       sujeira.push(["sedes", s.id]);
@@ -343,6 +343,39 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       ]);
       expect((await ds.obter("sedes", `${P}multi-a`))?.codigo).toBe("NOVO");
       expect(await ds.obter("sedes", `${P}multi-b`)).toBeNull();
+    });
+
+    it("tabela só de inclusão: id repetido no lote derruba o lote INTEIRO (create, não set)", async () => {
+      // O decorator (`lib/historico.ts`) já confere antes; isto é a segunda camada, a do
+      // próprio banco — a que fecha a corrida de dois cliques entre a conferência e o commit.
+      const evento: EventoQuadro = {
+        id: `${P}desl`, tipo: "desligamento", dataEfetiva: "2026-11-16", registradoEm: "2026-11-16T10:00:00.000Z",
+        matricula: "1", empresa: "E", nome: "N", funcao: "ASG", identidadeAlteradaEm: "", sedeDe: "DT", sedePara: "",
+        motivo: "", autor: "a@x.com", funcionarioId: "x",
+      };
+      sujeira.push(["eventos_quadro", evento.id], ["sedes", `${P}apos-evento`]);
+      await ds.gravarLote([{ tipo: "criar", tabela: "eventos_quadro", registro: evento }]);
+      await expect(
+        ds.gravarLote([
+          { tipo: "criar", tabela: "sedes", registro: sede("apos-evento") },
+          { tipo: "criar", tabela: "eventos_quadro", registro: { ...evento, motivo: "Outros" } },
+        ]),
+      ).rejects.toThrow();
+      expect(await ds.obter("sedes", `${P}apos-evento`)).toBeNull();
+      expect((await ds.obter("eventos_quadro", evento.id))?.motivo).toBe("");
+    });
+
+    it("criar com exigirNovo: id que já existe derruba o lote INTEIRO (a ficha-posto do \"saiu do posto\")", async () => {
+      sujeira.push(["sedes", `${P}exige-novo`], ["feriados", `${P}exige-novo`]);
+      await criarSede(sede("exige-novo", { codigo: "ORIGINAL" }));
+      await expect(
+        ds.gravarLote([
+          { tipo: "criar", tabela: "feriados", registro: feriado("exige-novo", "2026-12-25") },
+          { tipo: "criar", tabela: "sedes", registro: sede("exige-novo", { codigo: "OUTRO" }), exigirNovo: true },
+        ]),
+      ).rejects.toThrow();
+      expect(await ds.obter("feriados", `${P}exige-novo`)).toBeNull();
+      expect((await ds.obter("sedes", `${P}exige-novo`))?.codigo).toBe("ORIGINAL");
     });
 
     it("lote vazio não quebra", async () => {

@@ -21,3 +21,5 @@ export * from "./Historico";
 export * from "./CacheResumo";
 export * from "./UsoTela";
 export * from "./CentralDia";
+export * from "./Empresa";
+export * from "./EventoQuadro";

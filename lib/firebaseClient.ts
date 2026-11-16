@@ -13,7 +13,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
 import { obterAppAdmin } from "./firebaseAdmin";
 import { exigirId, semUndefined } from "./semUndefined";
-import type { MapaTabelas, NomeTabela } from "./schema";
+import { TABELAS_SO_DE_INCLUSAO, type MapaTabelas, type NomeTabela } from "./schema";
 
 export class FirebaseDataSource implements DataSource {
   private db: Firestore;
@@ -113,7 +113,10 @@ export class FirebaseDataSource implements DataSource {
       const lote = this.db.batch();
       for (const op of operacoes.slice(i, i + LIMITE)) {
         const ref = this.db.collection(op.tabela).doc(op.tipo === "criar" ? exigirId(op.tabela, op.registro) : op.id);
-        if (op.tipo === "criar") lote.set(ref, semUndefined(op.registro));
+        // Tabela só de inclusão: `create` falha se o documento já existe — e o lote
+        // inteiro com ele. Fecha a corrida de dois cliques no mesmo desligamento.
+        if (op.tipo === "criar" && (op.exigirNovo || TABELAS_SO_DE_INCLUSAO.has(op.tabela))) lote.create(ref, semUndefined(op.registro));
+        else if (op.tipo === "criar") lote.set(ref, semUndefined(op.registro));
         else if (op.tipo === "atualizar") lote.update(ref, semUndefined(op.mudancas));
         else lote.delete(ref);
       }

@@ -26,6 +26,7 @@ import {
 import type { Funcionario } from "@/types";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { exigirMatriculaLivre } from "./funcionariosService";
+import { exigirEmpresaDoCadastro } from "./empresasService";
 
 export class QuadroIndisponivel extends Error {
   constructor(readonly configurado: boolean) {
@@ -153,12 +154,18 @@ export async function vincularAoQuadro(
   if (!sedeNoChromos) throw naoAchou();
   const p = (await lerQuadro()).find((q) => q.id === quadroId);
   if (!p || p.sede !== sedeNoChromos || !p.matricula || !nomeConfereNaSede(f.nome, p.nome)) throw naoAchou();
+  // Lista fechada, como no cadastro (revisão de segurança, 16/11/2026): empresa do Quadro
+  // que não está ativa no cadastro daqui não entra pela porta do Vincular.
+  await exigirEmpresaDoCadastro(p.empresa);
   await exigirMatriculaLivre(p.matricula, p.empresa, f.id);
+  const agora = agoraISO();
   return ds.atualizar("funcionarios", f.id, {
     matricula: p.matricula,
     // Na forma padrão, como todo cadastro daqui (13/11/2026).
     empresa: normalizarEmpresa(p.empresa),
+    // Troca de identidade, como na edição: vai no evento do Quadro (emenda 5, 13/11/2026).
+    identidade_alterada_em: agora,
     atualizado_por: autor,
-    atualizado_em: agoraISO(),
+    atualizado_em: agora,
   });
 }

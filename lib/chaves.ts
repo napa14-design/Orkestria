@@ -47,6 +47,13 @@ export function recusaSeNaoForOChromos(autorizacao: string | null): { status: 40
     console.error("[chaves] a chave do Chromos é igual à do Orkestria");
     return { status: 503, erro: "Integração mal configurada." };
   }
+  // Igual ao segredo do cron (de qualquer tamanho): quem tem um abriria o outro — e o
+  // feed do Quadro entrega dado pessoal (casos de ataque do contrato do Quadro, 13/11/2026).
+  const cron = process.env.CRON_SECRET?.trim();
+  if (cron && aceitas.some((a) => tokenConfere(a, cron))) {
+    console.error("[chaves] a chave do Chromos é igual ao CRON_SECRET");
+    return { status: 503, erro: "Integração mal configurada." };
+  }
 
   // Confere as duas (sem parar na primeira): o tempo não diz se há anterior.
   const recebido = doCabecalho(autorizacao);
