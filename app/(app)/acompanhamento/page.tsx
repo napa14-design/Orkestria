@@ -549,13 +549,28 @@ export default function PaginaAcompanhamento() {
     const epis = exec?.epis_confirmados
       ? exec.epis_confirmados.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
-    setForm({
-      ...FORM_VAZIO,
-      inicio_real: rotina.inicio_planejado,
-      fim_real: rotina.fim_planejado,
-      tempo_real_min: rotina.tempo_previsto_min,
-      epis,
-    });
+    // ⚠️ Registro já gravado reabre com o que foi registrado (16/11/2026): reabria em
+    // branco, como "conforme" e no horário planejado — o desvio e a justificativa
+    // escritos "sumiam" da tela, e salvar de novo apagava os dois.
+    setForm(
+      exec
+        ? {
+            status_realizado: exec.status_realizado,
+            inicio_real: exec.inicio_real || rotina.inicio_planejado,
+            fim_real: exec.fim_real || rotina.fim_planejado,
+            tempo_real_min: exec.tempo_real_min || rotina.tempo_previsto_min,
+            justificativa: exec.justificativa ?? "",
+            observacao: exec.observacao ?? "",
+            epis,
+          }
+        : {
+            ...FORM_VAZIO,
+            inicio_real: rotina.inicio_planejado,
+            fim_real: rotina.fim_planejado,
+            tempo_real_min: rotina.tempo_previsto_min,
+            epis,
+          },
+    );
     setErro("");
     setRotinaAberta(rotina);
   }

@@ -8,6 +8,7 @@
 import type {
   Ausencia,
   ClassificacaoOcupacao,
+  ExecucaoRealizada,
   Feriado,
   Funcionario,
   Local,
@@ -139,7 +140,28 @@ export function percentualApoioOutroSetor(
   return total > 0 ? Math.round((Math.min(apoio, total) / total) * 1000) / 10 : null;
 }
 
-type EventualNaConta = Pick<ServicoEventual, "funcionario_id" | "data" | "inicio" | "fim" | "tempo_min"> & { sede_id?: string };
+type EventualNaConta = Pick<ServicoEventual, "funcionario_id" | "data" | "inicio" | "fim" | "tempo_min"> & {
+  sede_id?: string;
+  categoria_id?: string;
+};
+
+/** Execuções que dizem "fez a tarefa E outra coisa": com atraso ou parcial. */
+const COM_IMPACTO: ReadonlySet<string> = new Set(["com_atraso", "parcial"]);
+
+/**
+ * Os blocos feitos com atraso ou parcialmente — o sinal de que a pessoa cumpriu a
+ * tarefa mesmo tendo sido puxada para outra coisa. Vale o último registro do bloco.
+ */
+export function feitasComImpacto(
+  execucoes: Pick<ExecucaoRealizada, "rotina_id" | "status_realizado" | "atualizado_em">[],
+): Set<string> {
+  const ultimo = new Map<string, Pick<ExecucaoRealizada, "status_realizado" | "atualizado_em">>();
+  for (const e of execucoes) {
+    const atual = ultimo.get(e.rotina_id);
+    if (!atual || (e.atualizado_em ?? "") > (atual.atualizado_em ?? "")) ultimo.set(e.rotina_id, e);
+  }
+  return new Set([...ultimo].filter(([, e]) => COM_IMPACTO.has(e.status_realizado)).map(([id]) => id));
+}
 
 /** Hora de relógio. "24:00" e "09:75" não são: `hhmmParaMin` faria a conta assim mesmo. */
 export function horaValida(hora: unknown): hora is string {
@@ -203,31 +225,48 @@ export function minutosDoEventual(e: Pick<ServicoEventual, "inicio" | "fim" | "t
  * trabalhar e não for feriado (decisão do dono, 04/11/2026). Em folga, contar somava a
  * jornada inteira: 1 h no sábado de quem é de segunda a sexta derrubava uma semana cheia para 85%. E
  * tirar todo dia sem bloco também erra: 3 dias cheios + 2 só no detector davam 167%.
+ *
+ * `feitasComImpacto` (16/11/2026, pedido da coordenação da UniBenfica, decisão do dono):
+ * o APOIO (outro setor ou pedagógico) que cai sobre um bloco confirmado **com atraso ou
+ * parcial** conta inteiro — a pessoa montou o evento do colégio E cumpriu a rota, e é
+ * isso que vira sobrecarga. Sobre bloco "conforme" ou "não realizada" segue sem contar:
+ * ali o eventual pode ter substituído a tarefa (e o "fechamento do dia" marca conforme).
  */
 export function eventuaisForaDasTarefas(
-  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado">[],
+  rotinas: (Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado"> & { id?: string })[],
   eventuais: EventualNaConta[],
+  opcoes: { feitasComImpacto?: ReadonlySet<string> } = {},
 ): { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] {
   const sobra: { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] = [];
+  const impacto = opcoes.feitasComImpacto ?? new Set<string>();
+  // Dois mapas do mesmo dia: o de todos os blocos e o que o APOIO enxerga (sem os feitos com impacto).
   const ocupadoPorDia = new Map<string, [number, number][]>();
+  const ocupadoParaApoio = new Map<string, [number, number][]>();
   const somadoPorDia = new Map<string, number>();
+  const empurra = (mapa: Map<string, [number, number][]>, chave: string, j: [number, number]) => {
+    if (!mapa.has(chave)) mapa.set(chave, []);
+    mapa.get(chave)!.push(j);
+  };
   for (const r of rotinas) {
     if (!ocupaHorario(r)) continue;
     const chave = `${r.funcionario_id}|${r.data}`;
-    if (!ocupadoPorDia.has(chave)) ocupadoPorDia.set(chave, []);
-    ocupadoPorDia.get(chave)!.push([hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)]);
+    const j: [number, number] = [hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)];
+    empurra(ocupadoPorDia, chave, j);
+    if (!(r.id && impacto.has(r.id))) empurra(ocupadoParaApoio, chave, j);
   }
   for (const e of eventuais) {
     if (!e.funcionario_id) continue;
     const chave = `${e.funcionario_id}|${e.data}`;
-    const ocupado = ocupadoPorDia.get(chave) ?? [];
+    const ehApoio = e.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR || e.categoria_id === CATEGORIA_APOIO_PEDAGOGICO;
+    const ocupado = (ehApoio ? ocupadoParaApoio : ocupadoPorDia).get(chave) ?? [];
     const janela = janelaDoEventual(e);
     let minutos = minutosDoEventual(e);
     if (janela) {
       // Minuto a minuto: blocos e eventuais do dia podem se sobrepor entre si.
       for (let m = janela[0]; m < janela[1]; m++) if (ocupado.some(([a, b]) => a <= m && m < b)) minutos--;
-      ocupado.push(janela);
-      ocupadoPorDia.set(chave, ocupado);
+      // O próprio eventual ocupa o horário nos dois mapas: dois lançamentos no mesmo horário não somam.
+      empurra(ocupadoPorDia, chave, janela);
+      empurra(ocupadoParaApoio, chave, janela);
     }
     // O teto vale por pessoa e dia: sem horário, vários lançamentos somariam sem limite.
     minutos = Math.min(minutos, MAX_MINUTOS_EVENTUAL - (somadoPorDia.get(chave) ?? 0));
@@ -242,13 +281,15 @@ export function eventuaisNoApoio(
   rotinas: Parameters<typeof eventuaisForaDasTarefas>[0],
   eventuais: (EventualNaConta & Pick<ServicoEventual, "categoria_id">)[],
   categorias: readonly string[],
+  opcoes: { feitasComImpacto?: ReadonlySet<string> } = {},
 ): { apoioMin: number; foraDasTarefasMin: number } {
   const soma = (lista: { tempo_previsto_min: number }[]) => lista.reduce((s, x) => s + x.tempo_previsto_min, 0);
   return {
     // Sem blocos na conta: no apoio entra o tempo inteiro, mesmo sobre tarefa, mas o
     // mesmo horário lançado duas vezes e o teto do dia valem igual.
     apoioMin: soma(eventuaisForaDasTarefas([], eventuais.filter((e) => categorias.includes(e.categoria_id ?? "")))),
-    foraDasTarefasMin: soma(eventuaisForaDasTarefas(rotinas, eventuais)),
+    // O total segue a ocupação: com a regra do apoio sobre tarefa feita com impacto.
+    foraDasTarefasMin: soma(eventuaisForaDasTarefas(rotinas, eventuais, opcoes)),
   };
 }
 

@@ -231,6 +231,24 @@ describe("montarResumo", () => {
     expect(sul2.apoioOutroSetorPct).toBeGreaterThan(0);
   });
 
+  it("apoio sobre tarefa feita COM ATRASO conta na ocupação: fez as duas coisas (16/11/2026)", () => {
+    const b = rotinas.find((x) => x.id === "r2")!;
+    const janela = Number(b.fim_planejado.slice(0, 2)) * 60 + Number(b.fim_planejado.slice(3)) - (Number(b.inicio_planejado.slice(0, 2)) * 60 + Number(b.inicio_planejado.slice(3)));
+    const apoio = { id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: b.inicio_planejado, fim: b.fim_planejado, tempo_min: 0, categoria_id: "apoio_outro_setor" } as never;
+    const com = (status: ExecucaoRealizada["status_realizado"]) =>
+      montarResumo({
+        sedes, funcionarios, rotinas, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+        execucoes: [...execucoes.filter((e) => e.rotina_id !== "r2"), execucao({ id: "e2x", rotina_id: "r2", status_realizado: status })],
+        eventuais: [apoio],
+      }).porSede.find((s) => s.sede === "Sul 2")!.ocupacaoMediaPct;
+    // b: 270 planejados + a janela do apoio por cima, de 540; c segue em 50%.
+    expect(com("com_atraso")).toBe(Math.round((((270 + janela) / 540) * 100 + 50) / 2 * 10) / 10);
+    expect(com("parcial")).toBe(com("com_atraso"));
+    // Conforme ou não realizada: o eventual pode ter substituído a tarefa — não soma.
+    expect(com("conforme_planejado")).toBe(50);
+    expect(com("nao_realizada")).toBe(50);
+  });
+
   it("apoio pedagógico entra no total de apoio e aparece à parte (23/10/2026)", () => {
     // r6 (60 min em Sul 1) é apoio a outro setor; r4 (Benfica) é pedagógico.
     const res = montarResumo({

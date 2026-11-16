@@ -12,6 +12,7 @@ import {
   desvioPercentual,
   eventuaisForaDasTarefas,
   eventuaisNoApoio,
+  feitasComImpacto,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
@@ -133,9 +134,11 @@ export default function PaginaDashboard() {
     );
     const validas = rs.filter(ocupaHorario);
 
-    // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa.
+    // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa — salvo o
+    // apoio sobre tarefa feita com atraso ou parcial (fez as duas coisas: 16/11/2026).
     const evs = semAusentes(eventuais ?? [], ausencias ?? []);
-    const foraDasTarefas = eventuaisForaDasTarefas(validas, evs);
+    const comImpacto = { feitasComImpacto: feitasComImpacto(execucoes ?? []) };
+    const foraDasTarefas = eventuaisForaDasTarefas(validas, evs, comImpacto);
     const tempoPlanejadoTotal = [...validas, ...foraDasTarefas].reduce((s, r) => s + r.tempo_previsto_min, 0);
     // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos)
     // — com o apoio pedagógico somado e mostrado à parte (23/10/2026).
@@ -149,12 +152,12 @@ export default function PaginaDashboard() {
     const apoioOutroSetorPct = percentualApoioOutroSetor(
       validas,
       tarefasDeApoio,
-      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO]),
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO], comImpacto),
     );
     const apoioPedagogicoPct = percentualApoioOutroSetor(
       validas,
       tarefasPedagogicas,
-      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_PEDAGOGICO]),
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_PEDAGOGICO], comImpacto),
     );
 
     // Ocupação média por funcionário nos dias em que houve planejamento.

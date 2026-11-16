@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-11-16 — Sobrecarga por apoio a outro setor; desvio reabre com o que foi escrito
+
+Pedido da coordenação da UniBenfica: a equipe tem a rota cheia, é puxada para montar e
+desmontar eventos do colégio e ainda cumpre a rota (com atraso ou parcial). Isso não
+aparecia em lugar nenhum.
+
+- **Regra da ocupação** (decisão do dono, regra estreita): o serviço eventual de **apoio**
+  (outro setor ou pedagógico) que cai sobre um bloco confirmado **com atraso ou parcial**
+  agora conta inteiro — a pessoa fez as duas coisas, e a ocupação passa de 100%
+  (sobrecarga). Sobre bloco "conforme" ou "não realizada" segue sem contar, como em
+  04/11 (ali o eventual pode ter substituído a tarefa; o "fechamento do dia" marca
+  conforme). Vale igual no Painel, no Panorama (que passa a ler as execuções do período)
+  e no resumo do Chromos. `feitasComImpacto` + opção em `eventuaisForaDasTarefas` /
+  `eventuaisNoApoio`.
+- **Acompanhamento:** reabrir um registro já gravado vinha em branco (conforme, horário
+  planejado, sem justificativa) — o desvio "sumia" da tela e salvar de novo apagava o que
+  foi escrito. Agora reabre com status, horários, tempo, justificativa e observação.
+- **Dados:** histórico dos 4 ASG transferidos (blocos e confirmações desde junho) levado
+  da BN para a UBN; blocos duplicados de hoje na BN apagados.
+
+Arquivos: `lib/calculations.ts`, `lib/resumoExecutivo.ts`, `app/(app)/dashboard/page.tsx`,
+`app/(app)/panorama/page.tsx`, `app/(app)/acompanhamento/page.tsx`,
+`testes/eventuais-ocupacao.test.ts`, `testes/resumo-executivo.test.ts`.
+
+---
+
 ## 2026-11-16 — UniBenfica: sede própria; sigla do SGCP da Benfica volta a ser "BN"
 
 - **Sigla no SGCP:** o SGCP recebe a Benfica só como **"BN"** (dono). A troca antiga `BN → "UBN"`

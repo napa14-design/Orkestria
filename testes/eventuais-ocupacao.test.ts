@@ -16,6 +16,7 @@ import {
   CATEGORIA_APOIO_PEDAGOGICO,
   eventuaisForaDasTarefas,
   eventuaisNoApoio,
+  feitasComImpacto,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   MAX_MINUTOS_EVENTUAL,
@@ -60,6 +61,43 @@ describe("eventuaisForaDasTarefas", () => {
   it("tarefa cancelada ou remanejada não ocupa o horário", () => {
     expect(minutos([bloco("09:00", "10:00", 60, "cancelada")], [evento("09:00", "10:00", 60)])).toBe(60);
     expect(minutos([bloco("09:00", "10:00", 60, "remanejada")], [evento("09:00", "10:00", 60)])).toBe(60);
+  });
+
+  describe("apoio sobre tarefa feita com atraso ou parcial (16/11/2026)", () => {
+    const minImpacto = (r: RotinaPlanejada[], e: ServicoEventual[], ids: string[]) =>
+      eventuaisForaDasTarefas(r, e, { feitasComImpacto: new Set(ids) }).reduce((s, x) => s + x.tempo_previsto_min, 0);
+    // bloco("09:00", …) tem id "09:00".
+    it("apoio sobre bloco feito com impacto conta inteiro", () => {
+      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)], ["09:00"])).toBe(60);
+      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0, { categoria_id: "apoio_outro_setor" })], ["09:00"])).toBe(60);
+    });
+    it("só o pedaço sobre o bloco com impacto: o resto do horário segue descontado", () => {
+      const blocos = [bloco("09:00", "10:00", 60, "realizada"), bloco("10:00", "11:00", 60, "realizada")];
+      expect(minImpacto(blocos, [evento("09:00", "11:00", 0)], ["09:00"])).toBe(60);
+    });
+    it("eventual que não é de apoio não ganha a regra", () => {
+      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0, { categoria_id: "" })], ["09:00"])).toBe(0);
+    });
+    it("dois apoios no mesmo horário sobre o bloco com impacto contam uma vez", () => {
+      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0), { ...evento("09:00", "10:00", 0), id: "b" }], ["09:00"])).toBe(60);
+    });
+    it("sem a opção, nada muda (chamada antiga)", () => {
+      expect(minutos([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)])).toBe(0);
+    });
+    it("feitasComImpacto: só atraso e parcial, e vale o último registro do bloco", () => {
+      const ex = (rotina_id: string, status_realizado: string, atualizado_em: string) => ({ rotina_id, status_realizado, atualizado_em }) as never;
+      const s = feitasComImpacto([
+        ex("a", "com_atraso", "1"), ex("b", "parcial", "1"), ex("c", "conforme_planejado", "1"), ex("d", "nao_realizada", "1"),
+        ex("e", "com_atraso", "1"), ex("e", "conforme_planejado", "2"),
+      ]);
+      expect([...s].sort()).toEqual(["a", "b"]);
+    });
+    it("no Painel: o total do apoio segue a mesma regra", () => {
+      const r = eventuaisNoApoio([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)], [CATEGORIA_APOIO_PEDAGOGICO], {
+        feitasComImpacto: new Set(["09:00"]),
+      });
+      expect(r).toEqual({ apoioMin: 60, foraDasTarefasMin: 60 });
+    });
   });
 
   it("dois eventuais no mesmo horário não contam em dobro", () => {
