@@ -14,6 +14,9 @@ export function middleware(req: NextRequest) {
     // Integração com o Chromos: outro sistema, sem sessão. O portão é o token
     // (CHAVE_CROMOS, ver lib/chaves), conferido dentro de cada rota.
     pathname.startsWith("/api/chromos/") ||
+    // Resumo diário das rotas, chamado pelo Vercel Cron sem chave (decisão do dono:
+    // nenhum segredo novo). As travas estão em `services/resumoDiarioService.ts`.
+    pathname === "/api/agendado/resumo-diario" ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico";
 

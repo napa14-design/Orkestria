@@ -150,11 +150,13 @@ describe("podeEditarParametro", () => {
     }
   });
 
-  it("as três chaves travadas são exatamente os limites de ocupação", () => {
+  it("as chaves travadas são os limites de ocupação e quem recebe o resumo diário", () => {
     expect([...CHAVES_SO_ADMINISTRADOR].sort()).toEqual([
       "ocupacao_adequada",
       "ocupacao_alta",
       "ocupacao_baixa",
+      // 16/11/2026: coordenador não se põe (nem põe alguém de fora) na lista do e-mail das 10h.
+      "resumo_diario_para",
     ]);
   });
 

@@ -189,6 +189,8 @@ export const CHAVES_SO_ADMINISTRADOR = new Set([
   "ocupacao_baixa",
   "ocupacao_adequada",
   "ocupacao_alta",
+  // Quem recebe o resumo diário das rotas (16/11/2026): coordenador não se põe na lista.
+  "resumo_diario_para",
 ]);
 
 export function podeEditarParametro(

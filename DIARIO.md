@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-11-17 — Resumo diário das rotas por e-mail, às 10h
+
+De segunda a sábado, às 10h de Fortaleza, quem está no parâmetro **`resumo_diario_para`**
+(global, texto, e-mails separados por vírgula; **só o administrador edita**) recebe por
+e-mail a situação de cada sede que opera: "Não gerado" primeiro, depois "Gerado (N tarefas)",
+"Feriado" e "Sem rota padrão para hoje". As sedes saem do cadastro de quem recebe (o
+administrador recebe todas); e-mail que não é de um usuário ativo coordenador/administrador
+não recebe nada.
+
+- **Disparo:** Vercel Cron (`vercel.json`, `0 13 * * 1-6` UTC) chama
+  `GET /api/agendado/resumo-diario`. **Sem chave**, por decisão do dono (nenhum segredo novo):
+  qualquer um pode chamar a rota, e o pior que consegue é antecipar o e-mail do dia dentro da
+  janela (risco aceito). Travas, conforme os casos de ataque do `seguranca`: só age seg–sáb
+  entre 10:00 e 10:59 de Fortaleza e com SMTP configurado; a trava do dia (`cache_resumo`,
+  `create`) vem **antes** de qualquer leitura, então a 2ª chamada custa uma leitura; a trava
+  nunca é solta (falha = dia sem e-mail, não varredura em laço); blocos por `contar`; resposta
+  só "ok"/"fora da janela".
+- **Ressalvas:** no plano Hobby o cron roda "em algum momento da hora" — fora das 10h, não sai;
+  o Vercel Cron não tenta de novo nem avisa quando falha; a lista de e-mails aparece em
+  Parâmetros para quem tem sessão.
+
+Arquivos: `lib/resumoDiario.ts`, `services/resumoDiarioService.ts`,
+`app/api/agendado/resumo-diario/route.ts`, `middleware.ts`, `lib/permissions.ts`,
+`vercel.json`, `testes/resumo-diario.test.ts`, `testes/permissoes.test.ts`.
+
+---
+
 ## 2026-11-16 — Atalho do apoio a outro setor no registro da execução
 
 No formulário "Registrar execução", com status **com atraso**, **parcial** ou **não

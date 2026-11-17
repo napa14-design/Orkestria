@@ -203,6 +203,12 @@ describe("supervisor pelas rotas", () => {
     expect((await postExecucao(json(execucao(b, { status_realizado: "cancelada", justificativa: "evento" })))).status).toBe(201);
   });
 
+  it("coordenador não cria a lista do resumo diário, nem no escopo da sede dele (E4, 17/11/2026)", async () => {
+    sessao = { ...SUP, perfil: "coordenador" };
+    const r = await postParametro(json({ chave: "resumo_diario_para", valor: "eu@x.com", sede_id: "christus_dt", editavel_por_supervisor: true }));
+    expect(r.status).toBe(403);
+  });
+
   it("não escreve no planejado, nas ausências nem nos parâmetros", async () => {
     const r = await bloco();
     expect((await putRotina(new Request("http://x", { method: "PUT", body: JSON.stringify({ inicio_planejado: "09:00" }) }), ctx(r.id))).status).toBe(403);
