@@ -19,6 +19,10 @@ import {
   cobraDesvio,
   desvioPercentual,
   exigeJustificativa,
+  feitasComImpacto,
+  funcionarioNoDia,
+  ocupacaoDoDiaPorPessoa,
+  ocupaHorario,
   PARAMETROS_PADRAO,
 } from "@/lib/calculations";
 import { listaDoSupervisor } from "@/lib/agenda";
@@ -43,6 +47,7 @@ import type {
   Requisito,
   RotinaPlanejada,
   Sede,
+  ServicoEventual,
   StatusRealizado,
   Tarefa,
 } from "@/types";
@@ -168,8 +173,30 @@ export default function PaginaAcompanhamento() {
     fetcher,
   );
   const ausentes = useMemo(() => new Set((ausenciasDoDia ?? []).map((a) => a.funcionario_id)), [ausenciasDoDia]);
+  // Aviso de sobrecarga do dia (18/11/2026): a MESMA conta da agenda e do Painel
+  // (`ocupacaoDoDiaPorPessoa`, com o apoio sobre tarefa feita com atraso/parcial), para a
+  // coordenação ver no próprio Acompanhamento quem passou de 100%, sem abrir o Dashboard.
+  const { data: eventuaisDoDia } = useSWR<ServicoEventual[]>(
+    sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null,
+    fetcher,
+  );
   const [feitaPor, setFeitaPor] = useState<RotinaPlanejada | null>(null);
   const params = parametros ?? PARAMETROS_PADRAO;
+  const emSobrecarga = useMemo(() => {
+    if (!rotinas || !funcionarios || !eventuaisDoDia || !execucoes) return [];
+    const comTarefa = new Set(rotinas.filter(ocupaHorario).map((r) => r.funcionario_id));
+    return ocupacaoDoDiaPorPessoa({
+      funcionarios: funcionarios.filter((f) => comTarefa.has(f.id) && !ausentes.has(f.id)).map((f) => funcionarioNoDia(f, data)),
+      rotinas,
+      eventuais: eventuaisDoDia,
+      ausencias: ausenciasDoDia ?? [],
+      data,
+      parametros: params,
+      feitasComImpacto: feitasComImpacto(execucoes),
+    })
+      .filter((p) => p.resumo.classificacao === "sobrecarga")
+      .sort((a, b) => b.resumo.ocupacao_percentual - a.resumo.ocupacao_percentual);
+  }, [rotinas, funcionarios, eventuaisDoDia, execucoes, ausentes, ausenciasDoDia, data, params]);
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
   const hoje = hojeISO();
@@ -887,6 +914,27 @@ export default function PaginaAcompanhamento() {
               <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>{marcadasComEpi} marcada(s) com EPI ficarão de fora</span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Só aparece quando alguém do dia passa da régua de ocupação (some sozinho). */}
+      {emSobrecarga.length > 0 && (
+        <div
+          className="painel entra"
+          role="status"
+          style={{ marginBottom: 16, padding: "10px 14px", borderLeft: "6px solid var(--acento)", fontSize: 13 }}
+        >
+          <strong>Sobrecarga {data === hoje ? "hoje" : `em ${formatarDataBR(data)}`}:</strong>{" "}
+          {emSobrecarga.map((p, i) => (
+            <span key={p.funcionario.id}>
+              {i > 0 && " · "}
+              {p.funcionario.nome} <strong className="num">{p.resumo.ocupacao_percentual.toFixed(0)}%</strong>
+            </span>
+          ))}
+          <span style={{ color: "var(--tinta-3)" }}>
+            {" "}— passou de {params.ocupacao_alta}% da jornada, somando o apoio a outro setor lançado sobre tarefa feita com
+            atraso ou parcial.
+          </span>
         </div>
       )}
 

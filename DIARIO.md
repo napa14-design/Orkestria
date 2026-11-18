@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-11-18 — Aviso de sobrecarga no Acompanhamento
+
+No topo do Acompanhamento, uma linha "Sobrecarga hoje: Francisco 109% · …" aparece **só quando**
+alguém do dia passa da régua de ocupação (`ocupacao_alta`) e some sozinha. É a mesma conta da
+agenda e do Painel: a conta do dia foi para `ocupacaoDoDiaPorPessoa` (lib/calculations), que o
+resumo da agenda (`OccupancySummary`) passou a usar também, para os dois nunca divergirem. A tela
+lê os serviços eventuais do dia (uma consulta); tarefas e execuções ela já lia. Sem botão nem
+filtro novo: na visão do coordenador não há filtro por pessoa, então o aviso só informa.
+
+Arquivos: `lib/calculations.ts`, `components/agenda/OccupancySummary.tsx`,
+`app/(app)/acompanhamento/page.tsx`.
+
+---
+
 ## 2026-11-18 — Sobrecarga também na agenda; Top 10 desvios sem 0%; botão "EPI ou desvio"
 
 - **Dashboard, "Top 10 desvios previsto × realizado":** só entra desvio de verdade (|desvio| ≥

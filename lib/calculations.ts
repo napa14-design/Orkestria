@@ -911,6 +911,35 @@ export interface ResumoFuncionario {
   total_tarefas: number;
 }
 
+/**
+ * A ocupação de cada pessoa num DIA — a mesma conta do resumo da agenda (`OccupancySummary`)
+ * e do aviso de sobrecarga do Acompanhamento (18/11/2026), para os dois nunca divergirem.
+ * `funcionarios` já no horário do dia (`funcionarioNoDia`); eventual de quem faltou não conta.
+ */
+export function ocupacaoDoDiaPorPessoa(args: {
+  funcionarios: Funcionario[];
+  rotinas: RotinaPlanejada[];
+  eventuais: ServicoEventual[];
+  ausencias: Pick<Ausencia, "funcionario_id" | "data_inicio" | "data_fim">[];
+  data: string;
+  parametros: ParametrosResolvidos;
+  feitasComImpacto?: ReadonlySet<string>;
+}) {
+  const doDia = semAusentes(args.eventuais.filter((e) => e.data === args.data), args.ausencias);
+  const fora = eventuaisForaDasTarefas(args.rotinas, doDia, { feitasComImpacto: args.feitasComImpacto });
+  return args.funcionarios.map((f) => {
+    const dela = args.rotinas.filter((r) => r.funcionario_id === f.id);
+    const eventualMin = fora.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + e.tempo_previsto_min, 0);
+    return {
+      funcionario: f,
+      dela,
+      eventuaisDela: doDia.filter((e) => e.funcionario_id === f.id),
+      eventualMin,
+      resumo: resumoFuncionario(f, dela, args.parametros, eventualMin),
+    };
+  });
+}
+
 export function resumoFuncionario(
   funcionario: Funcionario,
   rotinasDoDia: RotinaPlanejada[],

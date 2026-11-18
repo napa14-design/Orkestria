@@ -4,12 +4,10 @@
 import { useMemo } from "react";
 import {
   diaSemJornada,
-  eventuaisForaDasTarefas,
   minutosDoEventual,
+  ocupacaoDoDiaPorPessoa,
   ocupaHorario,
-  resumoFuncionario,
   ROTULO_CLASSIFICACAO,
-  semAusentes,
 } from "@/lib/calculations";
 import { formatarDuracao } from "@/lib/dateUtils";
 import type {
@@ -89,22 +87,19 @@ export default function OccupancySummary({
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
 
   const resumos = useMemo(() => {
-    // Só os deste dia: ao trocar de data, a lista anterior fica na tela até a nova chegar.
-    const doDia = semAusentes(eventuais.filter((e) => e.data === data), ausencias);
-    const foraDasTarefas = eventuaisForaDasTarefas(rotinas, doDia, { feitasComImpacto });
-    return funcionarios.map((f) => {
-      const dela = rotinas.filter((r) => r.funcionario_id === f.id);
-      const eventualMin = foraDasTarefas.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + e.tempo_previsto_min, 0);
-      return {
+    // Só os deste dia (a função filtra): ao trocar de data, a lista anterior fica na tela até a nova chegar.
+    // A mesma conta do aviso de sobrecarga do Acompanhamento (`ocupacaoDoDiaPorPessoa`).
+    return ocupacaoDoDiaPorPessoa({ funcionarios, rotinas, eventuais, ausencias, data, parametros, feitasComImpacto }).map(
+      ({ funcionario: f, dela, eventuaisDela, eventualMin, resumo }) => ({
         funcionario: f,
         eventualMin,
         // Tudo o que foi lançado: sobre tarefas, a ocupação não muda, e sem isto a
         // pessoa lançava e achava que não tinha entrado.
-        lancadoMin: doDia.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + minutosDoEventual(e), 0),
+        lancadoMin: eventuaisDela.reduce((s, e) => s + minutosDoEventual(e), 0),
         soHoras: eventualMin > 0 && !dela.some(ocupaHorario) && diaSemJornada(f, data, feriados),
-        resumo: resumoFuncionario(f, dela, parametros, eventualMin),
-      };
-    });
+        resumo,
+      }),
+    );
   }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros, feitasComImpacto]);
 
   const selecionado = resumos.find((r) => r.funcionario.id === selecionadoId);
