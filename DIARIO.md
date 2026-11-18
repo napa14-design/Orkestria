@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-11-18 — Aviso único da atividade adicional
+
+A mudança de hoje muda o jeito de lançar e o que os números do Dashboard querem dizer, então
+coordenador e administrador recebem um aviso para ler uma vez, inteiro, ao entrar. O aviso não
+tem ✕ nem fecha clicando fora. O "Entendi" fica no fim do texto e só libera depois de 10 s.
+Visto fica marcado no navegador (como os avisos de remanejo); em outro aparelho, aparece de novo
+uma vez. Deixa de aparecer depois de 31/12/2026. O supervisor não vê.
+
+Não confundir com `AvisoAtualizacao` ("O Orkestria foi atualizado"), que é o aviso de versão nova.
+
+Arquivos: `components/AvisoNovidade.tsx`, `app/(app)/layout.tsx`.
+
+---
+
 ## 2026-11-18 — Atividade adicional e déficit estimado (substitui a regra de 16/11)
 
 Pedido da coordenação da UniBenfica: mostrar à gestão que a equipe (rota quase cheia), puxada
