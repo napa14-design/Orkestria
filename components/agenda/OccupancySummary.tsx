@@ -69,6 +69,7 @@ export default function OccupancySummary({
   selecionadoId,
   aoSelecionar,
   aoTrocar,
+  feitasComImpacto,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -82,13 +83,15 @@ export default function OccupancySummary({
   aoSelecionar: (id: string) => void;
   /** Sem isto (supervisor, só leitura), o botão de troca nem aparece. */
   aoTrocar?: (id: string) => void;
+  /** Blocos do dia feitos com atraso/parcial: o apoio sobre eles conta (16/11/2026), como no Painel. */
+  feitasComImpacto?: ReadonlySet<string>;
 }) {
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
 
   const resumos = useMemo(() => {
     // Só os deste dia: ao trocar de data, a lista anterior fica na tela até a nova chegar.
     const doDia = semAusentes(eventuais.filter((e) => e.data === data), ausencias);
-    const foraDasTarefas = eventuaisForaDasTarefas(rotinas, doDia);
+    const foraDasTarefas = eventuaisForaDasTarefas(rotinas, doDia, { feitasComImpacto });
     return funcionarios.map((f) => {
       const dela = rotinas.filter((r) => r.funcionario_id === f.id);
       const eventualMin = foraDasTarefas.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + e.tempo_previsto_min, 0);
@@ -102,7 +105,7 @@ export default function OccupancySummary({
         resumo: resumoFuncionario(f, dela, parametros, eventualMin),
       };
     });
-  }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros]);
+  }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros, feitasComImpacto]);
 
   const selecionado = resumos.find((r) => r.funcionario.id === selecionadoId);
 

@@ -73,6 +73,7 @@ export default function SemanaGrid({
   datas,
   dataSelecionada,
   aoAbrirDia,
+  feitasComImpacto,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -86,6 +87,8 @@ export default function SemanaGrid({
   datas: string[];
   dataSelecionada: string;
   aoAbrirDia: (data: string) => void;
+  /** Blocos da semana feitos com atraso/parcial: o apoio sobre eles conta (16/11/2026), como no Painel. */
+  feitasComImpacto?: ReadonlySet<string>;
 }) {
   const hoje = hojeISO();
   const [dica, setDica] = useState<{ x: number; y: number; acima: boolean; titulo: string; linhas: string[] } | null>(null);
@@ -107,8 +110,8 @@ export default function SemanaGrid({
   // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa.
   const foraDasTarefas = useMemo(() => {
     const ids = new Set(funcionarios.map((f) => f.id));
-    return eventuaisForaDasTarefas(daGrade, semAusentes(eventuais.filter((e) => ids.has(e.funcionario_id)), ausencias));
-  }, [funcionarios, eventuais, ausencias, daGrade]);
+    return eventuaisForaDasTarefas(daGrade, semAusentes(eventuais.filter((e) => ids.has(e.funcionario_id)), ausencias), { feitasComImpacto });
+  }, [funcionarios, eventuais, ausencias, daGrade, feitasComImpacto]);
   const daSemana = useMemo(
     () => new Map(ocupacaoPorPessoa(funcionarios, [...daGrade, ...foraDasTarefas], feriados).map((p) => [p.funcionario.id, p])),
     [funcionarios, daGrade, foraDasTarefas, feriados],

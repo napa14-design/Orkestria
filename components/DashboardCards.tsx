@@ -62,8 +62,11 @@ export function ListaBarras({
         {itens.length === 0 && (
           <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>{vazio}</span>
         )}
-        {itens.map((item) => (
-          <div key={item.rotulo}>
+        {/* ⚠️ Chave com a posição: o rótulo se repete ("Tarefa · ?" enquanto os nomes
+            carregam, dois funcionários de mesmo nome), e chave repetida deixava a linha
+            antiga na tela — a lista de "Top 10" chegou a mostrar 17 (18/11/2026). */}
+        {itens.map((item, i) => (
+          <div key={`${i}-${item.rotulo}`}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 8 }}>
                 {item.rotulo}

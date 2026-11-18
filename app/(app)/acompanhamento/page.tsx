@@ -1016,7 +1016,7 @@ export default function PaginaAcompanhamento() {
                     : !tarefaCarregada
                       ? "Carregando…"
                       : exigeEpi
-                        ? "Confirmar + EPI"
+                        ? "EPI ou desvio"
                         : "Houve desvio"}
                 </button>
                 )}
@@ -1145,7 +1145,7 @@ export default function PaginaAcompanhamento() {
                           : !tarefaCarregada
                             ? "Carregando…"
                             : exigeEpi
-                              ? "Confirmar + EPI"
+                              ? "EPI ou desvio"
                               : "Desvio"}
                       </button>
                       )}

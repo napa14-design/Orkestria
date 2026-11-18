@@ -276,6 +276,29 @@ export function eventuaisForaDasTarefas(
   return sobra;
 }
 
+/**
+ * Há apoio (outro setor/pedagógico) lançado sobre o horário de alguma tarefa da pessoa no
+ * mesmo dia? Só então importa saber quais tarefas foram feitas com atraso/parcial — a agenda
+ * da semana usa isto para não ler as execuções à toa (leitura é custo).
+ */
+export function haApoioSobreTarefa(
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado">[],
+  eventuais: EventualNaConta[],
+): boolean {
+  return eventuais.some((e) => {
+    if (!e.funcionario_id || (e.categoria_id !== CATEGORIA_APOIO_OUTRO_SETOR && e.categoria_id !== CATEGORIA_APOIO_PEDAGOGICO)) return false;
+    const j = janelaDoEventual(e);
+    return (
+      !!j &&
+      rotinas.some(
+        (r) =>
+          ocupaHorario(r) && r.funcionario_id === e.funcionario_id && r.data === e.data &&
+          hhmmParaMin(r.inicio_planejado) < j[1] && j[0] < hhmmParaMin(r.fim_planejado),
+      )
+    );
+  });
+}
+
 /** O que os eventuais somam no indicador de apoio do Painel. */
 export function eventuaisNoApoio(
   rotinas: Parameters<typeof eventuaisForaDasTarefas>[0],

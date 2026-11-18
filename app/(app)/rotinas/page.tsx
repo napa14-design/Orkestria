@@ -105,6 +105,8 @@ export default function PaginaRotinas() {
     rotinas,
     eventuais,
     eventuaisSemana,
+    feitasComImpactoDia,
+    feitasComImpactoSemana,
     feriados,
     mutateRotinas,
     historico,
@@ -942,6 +944,7 @@ export default function PaginaRotinas() {
           funcionarios={funcionariosVisiveis}
           rotinas={rotinasSemana ?? []}
           eventuais={eventuaisSemana ?? []}
+          feitasComImpacto={feitasComImpactoSemana}
           feriados={feriados ?? []}
           ausencias={ausenciasSemana ?? []}
           tarefas={tarefas ?? []}
@@ -1130,6 +1133,7 @@ export default function PaginaRotinas() {
               funcionarios={efetivosVisiveis}
               rotinas={rotinas ?? []}
               eventuais={eventuais ?? []}
+              feitasComImpacto={feitasComImpactoDia}
               ausencias={ausencias ?? []}
               feriados={feriados ?? []}
               data={data}

@@ -17,6 +17,7 @@ import {
   eventuaisForaDasTarefas,
   eventuaisNoApoio,
   feitasComImpacto,
+  haApoioSobreTarefa,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   MAX_MINUTOS_EVENTUAL,
@@ -158,7 +159,7 @@ describe("no mostrador e no Painel", () => {
 
   const mostrador = (
     eventuais: ServicoEventual[],
-    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string } = {},
+    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA, feitas }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string; feitas?: Set<string> } = {},
   ) =>
     renderToStaticMarkup(
       createElement(OccupancySummary, {
@@ -172,6 +173,7 @@ describe("no mostrador e no Painel", () => {
         parametros: PARAMETROS_PADRAO,
         selecionadoId: "f",
         aoSelecionar: () => {},
+        feitasComImpacto: feitas,
       }),
     ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
@@ -191,6 +193,22 @@ describe("no mostrador e no Painel", () => {
     expect(com).toContain("11.1%");
     expect(com).toContain("Eventual lançado 1h");
     expect(com).toContain("Fora das tarefas (já somado) 0min");
+  });
+
+  it("na agenda também: apoio sobre tarefa feita com atraso soma, como no Painel (18/11/2026)", () => {
+    // bloco("07:00", …) tem id "07:00". 60 de tarefa + 60 de apoio por cima, de 540 = 22,2%.
+    expect(mostrador([evento("07:00", "08:00", 60)], { feitas: new Set(["07:00"]) })).toContain("22.2%");
+    expect(mostrador([evento("07:00", "08:00", 60)], { feitas: new Set() })).toContain("11.1%");
+  });
+
+  it("haApoioSobreTarefa: só apoio, com horário, sobre tarefa da mesma pessoa e dia", () => {
+    const r = [bloco("09:00", "10:00", 60)];
+    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0)])).toBe(true);
+    expect(haApoioSobreTarefa(r, [evento("10:00", "11:00", 0)])).toBe(false); // encosta, não sobrepõe
+    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0, { categoria_id: "" })])).toBe(false);
+    expect(haApoioSobreTarefa(r, [evento("", "", 60)])).toBe(false); // sem horário
+    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0, { funcionario_id: "outra" })])).toBe(false);
+    expect(haApoioSobreTarefa([bloco("09:00", "10:00", 60, "cancelada")], [evento("09:30", "10:30", 0)])).toBe(false);
   });
 
   it("só eventual em folga ou feriado: mostra as horas, sem % nem selo de subutilizado", () => {

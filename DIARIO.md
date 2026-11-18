@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-11-18 — Sobrecarga também na agenda; Top 10 desvios sem 0%; botão "EPI ou desvio"
+
+- **Dashboard, "Top 10 desvios previsto × realizado":** só entra desvio de verdade (|desvio| ≥
+  0,5%). Com quase tudo fechado "conforme", o top 10 saía cheio de 0%.
+- **Listas de barras do Dashboard:** a chave do React era o rótulo, que se repete ("Tarefa · ?"
+  enquanto os nomes carregam, dois funcionários de mesmo nome). Chave repetida deixava a linha
+  antiga na tela: o "Top 10" chegou a mostrar 17 linhas, várias com "?". Agora a chave leva a posição.
+- **Acompanhamento:** em tarefa com EPI o botão dizia "Confirmar + EPI" e a coordenação não via
+  onde registrar o desvio. É o mesmo formulário completo (status, horário real, justificativa,
+  apoio a outro setor); o botão passou a se chamar **"EPI ou desvio"**.
+
+- **Agenda (Rotinas) com a regra da sobrecarga de 16/11:** o resumo do dia e a grade da semana
+  ainda contavam o apoio sobre tarefa como zero, então a pessoa mostrava 100% na agenda e 109% no
+  Painel. Agora usam `feitasComImpacto` como o Painel. O dia usa as execuções que a agenda já lia;
+  a semana só lê as execuções quando há apoio sobre o horário de alguma tarefa
+  (`haApoioSobreTarefa`), para não ler à toa.
+
+Arquivos: `components/DashboardCards.tsx`, `app/(app)/dashboard/page.tsx`,
+`app/(app)/acompanhamento/page.tsx`, `app/(app)/rotinas/page.tsx`, `app/(app)/rotinas/useRotinaData.ts`,
+`components/agenda/OccupancySummary.tsx`, `components/agenda/SemanaGrid.tsx`, `lib/calculations.ts`,
+`testes/eventuais-ocupacao.test.ts`.
+
+---
+
 ## 2026-11-17 — Resumo diário das rotas por e-mail, às 10h
 
 De segunda a sábado, às 10h de Fortaleza, quem está no parâmetro **`resumo_diario_para`**

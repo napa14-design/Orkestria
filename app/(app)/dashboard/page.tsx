@@ -205,6 +205,8 @@ export default function PaginaDashboard() {
           desvio: desvioPercentual(e.tempo_real_min, rotina.tempo_previsto_min),
         };
       })
+      // Só desvio de verdade: com quase tudo fechado "conforme", o top 10 saía cheio de 0%.
+      .filter((d) => Math.abs(d.desvio) >= 0.5)
       .sort((a, b) => Math.abs(b.desvio) - Math.abs(a.desvio))
       .slice(0, 10);
 
@@ -482,7 +484,7 @@ export default function PaginaDashboard() {
             <ListaBarras
               titulo="Top 10 desvios previsto × realizado"
               itens={barrasDesvio}
-              vazio="Nenhuma execução com tempo real registrada no período."
+              vazio="Nenhum desvio no período: as tarefas registradas foram feitas no tempo previsto."
             />
           </div>
         </>
