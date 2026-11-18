@@ -9,7 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
-import { coberturaPorHistorico, feitasComImpacto, haApoioSobreTarefa, jornadaDoDia } from "@/lib/calculations";
+import { coberturaPorHistorico, jornadaDoDia } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { sedeDaTela } from "@/lib/sedeDaTela";
@@ -18,7 +18,6 @@ import type {
   TipoLocalCatalogo,
   Ausencia,
   Categoria,
-  ExecucaoRealizada,
   Feriado,
   Funcionario,
   Local,
@@ -98,10 +97,10 @@ export function useRotinaData(
     AO_VOLTAR,
   );
   // O eventual conta na ocupação do mostrador (poucos registros por dia).
-  const { data: eventuais } = useSWR<ServicoEventual[]>(sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
+  const { data: eventuais, mutate: mutateEventuais } = useSWR<ServicoEventual[]>(sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null, fetcher);
   const { data: ausencias } = useSWR<Ausencia[]>(sedeId ? `/api/ausencias?data=${data}&sede=${sedeId}` : null, fetcher);
   // Execuções já lançadas no dia — para destacar o passo "Registrar o realizado".
-  const { data: execucoesDia } = useSWR<ExecucaoRealizada[]>(
+  const { data: execucoesDia } = useSWR<{ rotina_id: string }[]>(
     sedeId ? `/api/execucoes?de=${data}&ate=${data}&sede=${sedeId}` : null,
     fetcher,
     AO_VOLTAR,
@@ -145,17 +144,6 @@ export function useRotinaData(
     modo === "semana" && sedeId ? `/api/servicos-eventuais?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
     fetcher,
   );
-  // Execuções da semana SÓ quando há apoio lançado sobre o horário de uma tarefa: é o único
-  // caso em que "feita com atraso/parcial" muda a ocupação (regra de 16/11/2026), e sem isto
-  // a semana mostrava 100% onde o Painel mostrava sobrecarga.
-  const precisaExecucoesSemana =
-    modo === "semana" && !!rotinasSemana && !!eventuaisSemana && haApoioSobreTarefa(rotinasSemana, eventuaisSemana);
-  const { data: execucoesSemana } = useSWR<ExecucaoRealizada[]>(
-    precisaExecucoesSemana && sedeId ? `/api/execucoes?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
-    fetcher,
-  );
-  const feitasComImpactoDia = useMemo(() => feitasComImpacto(execucoesDia ?? []), [execucoesDia]);
-  const feitasComImpactoSemana = useMemo(() => feitasComImpacto(execucoesSemana ?? []), [execucoesSemana]);
   const { data: feriados } = useSWR<Feriado[]>(sedeId ? `/api/feriados?sede=${sedeId}` : null, fetcher);
   const { data: ausenciasSemana } = useSWR<Ausencia[]>(
     modo === "semana" && sedeId ? `/api/ausencias?de=${segunda}&ate=${somarDias(segunda, 6)}&sede=${sedeId}` : null,
@@ -199,9 +187,8 @@ export function useRotinaData(
     rotinas,
     mutateRotinas,
     eventuais,
+    mutateEventuais,
     eventuaisSemana,
-    feitasComImpactoDia,
-    feitasComImpactoSemana,
     feriados,
     ausencias,
     historico,

@@ -31,7 +31,6 @@ import {
   CATEGORIA_APOIO_PEDAGOGICO,
   eventuaisForaDasTarefas,
   eventuaisNoApoio,
-  feitasComImpacto,
   ocupacaoPorPessoa,
   percentualApoioOutroSetor,
   resumoDeOcupacao,
@@ -168,9 +167,8 @@ export function montarResumo(args: {
   const ativos = args.funcionarios.filter((f) => f.ativo);
   const blocos = args.rotinas.filter((r) => r.status !== "cancelada");
   const eventuais = semAusentes(args.eventuais ?? [], args.ausencias ?? []);
-  // Como no Painel: apoio sobre tarefa feita com atraso/parcial conta (16/11/2026).
-  const comImpacto = { feitasComImpacto: feitasComImpacto(args.execucoes) };
-  const foraDasTarefas = eventuaisForaDasTarefas(blocos, eventuais, comImpacto);
+  // Como no Painel: a atividade adicional (Apoio a outro setor) soma sempre (Consulta 6, 18/11/2026).
+  const foraDasTarefas = eventuaisForaDasTarefas(blocos, eventuais);
 
   // Um realizado por bloco; se houver mais de um, vale o último gravado.
   const realizado = new Map<string, ExecucaoRealizada>();
@@ -217,9 +215,9 @@ export function montarResumo(args: {
       apoioOutroSetorPct: percentualApoioOutroSetor(
         daqui,
         todoApoio,
-        eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO], comImpacto),
+        eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO]),
       ),
-      apoioPedagogicoPct: percentualApoioOutroSetor(daqui, pedagogicas, eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_PEDAGOGICO], comImpacto)),
+      apoioPedagogicoPct: percentualApoioOutroSetor(daqui, pedagogicas, eventuaisNoApoio(daqui, evsDaqui, [CATEGORIA_APOIO_PEDAGOGICO])),
     };
   };
   const teveAlgo = (n: Numeros) => n.pessoasPlanejadas > 0 || n.execucoesPrevistas > 0;

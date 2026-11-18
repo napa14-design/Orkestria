@@ -47,10 +47,13 @@ export function ListaBarras({
   titulo,
   itens,
   vazio = "Sem dados no período.",
+  nota,
 }: {
   titulo: string;
   itens: ItemBarra[];
   vazio?: string;
+  /** Texto curto embaixo da lista: o que o número cobre e o que não cobre. */
+  nota?: string;
 }) {
   const maximo = Math.max(1, ...itens.map((i) => i.valor));
   return (
@@ -84,6 +87,7 @@ export function ListaBarras({
             </div>
           </div>
         ))}
+        {nota && <p style={{ margin: 0, fontSize: 11, color: "var(--tinta-3)", lineHeight: 1.5 }}>{nota}</p>}
       </div>
     </div>
   );

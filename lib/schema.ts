@@ -265,6 +265,8 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("observacao"),
     col("supervisor_id"),
     ...AUDITORIA,
+    // Campo novo no FIM (o Sheets grava por posição).
+    col("exigencia"),
   ],
   tempos_personalizados: [
     col("id"),

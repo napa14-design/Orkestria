@@ -9,10 +9,12 @@ import SugestoesAjuste from "@/components/SugestoesAjuste";
 import {
   classificarOcupacao,
   cobraDesvio,
+  deficitEstimado,
   desvioPercentual,
+  ehAtividadeAdicional,
   eventuaisForaDasTarefas,
+  minutosDoEventual,
   eventuaisNoApoio,
-  feitasComImpacto,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
@@ -134,11 +136,35 @@ export default function PaginaDashboard() {
     );
     const validas = rs.filter(ocupaHorario);
 
-    // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa — salvo o
-    // apoio sobre tarefa feita com atraso ou parcial (fez as duas coisas: 16/11/2026).
+    // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa — salvo a
+    // atividade adicional ("Apoio a outro setor"), que soma sempre (Consulta 6, 18/11/2026).
     const evs = semAusentes(eventuais ?? [], ausencias ?? []);
-    const comImpacto = { feitasComImpacto: feitasComImpacto(execucoes ?? []) };
-    const foraDasTarefas = eventuaisForaDasTarefas(validas, evs, comImpacto);
+    const foraDasTarefas = eventuaisForaDasTarefas(validas, evs);
+    // Déficit estimado em horas-pessoa: o número para a gestão (Consulta 6). O que a
+    // atividade adicional explica é só a diferença para a conta sem ela.
+    const deficit = deficitEstimado({ funcionarios: funcs, rotinas: rs, eventuais: evs, feriados: feriados ?? [] });
+    // Perfil da atividade adicional por pessoa: horas e o subconjunto com movimentação de carga.
+    // O tipo descreve a ocorrência; NUNCA entra na conta do tempo.
+    const idsFuncs = new Set(funcs.map((f) => f.id));
+    const adicionais = evs.filter((e) => ehAtividadeAdicional(e) && idsFuncs.has(e.funcionario_id));
+    // Minutos sem duplicar: o mesmo horário lançado duas vezes conta uma, como na demanda.
+    const minutosSemDobra = (lista: typeof adicionais) => eventuaisForaDasTarefas([], lista).reduce((s, x) => s + x.tempo_previsto_min, 0);
+    const classificado = (e: (typeof adicionais)[number]) => !!e.exigencia && e.exigencia !== "nao_sei";
+    const porPessoaAdicional = new Map<string, { min: number; n: number; cargasMin: number }>();
+    for (const id of new Set(adicionais.map((e) => e.funcionario_id))) {
+      const dela = adicionais.filter((e) => e.funcionario_id === id);
+      porPessoaAdicional.set(id, {
+        min: minutosSemDobra(dela),
+        n: dela.length,
+        cargasMin: minutosSemDobra(dela.filter((e) => e.exigencia === "cargas")),
+      });
+    }
+    const diasRotina = new Set(validas.map((r) => r.data));
+    const diasComRotina = diasRotina.size;
+    // Só os dias que estão no denominador: um evento em dia sem rota não vira "8 de 7 dias".
+    const diasComAdicional = new Set(adicionais.map((e) => e.data).filter((d) => diasRotina.has(d))).size;
+    const adicionalMin = minutosSemDobra(adicionais);
+    const classificadoMin = minutosSemDobra(adicionais.filter(classificado));
     const tempoPlanejadoTotal = [...validas, ...foraDasTarefas].reduce((s, r) => s + r.tempo_previsto_min, 0);
     // Quanto do tempo vai para outro setor (plantão, cantina, portaria, eventos)
     // — com o apoio pedagógico somado e mostrado à parte (23/10/2026).
@@ -152,12 +178,12 @@ export default function PaginaDashboard() {
     const apoioOutroSetorPct = percentualApoioOutroSetor(
       validas,
       tarefasDeApoio,
-      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO], comImpacto),
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_OUTRO_SETOR, CATEGORIA_APOIO_PEDAGOGICO]),
     );
     const apoioPedagogicoPct = percentualApoioOutroSetor(
       validas,
       tarefasPedagogicas,
-      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_PEDAGOGICO], comImpacto),
+      eventuaisNoApoio(validas, evs, [CATEGORIA_APOIO_PEDAGOGICO]),
     );
 
     // Ocupação média por funcionário nos dias em que houve planejamento.
@@ -228,6 +254,13 @@ export default function PaginaDashboard() {
       tempoPorSede,
       porStatus,
       funcsAtivos: funcs.length,
+      deficit,
+      porPessoaAdicional,
+      diasComRotina,
+      diasComAdicional,
+      adicionalMin,
+      classificadoMin,
+      ocorrenciasAdicionais: adicionais.length,
     };
   }, [rotinas, eventuais, ausencias, feriados, execucoes, funcionarios, tarefas, sedeFiltro, params]);
 
@@ -319,6 +352,22 @@ export default function PaginaDashboard() {
       }),
     );
   }
+
+  // Tempo e tipo em campos separados ("dessas Xh, Yh..."): o tipo é subconjunto do tempo
+  // que já entrou na demanda, nunca um acréscimo (Consulta 6).
+  const barrasAdicional: ItemBarra[] = [...indicadores.porPessoaAdicional]
+    .sort((a, b) => b[1].min - a[1].min)
+    .map(([id, a]) => ({
+      rotulo: nomeFuncionario(id),
+      valor: a.min,
+      texto: `${formatarDuracao(a.min)} · ${a.n} ocorrência${a.n === 1 ? "" : "s"}${a.cargasMin ? ` · dessas, ${formatarDuracao(a.cargasMin)} com movimentação de cargas` : ""}`,
+      cor: "var(--acento)",
+    }));
+  const notaAdicional = indicadores.ocorrenciasAdicionais
+    ? `Atividade adicional registrada em ${indicadores.diasComAdicional} dos ${indicadores.diasComRotina} dias com rotina gerada — dia sem registro não quer dizer dia sem apoio. ` +
+      `Tipo informado em ${indicadores.adicionalMin ? Math.round((100 * indicadores.classificadoMin) / indicadores.adicionalMin) : 0}% das horas. ` +
+      `A atividade adicional soma sempre na demanda; apoio pedagógico e capacitação só contam fora do horário de tarefa.`
+    : undefined;
 
   const barrasDesvio: ItemBarra[] = indicadores.desvios.map(({ rotina, execucao, desvio }) => ({
     rotulo: `${nomeTarefa(rotina.tarefa_id)} · ${nomeFuncionario(rotina.funcionario_id)} (${rotina.data.slice(8)}/${rotina.data.slice(5, 7)})`,
@@ -437,6 +486,16 @@ export default function PaginaDashboard() {
               cor="var(--vermelho)"
             />
             <CartaoKpi
+              rotulo="Déficit estimado"
+              valor={`${(indicadores.deficit.totalMin / 60).toFixed(1).replace(".", ",")} h-pessoa`}
+              detalhe={
+                indicadores.deficit.totalMin > indicadores.deficit.semAdicionalMin
+                  ? `${((indicadores.deficit.totalMin - indicadores.deficit.semAdicionalMin) / 60).toFixed(1).replace(".", ",")} h pela atividade adicional`
+                  : "demanda além da jornada, dia a dia"
+              }
+              cor="var(--vermelho)"
+            />
+            <CartaoKpi
               rotulo="Subutilizados"
               valor={String(indicadores.subutilizados)}
               detalhe={`abaixo de ${params.ocupacao_baixa}%`}
@@ -478,6 +537,12 @@ export default function PaginaDashboard() {
             }}
           >
             <ListaBarras titulo="Ocupação por funcionário" itens={barrasOcupacao} />
+            <ListaBarras
+              titulo="Atividade adicional por funcionário"
+              itens={barrasAdicional}
+              vazio="Nenhuma atividade adicional registrada no período."
+              nota={notaAdicional}
+            />
             <ListaBarras titulo="Top 10 locais por tempo consumido" itens={barrasLocais} />
             <ListaBarras titulo="Tempo planejado por sede" itens={barrasSedes} />
             <ListaBarras titulo="Tarefas por status" itens={barrasStatus} />

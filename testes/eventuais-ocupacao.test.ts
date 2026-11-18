@@ -15,9 +15,9 @@ import { createServicoEventual, updateServicoEventual } from "@/services/servico
 import {
   CATEGORIA_APOIO_PEDAGOGICO,
   eventuaisForaDasTarefas,
+  CATEGORIA_APOIO_OUTRO_SETOR,
+  deficitEstimado,
   eventuaisNoApoio,
-  feitasComImpacto,
-  haApoioSobreTarefa,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   MAX_MINUTOS_EVENTUAL,
@@ -64,40 +64,63 @@ describe("eventuaisForaDasTarefas", () => {
     expect(minutos([bloco("09:00", "10:00", 60, "remanejada")], [evento("09:00", "10:00", 60)])).toBe(60);
   });
 
-  describe("apoio sobre tarefa feita com atraso ou parcial (16/11/2026)", () => {
-    const minImpacto = (r: RotinaPlanejada[], e: ServicoEventual[], ids: string[]) =>
-      eventuaisForaDasTarefas(r, e, { feitasComImpacto: new Set(ids) }).reduce((s, x) => s + x.tempo_previsto_min, 0);
-    // bloco("09:00", …) tem id "09:00".
-    it("apoio sobre bloco feito com impacto conta inteiro", () => {
-      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)], ["09:00"])).toBe(60);
-      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0, { categoria_id: "apoio_outro_setor" })], ["09:00"])).toBe(60);
+  describe("atividade adicional — Apoio a outro setor soma sempre (Consulta 6, 18/11/2026)", () => {
+    const adicional = (inicio: string, fim: string, extra: Partial<ServicoEventual> = {}) => evento(inicio, fim, 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, ...extra });
+    it("sobre tarefa, conta inteiro, qualquer que seja o status da tarefa", () => {
+      for (const st of ["planejada", "realizada", "nao_realizada", "pendente"] as StatusRotina[])
+        expect(minutos([bloco("09:00", "10:00", 60, st)], [adicional("09:00", "10:00")]), st).toBe(60);
     });
-    it("só o pedaço sobre o bloco com impacto: o resto do horário segue descontado", () => {
-      const blocos = [bloco("09:00", "10:00", 60, "realizada"), bloco("10:00", "11:00", 60, "realizada")];
-      expect(minImpacto(blocos, [evento("09:00", "11:00", 0)], ["09:00"])).toBe(60);
+    it("apoio pedagógico e o resto seguem a regra antiga: sobre tarefa não soma", () => {
+      expect(minutos([bloco("09:00", "10:00", 60)], [evento("09:00", "10:00", 0)])).toBe(0); // pedagógico (padrão do helper)
+      expect(minutos([bloco("09:00", "10:00", 60)], [evento("09:00", "10:00", 0, { categoria_id: "" })])).toBe(0);
     });
-    it("eventual que não é de apoio não ganha a regra", () => {
-      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0, { categoria_id: "" })], ["09:00"])).toBe(0);
+    it("dois lançamentos no mesmo horário contam uma vez, mesmo de categorias diferentes", () => {
+      expect(minutos([], [adicional("09:00", "10:00"), { ...adicional("09:30", "10:30"), id: "b" }])).toBe(90);
     });
-    it("dois apoios no mesmo horário sobre o bloco com impacto contam uma vez", () => {
-      expect(minImpacto([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0), { ...evento("09:00", "10:00", 0), id: "b" }], ["09:00"])).toBe(60);
+    it("pedagógico e atividade adicional no mesmo horário sobre tarefa: 60, em qualquer ordem de lançamento", () => {
+      const ped = evento("09:00", "10:00", 0);
+      const adi = { ...adicional("09:00", "10:00"), id: "b" };
+      expect(minutos([bloco("09:00", "10:00", 60)], [ped, adi])).toBe(60);
+      expect(minutos([bloco("09:00", "10:00", 60)], [adi, ped])).toBe(60);
     });
-    it("sem a opção, nada muda (chamada antiga)", () => {
-      expect(minutos([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)])).toBe(0);
+    it("o teto de um dia continua valendo", () => {
+      expect(minutos([], [adicional("", "", { tempo_min: 1500 } as never)])).toBe(MAX_MINUTOS_EVENTUAL);
     });
-    it("feitasComImpacto: só atraso e parcial, e vale o último registro do bloco", () => {
-      const ex = (rotina_id: string, status_realizado: string, atualizado_em: string) => ({ rotina_id, status_realizado, atualizado_em }) as never;
-      const s = feitasComImpacto([
-        ex("a", "com_atraso", "1"), ex("b", "parcial", "1"), ex("c", "conforme_planejado", "1"), ex("d", "nao_realizada", "1"),
-        ex("e", "com_atraso", "1"), ex("e", "conforme_planejado", "2"),
-      ]);
-      expect([...s].sort()).toEqual(["a", "b"]);
-    });
-    it("no Painel: o total do apoio segue a mesma regra", () => {
-      const r = eventuaisNoApoio([bloco("09:00", "10:00", 60, "realizada")], [evento("09:00", "10:00", 0)], [CATEGORIA_APOIO_PEDAGOGICO], {
-        feitasComImpacto: new Set(["09:00"]),
-      });
+    it("no Painel: o total segue a mesma regra, e o apoio entra inteiro", () => {
+      const r = eventuaisNoApoio([bloco("09:00", "10:00", 60)], [adicional("09:00", "10:00")], [CATEGORIA_APOIO_OUTRO_SETOR]);
       expect(r).toEqual({ apoioMin: 60, foraDasTarefasMin: 60 });
+    });
+  });
+
+  describe("deficitEstimado (horas-pessoa, dia a dia)", () => {
+    // jornada líquida de 540 min (07:00–17:00 com 1 h de almoço), seg–sex.
+    const ana = { id: "f", nome: "Ana", sede_id: "s", entrada: "07:00", saida: "17:00", intervalo_min: 60, intervalo_inicio: "12:00", intervalo_fim: "13:00", escala: "seg_sex", ativo: true } as Funcionario;
+    const dia = (data: string, min: number) => ({ ...bloco("07:00", "16:00", min), id: `b${data}`, data });
+    const adicional = (data: string, inicio: string, fim: string) => evento(inicio, fim, 0, { data, categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, id: `e${data}${inicio}` });
+    it("uma terça folgada não apaga uma segunda acima da jornada", () => {
+      const d = deficitEstimado({ funcionarios: [ana], rotinas: [dia("2026-11-02", 540), dia("2026-11-03", 300)], eventuais: [adicional("2026-11-02", "09:00", "10:00")] });
+      expect(d.totalMin).toBe(60); // segunda 600 de 540; terça 300 não compensa
+      expect(d.semAdicionalMin).toBe(0); // o que a atividade adicional explica = 60
+      expect(d.porPessoa.get("f")).toEqual({ totalMin: 60, semAdicionalMin: 0 });
+    });
+    it("se já havia déficit sem o apoio, ao apoio cabe só o aumento", () => {
+      const d = deficitEstimado({ funcionarios: [ana], rotinas: [dia("2026-11-02", 570)], eventuais: [adicional("2026-11-02", "09:00", "10:00")] });
+      expect(d.totalMin).toBe(90);
+      expect(d.semAdicionalMin).toBe(30);
+    });
+    it("em folga, a jornada é zero: o apoio inteiro é além da jornada", () => {
+      const d = deficitEstimado({ funcionarios: [ana], rotinas: [], eventuais: [adicional("2026-11-07", "08:00", "10:00")] }); // sábado
+      expect(d.totalMin).toBe(120);
+    });
+    it("feriado ou folga COM rota usa a jornada normal; sem rota, jornada zero", () => {
+      const feriados = [{ id: "fx", data_inicio: "2026-11-02", data_fim: "2026-11-02", ativo: true, nome: "Feriado", sede_id: "" }] as never;
+      expect(deficitEstimado({ funcionarios: [ana], rotinas: [dia("2026-11-02", 540)], eventuais: [], feriados }).totalMin).toBe(0);
+      expect(deficitEstimado({ funcionarios: [ana], rotinas: [dia("2026-11-07", 540)], eventuais: [] }).totalMin).toBe(0); // sábado com rota
+      expect(deficitEstimado({ funcionarios: [ana], rotinas: [], eventuais: [adicional("2026-11-02", "08:00", "09:00")], feriados }).totalMin).toBe(60);
+    });
+    it("tarefa cancelada ou remanejada sai da demanda", () => {
+      const d = deficitEstimado({ funcionarios: [ana], rotinas: [dia("2026-11-02", 540), { ...dia("2026-11-02", 60), id: "x", status: "cancelada" }], eventuais: [] });
+      expect(d.totalMin).toBe(0);
     });
   });
 
@@ -159,7 +182,7 @@ describe("no mostrador e no Painel", () => {
 
   const mostrador = (
     eventuais: ServicoEventual[],
-    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA, feitas }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string; feitas?: Set<string> } = {},
+    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string } = {},
   ) =>
     renderToStaticMarkup(
       createElement(OccupancySummary, {
@@ -173,7 +196,6 @@ describe("no mostrador e no Painel", () => {
         parametros: PARAMETROS_PADRAO,
         selecionadoId: "f",
         aoSelecionar: () => {},
-        feitasComImpacto: feitas,
       }),
     ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
@@ -195,20 +217,10 @@ describe("no mostrador e no Painel", () => {
     expect(com).toContain("Fora das tarefas (já somado) 0min");
   });
 
-  it("na agenda também: apoio sobre tarefa feita com atraso soma, como no Painel (18/11/2026)", () => {
-    // bloco("07:00", …) tem id "07:00". 60 de tarefa + 60 de apoio por cima, de 540 = 22,2%.
-    expect(mostrador([evento("07:00", "08:00", 60)], { feitas: new Set(["07:00"]) })).toContain("22.2%");
-    expect(mostrador([evento("07:00", "08:00", 60)], { feitas: new Set() })).toContain("11.1%");
-  });
-
-  it("haApoioSobreTarefa: só apoio, com horário, sobre tarefa da mesma pessoa e dia", () => {
-    const r = [bloco("09:00", "10:00", 60)];
-    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0)])).toBe(true);
-    expect(haApoioSobreTarefa(r, [evento("10:00", "11:00", 0)])).toBe(false); // encosta, não sobrepõe
-    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0, { categoria_id: "" })])).toBe(false);
-    expect(haApoioSobreTarefa(r, [evento("", "", 60)])).toBe(false); // sem horário
-    expect(haApoioSobreTarefa(r, [evento("09:30", "10:30", 0, { funcionario_id: "outra" })])).toBe(false);
-    expect(haApoioSobreTarefa([bloco("09:00", "10:00", 60, "cancelada")], [evento("09:30", "10:30", 0)])).toBe(false);
+  it("na agenda também: a atividade adicional sobre tarefa soma, como no Painel (18/11/2026)", () => {
+    // 60 de tarefa + 60 de atividade adicional por cima, de 540 = 22,2%.
+    expect(mostrador([evento("07:00", "08:00", 60, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR })])).toContain("22.2%");
+    expect(mostrador([evento("07:00", "08:00", 60)])).toContain("11.1%"); // pedagógico: regra antiga
   });
 
   it("só eventual em folga ou feriado: mostra as horas, sem % nem selo de subutilizado", () => {
@@ -347,6 +359,31 @@ describe("no mostrador e no Painel", () => {
       const criado = await createServicoEventual(dados({ inicio: "", fim: "", tempo_min: 45.6 }), "c@x.com");
       expect(criado.tempo_min).toBe(46);
       expect((await updateServicoEventual(criado.id, { tempo_min: "60" } as never, "c@x.com")).tempo_min).toBe(60);
+    });
+
+    it("Apoio a outro setor exige o tipo do que a pessoa fez ao lançar; o legado sem tipo segue editável", async () => {
+      reiniciarBanco();
+      const apoio = (extra: Record<string, unknown>) => dados({ categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, inicio: "09:00", fim: "10:00", ...extra });
+      await expect(createServicoEventual(apoio({}), "c@x.com")).rejects.toThrow(ErroValidacao);
+      await expect(createServicoEventual(apoio({ exigencia: "pesado" }), "c@x.com")).rejects.toThrow(ErroValidacao);
+      const ok = await createServicoEventual(apoio({ exigencia: "cargas" }), "c@x.com");
+      expect(ok.exigencia).toBe("cargas");
+      expect((await createServicoEventual(apoio({ exigencia: "nao_sei" }), "c@x.com")).exigencia).toBe("nao_sei");
+      // Outra categoria não exige; e o legado (sem tipo) edita sem pedir.
+      const outro = await createServicoEventual(dados({ inicio: "09:00", fim: "10:00" }), "c@x.com");
+      expect(outro.exigencia).toBeUndefined();
+      const ds = await getDataSource();
+      await ds.atualizar("servicos_eventuais", ok.id, { exigencia: "" });
+      expect((await updateServicoEventual(ok.id, { descricao: "Montagem" } as never, "c@x.com")).descricao).toBe("Montagem");
+      // Como a tela manda: o formulário inteiro, com exigencia "" no legado.
+      const corpoDaTela = { ...(dados({ categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, inicio: "09:00", fim: "10:00" }) as object), exigencia: "", descricao: "Desmontagem" };
+      expect((await updateServicoEventual(ok.id, corpoDaTela as never, "c@x.com")).descricao).toBe("Desmontagem");
+      await expect(updateServicoEventual(ok.id, { exigencia: "x" } as never, "c@x.com")).rejects.toThrow(ErroValidacao);
+      // Apagar o tipo, ou passar outro registro para Apoio a outro setor sem tipo, não passa.
+      const outroTipo = await createServicoEventual(apoio({ exigencia: "atendimento" }), "c@x.com");
+      await expect(updateServicoEventual(outroTipo.id, { exigencia: "" } as never, "c@x.com")).rejects.toThrow(ErroValidacao);
+      await expect(updateServicoEventual(outro.id, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR } as never, "c@x.com")).rejects.toThrow(ErroValidacao);
+      expect((await updateServicoEventual(outro.id, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "organizacao" } as never, "c@x.com")).exigencia).toBe("organizacao");
     });
 
     it("com horário, o tempo digitado não impede salvar: é descartado", async () => {

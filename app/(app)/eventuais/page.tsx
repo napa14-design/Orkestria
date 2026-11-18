@@ -6,6 +6,8 @@
  */
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
+import { EXIGENCIAS } from "@/lib/atividadeAdicional";
+import { CATEGORIA_APOIO_OUTRO_SETOR } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { useDasSedes } from "@/lib/useDasSedes";
 import { formatarDataBR, formatarDuracao } from "@/lib/dateUtils";
@@ -87,6 +89,22 @@ export default function PaginaEventuais() {
           opcoes: (categorias ?? []).filter((c) => c.ativo).map((c) => ({ valor: c.id, rotulo: c.nome })),
           ajuda: "Opcional",
           dica: "Categoria de atividade, quando se encaixar em uma (ex.: Higienização). Opcional.",
+        },
+        {
+          // Atividade adicional (18/11/2026): no "Apoio a outro setor", o que a pessoa fez.
+          // Não muda a conta do tempo; o servidor exige ao lançar (há "Não sei informar").
+          key: "exigencia",
+          rotulo: "O que a pessoa fez",
+          tipo: "select",
+          opcoes: EXIGENCIAS.map((x) => ({ valor: x.valor, rotulo: x.rotulo })),
+          // Obrigatório, menos no lançamento antigo de apoio que ainda não tem tipo: esse segue editável.
+          obrigatorio: (form) => {
+            const antes = form.__antes as { categoria_id?: string; exigencia?: string } | undefined;
+            const legadoSemTipo = antes?.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR && !antes.exigencia;
+            return form.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR && !legadoSemTipo;
+          },
+          ajuda: "No Apoio a outro setor",
+          dica: EXIGENCIAS.map((x) => `${x.rotulo}: ${x.dica}`).join(" · "),
         },
         {
           key: "local_id",

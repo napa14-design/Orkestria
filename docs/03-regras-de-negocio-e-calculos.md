@@ -118,7 +118,8 @@ função (`eventuaisForaDasTarefas`).
 |---|---|
 | Com início e fim válidos | O horário, não o tempo digitado |
 | Sem início ou sem fim | O tempo digitado (obrigatório: sem nenhum dos dois, não grava) |
-| Horário que já tinha tarefa | Não soma de novo no total |
+| Horário que já tinha tarefa | Não soma de novo no total — **salvo a atividade adicional** (abaixo) |
+| **Atividade adicional** ("Apoio a outro setor") | Soma **sempre**, mesmo sobre tarefa, qualquer que seja o status dela. Só sai da demanda o que foi cancelado ou remanejado. Apoio pedagógico e capacitação seguem "sobre tarefa não soma" (hipótese: nesses é comum substituir a tarefa sem cancelar) |
 | Sem pessoa | Não é ocupação de ninguém |
 | Dia em que a pessoa estava ausente | Não conta, em tela nenhuma |
 | Dia só com eventual, escala manda trabalhar | Entra na média, com a jornada do dia |
@@ -126,6 +127,31 @@ função (`eventuaisForaDasTarefas`).
 | Categoria de apoio | No indicador de Apoio entra o tempo inteiro, mesmo sobre tarefa (limitado a 100%) |
 
 Teto: 1.440 minutos por lançamento e por pessoa e dia, também no que já está gravado.
+
+### Atividade adicional e déficit estimado (18/11/2026, Consulta 6)
+
+O trabalho fora da rota a que a pessoa foi puxada (montar ou desmontar um evento do
+colégio) é lançado **uma vez por pessoa**, pelo botão "+ Atividade adicional" do
+Acompanhamento ou da agenda. O lançamento grava um serviço eventual de "Apoio a outro setor"
+com o **tipo** do que ela fez (`exigencia`), que é obrigatório ao lançar:
+
+| Tipo | Descrição |
+|---|---|
+| Atendimento e acompanhamento | Recepcionar, orientar ou acompanhar, sem mover mobiliário ou carga |
+| Organização e decoração | Separar, posicionar ou montar materiais e peças pequenas |
+| Movimentação de mobiliário e cargas | Levantar, carregar, empurrar ou puxar à mão mesas, cadeiras, grades, palco, jardineiras |
+| Não sei informar | Melhor que adivinhar |
+
+O tipo **descreve** a ocorrência e nunca multiplica o tempo: mudar só o tipo deixa o
+déficit igual. Ocorrência mista vale pela maior exigência. Lançamento antigo sem tipo
+aparece como "não classificado".
+
+**Déficit estimado** (Painel), em horas-pessoa: Σ por pessoa e dia de
+máx(0, demanda − jornada líquida do dia), em que demanda = tarefas que ocupam horário +
+eventuais pela regra acima (`deficitEstimado`). Em folga ou feriado sem rota a jornada é 0 (com rota, vale a jornada normal). O que se
+atribui à atividade adicional é só a diferença para a mesma conta sem ela. Ao lado vem o
+perfil por pessoa ("6h em 4 ocorrências · dessas, 4h com movimentação de cargas") e a
+cobertura ("registrada em X dos Y dias com rotina"). Dia sem registro não quer dizer dia sem apoio.
 
 ## 4. Validações da agenda
 

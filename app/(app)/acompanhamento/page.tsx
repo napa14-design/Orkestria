@@ -10,16 +10,15 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
+import RegistrarAtividadeAdicional from "@/components/RegistrarAtividadeAdicional";
 import SeletorDia from "@/components/SeletorDia";
 import SeletorSede from "@/components/SeletorSede";
 import { useSessao } from "@/components/SessaoContexto";
 import {
-  CATEGORIA_APOIO_OUTRO_SETOR,
   cedidasNaCobertura,
   cobraDesvio,
   desvioPercentual,
   exigeJustificativa,
-  feitasComImpacto,
   funcionarioNoDia,
   ocupacaoDoDiaPorPessoa,
   ocupaHorario,
@@ -119,9 +118,6 @@ export default function PaginaAcompanhamento() {
   const [sedeEscolhida, setSedeEscolhida] = useState("");
   const [rotinaAberta, setRotinaAberta] = useState<RotinaPlanejada | null>(null);
   const [form, setForm] = useState<FormExecucao>(FORM_VAZIO);
-  // Atalho do apoio a outro setor (16/11/2026): no próprio registro do desvio, sem ir a
-  // Serviços eventuais redigitar pessoa, dia, horário e motivo. Nasce desmarcado sempre.
-  const [apoio, setApoio] = useState({ marcado: false, inicio: "", fim: "" });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [processandoRapido, setProcessandoRapido] = useState<Set<string>>(() => new Set());
@@ -174,16 +170,16 @@ export default function PaginaAcompanhamento() {
   );
   const ausentes = useMemo(() => new Set((ausenciasDoDia ?? []).map((a) => a.funcionario_id)), [ausenciasDoDia]);
   // Aviso de sobrecarga do dia (18/11/2026): a MESMA conta da agenda e do Painel
-  // (`ocupacaoDoDiaPorPessoa`, com o apoio sobre tarefa feita com atraso/parcial), para a
+  // (`ocupacaoDoDiaPorPessoa`, com a atividade adicional, que soma sempre), para a
   // coordenação ver no próprio Acompanhamento quem passou de 100%, sem abrir o Dashboard.
-  const { data: eventuaisDoDia } = useSWR<ServicoEventual[]>(
+  const { data: eventuaisDoDia, mutate: mutateEventuais } = useSWR<ServicoEventual[]>(
     sedeId ? `/api/servicos-eventuais?de=${data}&ate=${data}&sede=${sedeId}` : null,
     fetcher,
   );
   const [feitaPor, setFeitaPor] = useState<RotinaPlanejada | null>(null);
   const params = parametros ?? PARAMETROS_PADRAO;
   const emSobrecarga = useMemo(() => {
-    if (!rotinas || !funcionarios || !eventuaisDoDia || !execucoes) return [];
+    if (!rotinas || !funcionarios || !eventuaisDoDia) return [];
     const comTarefa = new Set(rotinas.filter(ocupaHorario).map((r) => r.funcionario_id));
     return ocupacaoDoDiaPorPessoa({
       funcionarios: funcionarios.filter((f) => comTarefa.has(f.id) && !ausentes.has(f.id)).map((f) => funcionarioNoDia(f, data)),
@@ -192,11 +188,10 @@ export default function PaginaAcompanhamento() {
       ausencias: ausenciasDoDia ?? [],
       data,
       parametros: params,
-      feitasComImpacto: feitasComImpacto(execucoes),
     })
       .filter((p) => p.resumo.classificacao === "sobrecarga")
       .sort((a, b) => b.resumo.ocupacao_percentual - a.resumo.ocupacao_percentual);
-  }, [rotinas, funcionarios, eventuaisDoDia, execucoes, ausentes, ausenciasDoDia, data, params]);
+  }, [rotinas, funcionarios, eventuaisDoDia, ausentes, ausenciasDoDia, data, params]);
 
   // Dias anteriores (última semana) com tarefas planejadas sem registro.
   const hoje = hojeISO();
@@ -603,7 +598,6 @@ export default function PaginaAcompanhamento() {
             epis,
           },
     );
-    setApoio({ marcado: false, inicio: rotina.inicio_planejado, fim: rotina.fim_planejado });
     setErro("");
     setRotinaAberta(rotina);
   }
@@ -652,13 +646,7 @@ export default function PaginaAcompanhamento() {
   const desvioAtual = rotinaAberta
     ? desvioPercentual(form.tempo_real_min, rotinaAberta.tempo_previsto_min)
     : 0;
-  // Só no desvio que diz "fez a tarefa mal ou não fez" e só para quem lança eventual
-  // (o supervisor de chão registra o realizado, mas não lança eventual).
-  const podeLancarApoio =
-    !!sessao && podeEscrever(sessao) && ["com_atraso", "parcial", "nao_realizada"].includes(form.status_realizado);
-  const lancaApoio = podeLancarApoio && apoio.marcado;
   const precisaJustificar =
-    lancaApoio ||
     statusCritico ||
     (rotinaAberta !== null &&
       !ehReferencia &&
@@ -697,12 +685,7 @@ export default function PaginaAcompanhamento() {
     e.preventDefault();
     if (!rotinaAberta) return;
     setErro("");
-    if (lancaApoio) {
-      if (!form.justificativa.trim()) return setErro("Escreva na justificativa o que a pessoa foi fazer: é a descrição do apoio.");
-      if (!(hhmmParaMin(apoio.fim) > hhmmParaMin(apoio.inicio))) return setErro("O fim do apoio precisa ser depois do início.");
-    }
     setSalvando(true);
-    let execucaoGravada = false;
     try {
       await apiPost("/api/execucoes", {
         rotina_id: rotinaAberta.id,
@@ -715,31 +698,10 @@ export default function PaginaAcompanhamento() {
         observacao: form.observacao,
         epis_confirmados: statusCritico ? "" : form.epis.join(", "),
       });
-      execucaoGravada = true;
-      if (lancaApoio)
-        await apiPost("/api/servicos-eventuais", {
-          sede_id: rotinaAberta.sede_id,
-          funcionario_id: rotinaAberta.funcionario_id,
-          local_id: "",
-          categoria_id: CATEGORIA_APOIO_OUTRO_SETOR,
-          data,
-          tipo: "eventual",
-          descricao: form.justificativa.trim(),
-          inicio: apoio.inicio,
-          fim: apoio.fim,
-          tempo_min: hhmmParaMin(apoio.fim) - hhmmParaMin(apoio.inicio),
-          observacao: `Lançado no registro da tarefa "${tarefaPorId.get(rotinaAberta.tarefa_id)?.nome_tarefa ?? ""}".`,
-        });
       await Promise.all([mutateRotinas(), mutateExecucoes()]);
       setRotinaAberta(null);
     } catch (err) {
-      const msg = err instanceof ErroApi ? err.message : "Erro ao registrar.";
-      if (execucaoGravada) {
-        // A execução já foi: o que falhou foi só o apoio. Desmarca para um novo clique não regravar à toa.
-        await Promise.all([mutateRotinas(), mutateExecucoes()]);
-        setApoio((a) => ({ ...a, marcado: false }));
-        setErro(`A tarefa foi registrada, mas o apoio não foi lançado: ${msg} Lance em Serviços eventuais.`);
-      } else setErro(msg);
+      setErro(err instanceof ErroApi ? err.message : "Erro ao registrar.");
     } finally {
       setSalvando(false);
     }
@@ -768,6 +730,16 @@ export default function PaginaAcompanhamento() {
           <button className="btn" onClick={exportarCSV} disabled={linhas.length === 0}>
             ⬇ Exportar CSV
           </button>
+        )}
+        {/* A atividade adicional (Consulta 6): só quem lança eventual — o supervisor de chão não lança. */}
+        {sessao && podeEscrever(sessao) && sedeId && (
+          <RegistrarAtividadeAdicional
+            sedeId={sedeId}
+            data={data}
+            // Toda a equipe ativa, não só quem tem rota: o evento pode cair num dia sem rota (sábado de folga).
+            pessoas={(funcionarios ?? []).filter((f) => f.ativo !== false && !f.desligado_em).map((f) => ({ id: f.id, nome: f.nome }))}
+            aoSalvar={() => void mutateEventuais()}
+          />
         )}
         <SeletorDia data={data} aoMudar={setData} />
         <SeletorSede sedes={sedes ?? []} valor={sedeId} aoMudar={setSedeEscolhida} />
@@ -918,13 +890,15 @@ export default function PaginaAcompanhamento() {
       )}
 
       {/* Só aparece quando alguém do dia passa da régua de ocupação (some sozinho). */}
-      {emSobrecarga.length > 0 && (
+      {/* Fora para o supervisor: a rota não manda a ele a categoria do eventual, então a atividade
+          adicional não soma do lado dele e o texto do aviso ("somando a atividade adicional") mentiria. */}
+      {!ehSupervisor && emSobrecarga.length > 0 && (
         <div
           className="painel entra"
           role="status"
           style={{ marginBottom: 16, padding: "10px 14px", borderLeft: "6px solid var(--acento)", fontSize: 13 }}
         >
-          <strong>Sobrecarga {data === hoje ? "hoje" : `em ${formatarDataBR(data)}`}:</strong>{" "}
+          <strong>Demanda estimada {data === hoje ? "hoje" : `em ${formatarDataBR(data)}`}:</strong>{" "}
           {emSobrecarga.map((p, i) => (
             <span key={p.funcionario.id}>
               {i > 0 && " · "}
@@ -932,8 +906,7 @@ export default function PaginaAcompanhamento() {
             </span>
           ))}
           <span style={{ color: "var(--tinta-3)" }}>
-            {" "}— passou de {params.ocupacao_alta}% da jornada, somando o apoio a outro setor lançado sobre tarefa feita com
-            atraso ou parcial.
+            {" "}— acima de {params.ocupacao_alta}% da jornada do dia, somando a atividade adicional registrada.
           </span>
         </div>
       )}
@@ -1330,38 +1303,6 @@ export default function PaginaAcompanhamento() {
                       desmarcar acima substitui essa lista.
                     </div>
                   )}
-              </div>
-            )}
-
-            {podeLancarApoio && (
-              <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12 }}>
-                <label style={{ display: "flex", gap: 8, alignItems: "center", flex: "1 1 100%" }}>
-                  <input
-                    type="checkbox"
-                    checked={apoio.marcado}
-                    onChange={(e) => setApoio((a) => ({ ...a, marcado: e.target.checked }))}
-                  />
-                  <span>
-                    Foi puxado(a) para outro setor (ex.: evento do colégio) — lançar como{" "}
-                    <strong>Apoio a outro setor</strong>
-                  </span>
-                </label>
-                {apoio.marcado && (
-                  <>
-                    <label className="campo">
-                      <span className="rotulo">Apoio · início</span>
-                      <input type="time" value={apoio.inicio} onChange={(e) => setApoio((a) => ({ ...a, inicio: e.target.value }))} required />
-                    </label>
-                    <label className="campo">
-                      <span className="rotulo">Apoio · fim</span>
-                      <input type="time" value={apoio.fim} onChange={(e) => setApoio((a) => ({ ...a, fim: e.target.value }))} required />
-                    </label>
-                    <span style={{ flex: "1 1 200px", fontSize: 13, opacity: 0.75 }}>
-                      A justificativa vira a descrição. Conta no Painel em “Apoio a outro setor” e, com a tarefa feita com
-                      atraso ou parcial, na sobrecarga.
-                    </span>
-                  </>
-                )}
               </div>
             )}
 

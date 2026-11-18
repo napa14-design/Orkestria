@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-11-18 — Atividade adicional e déficit estimado (substitui a regra de 16/11)
+
+Pedido da coordenação da UniBenfica: mostrar à gestão que a equipe (rota quase cheia), puxada
+para montar e desmontar eventos do colégio, fica sobrecarregada de tempo **e** de esforço.
+Consulta 6 com o Sol (vault) e medição na produção: 91% das 9.675 confirmações de 30 dias saem
+do "Fechamento do dia" como conforme, e só 8 foram "com atraso". A regra de 16/11 (o apoio só
+somava sobre tarefa com atraso/parcial) dependia de um dado que quase não existe.
+
+- **Regra nova:** o serviço eventual de **"Apoio a outro setor"** (a atividade adicional) soma
+  **sempre** na demanda do dia, mesmo sobre tarefa, qualquer que seja o status dela; só sai o que
+  foi cancelado ou remanejado. Apoio pedagógico e capacitação seguem "sobre tarefa não soma"
+  (hipótese, escrita no Painel). Sai `feitasComImpacto` de todas as telas e do resumo.
+- **"+ Atividade adicional"** no Acompanhamento e na barra da agenda (`RegistrarAtividadeAdicional`):
+  um lançamento por pessoa, com horário, o que foi feito e o **tipo** do que ela fez
+  (`exigencia`: atendimento e acompanhamento · organização e decoração · movimentação de
+  mobiliário e cargas · não sei informar), obrigatório ao lançar e sem opção pré-marcada. O tipo
+  não entra em conta nenhuma de tempo. Sai a caixa "Foi puxado(a)" de dentro do desvio.
+- **Dashboard:** cartão **"Déficit estimado"** em horas-pessoa (`deficitEstimado`: soma por pessoa
+  e dia de máx(0, demanda − jornada), e quanto disso vem da atividade adicional) e lista
+  "Atividade adicional por funcionário" ("6h · 4 ocorrências · dessas, 4h com movimentação de
+  cargas"), com a cobertura dos registros.
+- Aviso do Acompanhamento: "Demanda estimada hoje: …". Não aparece para o supervisor: a rota
+  não manda a categoria do eventual a ele, então a conta dele não somaria a atividade adicional.
+- Bordas (auditoria): a atividade adicional é contada antes do pedagógico no mesmo horário (o
+  resultado dependia da ordem de lançamento); com rota no dia, feriado e folga usam a jornada
+  normal no déficit; a lista do Dashboard não conta em dobro o mesmo horário; no Acompanhamento
+  o botão lista toda a equipe ativa (evento em dia sem rota); editar não apaga o tipo nem passa
+  um registro para "Apoio a outro setor" sem ele.
+
+Arquivos: `lib/atividadeAdicional.ts`, `lib/calculations.ts`, `components/RegistrarAtividadeAdicional.tsx`,
+`services/servicosEventuaisService.ts`, `types/ServicoEventual.ts`, `lib/schema.ts`, telas do
+Acompanhamento, Dashboard, agenda, Panorama e Serviços eventuais, `lib/resumoExecutivo.ts`,
+`docs/02` e `docs/03`, testes.
+
+---
+
 ## 2026-11-18 — Aviso de sobrecarga no Acompanhamento
 
 No topo do Acompanhamento, uma linha "Sobrecarga hoje: Francisco 109% · …" aparece **só quando**

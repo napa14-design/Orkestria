@@ -24,6 +24,8 @@ interface BarraPassosDoDiaProps {
   aoAlternarDenso: () => void;
   /** Supervisor: sem ensinar/desfazer e sem o atalho para Ausências (tela que não é dele). */
   somenteLeitura?: boolean;
+  /** "+ Atividade adicional" (18/11/2026): o mesmo formulário do Acompanhamento. */
+  atividadeAdicional?: React.ReactNode;
 }
 
 export default function BarraPassosDoDia({
@@ -40,6 +42,7 @@ export default function BarraPassosDoDia({
   aoSalvarRotaPadrao,
   aoAlternarDenso,
   somenteLeitura,
+  atividadeAdicional,
 }: BarraPassosDoDiaProps) {
   return (
     <div className="painel agenda-acoes-contextuais">
@@ -93,6 +96,8 @@ export default function BarraPassosDoDia({
           Imprimir fichas
         </a>
       )}
+
+      {!somenteLeitura && temRotinas && atividadeAdicional}
 
       {faltamRegistrar > 0 && (
         <Link

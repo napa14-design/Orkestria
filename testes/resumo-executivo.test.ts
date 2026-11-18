@@ -217,7 +217,7 @@ describe("montarResumo", () => {
     expect(comEventual.porSede.find((s) => s.sede === "Sul 1")!.apoioPedagogicoPct).toBe(0); // outra sede não pega
   });
 
-  it("eventual sobre a tarefa não conta em dobro na ocupação; apoio a outro setor não é pedagógico", () => {
+  it("eventual (não adicional) sobre a tarefa não conta em dobro; apoio a outro setor não é pedagógico", () => {
     const b = rotinas.find((x) => x.id === "r2")!;
     const comEventual = montarResumo({
       sedes, funcionarios, rotinas, execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
@@ -226,27 +226,29 @@ describe("montarResumo", () => {
       ],
     });
     const sul2 = comEventual.porSede.find((s) => s.sede === "Sul 2")!;
-    expect(sul2.ocupacaoMediaPct).toBe(50); // igual a sem eventual: o horário já tinha tarefa
+    // Atividade adicional soma sempre (Consulta 6): 52,8 = (270 + 30 de 540 + 50%) / 2.
+    expect(sul2.ocupacaoMediaPct).toBe(52.8);
     expect(sul2.apoioPedagogicoPct).toBe(0);
     expect(sul2.apoioOutroSetorPct).toBeGreaterThan(0);
+    // Outro eventual no mesmo horário (sem categoria de atividade adicional) não conta em dobro.
+    const comum = montarResumo({
+      sedes, funcionarios, rotinas, execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+      eventuais: [{ id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: b.inicio_planejado, fim: b.fim_planejado, tempo_min: 60, categoria_id: "" } as never],
+    });
+    expect(comum.porSede.find((s) => s.sede === "Sul 2")!.ocupacaoMediaPct).toBe(50);
   });
 
-  it("apoio sobre tarefa feita COM ATRASO conta na ocupação: fez as duas coisas (16/11/2026)", () => {
+  it("atividade adicional (Apoio a outro setor) sobre tarefa soma, qualquer que seja o status (Consulta 6)", () => {
     const b = rotinas.find((x) => x.id === "r2")!;
     const janela = Number(b.fim_planejado.slice(0, 2)) * 60 + Number(b.fim_planejado.slice(3)) - (Number(b.inicio_planejado.slice(0, 2)) * 60 + Number(b.inicio_planejado.slice(3)));
-    const apoio = { id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: b.inicio_planejado, fim: b.fim_planejado, tempo_min: 0, categoria_id: "apoio_outro_setor" } as never;
-    const com = (status: ExecucaoRealizada["status_realizado"]) =>
+    const com = (categoria_id: string) =>
       montarResumo({
-        sedes, funcionarios, rotinas, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
-        execucoes: [...execucoes.filter((e) => e.rotina_id !== "r2"), execucao({ id: "e2x", rotina_id: "r2", status_realizado: status })],
-        eventuais: [apoio],
+        sedes, funcionarios, rotinas, execucoes, params: PARAMETROS_PADRAO, de: "2026-09", ate: "2026-09", agora: AGORA,
+        eventuais: [{ id: "e", sede_id: "s2", funcionario_id: "b", data: "2026-09-10", inicio: b.inicio_planejado, fim: b.fim_planejado, tempo_min: 0, categoria_id } as never],
       }).porSede.find((s) => s.sede === "Sul 2")!.ocupacaoMediaPct;
-    // b: 270 planejados + a janela do apoio por cima, de 540; c segue em 50%.
-    expect(com("com_atraso")).toBe(Math.round((((270 + janela) / 540) * 100 + 50) / 2 * 10) / 10);
-    expect(com("parcial")).toBe(com("com_atraso"));
-    // Conforme ou não realizada: o eventual pode ter substituído a tarefa — não soma.
-    expect(com("conforme_planejado")).toBe(50);
-    expect(com("nao_realizada")).toBe(50);
+    // b: 270 planejados + a janela por cima, de 540; c segue em 50%.
+    expect(com("apoio_outro_setor")).toBe(Math.round((((270 + janela) / 540) * 100 + 50) / 2 * 10) / 10);
+    expect(com("apoio_pedagogico")).toBe(50); // regra antiga: sobre tarefa não soma
   });
 
   it("apoio pedagógico entra no total de apoio e aparece à parte (23/10/2026)", () => {

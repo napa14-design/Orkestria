@@ -28,6 +28,7 @@ import SemanaGrid from "@/components/agenda/SemanaGrid";
 import TaskPalette from "@/components/agenda/TaskPalette";
 import TrocarTarefas from "@/components/agenda/TrocarTarefas";
 import Carregando from "@/components/Carregando";
+import RegistrarAtividadeAdicional from "@/components/RegistrarAtividadeAdicional";
 import { useSessao } from "@/components/SessaoContexto";
 import {
   blocosOcupados,
@@ -104,9 +105,8 @@ export default function PaginaRotinas() {
     parametros,
     rotinas,
     eventuais,
+    mutateEventuais,
     eventuaisSemana,
-    feitasComImpactoDia,
-    feitasComImpactoSemana,
     feriados,
     mutateRotinas,
     historico,
@@ -892,6 +892,18 @@ export default function PaginaRotinas() {
           aoSalvarRotaPadrao={salvarRotaPadrao}
           aoAlternarDenso={() => setDenso((v) => !v)}
           somenteLeitura={somenteLeitura}
+          atividadeAdicional={
+            sedeId && sessao && podeEscrever(sessao) ? (
+              <RegistrarAtividadeAdicional
+                sedeId={sedeId}
+                data={data}
+                pessoas={(funcionarios ?? []).filter((f) => f.ativo !== false && !f.desligado_em).map((f) => ({ id: f.id, nome: f.nome }))}
+                pessoaInicial={selecionado ?? undefined}
+                aoSalvar={() => void mutateEventuais()}
+                classeBotao="btn btn-mini"
+              />
+            ) : undefined
+          }
         />
       ) : modo === "semana" ? (
         <div
@@ -944,7 +956,6 @@ export default function PaginaRotinas() {
           funcionarios={funcionariosVisiveis}
           rotinas={rotinasSemana ?? []}
           eventuais={eventuaisSemana ?? []}
-          feitasComImpacto={feitasComImpactoSemana}
           feriados={feriados ?? []}
           ausencias={ausenciasSemana ?? []}
           tarefas={tarefas ?? []}
@@ -1133,7 +1144,6 @@ export default function PaginaRotinas() {
               funcionarios={efetivosVisiveis}
               rotinas={rotinas ?? []}
               eventuais={eventuais ?? []}
-              feitasComImpacto={feitasComImpactoDia}
               ausencias={ausencias ?? []}
               feriados={feriados ?? []}
               data={data}

@@ -67,7 +67,6 @@ export default function OccupancySummary({
   selecionadoId,
   aoSelecionar,
   aoTrocar,
-  feitasComImpacto,
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -81,15 +80,13 @@ export default function OccupancySummary({
   aoSelecionar: (id: string) => void;
   /** Sem isto (supervisor, só leitura), o botão de troca nem aparece. */
   aoTrocar?: (id: string) => void;
-  /** Blocos do dia feitos com atraso/parcial: o apoio sobre eles conta (16/11/2026), como no Painel. */
-  feitasComImpacto?: ReadonlySet<string>;
 }) {
   const tarefaPorId = useMemo(() => new Map(tarefas.map((t) => [t.id, t])), [tarefas]);
 
   const resumos = useMemo(() => {
     // Só os deste dia (a função filtra): ao trocar de data, a lista anterior fica na tela até a nova chegar.
     // A mesma conta do aviso de sobrecarga do Acompanhamento (`ocupacaoDoDiaPorPessoa`).
-    return ocupacaoDoDiaPorPessoa({ funcionarios, rotinas, eventuais, ausencias, data, parametros, feitasComImpacto }).map(
+    return ocupacaoDoDiaPorPessoa({ funcionarios, rotinas, eventuais, ausencias, data, parametros }).map(
       ({ funcionario: f, dela, eventuaisDela, eventualMin, resumo }) => ({
         funcionario: f,
         eventualMin,
@@ -100,7 +97,7 @@ export default function OccupancySummary({
         resumo,
       }),
     );
-  }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros, feitasComImpacto]);
+  }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros]);
 
   const selecionado = resumos.find((r) => r.funcionario.id === selecionadoId);
 

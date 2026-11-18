@@ -1,4 +1,5 @@
-import { horaValida, MAX_MINUTOS_EVENTUAL, minutosDoEventual } from "@/lib/calculations";
+import { exigenciaValida } from "@/lib/atividadeAdicional";
+import { CATEGORIA_APOIO_OUTRO_SETOR, horaValida, MAX_MINUTOS_EVENTUAL, minutosDoEventual } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
 import { dataReal } from "@/lib/dateUtils";
 import type { ServicoEventual } from "@/types";
@@ -16,12 +17,19 @@ type DadosEventual = Omit<
 function soCamposDoEventual<T extends Partial<DadosEventual>>(corpo: T): T {
   if (!corpo || typeof corpo !== "object" || Array.isArray(corpo))
     throw new ErroValidacao([{ nivel: "erro", codigo: "CORPO_INVALIDO", mensagem: "Lançamento inválido." }]);
-  const CAMPOS = ["sede_id", "funcionario_id", "local_id", "categoria_id", "data", "tipo", "descricao", "inicio", "fim", "tempo_min", "observacao", "supervisor_id"] as const;
+  const CAMPOS = ["sede_id", "funcionario_id", "local_id", "categoria_id", "data", "tipo", "descricao", "inicio", "fim", "tempo_min", "observacao", "supervisor_id", "exigencia"] as const;
   return Object.fromEntries(CAMPOS.filter((c) => c in corpo).map((c) => [c, corpo[c]])) as T;
 }
 
-function validar(dados: Partial<DadosEventual>) {
+/** `exigeTipo`: ao lançar, e na edição que mexe no tipo ou passa o registro para "Apoio a outro setor". */
+function validar(dados: Partial<DadosEventual>, exigeTipo = false) {
   const erros = [];
+  // Tipo da atividade adicional: só os valores do catálogo; obrigatório ao LANÇAR "Apoio a
+  // outro setor" (há "Não sei informar"). O legado sem tipo segue editável: não classificado.
+  if (dados.exigencia != null && dados.exigencia !== "" && !exigenciaValida(dados.exigencia))
+    erros.push({ nivel: "erro" as const, codigo: "EXIGENCIA_INVALIDA", mensagem: "Tipo de atividade inválido." });
+  if (exigeTipo && dados.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR && !exigenciaValida(dados.exigencia))
+    erros.push({ nivel: "erro" as const, codigo: "SEM_EXIGENCIA", mensagem: "Diga o que a pessoa fez (ou “Não sei informar”)." });
   if (!dados.sede_id) erros.push({ nivel: "erro" as const, codigo: "SEM_SEDE", mensagem: "Informe a sede." });
   // Id que não é texto derruba o `doc()` do Firestore: viraria 500 em vez de recusa.
   if ([dados.sede_id, dados.funcionario_id, dados.local_id, dados.categoria_id, dados.supervisor_id].some((v) => v != null && typeof v !== "string"))
@@ -98,7 +106,7 @@ export async function createServicoEventual(
   autor: string,
 ): Promise<ServicoEventual> {
   const dados = soCamposDoEventual(corpo);
-  validar(dados);
+  validar(dados, true);
   await validarVinculos(dados);
   const ds = await getDataSource();
   const agora = agoraISO();
@@ -126,7 +134,13 @@ export async function updateServicoEventual(
   const atual = await ds.obter("servicos_eventuais", id);
   if (!atual) throw new Error("Registro não encontrado.");
   const destino = { ...atual, ...mudancas };
-  validar(destino);
+  // O legado sem tipo continua editável; o que não pode é apagar o tipo nem virar apoio sem ele.
+  // A tela manda o formulário inteiro (o legado vai com exigencia ""): conta só se o valor mudou.
+  validar(
+    destino,
+    (mudancas.exigencia !== undefined && (mudancas.exigencia ?? "") !== (atual.exigencia ?? "")) ||
+      (mudancas.categoria_id !== undefined && mudancas.categoria_id !== atual.categoria_id),
+  );
   await validarVinculos(destino);
   return ds.atualizar("servicos_eventuais", id, {
     ...mudancas,

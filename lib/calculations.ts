@@ -8,7 +8,6 @@
 import type {
   Ausencia,
   ClassificacaoOcupacao,
-  ExecucaoRealizada,
   Feriado,
   Funcionario,
   Local,
@@ -145,24 +144,6 @@ type EventualNaConta = Pick<ServicoEventual, "funcionario_id" | "data" | "inicio
   categoria_id?: string;
 };
 
-/** Execuções que dizem "fez a tarefa E outra coisa": com atraso ou parcial. */
-const COM_IMPACTO: ReadonlySet<string> = new Set(["com_atraso", "parcial"]);
-
-/**
- * Os blocos feitos com atraso ou parcialmente — o sinal de que a pessoa cumpriu a
- * tarefa mesmo tendo sido puxada para outra coisa. Vale o último registro do bloco.
- */
-export function feitasComImpacto(
-  execucoes: Pick<ExecucaoRealizada, "rotina_id" | "status_realizado" | "atualizado_em">[],
-): Set<string> {
-  const ultimo = new Map<string, Pick<ExecucaoRealizada, "status_realizado" | "atualizado_em">>();
-  for (const e of execucoes) {
-    const atual = ultimo.get(e.rotina_id);
-    if (!atual || (e.atualizado_em ?? "") > (atual.atualizado_em ?? "")) ultimo.set(e.rotina_id, e);
-  }
-  return new Set([...ultimo].filter(([, e]) => COM_IMPACTO.has(e.status_realizado)).map(([id]) => id));
-}
-
 /** Hora de relógio. "24:00" e "09:75" não são: `hhmmParaMin` faria a conta assim mesmo. */
 export function horaValida(hora: unknown): hora is string {
   return typeof hora === "string" && /^([01]\d|2[0-3]):[0-5]\d$/u.test(hora);
@@ -226,22 +207,25 @@ export function minutosDoEventual(e: Pick<ServicoEventual, "inicio" | "fim" | "t
  * jornada inteira: 1 h no sábado de quem é de segunda a sexta derrubava uma semana cheia para 85%. E
  * tirar todo dia sem bloco também erra: 3 dias cheios + 2 só no detector davam 167%.
  *
- * `feitasComImpacto` (16/11/2026, pedido da coordenação da UniBenfica, decisão do dono):
- * o APOIO (outro setor ou pedagógico) que cai sobre um bloco confirmado **com atraso ou
- * parcial** conta inteiro — a pessoa montou o evento do colégio E cumpriu a rota, e é
- * isso que vira sobrecarga. Sobre bloco "conforme" ou "não realizada" segue sem contar:
- * ali o eventual pode ter substituído a tarefa (e o "fechamento do dia" marca conforme).
+ * **Atividade adicional — "Apoio a outro setor" — soma SEMPRE** (Consulta 6 com o Sol,
+ * 18/11/2026): é trabalho fora da rota a que a pessoa foi puxada, e a rota daquele horário
+ * continua exigida enquanto a coordenação não a cancelar nem passar a outra pessoa
+ * (`ocupaHorario` já tira cancelada e remanejada). A regra de 16/11 — só somar sobre bloco
+ * confirmado "com atraso"/"parcial" — mediu outra coisa: 91% das confirmações da rede saem
+ * do "Fechamento do dia" como conforme, e 8 de 9.675 foram com atraso em 30 dias.
+ * Apoio pedagógico e capacitação seguem a regra antiga (sobre tarefa não soma): nesses é
+ * comum o eventual substituir a tarefa sem ninguém cancelar. É HIPÓTESE, escrita no Painel.
+ * Dois lançamentos no mesmo horário continuam contando uma vez, e o teto do dia vale igual.
  */
 export function eventuaisForaDasTarefas(
-  rotinas: (Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado"> & { id?: string })[],
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado">[],
   eventuais: EventualNaConta[],
-  opcoes: { feitasComImpacto?: ReadonlySet<string> } = {},
 ): { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] {
   const sobra: { funcionario_id: string; sede_id?: string; data: string; status: StatusRotina; tempo_previsto_min: number; so_tempo: true }[] = [];
-  const impacto = opcoes.feitasComImpacto ?? new Set<string>();
-  // Dois mapas do mesmo dia: o de todos os blocos e o que o APOIO enxerga (sem os feitos com impacto).
+  // Dois mapas do mesmo dia: blocos + eventuais (regra geral) e só eventuais (o que a
+  // atividade adicional enxerga: ela não desconta tarefa, só outro lançamento no mesmo horário).
   const ocupadoPorDia = new Map<string, [number, number][]>();
-  const ocupadoParaApoio = new Map<string, [number, number][]>();
+  const ocupadoPorEventuais = new Map<string, [number, number][]>();
   const somadoPorDia = new Map<string, number>();
   const empurra = (mapa: Map<string, [number, number][]>, chave: string, j: [number, number]) => {
     if (!mapa.has(chave)) mapa.set(chave, []);
@@ -249,16 +233,15 @@ export function eventuaisForaDasTarefas(
   };
   for (const r of rotinas) {
     if (!ocupaHorario(r)) continue;
-    const chave = `${r.funcionario_id}|${r.data}`;
-    const j: [number, number] = [hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)];
-    empurra(ocupadoPorDia, chave, j);
-    if (!(r.id && impacto.has(r.id))) empurra(ocupadoParaApoio, chave, j);
+    empurra(ocupadoPorDia, `${r.funcionario_id}|${r.data}`, [hhmmParaMin(r.inicio_planejado), hhmmParaMin(r.fim_planejado)]);
   }
-  for (const e of eventuais) {
+  // A atividade adicional entra primeiro: soma sempre, e o pedagógico no mesmo horário é que
+  // vira duplicado. Na ordem de lançamento, o resultado mudava (60 ou 0) conforme quem veio antes.
+  const ordenados = [...eventuais].sort((a, b) => Number(ehAtividadeAdicional(b)) - Number(ehAtividadeAdicional(a)));
+  for (const e of ordenados) {
     if (!e.funcionario_id) continue;
     const chave = `${e.funcionario_id}|${e.data}`;
-    const ehApoio = e.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR || e.categoria_id === CATEGORIA_APOIO_PEDAGOGICO;
-    const ocupado = (ehApoio ? ocupadoParaApoio : ocupadoPorDia).get(chave) ?? [];
+    const ocupado = (ehAtividadeAdicional(e) ? ocupadoPorEventuais : ocupadoPorDia).get(chave) ?? [];
     const janela = janelaDoEventual(e);
     let minutos = minutosDoEventual(e);
     if (janela) {
@@ -266,7 +249,7 @@ export function eventuaisForaDasTarefas(
       for (let m = janela[0]; m < janela[1]; m++) if (ocupado.some(([a, b]) => a <= m && m < b)) minutos--;
       // O próprio eventual ocupa o horário nos dois mapas: dois lançamentos no mesmo horário não somam.
       empurra(ocupadoPorDia, chave, janela);
-      empurra(ocupadoParaApoio, chave, janela);
+      empurra(ocupadoPorEventuais, chave, janela);
     }
     // O teto vale por pessoa e dia: sem horário, vários lançamentos somariam sem limite.
     minutos = Math.min(minutos, MAX_MINUTOS_EVENTUAL - (somadoPorDia.get(chave) ?? 0));
@@ -276,27 +259,51 @@ export function eventuaisForaDasTarefas(
   return sobra;
 }
 
+/** A atividade adicional: "Apoio a outro setor", que soma sempre na demanda do dia. */
+export function ehAtividadeAdicional(e: Pick<ServicoEventual, "categoria_id">): boolean {
+  return e.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR;
+}
+
 /**
- * Há apoio (outro setor/pedagógico) lançado sobre o horário de alguma tarefa da pessoa no
- * mesmo dia? Só então importa saber quais tarefas foram feitas com atraso/parcial — a agenda
- * da semana usa isto para não ler as execuções à toa (leitura é custo).
+ * Déficit estimado em minutos-pessoa (Consulta 6, 18/11/2026): por pessoa e DIA, quanto a
+ * demanda (tarefas que ocupam horário + eventuais na regra acima) passou da jornada líquida
+ * do dia. Soma dia a dia, para uma terça folgada não apagar uma segunda impossível nem a folga
+ * de uma pessoa apagar o excesso de outra. `semAdicional` é a mesma conta sem a atividade
+ * adicional: o que se atribui a ela é só a diferença. Em folga ou feriado SEM rota a jornada é 0.
  */
-export function haApoioSobreTarefa(
-  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado">[],
-  eventuais: EventualNaConta[],
-): boolean {
-  return eventuais.some((e) => {
-    if (!e.funcionario_id || (e.categoria_id !== CATEGORIA_APOIO_OUTRO_SETOR && e.categoria_id !== CATEGORIA_APOIO_PEDAGOGICO)) return false;
-    const j = janelaDoEventual(e);
-    return (
-      !!j &&
-      rotinas.some(
-        (r) =>
-          ocupaHorario(r) && r.funcionario_id === e.funcionario_id && r.data === e.data &&
-          hhmmParaMin(r.inicio_planejado) < j[1] && j[0] < hhmmParaMin(r.fim_planejado),
-      )
-    );
-  });
+export function deficitEstimado(args: {
+  funcionarios: Funcionario[];
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado" | "tempo_previsto_min">[];
+  /** Já sem os de quem estava ausente (`semAusentes`). */
+  eventuais: (EventualNaConta & Pick<ServicoEventual, "categoria_id">)[];
+  feriados?: Feriado[];
+}): { totalMin: number; semAdicionalMin: number; porPessoa: Map<string, { totalMin: number; semAdicionalMin: number }> } {
+  const ids = new Set(args.funcionarios.map((f) => f.id));
+  const rotinas = args.rotinas.filter((r) => ids.has(r.funcionario_id) && ocupaHorario(r));
+  const conta = (eventuais: typeof args.eventuais) => {
+    const demanda = new Map<string, number>();
+    const soma = (k: string, m: number) => demanda.set(k, (demanda.get(k) ?? 0) + m);
+    for (const r of rotinas) soma(`${r.funcionario_id}|${r.data}`, r.tempo_previsto_min || 0);
+    const comRota = new Set(rotinas.map((r) => `${r.funcionario_id}|${r.data}`));
+    for (const e of eventuaisForaDasTarefas(rotinas, eventuais.filter((x) => ids.has(x.funcionario_id))))
+      soma(`${e.funcionario_id}|${e.data}`, e.tempo_previsto_min);
+    const porPessoa = new Map<string, number>();
+    for (const [k, m] of demanda) {
+      const [id, data] = k.split("|");
+      const f = args.funcionarios.find((x) => x.id === id)!;
+      // Com rota no dia, vale a jornada mesmo em feriado ou folga: quem planejou mandou trabalhar
+      // (senão um feriado com rota virava ~9 h de déficit por pessoa). Sem rota, folga é jornada 0.
+      const jornada = !comRota.has(k) && diaSemJornada(f, data, args.feriados ?? []) ? 0 : jornadaLiquidaMin(funcionarioNoDia(f, data));
+      porPessoa.set(id, (porPessoa.get(id) ?? 0) + Math.max(0, m - jornada));
+    }
+    return porPessoa;
+  };
+  const com = conta(args.eventuais);
+  const sem = conta(args.eventuais.filter((e) => !ehAtividadeAdicional(e)));
+  const porPessoa = new Map<string, { totalMin: number; semAdicionalMin: number }>();
+  for (const id of new Set([...com.keys(), ...sem.keys()])) porPessoa.set(id, { totalMin: com.get(id) ?? 0, semAdicionalMin: sem.get(id) ?? 0 });
+  const somar = (m: Map<string, number>) => [...m.values()].reduce((s, x) => s + x, 0);
+  return { totalMin: somar(com), semAdicionalMin: somar(sem), porPessoa };
 }
 
 /** O que os eventuais somam no indicador de apoio do Painel. */
@@ -304,15 +311,14 @@ export function eventuaisNoApoio(
   rotinas: Parameters<typeof eventuaisForaDasTarefas>[0],
   eventuais: (EventualNaConta & Pick<ServicoEventual, "categoria_id">)[],
   categorias: readonly string[],
-  opcoes: { feitasComImpacto?: ReadonlySet<string> } = {},
 ): { apoioMin: number; foraDasTarefasMin: number } {
   const soma = (lista: { tempo_previsto_min: number }[]) => lista.reduce((s, x) => s + x.tempo_previsto_min, 0);
   return {
     // Sem blocos na conta: no apoio entra o tempo inteiro, mesmo sobre tarefa, mas o
     // mesmo horário lançado duas vezes e o teto do dia valem igual.
     apoioMin: soma(eventuaisForaDasTarefas([], eventuais.filter((e) => categorias.includes(e.categoria_id ?? "")))),
-    // O total segue a ocupação: com a regra do apoio sobre tarefa feita com impacto.
-    foraDasTarefasMin: soma(eventuaisForaDasTarefas(rotinas, eventuais, opcoes)),
+    // O total segue a ocupação (a atividade adicional soma sempre).
+    foraDasTarefasMin: soma(eventuaisForaDasTarefas(rotinas, eventuais)),
   };
 }
 
@@ -923,10 +929,9 @@ export function ocupacaoDoDiaPorPessoa(args: {
   ausencias: Pick<Ausencia, "funcionario_id" | "data_inicio" | "data_fim">[];
   data: string;
   parametros: ParametrosResolvidos;
-  feitasComImpacto?: ReadonlySet<string>;
 }) {
   const doDia = semAusentes(args.eventuais.filter((e) => e.data === args.data), args.ausencias);
-  const fora = eventuaisForaDasTarefas(args.rotinas, doDia, { feitasComImpacto: args.feitasComImpacto });
+  const fora = eventuaisForaDasTarefas(args.rotinas, doDia);
   return args.funcionarios.map((f) => {
     const dela = args.rotinas.filter((r) => r.funcionario_id === f.id);
     const eventualMin = fora.filter((e) => e.funcionario_id === f.id).reduce((s, e) => s + e.tempo_previsto_min, 0);

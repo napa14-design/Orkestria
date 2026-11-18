@@ -29,4 +29,10 @@ export interface ServicoEventual extends Auditoria {
   observacao: string;
   /** Quem registrou (supervisor/admin). */
   supervisor_id: string;
+  /**
+   * Tipo do que a pessoa fez na atividade adicional (`lib/atividadeAdicional.ts`): obrigatório
+   * ao lançar "Apoio a outro setor" (18/11/2026); ""/ausente = não classificado (legado).
+   * Descreve a ocorrência — não entra em nenhuma conta de tempo.
+   */
+  exigencia?: string;
 }

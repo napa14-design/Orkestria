@@ -13,7 +13,6 @@ import { CartaoKpi, ListaBarras, type ItemBarra } from "@/components/DashboardCa
 import {
   classificarOcupacao,
   eventuaisForaDasTarefas,
-  feitasComImpacto,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
@@ -25,7 +24,7 @@ import { useSessao } from "@/components/SessaoContexto";
 import { sedesPermitidas } from "@/lib/permissions";
 import { MAX_DIAS_PERIODO, MAX_DIAS_SEM_SEDE, diasDoPeriodo, formatarDuracao, hojeISO } from "@/lib/dateUtils";
 import { useDasSedes } from "@/lib/useDasSedes";
-import type { Ausencia, ExecucaoRealizada, Feriado, Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede, ServicoEventual } from "@/types";
+import type { Ausencia, Feriado, Funcionario, ParametrosResolvidos, RotinaPlanejada, Sede, ServicoEventual } from "@/types";
 
 function diasAtras(n: number): string {
   const d = new Date();
@@ -82,9 +81,6 @@ export default function PaginaPanorama() {
   const { data: eventuais } = useDasSedes<ServicoEventual>("servicos-eventuais", periodoOk ? `de=${de}&ate=${ate}` : null);
   const { data: feriados } = useDasSedes<Feriado>("feriados");
   const { data: ausencias } = useDasSedes<Ausencia>("ausencias", periodoOk ? `de=${de}&ate=${ate}` : null);
-  // Só para saber quais tarefas foram feitas com atraso/parcial: o apoio sobre elas
-  // conta na ocupação, como no Painel (16/11/2026).
-  const { data: execucoes } = useDasSedes<ExecucaoRealizada>("execucoes", periodoOk ? `de=${de}&ate=${ate}` : null);
   const { data: parametros } = useSWR<ParametrosResolvidos>("/api/parametros?resolvidos=1", fetcher);
   const params = parametros ?? PARAMETROS_PADRAO;
   // Cada sede medida com os parâmetros DELA: sem `&sede`, todas usavam os da
@@ -99,9 +95,7 @@ export default function PaginaPanorama() {
   // Métricas por sede (mesma lógica do Dashboard, mas para todas as sedes).
   const porSede = useMemo<MetricaSede[]>(() => {
     const rs = (rotinas ?? []).filter(ocupaHorario);
-    const foraDasTarefas = eventuaisForaDasTarefas(rs, semAusentes(eventuais ?? [], ausencias ?? []), {
-      feitasComImpacto: feitasComImpacto(execucoes ?? []),
-    });
+    const foraDasTarefas = eventuaisForaDasTarefas(rs, semAusentes(eventuais ?? [], ausencias ?? []));
     const funcs = (funcionarios ?? []).filter((f) => f.ativo);
     return (sedes ?? [])
       .filter((s) => s.ativo)
@@ -119,7 +113,7 @@ export default function PaginaPanorama() {
           params: p,
         };
       });
-  }, [sedes, funcionarios, rotinas, eventuais, ausencias, execucoes, feriados, params, paramsDaSede]);
+  }, [sedes, funcionarios, rotinas, eventuais, ausencias, feriados, params, paramsDaSede]);
 
   // Agrupa as sedes por grupo ou por tipo.
   const grupos = useMemo(() => {

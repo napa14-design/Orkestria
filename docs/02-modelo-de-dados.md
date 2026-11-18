@@ -298,6 +298,22 @@ O `nivel` não participa desse bloqueio: ele alimenta a sugestão "★ Habilitad
 na lista de tarefas, para direcionar quem chamar primeiro (ex.: montagem de
 palco num evento).
 
+### servicos_eventuais
+Trabalho fora da rota, lançado depois (`types/ServicoEventual.ts`). Com pessoa, conta na
+ocupação (ver docs/03 › Serviço eventual na ocupação).
+
+| Campo | Tipo | Observação |
+|---|---|---|
+| sede_id | string | obrigatório |
+| funcionario_id, local_id, categoria_id | string | opcionais ("") |
+| data | YYYY-MM-DD | obrigatório |
+| tipo | enum | eventual · imprevisto |
+| descricao | string | obrigatório |
+| inicio, fim | HH:mm | com os dois, vale o horário |
+| tempo_min | number | só sem horário |
+| observacao, supervisor_id, auditoria | | |
+| exigencia | enum | atendimento · organizacao · cargas · nao_sei — obrigatório ao lançar "Apoio a outro setor" (18/11/2026); "" = não classificado |
+
 ### ausencias
 Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário
 fica bloqueada (alocação é rejeitada no cliente e no servidor) e as tarefas já
