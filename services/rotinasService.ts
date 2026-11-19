@@ -15,7 +15,7 @@ import {
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, ehIdRepetido, getDataSource, novoId } from "@/lib/datasource";
 import { formatarDataBR, hhmmParaMin, minParaHHMM, rotularDiasSemana, somarDias } from "@/lib/dateUtils";
 import { CODIGOS_AUTORIZAVEIS, temErro, validarAlocacao, validarRotina } from "@/lib/validations";
 import { resumirProblemas, validarDia, type ProblemaDoDia } from "@/lib/validacaoDoDia";
@@ -875,7 +875,12 @@ export async function duplicarDia(
     if (dataDestino === dataOrigem) continue;
     const existentes = await getRotinasByData(dataDestino);
     const ocupados = existentes.filter((r) => r.status !== "cancelada");
-    const chavesExistentes = new Set(ocupados.map(chave));
+    // ⚠️ As chaves e os ids vêm de TODOS os blocos do destino, cancelados inclusive. Só com
+    // os que ocupam horário, repetir de novo regravava o bloco cancelado (mesmo id `m_…`)
+    // como "planejada", com a execução ainda "cancelada"; e o bloco copiado que alguém
+    // moveu voltava ao horário antigo (auditoria, 19/11/2026).
+    const chavesExistentes = new Set(existentes.map(chave));
+    const idsExistentes = new Set(existentes.map((r) => r.id));
 
     // Presença de todos os funcionários numa só rodada (em vez de 1 query por vez).
     const ausentes = await Promise.all(idsFunc.map((id) => ausenteEm(id, dataDestino)));
@@ -888,8 +893,9 @@ export async function duplicarDia(
         puladas++;
         continue;
       }
-      if (chavesExistentes.has(chave(r))) {
-        puladas++; // já existe idêntica no destino
+      const id = idMaterializacao(dataDestino, r.funcionario_id, r.tarefa_id, r.inicio_planejado);
+      if (chavesExistentes.has(chave(r)) || idsExistentes.has(id)) {
+        puladas++; // já existe idêntica no destino, ou é a cópia anterior, cancelada ou movida
         continue;
       }
       const ini = hhmmParaMin(r.inicio_planejado);
@@ -906,7 +912,7 @@ export async function duplicarDia(
       }
       const copia: RotinaPlanejada = {
         ...r,
-        id: idMaterializacao(dataDestino, r.funcionario_id, r.tarefa_id, r.inicio_planejado),
+        id,
         data: dataDestino,
         status: "planejada",
         supervisor_id: supervisorId,
@@ -918,10 +924,16 @@ export async function duplicarDia(
       chavesExistentes.add(chave(copia));
     }
 
-    // Grava em lotes paralelos — o gargalo era 1 escrita por vez (~2 min p/ um dia).
-    const LOTE = 25;
-    for (let i = 0; i < copias.length; i += LOTE) {
-      await Promise.all(copias.slice(i, i + LOTE).map((c) => ds.criar("rotinas_planejadas", c)));
+    // Um lote por dia (o gargalo era 1 escrita por vez, ~2 min p/ um dia). `exigirNovo`: o
+    // que entrou no destino depois da leitura acima (outra aba repetindo) não é regravado; o
+    // lote do dia recusa e quem repetia recarrega. Repetir de novo pula o que já foi copiado.
+    try {
+      await ds.gravarLote(copias.map((c) => ({ tipo: "criar" as const, tabela: "rotinas_planejadas" as const, registro: c, exigirNovo: true })));
+    } catch (e) {
+      if (!ehIdRepetido(e)) throw e;
+      throw new ErroValidacao([
+        { nivel: "erro", codigo: "DIA_MUDOU", mensagem: `O dia ${formatarDataBR(dataDestino)} foi alterado por outra pessoa enquanto você repetia. Atualize a tela e repita: o que já estava lá ficou como está.` },
+      ]);
     }
     copiadas += copias.length;
 

@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-11-19 — "Repetir o dia" não desfaz mais o cancelamento no destino
+
+Defeito provado pela auditoria do bloco A. Na conferência de "já existe no destino", o "Repetir o
+dia" ignorava os blocos cancelados e gravava a cópia com `set` no id fixo `m_…`. Repetir o dia,
+cancelar um bloco no destino e repetir de novo levava a rotina de volta a "planejada" com a
+execução ainda "cancelada": o cancelamento se perdia e o bloco voltava a contar na ocupação. O
+mesmo `set` levava de volta ao horário antigo o bloco copiado que alguém tinha movido.
+
+- As chaves (pessoa + tarefa + início) e os ids vêm de **todos** os blocos do destino, cancelados
+  inclusive. A cópia anterior, cancelada ou movida, conta como "pulada". A sobreposição de
+  horário continua ignorando o cancelado.
+- A gravação é um lote por dia com `exigirNovo`, como no "Gerar o dia". Se o bloco entrou no
+  destino depois da leitura (outra aba), o lote recusa com "atualize a tela e repita", e nada do
+  que estava lá é regravado.
+
+Arquivos: `services/rotinasService.ts` (`duplicarDia`), `testes/repetir-dia.test.ts`.
+
+---
+
 ## 2026-11-19 — Marcar tarefa pesada num clique, na lista de Tarefas
 
 Para o "Serviço pesado" valer, o catálogo precisa estar classificado: na UniBenfica, 69 de 81
