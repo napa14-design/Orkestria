@@ -68,8 +68,8 @@ export default function AvisoNovidade() {
               a tarefa ou passe para outra pessoa — senão conta as duas coisas.
             </li>
             <li style={item}>
-              <strong>O tipo</strong> (atendimento, organização e decoração, movimentação de cargas, ou “não sei
-              informar”) não muda as horas: registra o esforço, para mostrar à gestão quem pegou peso.
+              <strong>O tipo</strong> (atendimento, organização e decoração, manutenção e serviços diversos,
+              movimentação de cargas, ou “não sei informar”) não muda as horas: registra o esforço, para mostrar à gestão quem pegou peso.
             </li>
             <li style={item}>
               <strong>Desvio continua sendo para tarefa da rota</strong> feita de outro jeito. A caixa “Foi

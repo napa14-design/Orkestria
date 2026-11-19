@@ -413,6 +413,7 @@ describe("no mostrador e no Painel", () => {
       const ok = await createServicoEventual(apoio({ exigencia: "cargas" }), "c@x.com");
       expect(ok.exigencia).toBe("cargas");
       expect((await createServicoEventual(apoio({ exigencia: "nao_sei" }), "c@x.com")).exigencia).toBe("nao_sei");
+      expect((await createServicoEventual(apoio({ exigencia: "manutencao" }), "c@x.com")).exigencia).toBe("manutencao");
       // Outra categoria não exige; e o legado (sem tipo) edita sem pedir.
       const outro = await createServicoEventual(dados({ inicio: "09:00", fim: "10:00" }), "c@x.com");
       expect(outro.exigencia).toBeUndefined();

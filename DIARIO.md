@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-11-19 — Atividade adicional: tipo "Manutenção e serviços diversos"
+
+Pedido da coordenação: uma pessoa da equipe passou a manhã pintando na sede da manutenção para a
+festa de Natal. Não era organização nem carga, e sem lugar ia para "Não sei informar".
+
+- Novo tipo `manutencao`, "Manutenção e serviços diversos" (pintura, pequenos reparos, apoio à
+  manutenção, sem mover carga), entre "Organização" e "Cargas". Conta como tipo informado no
+  Dashboard; não entra no "Serviço pesado", que fica só com carga.
+- Os exemplos do formulário e do aviso único deixaram de falar só de evento.
+
+Arquivos: `lib/atividadeAdicional.ts`, `components/RegistrarAtividadeAdicional.tsx`,
+`components/AvisoNovidade.tsx`, `docs/02`, `docs/03`, `testes/eventuais-ocupacao.test.ts`.
+
+---
+
 ## 2026-11-19 — Next 16.4.3 → 16.4.5: o build voltou a fechar
 
 O `next build` passou a abortar no fim, depois de compilar e gerar as 88 páginas, com

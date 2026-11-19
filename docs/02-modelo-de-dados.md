@@ -312,7 +312,7 @@ ocupação (ver docs/03 › Serviço eventual na ocupação).
 | inicio, fim | HH:mm | com os dois, vale o horário |
 | tempo_min | number | só sem horário |
 | observacao, supervisor_id, auditoria | | |
-| exigencia | enum | atendimento · organizacao · cargas · nao_sei — obrigatório ao lançar "Apoio a outro setor" (18/11/2026); "" = não classificado |
+| exigencia | enum | atendimento · organizacao · manutencao (19/11/2026) · cargas · nao_sei — obrigatório ao lançar "Apoio a outro setor" (18/11/2026); "" = não classificado |
 
 ### ausencias
 Faltas, atestados, férias e folgas. Durante a ausência a agenda do funcionário

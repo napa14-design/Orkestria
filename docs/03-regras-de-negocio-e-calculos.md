@@ -149,6 +149,7 @@ com o **tipo** do que ela fez (`exigencia`), que é obrigatório ao lançar:
 |---|---|
 | Atendimento e acompanhamento | Recepcionar, orientar ou acompanhar, sem mover mobiliário ou carga |
 | Organização e decoração | Separar, posicionar ou montar materiais e peças pequenas |
+| Manutenção e serviços diversos | Pintura, pequenos reparos, apoio à manutenção, sem mover carga (19/11/2026) |
 | Movimentação de mobiliário e cargas | Levantar, carregar, empurrar ou puxar à mão mesas, cadeiras, grades, palco, jardineiras |
 | Não sei informar | Melhor que adivinhar |
 

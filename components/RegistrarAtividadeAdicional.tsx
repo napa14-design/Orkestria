@@ -94,7 +94,7 @@ export default function RegistrarAtividadeAdicional({
       <Modal titulo={`Atividade adicional — ${formatarDataBR(data)}`} aberto={aberto} aoFechar={() => setAberto(false)} larguraMax={560}>
         <form onSubmit={salvar} style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
           <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 13, color: "var(--tinta-2)" }}>
-            Trabalho fora da rota a que a pessoa foi puxada (ex.: montar ou desmontar evento do colégio). Soma na
+            Trabalho fora da rota a que a pessoa foi puxada (ex.: montar ou desmontar evento, pintura para a manutenção). Soma na
             demanda do dia dela; a rota daquele horário continua contando, a não ser que você a cancele.
           </p>
           <label className="campo" style={{ gridColumn: "1 / -1" }}>

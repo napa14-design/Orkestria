@@ -18,6 +18,13 @@ export const EXIGENCIAS = [
     dica: "Separar, posicionar ou montar materiais e peças pequenas, sem mover mobiliário ou carga.",
   },
   {
+    // Pedido da coordenação (19/11/2026): pintura na sede de manutenção para o evento não é
+    // "organização" nem "carga", e sem lugar virava "Não sei informar".
+    valor: "manutencao",
+    rotulo: "Manutenção e serviços diversos",
+    dica: "Pintura, pequenos reparos, apoio à equipe de manutenção ou outro serviço fora da limpeza, sem mover mobiliário ou carga.",
+  },
+  {
     valor: "cargas",
     rotulo: "Movimentação de mobiliário e cargas",
     dica: "Levantar, carregar, empurrar ou puxar à mão mesas, cadeiras, grades, peças de palco, jardineiras ou outros volumes.",
