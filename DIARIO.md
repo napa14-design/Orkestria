@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-11-19 — Desligar, transferir, sair do posto, assumir o posto e o × não apagam bloco confirmado no meio
+
+A auditoria achou nesses caminhos a mesma corrida do "Limpar o dia". Eles leem os blocos "só
+planejados" e excluem pela leitura. Se o supervisor confirma um deles nesse meio-tempo, o bloco sai
+e a execução fica órfã.
+
+- **Onde a corrida é real:** desligar e transferir com data de hoje ou passada (a data aceita
+  passado), e sair do posto (só hoje ou passado). Assumir o posto na edição vale de hoje em diante,
+  então pega os blocos de hoje. O × pega qualquer bloco. **Onde é improvável:** desligar ou
+  transferir com data futura, e os dias seguintes do assumir o posto. Num bloco futuro só quem
+  coordena registra, e só "não vai dar", cancelar ou remanejar. A condição vale para esses também,
+  ao custo de uma leitura por bloco.
+- **No lote, sem perder a atomicidade:** o `excluirSe` solto separaria a exclusão da ficha, do
+  posto vago e do evento do Quadro. Então a condição entrou **no próprio lote**: `excluir` ganhou
+  `seAinda`. O bloco só sai se continua como foi lido (status + `atualizado_em`). Se não vale, o lote
+  **inteiro** é recusado com `LoteMudou`, sem gravar nada. Recusa em vez de pular, para o histórico
+  (que o decorator põe no mesmo lote) não registrar o que não saiu. Quem chama relê e monta de novo
+  (`comReleitura`, até 3 voltas; depois, `ErroConflito`). Na releitura o bloco confirmado deixa de
+  ser "só planejado" e fica.
+  - Firestore: pedaço com `seAinda` vira transação (lê, confere, grava); sem `seAinda`, segue o
+    `WriteBatch`. Sheets confere antes, sem trava. A memória confere antes de gravar.
+  - Lote acima de 500 escritas (desligamento retroativo de ~500 blocos): o 1º pedaço confere as
+    condições do lote inteiro. Conferindo só as suas, uma corrida no 2º pedaço deixava a ficha
+    desligada e o evento no Quadro gravados, e a releitura batia no evento já existente (achado do
+    auditor). Sobra só a janela entre dois commits.
+- **O × do card** (`deleteRotina`) **muda de comportamento:** antes excluía até bloco com realizado,
+  deixando a execução órfã mesmo sem corrida. Agora recusa e manda usar "Desmarcar" no Acompanhamento.
+  Também só exclui se o bloco continua como foi lido (`excluirSe`), senão devolve conflito.
+- Testes: 8 casos novos em `testes/corridas-realizado.test.ts` (corrida em cada caminho, o ×
+  com realizado, o limite de 3 voltas) e o `seAinda` no contrato do DataSource, inclusive o lote de
+  551 escritas. Os 6 de corrida ficam vermelhos se a condição sai; o de 551, na perna do Firestore,
+  fica vermelho se o 1º pedaço confere só as suas.
+- Ressalva da auditoria, deixada para o dono: o × manda usar "Desmarcar", e o Desmarcar pode
+  recusar por sobreposição (bloco cancelado com outro no mesmo horário). Há saída, mas a mensagem não
+  a explica.
+
+Arquivos: `lib/datasource.ts` (`seAinda`, `LoteMudou`), `lib/firebaseClient.ts`,
+`lib/memoryStore.ts`, `lib/googleSheetsClient.ts`, `services/funcionariosService.ts`,
+`services/rotinasService.ts`, `testes/corridas-realizado.test.ts`,
+`testes/datasource-contrato.test.ts`.
+
+---
+
 ## 2026-11-19 — "Repetir o dia" não desfaz mais o cancelamento no destino
 
 Defeito provado pela auditoria do bloco A. Na conferência de "já existe no destino", o "Repetir o

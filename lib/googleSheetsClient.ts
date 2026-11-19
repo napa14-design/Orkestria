@@ -12,6 +12,7 @@ import {
   type CondicaoConsulta,
   type DataSource,
   filtrarEmMemoria,
+  LoteMudou,
   type OperacaoLote,
   type OpcoesConsulta,
   ordenarELimitar,
@@ -169,6 +170,13 @@ export class GoogleSheetsDataSource implements DataSource {
    * provisória: em produção o `DATA_SOURCE` é `firebase`.
    */
   async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
+    // As condições (`seAinda`) antes de gravar qualquer coisa — sem trava: só reduz a janela.
+    for (const op of operacoes) {
+      if (op.tipo !== "excluir" || !op.seAinda) continue;
+      this.cache.delete(op.tabela);
+      const atual = await this.obter(op.tabela, op.id);
+      if (!atual || !op.seAinda(atual)) throw new LoteMudou(op.tabela, op.id);
+    }
     for (const op of operacoes) {
       if (op.tipo === "criar") await this.criar(op.tabela, op.registro);
       else if (op.tipo === "atualizar") await this.atualizar(op.tabela, op.id, op.mudancas);

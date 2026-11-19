@@ -8,17 +8,26 @@
  * 3. Execução e status da rotina em duas escritas: falhar a segunda deixava os dois divergentes.
  * 4. "Limpar o dia" lia "sem realizado" e excluía o bloco que alguém acabara de confirmar.
  * 5. "Gerar o dia" atrasado gravava por cima do bloco já gerado e mexido.
+ * 6. Desligar, transferir, sair do posto, assumir o posto e o × do card: a mesma corrida do 4.
  *
  * As corridas se simulam no meio da gravação (espião no lote / na exclusão condicional).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDataSource, type OperacaoLote } from "@/lib/datasource";
+import { getDataSource, LoteMudou, type OperacaoLote } from "@/lib/datasource";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { reiniciarBanco } from "@/lib/memoryStore";
-import { ErroValidacao } from "@/services/erros";
+import { ErroConflito, ErroValidacao } from "@/services/erros";
 import { confirmarDiaComoPlanejado, idDaExecucao, registrarExecucao } from "@/services/execucoesService";
+import {
+  assumirPostoNaEdicao,
+  desligarFuncionario,
+  sairDoPosto,
+  transferirFuncionario,
+  transferirParaSetor,
+} from "@/services/funcionariosService";
 import { gerarDiaDaRotaPadrao, salvarModelo } from "@/services/modelosService";
-import { limparDia } from "@/services/rotinasService";
+import { deleteRotina, limparDia } from "@/services/rotinasService";
+import { rh } from "./fixtures";
 import type { ExecucaoRealizada, RotinaPlanejada } from "@/types";
 import type { SessaoUsuario } from "@/lib/permissions";
 import { POST as conformeRota } from "@/app/api/execucoes/conforme/route";
@@ -189,6 +198,170 @@ describe("Limpar o dia × confirmação no meio", () => {
       .filter((h) => h.tabela === "rotinas_planejadas" && h.acao === "excluir" && ["b1", "b2"].includes(h.registro_id))
       .map((h) => h.registro_id);
     expect(excluidos).toEqual(["b2"]);
+  });
+});
+
+/**
+ * As outras exclusões de bloco por leitura anterior (auditoria, 19/11/2026). Elas excluem
+ * dentro de um lote junto com a ficha, o posto vago e o evento do Quadro — então a condição
+ * vai NO lote (`seAinda`), e o lote recusado é montado de novo a partir de uma releitura.
+ */
+describe("Desligar, transferir, sair do posto, assumir o posto e o × × confirmação no meio", () => {
+  const excluiBloco = (id: string) => (ops: OperacaoLote[]) =>
+    ops.some((o) => o.tipo === "excluir" && o.tabela === "rotinas_planejadas" && o.id === id);
+  const confirmaB1 = () => registrarExecucao(conforme("b1"), { perfil: "coordenador" });
+  const SOLICITANTE = { nome: "Coord", email: "c@x.com" };
+
+  beforeEach(async () => {
+    reiniciarBanco();
+    const ds = await getDataSource();
+    for (const r of await ds.listar("rotinas_planejadas")) await ds.excluir("rotinas_planejadas", r.id);
+    await tarefaSemEpi("t-sem");
+    await bloco("b1", "07:00", "07:10");
+    await bloco("b2", "08:00", "08:10");
+  });
+
+  /** b1 fica com a execução; b2 sai; o histórico registra só a exclusão do b2. */
+  async function conferirB1FicouB2Saiu() {
+    const ds = await getDataSource();
+    expect(await ds.obter("rotinas_planejadas", "b1")).not.toBeNull();
+    expect(await ds.obter("rotinas_planejadas", "b2")).toBeNull();
+    expect(await execucoesDe("b1")).toHaveLength(1);
+    const excluidos = (await ds.listar("historico"))
+      .filter((h) => h.tabela === "rotinas_planejadas" && h.acao === "excluir" && ["b1", "b2"].includes(h.registro_id))
+      .map((h) => h.registro_id);
+    expect(excluidos).toEqual(["b2"]);
+  }
+
+  it("desligar: o bloco confirmado no meio fica; o resto sai junto com a ficha", async () => {
+    const espiao = await noMeioDoLote(excluiBloco("b1"), confirmaB1);
+    let res;
+    try {
+      res = await desligarFuncionario("christus_f1", { tipo: "saiu_da_empresa", data: ONTEM, motivo: "Outros", abrirVaga: false }, "c@x.com", SOLICITANTE);
+    } finally {
+      espiao.mockRestore();
+    }
+    await conferirB1FicouB2Saiu();
+    expect(res).toMatchObject({ blocosRemovidos: 1, blocosPreservados: 1 });
+    expect((await (await getDataSource()).obter("funcionarios", "christus_f1"))?.desligado_em).toBe(ONTEM);
+  });
+
+  it("transferir de sede: idem, e a ficha nova é criada uma vez só", async () => {
+    const ds = await getDataSource();
+    await ds.atualizar("funcionarios", "christus_f1", rh());
+    const espiao = await noMeioDoLote(excluiBloco("b1"), confirmaB1);
+    let res;
+    try {
+      res = await transferirFuncionario("christus_f1", { sede_id: "christus_ald", data: ONTEM }, "c@x.com", SOLICITANTE);
+    } finally {
+      espiao.mockRestore();
+    }
+    await conferirB1FicouB2Saiu();
+    expect(res).toMatchObject({ blocosRemovidos: 1, blocosPreservados: 1 });
+    const fichasNovas = (await ds.listar("funcionarios")).filter((f) => f.transferido_de === "christus_f1");
+    expect(fichasNovas.map((f) => f.id)).toEqual([res.novo.id]);
+  });
+
+  it("transferir para outro setor: idem", async () => {
+    const espiao = await noMeioDoLote(excluiBloco("b1"), confirmaB1);
+    let res;
+    try {
+      res = await transferirParaSetor("christus_f1", { setor: "Cantina", data: ONTEM, abrirVaga: false }, "c@x.com", SOLICITANTE);
+    } finally {
+      espiao.mockRestore();
+    }
+    await conferirB1FicouB2Saiu();
+    expect(res).toMatchObject({ blocosRemovidos: 1, blocosPreservados: 1 });
+  });
+
+  it("sair do posto: idem, e o posto vago sai uma vez só", async () => {
+    const ds = await getDataSource();
+    // Com rota, para o lote levar também a criação do posto (`exigirNovo`) e a mudança de dono da rota.
+    await ds.criar("modelos_rotina", {
+      id: "rota-f1-a", nome_modelo: "Rota padrão", sede_id: SEDE, funcionario_id: "christus_f1", tarefa_id: "t-sem",
+      local_id: "christus_l1", inicio_planejado: "07:00", duracao_min: 10, padrao: true, criado_em: "", atualizado_em: "",
+    } as never);
+    const espiao = await noMeioDoLote(excluiBloco("b1"), confirmaB1);
+    let res;
+    try {
+      res = await sairDoPosto("christus_f1", { tipo: "saiu_do_posto", data: ONTEM }, "c@x.com");
+    } finally {
+      espiao.mockRestore();
+    }
+    await conferirB1FicouB2Saiu();
+    expect(res).toMatchObject({ blocosRemovidos: 1, blocosPreservados: 1, postoVagoId: `posto_christus_f1_${ONTEM}` });
+    expect((await ds.obter("modelos_rotina", "rota-f1-a"))?.funcionario_id).toBe(`posto_christus_f1_${ONTEM}`);
+  });
+
+  it("assumir o posto na edição: o bloco de hoje confirmado no meio fica; o resto do dia sai", async () => {
+    const ds = await getDataSource();
+    const hoje = hojeISO();
+    const base = await ds.obter("funcionarios", "christus_f1");
+    await ds.criar("funcionarios", { ...base!, id: "f-saiu", nome: "Pessoa Que Saiu", ...rh(), ativo: false, desligado_em: hoje, motivo_desligamento: "Outros", observacoes: "" });
+    await ds.criar("modelos_rotina", {
+      id: "rota-f-saiu-a", nome_modelo: "Rota padrão", sede_id: SEDE, funcionario_id: "f-saiu", tarefa_id: "t-sem",
+      local_id: "christus_l1", inicio_planejado: "09:00", duracao_min: 10, padrao: true, criado_em: "", atualizado_em: "",
+    } as never);
+    // Os blocos de b1/b2 passam para hoje (a edição vale de hoje em diante).
+    for (const id of ["b1", "b2"]) await ds.atualizar("rotinas_planejadas", id, { data: hoje });
+    // "Não vai dar": quem coordena registra antes do horário, então não depende do relógio.
+    const naoVaiDar = () =>
+      registrarExecucao({ ...desvio("b1"), data_execucao: hoje, status_realizado: "nao_realizada" }, { perfil: "coordenador" });
+    const espiao = await noMeioDoLote(excluiBloco("b1"), naoVaiDar);
+    let res;
+    try {
+      res = await assumirPostoNaEdicao("christus_f1", "f-saiu", hoje, "c@x.com");
+    } finally {
+      espiao.mockRestore();
+    }
+    await conferirB1FicouB2Saiu();
+    expect(res).toMatchObject({ blocosTrocados: 1 });
+  });
+
+  it("o × do card: confirmado no meio, recusa e o bloco fica com a execução", async () => {
+    const ds = await getDataSource();
+    const original = ds.excluirSe.bind(ds);
+    const espiao = vi.spyOn(ds, "excluirSe").mockImplementation((async (...args: Parameters<typeof original>) => {
+      await confirmaB1();
+      return original(...args);
+    }) as never);
+    try {
+      await expect(deleteRotina("b1")).rejects.toThrow(ErroConflito);
+    } finally {
+      espiao.mockRestore();
+    }
+    expect(await ds.obter("rotinas_planejadas", "b1")).not.toBeNull();
+    expect(await execucoesDe("b1")).toHaveLength(1);
+  });
+
+  it("o × do card em bloco que já tem realizado: recusa (a execução ficaria órfã); sem realizado, sai", async () => {
+    const ds = await getDataSource();
+    await confirmaB1();
+    await expect(deleteRotina("b1")).rejects.toThrow(/Desmarcar/);
+    expect(await ds.obter("rotinas_planejadas", "b1")).not.toBeNull();
+    await deleteRotina("b2");
+    expect(await ds.obter("rotinas_planejadas", "b2")).toBeNull();
+  });
+
+  it("se o bloco não para de mudar, desiste em 3 voltas sem gravar nada", async () => {
+    const ds = await getDataSource();
+    let voltas = 0;
+    const espiao = vi.spyOn(ds, "gravarLote").mockImplementation((async (ops: OperacaoLote[]) => {
+      if (excluiBloco("b1")(ops)) {
+        voltas++;
+        throw new LoteMudou("rotinas_planejadas", "b1");
+      }
+    }) as never);
+    try {
+      await expect(
+        desligarFuncionario("christus_f1", { tipo: "saiu_da_empresa", data: ONTEM, motivo: "Outros", abrirVaga: false }, "c@x.com", SOLICITANTE),
+      ).rejects.toThrow(ErroConflito);
+    } finally {
+      espiao.mockRestore();
+    }
+    expect(voltas).toBe(3);
+    expect((await ds.obter("funcionarios", "christus_f1"))?.desligado_em ?? "").toBe("");
+    expect(await ds.obter("rotinas_planejadas", "b2")).not.toBeNull();
   });
 });
 

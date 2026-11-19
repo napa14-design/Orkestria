@@ -41,7 +41,7 @@
  * `lib/datasource.ts`.
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { ehIdRepetido, type DataSource } from "@/lib/datasource";
+import { ehIdRepetido, LoteMudou, type DataSource } from "@/lib/datasource";
 import { MemoryDataSource } from "@/lib/memoryStore";
 import type { EventoQuadro, Feriado, Sede } from "@/types";
 
@@ -228,6 +228,57 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
       expect(await ds.excluirSe("sedes", [`${P}ex-mudou`], (a) => a.codigo === "AAA")).toEqual([]);
       expect(await ds.obter("sedes", `${P}ex-mudou`)).not.toBeNull();
     });
+
+    // O `excluirSe` dentro do lote: o desligamento exclui os blocos junto com a ficha.
+    it("gravarLote com excluir + seAinda que vale grava o lote inteiro", async () => {
+      await criarSede(sede("lote-se-sai", { codigo: "AAA" }));
+      sujeira.push(["sedes", `${P}lote-se-junto`]);
+      await ds.gravarLote([
+        { tipo: "criar", tabela: "sedes", registro: sede("lote-se-junto") },
+        { tipo: "excluir", tabela: "sedes", id: `${P}lote-se-sai`, seAinda: (a) => (a as Sede).codigo === "AAA" },
+      ]);
+      expect(await ds.obter("sedes", `${P}lote-se-sai`)).toBeNull();
+      expect(await ds.obter("sedes", `${P}lote-se-junto`)).not.toBeNull();
+    });
+
+    it("gravarLote com seAinda que não vale, ou registro sumido: LoteMudou e NADA do lote gravado", async () => {
+      await criarSede(sede("lote-mudou", { codigo: "AAA" }));
+      await ds.atualizar("sedes", `${P}lote-mudou`, { codigo: "BBB" }); // mudou depois da "leitura"
+      await criarSede(sede("lote-mudou-vizinha", { codigo: "CCC" }));
+      sujeira.push(["sedes", `${P}lote-mudou-nova`]);
+      const lote = (idCondicionado: string) =>
+        ds
+          .gravarLote([
+            { tipo: "atualizar", tabela: "sedes", id: `${P}lote-mudou-vizinha`, mudancas: { codigo: "DDD" } },
+            { tipo: "criar", tabela: "sedes", registro: sede("lote-mudou-nova") },
+            { tipo: "excluir", tabela: "sedes", id: idCondicionado, seAinda: (a) => (a as Sede).codigo === "AAA" },
+          ])
+          .then(() => null, (e: unknown) => e);
+      for (const id of [`${P}lote-mudou`, `${P}lote-sumido`]) {
+        const erro = await lote(id);
+        expect(erro).toBeInstanceOf(LoteMudou);
+        expect((await ds.obter("sedes", `${P}lote-mudou`))?.codigo).toBe("BBB");
+        expect((await ds.obter("sedes", `${P}lote-mudou-vizinha`))?.codigo).toBe("CCC");
+        expect(await ds.obter("sedes", `${P}lote-mudou-nova`)).toBeNull();
+      }
+    });
+
+    it("lote acima de 500 escritas com a condição falhando no 2º pedaço: nem o 1º pedaço é gravado", async () => {
+      // No Firestore o lote é partido em pedaços de 500; o 1º confere as condições do lote todo.
+      await criarSede(sede("lote-grande-alvo", { codigo: "AAA" }));
+      await ds.atualizar("sedes", `${P}lote-grande-alvo`, { codigo: "BBB" });
+      sujeira.push(["sedes", `${P}lote-grande-0`], ["sedes", `${P}lote-grande-509`]);
+      const erro = await ds
+        .gravarLote([
+          ...Array.from({ length: 510 }, (_, i) => ({ tipo: "criar" as const, tabela: "sedes" as const, registro: sede(`lote-grande-${i}`) })),
+          { tipo: "excluir", tabela: "sedes", id: `${P}lote-grande-alvo`, seAinda: (a) => (a as Sede).codigo === "AAA" },
+        ])
+        .then(() => null, (e: unknown) => e);
+      expect(erro).toBeInstanceOf(LoteMudou);
+      expect(await ds.obter("sedes", `${P}lote-grande-0`)).toBeNull();
+      expect(await ds.obter("sedes", `${P}lote-grande-509`)).toBeNull();
+      expect(await ds.obter("sedes", `${P}lote-grande-alvo`)).not.toBeNull();
+    }, 30_000);
 
     it("atualizar com undefined PRESERVA o valor — incidente de 20/08", async () => {
       // `undefined` quer dizer "não mexi neste campo". Quem limpa grava "".

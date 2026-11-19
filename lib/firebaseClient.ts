@@ -9,8 +9,16 @@
  * projeto → Contas de serviço → Gerar nova chave privada):
  *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
  */
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import type { CondicaoConsulta, DataSource, OperacaoLote, OpcoesConsulta } from "./datasource";
+import { getFirestore, type DocumentData, type DocumentReference, type Firestore } from "firebase-admin/firestore";
+import { LoteMudou, type CondicaoConsulta, type DataSource, type OperacaoLote, type OpcoesConsulta } from "./datasource";
+
+/** O que `WriteBatch` e `Transaction` têm em comum: o mesmo lote monta nos dois. */
+type Escritor = {
+  create(ref: DocumentReference, dado: DocumentData): unknown;
+  set(ref: DocumentReference, dado: DocumentData): unknown;
+  update(ref: DocumentReference, dado: DocumentData): unknown;
+  delete(ref: DocumentReference): unknown;
+};
 import { obterAppAdmin } from "./firebaseAdmin";
 import { exigirId, semUndefined } from "./semUndefined";
 import { TABELAS_SO_DE_INCLUSAO, type MapaTabelas, type NomeTabela } from "./schema";
@@ -127,13 +135,20 @@ export class FirebaseDataSource implements DataSource {
    *    e a atomicidade passa a valer por pedaço — nunca fica documento pela
    *    metade, mas pode faltar um pedaço inteiro. Quem chama recebe o erro e a
    *    operação é idempotente (id determinístico), então repetir completa.
+   * 3. Com `excluir` + `seAinda`, o pedaço vira **transação**: lê os condicionados, confere
+   *    e só então grava; condição falhou, nada do pedaço é gravado (`LoteMudou`). O 1º pedaço
+   *    confere as condições do lote INTEIRO: conferindo só as dele, uma corrida no 2º pedaço
+   *    deixava o 1º gravado — num desligamento retroativo de ~500 blocos, ficha desligada e
+   *    evento no Quadro, e a releitura batia no evento já gravado (auditoria, 19/11/2026).
+   *    Sobra a janela entre um commit e outro, e cada pedaço seguinte confere de novo os seus.
    */
   async gravarLote(operacoes: OperacaoLote[]): Promise<void> {
     const LIMITE = 500;
-    for (let i = 0; i < operacoes.length; i += LIMITE) {
-      const lote = this.db.batch();
-      for (const op of operacoes.slice(i, i + LIMITE)) {
-        const ref = this.db.collection(op.tabela).doc(op.tipo === "criar" ? exigirId(op.tabela, op.registro) : op.id);
+    const refDe = (op: OperacaoLote) =>
+      this.db.collection(op.tabela).doc(op.tipo === "criar" ? exigirId(op.tabela, op.registro) : op.id);
+    const montar = (lote: Escritor, pedaco: OperacaoLote[]) => {
+      for (const op of pedaco) {
+        const ref = refDe(op);
         // Tabela só de inclusão: `create` falha se o documento já existe — e o lote
         // inteiro com ele. Fecha a corrida de dois cliques no mesmo desligamento.
         if (op.tipo === "criar" && (op.exigirNovo || TABELAS_SO_DE_INCLUSAO.has(op.tabela))) lote.create(ref, semUndefined(op.registro));
@@ -141,7 +156,26 @@ export class FirebaseDataSource implements DataSource {
         else if (op.tipo === "atualizar") lote.update(ref, semUndefined(op.mudancas));
         else lote.delete(ref);
       }
-      await lote.commit();
+    };
+    const condicionadasEm = (ops: OperacaoLote[]) =>
+      ops.filter((op): op is Extract<OperacaoLote, { tipo: "excluir" }> => op.tipo === "excluir" && !!op.seAinda);
+    for (let i = 0; i < operacoes.length; i += LIMITE) {
+      const pedaco = operacoes.slice(i, i + LIMITE);
+      const condicionadas = condicionadasEm(i === 0 ? operacoes : pedaco);
+      if (!condicionadas.length) {
+        const lote = this.db.batch();
+        montar(lote, pedaco);
+        await lote.commit();
+        continue;
+      }
+      await this.db.runTransaction(async (tx) => {
+        const docs = await tx.getAll(...condicionadas.map(refDe));
+        docs.forEach((doc, k) => {
+          const op = condicionadas[k];
+          if (!doc.exists || !op.seAinda!(doc.data() as MapaTabelas[NomeTabela])) throw new LoteMudou(op.tabela, op.id);
+        });
+        montar(tx, pedaco);
+      });
     }
   }
 }
