@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-11-19 — Next 16.4.3 → 16.4.5: o build voltou a fechar
+
+O `next build` passou a abortar no fim, depois de compilar e gerar as 88 páginas, com
+`SecurityFatalError`: o próprio Next recusa terminar o build numa versão com falha conhecida.
+As duas falhas (GHSA-mfr8-8qww-v76h e GHSA-vc7v-qv4w-wrv8, vazamento de cache entre valores de
+root params) pegam até a 16.4.4. Elas dependem de `use cache`/`unstable_cache`, que o projeto não
+usa, mas a trava vale para qualquer build, e o deploy na Vercel cairia do mesmo jeito.
+
+- `next` subiu para a **16.4.5**, a menor versão corrigida da linha 16 (pacote oficial, publicado
+  pelo GitHub Actions da Vercel, assinado). O lockfile mudou só o `next` e os `@next/*`.
+- Não há `eslint-config-next` no projeto. `firebase-admin` 13.x, os `overrides` e o `--webpack`
+  ficaram como estavam.
+- Conferido: `npm run build` sai com 0, `npm test` passa (1224, 1 pulado: a perna do Firestore sem
+  emulador) e o `npm audit` não lista mais o `next`.
+- Ficam no audit, sem correção nesta mudança: fast-xml-parser, gaxios, gcp-metadata,
+  googleapis-common, glob, minimatch, rimraf, qs, re2js (alta) e nodemailer (dependência direta).
+
+Arquivos: `package.json`, `package-lock.json`.
+
+---
+
+## 2026-11-19 — Nodemailer 10.1.1 → 10.1.4: endereço que vira outro destinatário
+
+O `addressparser` do nodemailer tinha três falhas (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w,
+GHSA-85x2-q946-cp5h), todas até a 10.1.3. Com elas, um endereço com aspas, `;`, `>` ou comentário
+aninhado faz o e-mail ir também para outro destinatário. Aqui isso pesa porque o código de acesso
+de coordenador vai só por e-mail: um envio desviado entrega a conta.
+
+- `nodemailer` subiu para a **10.1.4**, a correção na mesma major. É o pacote oficial: mantenedor
+  `andris`, repositório `nodemailer/nodemailer`, assinado, publicado em 18/10. A integridade no
+  lockfile bate com o registro. O lockfile mudou só o `nodemailer`.
+- **Revisão de segurança: libera com ressalvas.** Toda escrita do app em `usuarios.email` passa por
+  `normalizarEmail`, que só aceita `[a-z0-9._%+-]@...` em ASCII e barra aspas, `;`, `>`,
+  parênteses, vírgula e espaço. Os `scripts/` não gravam e-mail. O login com Google não cria conta.
+- **Ressalvas, sem correção nesta mudança:**
+  - cadastros anteriores a 04/11 (`d4aee6b`) e os que vieram do Sheets pelo `migrar-firebase`
+    foram gravados sem essa validação;
+  - `enviarEmail` não valida o `para`.
+  Ficam como tarefa à parte: validar o destinatário dentro de `enviarEmail` ou conferir em produção
+  se todo `usuarios.email` bate com a regex.
+- Conferido: `npm test` passa (1224, 1 pulado: a perna do Firestore sem emulador). O `npm audit`
+  não lista mais o `nodemailer`. `npm run build` sai com 0, mas com o `next` 16.4.5 posto no
+  `node_modules` sem salvar no projeto, porque o bump do `next` para a 16.4.5, feito no mesmo dia em
+  outra cópia, ainda não estava nesta. Os outros avisos do audit ficaram como estavam.
+
+Arquivos: `package.json`, `package-lock.json`.
+
+---
+
 ## 2026-11-19 — Desligar, transferir, sair do posto, assumir o posto e o × não apagam bloco confirmado no meio
 
 A auditoria achou nesses caminhos a mesma corrida do "Limpar o dia". Eles leem os blocos "só
