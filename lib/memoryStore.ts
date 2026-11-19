@@ -9,6 +9,7 @@ import {
   type CondicaoConsulta,
   type DataSource,
   filtrarEmMemoria,
+  LoteMudou,
   type OperacaoLote,
   type OpcoesConsulta,
   ordenarELimitar,
@@ -366,6 +367,12 @@ export class MemoryDataSource implements DataSource {
 
   private async gravarLoteAgora(operacoes: OperacaoLote[]): Promise<void> {
     const b = banco() as Record<string, unknown[]>;
+    // Como a transação do Firestore: as condições olham o que está gravado ANTES do lote.
+    for (const op of operacoes) {
+      if (op.tipo !== "excluir" || !op.seAinda) continue;
+      const atual = (b[op.tabela] as Array<MapaTabelas[NomeTabela] & { id: string }>).find((r) => r.id === op.id);
+      if (!atual || !op.seAinda(atual)) throw new LoteMudou(op.tabela, op.id);
+    }
     const tocadas = [...new Set(operacoes.map((o) => o.tabela))];
     const copia = new Map(tocadas.map((t) => [t, [...b[t]]]));
     try {

@@ -1,4 +1,4 @@
-import { agoraISO, getDataSource, novoId, type OperacaoLote } from "@/lib/datasource";
+import { agoraISO, getDataSource, LoteMudou, novoId, type OperacaoLote } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
 import { mapaFatorDoTipo } from "./tiposLocalService";
 import { tempoPrevistoMin } from "@/lib/calculations";
@@ -18,7 +18,7 @@ import { normalizarMatricula } from "@/lib/quadroInfra";
 import { normalizarEmpresa } from "@/lib/empresas";
 import { minhaChave } from "@/lib/chaves";
 import { validarFuncionario, temErro } from "@/lib/validations";
-import type { EventoQuadro, Funcionario, Local, ModeloRotinaItem, Sede, Tarefa } from "@/types";
+import type { EventoQuadro, Funcionario, Local, ModeloRotinaItem, RotinaPlanejada, Sede, Tarefa } from "@/types";
 import { exigirEmpresaDoCadastro } from "./empresasService";
 import { ErroConflito, ErroValidacao } from "./erros";
 
@@ -26,6 +26,37 @@ type Ds = Awaited<ReturnType<typeof getDataSource>>;
 
 /** A operação de lote que grava um evento do Quadro (`lib/eventosQuadro.ts`). */
 const criarEvento = (evento: EventoQuadro): OperacaoLote => ({ tipo: "criar", tabela: "eventos_quadro", registro: evento });
+
+/**
+ * ⚠️ O bloco só sai se continua como foi lido (status + `atualizado_em`). Excluir pela leitura
+ * apagava o bloco que o supervisor confirmara no meio do caminho e deixava a execução órfã
+ * (auditoria, 19/11/2026). Registrar o realizado sempre muda os dois.
+ */
+const excluirBlocoComoLido = (b: RotinaPlanejada): OperacaoLote => ({
+  tipo: "excluir",
+  tabela: "rotinas_planejadas",
+  id: b.id,
+  seAinda: (a) => {
+    const atual = a as RotinaPlanejada;
+    return atual.status === b.status && (atual.atualizado_em ?? "") === (b.atualizado_em ?? "");
+  },
+});
+
+/**
+ * Lê, monta e grava de novo quando um bloco mudou entre a leitura e o lote (`LoteMudou`:
+ * nada foi gravado). Na releitura o bloco confirmado já não é "só planejado" e fica.
+ */
+async function comReleitura<T>(fazer: () => Promise<T>): Promise<T> {
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      return await fazer();
+    } catch (e) {
+      if (!(e instanceof LoteMudou)) throw e;
+      if (tentativa === 3)
+        throw new ErroConflito("A agenda desta pessoa está mudando agora (alguém registrando o realizado?). Nada foi gravado; tente de novo em instantes.");
+    }
+  }
+}
 
 type DadosFuncionario = Omit<
   Funcionario,
@@ -608,17 +639,21 @@ export async function assumirPostoNaEdicao(
     ]);
   const { novo, antigo } = await conferirSubstituicao(id, antigoId, aPartirDe);
   const ds = await getDataSource();
-  const [rota, blocos] = await Promise.all([
-    ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
-    ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
-  ]);
-  const itensSaem = rota.filter((item) => item.padrao);
-  const blocosSaem = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");
-  if (itensSaem.length || blocosSaem.length)
-    await ds.gravarLote([
-      ...itensSaem.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
-      ...blocosSaem.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })),
+  const { itensSaem, blocosSaem } = await comReleitura(async () => {
+    const [rota, blocos] = await Promise.all([
+      ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
+      ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
     ]);
+    const itensSaem = rota.filter((item) => item.padrao);
+    // Vale de hoje em diante: os blocos de hoje podem estar sendo confirmados agora.
+    const blocosSaem = blocos.filter((b) => b.data >= aPartirDe && b.status === "planejada");
+    if (itensSaem.length || blocosSaem.length)
+      await ds.gravarLote([
+        ...itensSaem.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
+        ...blocosSaem.map(excluirBlocoComoLido),
+      ]);
+    return { itensSaem, blocosSaem };
+  });
   const r = await passarPosto(ds, novo, antigo, aPartirDe, autor);
   return { ...r, itensTrocados: itensSaem.length, blocosTrocados: blocosSaem.length };
 }
@@ -706,19 +741,22 @@ export async function desligarFuncionario(
     ]);
 
   const agora = agoraISO();
-  const enc = await encerramento(ds, atual, { data, motivo, extinguir, destino: {}, autor, agora });
   const sede = ehAsg(atual.cargo) ? await ds.obter("sedes", atual.sede_id) : null;
-  await ds.gravarLote([
-    enc.ficha,
-    // O evento sai da ficha como ela fica gravada neste lote — nunca do corpo do pedido.
-    ...(ehAsg(atual.cargo)
-      ? [criarEvento(montarEvento({
-          tipo: "desligamento", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
-          sedeDe: sede?.codigo ?? "", sedePara: "", autor, registradoEm: agora,
-        }))]
-      : []),
-    ...enc.resto,
-  ]);
+  const enc = await comReleitura(async () => {
+    const enc = await encerramento(ds, atual, { data, motivo, extinguir, destino: {}, autor, agora });
+    await ds.gravarLote([
+      enc.ficha,
+      // O evento sai da ficha como ela fica gravada neste lote — nunca do corpo do pedido.
+      ...(ehAsg(atual.cargo)
+        ? [criarEvento(montarEvento({
+            tipo: "desligamento", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+            sedeDe: sede?.codigo ?? "", sedePara: "", autor, registradoEm: agora,
+          }))]
+        : []),
+      ...enc.resto,
+    ]);
+    return enc;
+  });
 
   const vaga = await decidirVaga(id, motivo, extinguir, dados.abrirVaga !== false, solicitante);
   return { ...enc.resultado, vaga };
@@ -791,7 +829,8 @@ async function encerramento(
      */
     ficha: { tipo: "atualizar", tabela: "funcionarios", id: atual.id, mudancas } as OperacaoLote,
     resto: [
-      ...remover.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })),
+      // Data de hoje ou passada pega blocos que o supervisor pode estar confirmando agora.
+      ...remover.map(excluirBlocoComoLido),
       ...rota.map((i) => ({ tipo: "excluir" as const, tabela: "modelos_rotina" as const, id: i.id })),
     ] as OperacaoLote[],
     mudancas,
@@ -851,7 +890,12 @@ export async function sairDoPosto(
   exigirNaoDesligado(atual);
   if (comAtivoDoDia(atual, hojeISO()).ativo === false || atual.substituido_por)
     throw recusa("FORA_DO_QUADRO", `${atual.nome} não está no quadro: não há posto a deixar.`);
+  return comReleitura(() => gravarSaidaDoPosto(ds, atual, data, autor));
+}
 
+/** Lê a rota e os blocos e grava o lote da saída do posto; `comReleitura` repete se um bloco mudou. */
+async function gravarSaidaDoPosto(ds: Ds, atual: Funcionario, data: string, autor: string): Promise<ResultadoSaidaDoPosto> {
+  const id = atual.id;
   const [itens, blocos] = await Promise.all([
     ds.consultar("modelos_rotina", [{ campo: "funcionario_id", op: "==", valor: id }]),
     ds.consultar("rotinas_planejadas", [{ campo: "funcionario_id", op: "==", valor: id }]),
@@ -906,7 +950,8 @@ export async function sairDoPosto(
       } else ops.push({ tipo: "atualizar", tabela: "modelos_rotina", id: item.id, mudancas: { funcionario_id: posto.id } });
     }
   }
-  ops.push(...remover.map((b) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: b.id })));
+  // A saída vale de hoje para trás: são justamente os blocos que podem estar sendo confirmados.
+  ops.push(...remover.map(excluirBlocoComoLido));
   ops.push({
     tipo: "atualizar",
     tabela: "funcionarios",
@@ -1017,20 +1062,23 @@ export async function transferirFuncionario(
   // A transferência INTEIRA num lote só (emenda 2 do contrato do Quadro, 13/11/2026):
   // encerrar a origem, criar o destino e o evento `transf_`. Falha no meio: nada gravado.
   const agora = agoraISO();
-  const enc = await encerramento(ds, atual, {
-    data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_para: destino.id }, autor, agora,
+  const enc = await comReleitura(async () => {
+    const enc = await encerramento(ds, atual, {
+      data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_para: destino.id }, autor, agora,
+    });
+    await ds.gravarLote([
+      enc.ficha,
+      { tipo: "criar", tabela: "funcionarios", registro: novo },
+      ...(ehAsg(atual.cargo)
+        ? [criarEvento(montarEvento({
+            tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+            sedeDe: sedeOrigem?.codigo ?? "", sedePara: destino.codigo ?? "", autor, registradoEm: agora,
+          }))]
+        : []),
+      ...enc.resto,
+    ]);
+    return enc;
   });
-  await ds.gravarLote([
-    enc.ficha,
-    { tipo: "criar", tabela: "funcionarios", registro: novo },
-    ...(ehAsg(atual.cargo)
-      ? [criarEvento(montarEvento({
-          tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
-          sedeDe: sedeOrigem?.codigo ?? "", sedePara: destino.codigo ?? "", autor, registradoEm: agora,
-        }))]
-      : []),
-    ...enc.resto,
-  ]);
   const vaga = await decidirVaga(id, MOTIVO_TRANSFERENCIA, false, dados.abrirVaga === true, solicitante);
   return { ...enc.resultado, vaga, novo };
 }
@@ -1068,21 +1116,24 @@ export async function transferirParaSetor(
   const data = dados.data as string;
 
   const agora = agoraISO();
-  const enc = await encerramento(ds, atual, {
-    data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_setor: setor }, autor, agora,
-  });
   const sede = ehAsg(atual.cargo) ? await ds.obter("sedes", atual.sede_id) : null;
-  await ds.gravarLote([
-    enc.ficha,
-    // O setor vai só como "setor": o texto livre não sai daqui (emenda 5).
-    ...(ehAsg(atual.cargo)
-      ? [criarEvento(montarEvento({
-          tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
-          sedeDe: sede?.codigo ?? "", sedePara: SEDE_SETOR, autor, registradoEm: agora,
-        }))]
-      : []),
-    ...enc.resto,
-  ]);
+  const enc = await comReleitura(async () => {
+    const enc = await encerramento(ds, atual, {
+      data, motivo: MOTIVO_TRANSFERENCIA, extinguir: false, destino: { transferido_setor: setor }, autor, agora,
+    });
+    await ds.gravarLote([
+      enc.ficha,
+      // O setor vai só como "setor": o texto livre não sai daqui (emenda 5).
+      ...(ehAsg(atual.cargo)
+        ? [criarEvento(montarEvento({
+            tipo: "transferencia", funcionario: { ...atual, ...enc.mudancas }, dataEfetiva: data,
+            sedeDe: sede?.codigo ?? "", sedePara: SEDE_SETOR, autor, registradoEm: agora,
+          }))]
+        : []),
+      ...enc.resto,
+    ]);
+    return enc;
+  });
   const vaga = await decidirVaga(id, MOTIVO_TRANSFERENCIA, false, dados.abrirVaga === true, solicitante);
   return { ...enc.resultado, vaga };
 }

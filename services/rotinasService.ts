@@ -827,9 +827,30 @@ export async function trocarTarefasDoDia(args: {
   return { ...proposta, gravados: blocos.length };
 }
 
+/**
+ * O × do card. ⚠️ Bloco com realizado não sai: a execução ficaria órfã (o "Limpar o dia" já
+ * preservava). E só sai se continua como foi lido — o supervisor pode confirmar entre a
+ * conferência e a exclusão (auditoria, 19/11/2026); registrar muda status e `atualizado_em`.
+ */
 export async function deleteRotina(id: string): Promise<void> {
   const ds = await getDataSource();
-  await ds.excluir("rotinas_planejadas", id);
+  const [lido, execucoes] = await Promise.all([
+    ds.obter("rotinas_planejadas", id),
+    ds.consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: id }]),
+  ]);
+  if (!lido) return;
+  if (execucoes.length)
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "BLOCO_COM_REALIZADO",
+        mensagem: "Esta tarefa já tem o realizado registrado. Para removê-la, primeiro use \"Desmarcar\" no registro, no Acompanhamento.",
+      },
+    ]);
+  const marca = (r: RotinaPlanejada) => `${r.status}|${r.atualizado_em ?? ""}`;
+  const removidos = await ds.excluirSe("rotinas_planejadas", [id], (a) => marca(a) === marca(lido));
+  if (!removidos.length)
+    throw new ErroConflito("Esta tarefa mudou enquanto você removia (alguém registrou o realizado ou a editou). Confira a agenda e tente de novo.");
 }
 
 /**

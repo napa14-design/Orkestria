@@ -73,7 +73,25 @@ export type OperacaoLote =
    */
   | { tipo: "criar"; tabela: NomeTabela; registro: MapaTabelas[NomeTabela]; exigirNovo?: boolean }
   | { tipo: "atualizar"; tabela: NomeTabela; id: string; mudancas: Partial<MapaTabelas[NomeTabela]> }
-  | { tipo: "excluir"; tabela: NomeTabela; id: string };
+  /**
+   * `seAinda`: o lote inteiro é recusado com `LoteMudou` se o registro não existe mais ou a
+   * condição não vale para o que está gravado ANTES do lote. É o `excluirSe` dentro de um
+   * lote: o desligamento lia "só planejado" e excluía, junto com a ficha, o bloco que alguém
+   * confirmara no meio, deixando a execução órfã (auditoria, 19/11/2026). Recusa em vez de
+   * pular para o histórico do decorator, que vai no mesmo lote, não registrar o que não saiu.
+   */
+  | { tipo: "excluir"; tabela: NomeTabela; id: string; seAinda?: (atual: MapaTabelas[NomeTabela]) => boolean };
+
+/** Um `excluir` com `seAinda` achou o registro mudado ou já excluído: NADA do lote foi gravado. */
+export class LoteMudou extends Error {
+  constructor(
+    readonly tabela: string,
+    readonly id: string,
+  ) {
+    super(`Registro ${id} mudou em ${tabela} enquanto o lote era montado; nada foi gravado.`);
+    this.name = "LoteMudou";
+  }
+}
 
 /**
  * Id repetido numa criação com `exigirNovo`: a conferência do decorator e a da memória
@@ -147,6 +165,9 @@ export interface DataSource {
    *  - **memória**: tira uma cópia antes e desfaz tudo se qualquer uma falhar.
    *  - **Sheets**: **não é atômico** — a API não oferece transação. Grava em
    *    sequência e propaga o erro; está aqui para o contrato fechar.
+   *
+   * Com `seAinda` num `excluir`: Firestore faz o pedaço numa transação (lê os condicionados,
+   * confere, grava); memória confere antes de gravar; Sheets confere e grava sem trava.
    */
   gravarLote(operacoes: OperacaoLote[]): Promise<void>;
 }
