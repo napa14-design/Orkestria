@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-11-19 — Marcar tarefa pesada num clique, na lista de Tarefas
+
+Para o "Serviço pesado" valer, o catálogo precisa estar classificado: na UniBenfica, 69 de 81
+tarefas estavam sem natureza. Abrir o formulário tarefa por tarefa era o obstáculo.
+
+- Coluna **"Esforço"** na lista de Tarefas: um botão alterna rotina ↔ pesada e grava na hora. Quem
+  não pode editar a sede vê só o selo; desincrustante continua no formulário. O selo de natureza
+  saiu da coluna "Regras", para não aparecer duas vezes.
+- O tempo da rota gerada não muda: os 3.392 itens de rota da rede guardam a própria duração
+  (medido na produção). O ×1,5 só vale para quem arrasta a tarefa à mão para a agenda.
+
+Arquivo: `app/(app)/tarefas/page.tsx`.
+
+---
+
 ## 2026-11-19 — Serviço pesado por pessoa, e a natureza da tarefa limpa
 
 Pedido da coordenação: "o tempo não mostra a sobrecarga física". O cadastro já tinha a natureza

@@ -1,16 +1,57 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import CrudManager from "@/components/CrudManager";
 import { useSessao } from "@/components/SessaoContexto";
-import { podeCriarNoCatalogo, podeEscrever, sedesPermitidas } from "@/lib/permissions";
+import { podeAlterarSede, podeCriarNoCatalogo, podeEscrever, sedesPermitidas } from "@/lib/permissions";
 import { nivelPrioridade, rotuloPrioridade, tempoPrevistoMin } from "@/lib/calculations";
-import { fetcher } from "@/lib/clientApi";
+import { apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDuracao, rotularDiasSemana } from "@/lib/dateUtils";
 import { escolhaDoHorario } from "@/lib/remanejoAuto";
 import type {
   TipoLocalCatalogo, Categoria, Local, Requisito, Sede, Tarefa } from "@/types";
+
+/**
+ * Marcar "pesada" num clique, na própria lista (19/11/2026): é o que alimenta o "Serviço pesado"
+ * do Dashboard, e abrir o formulário tarefa por tarefa era o que impedia o catálogo de ser
+ * classificado. A rota padrão guarda a duração de cada item, então o tempo gerado não muda.
+ */
+function EsforcoDaTarefa({ tarefa, pode }: { tarefa: Tarefa; pode: boolean }) {
+  const [salvando, setSalvando] = useState(false);
+  // O que acabou de ser salvo vale na hora: a lista do CrudManager não se refaz com o mutate.
+  const [salvo, setSalvo] = useState<Tarefa["tipo_servico"]>();
+  // Se a lista se refizer (ex.: edição pelo formulário), vale o que veio do banco.
+  useEffect(() => setSalvo(undefined), [tarefa.tipo_servico]);
+  const natureza = salvo ?? tarefa.tipo_servico;
+  if (natureza === "desincrustante") return <span className="selo selo-laranja">desincrustante ×2,0</span>;
+  const pesada = natureza === "pesada";
+  if (!pode) return pesada ? <span className="selo selo-laranja">pesada ×1,5</span> : <span style={{ color: "var(--tinta-3)", fontSize: 12 }}>rotina</span>;
+  async function alternar() {
+    setSalvando(true);
+    try {
+      const nova = pesada ? "rotina" : "pesada";
+      await apiPut(`/api/tarefas/${tarefa.id}`, { tipo_servico: nova });
+      setSalvo(nova);
+    } catch (e) {
+      alert(e instanceof ErroApi ? e.message : "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      className={`btn btn-mini${pesada ? "" : " btn-fantasma"}`}
+      aria-pressed={pesada}
+      disabled={salvando}
+      onClick={() => void alternar()}
+      title={pesada ? "Marcada como pesada. Clique para voltar a rotina." : "Clique para marcar como pesada: carga, mobiliário, laboratório, lavagem pesada…"}
+    >
+      {pesada ? "◼ pesada" : "◻ pesada"}
+    </button>
+  );
+}
 
 const REGRAS = [
   { valor: "fixo", rotulo: "Tempo fixo" },
@@ -464,6 +505,11 @@ export default function PaginaTarefas() {
           },
         },
         {
+          key: "tipo_servico",
+          rotulo: "Esforço",
+          render: (t) => <EsforcoDaTarefa tarefa={t} pode={!!sessao && podeEscrever(sessao) && podeAlterarSede(sessao, t.sede_id)} />,
+        },
+        {
           key: "restricao_genero",
           rotulo: "Regras",
           render: (t) => (
@@ -471,11 +517,6 @@ export default function PaginaTarefas() {
               {t.restricao_genero && (
                 <span className={`selo ${t.restricao_genero === "feminino" ? "selo-vermelho" : "selo-azul"}`}>
                   {t.restricao_genero === "feminino" ? "♀ Mulheres" : "♂ Homens"}
-                </span>
-              )}
-              {t.tipo_servico && t.tipo_servico !== "rotina" && (
-                <span className="selo selo-laranja">
-                  {t.tipo_servico === "pesada" ? "pesada ×1,5" : "desincrustante ×2,0"}
                 </span>
               )}
               {t.janela_inicio && t.janela_fim && (
@@ -507,7 +548,6 @@ export default function PaginaTarefas() {
                 </span>
               ))}
               {!t.restricao_genero &&
-                (!t.tipo_servico || t.tipo_servico === "rotina") &&
                 !t.tempo_referencia &&
                 !t.presenca &&
                 !t.critica &&
