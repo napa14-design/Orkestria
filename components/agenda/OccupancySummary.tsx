@@ -11,6 +11,7 @@ import {
   ocupacaoDoDiaPorPessoa,
   ocupaHorario,
   ROTULO_CLASSIFICACAO,
+  servicoPesadoPorPessoa,
 } from "@/lib/calculations";
 import { formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 import type {
@@ -103,6 +104,9 @@ export default function OccupancySummary({
   }, [funcionarios, rotinas, eventuais, ausencias, feriados, data, parametros]);
 
   const selecionado = resumos.find((r) => r.funcionario.id === selecionadoId);
+  const pesado = useMemo(() => servicoPesadoPorPessoa({ rotinas, tarefas, eventuais }), [rotinas, tarefas, eventuais]);
+  const pesadoDele = selecionado ? pesado.get(selecionado.funcionario.id) : undefined;
+  const pesadoMin = (pesadoDele?.rotaMin ?? 0) + (pesadoDele?.cargasMin ?? 0);
 
   return (
     <aside className="entra-3 resumo-lateral">
@@ -165,6 +169,8 @@ export default function OccupancySummary({
                     ]
                   : []),
                 ...(selecionado.soHoras ? [] : [["Ociosidade prevista", formatarDuracao(selecionado.resumo.ociosidade_prevista_min)]]),
+                // Tarefa pesada (cadastro) + carga em atividade adicional: o esforço que o tempo esconde.
+                ...(pesadoMin > 0 ? [["Serviço pesado", formatarDuracao(pesadoMin)]] : []),
                 ["Tarefas no dia", String(selecionado.resumo.total_tarefas)],
               ].map(([rotulo, valor]) => (
                 <div key={rotulo} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--linha)", paddingBottom: 4 }}>

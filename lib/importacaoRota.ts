@@ -251,12 +251,18 @@ export function analisarRota(linhas: LinhaPlanilha[]): Analise {
     const dur = fim - ini;
     const jaT = tarefas.get(kt);
     if (!jaT) {
+      // ⚠️ Só os três valores: ~60 tarefas entraram com texto da planilha ("limpeza sala",
+      // "Apoio adm") e o cálculo as tratava como rotina sem ninguém saber (19/11/2026).
+      const natureza = (l.tipo_servico ?? "").trim().toLowerCase();
+      const tipoServico = natureza === "pesada" || natureza === "desincrustante" ? natureza : "rotina";
+      if (natureza && natureza !== tipoServico)
+        avisos.push({ linha: n, campo: "Tipo de serviço", mensagem: `Tipo de serviço "${l.tipo_servico}" não é rotina, pesada nem desincrustante. Usei rotina.` });
       tarefas.set(kt, {
         nome_tarefa: l.tarefa,
         local: l.local,
         tempo_base_min: dur,
         categoria: l.categoria,
-        tipo_servico: l.tipo_servico || "rotina",
+        tipo_servico: tipoServico,
         frequencia: l.frequencia || "diaria",
         dias_semana: l.dias_semana,
         epis: l.epis.split(";").map(norm).filter(Boolean),

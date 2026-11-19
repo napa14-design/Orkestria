@@ -56,6 +56,18 @@ describe("importação de rota × dados do RH", () => {
     await expect(aplicarImportacao(SEDE, "2026-11-17", deNovo, "t@t.com")).rejects.toThrow(/já está em outro cadastro/);
   });
 
+  it("tipo de serviço: só rotina, pesada ou desincrustante; texto solto vira rotina com aviso (19/11/2026)", () => {
+    const a = analisarRota([
+      linha("Ana", { ...RH, tarefa: "T1", tipo_servico: "Pesada" }),
+      linha("Ana", { ...RH, tarefa: "T2", tipo_servico: "limpeza sala", inicio: "08:00", fim: "09:00" }),
+      linha("Ana", { ...RH, tarefa: "T3", inicio: "09:00", fim: "10:00" }),
+    ] as LinhaPlanilha[]);
+    expect(a.tarefas.map((t) => [t.nome_tarefa, t.tipo_servico])).toEqual([["T1", "pesada"], ["T2", "rotina"], ["T3", "rotina"]]);
+    expect(a.avisos.filter((x) => x.campo === "Tipo de serviço").map((x) => x.mensagem)).toEqual([
+      'Tipo de serviço "limpeza sala" não é rotina, pesada nem desincrustante. Usei rotina.',
+    ]);
+  });
+
   it("data de admissão: dd/mm/aaaa ou célula de data do Excel; texto que não é data vira erro de linha", () => {
     expect(dataDaPlanilha("5/3/2024")).toBe("2024-03-05");
     expect(dataDaPlanilha("2024-03-05")).toBe("2024-03-05");

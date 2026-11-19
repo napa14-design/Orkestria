@@ -17,6 +17,7 @@ import {
   eventuaisForaDasTarefas,
   CATEGORIA_APOIO_OUTRO_SETOR,
   deficitEstimado,
+  servicoPesadoPorPessoa,
   eventuaisNoApoio,
   ocupacaoPorPessoa,
   PARAMETROS_PADRAO,
@@ -27,7 +28,7 @@ import {
   semAusentes,
 } from "@/lib/calculations";
 import { ErroValidacao } from "@/services/erros";
-import type { Ausencia, Feriado, Funcionario, RotinaPlanejada, ServicoEventual, StatusRotina } from "@/types";
+import type { Ausencia, Feriado, Funcionario, RotinaPlanejada, ServicoEventual, StatusRotina, Tarefa } from "@/types";
 
 let sessao: SessaoUsuario | null = null;
 vi.mock("@/lib/session", () => ({
@@ -89,6 +90,27 @@ describe("eventuaisForaDasTarefas", () => {
     it("no Painel: o total segue a mesma regra, e o apoio entra inteiro", () => {
       const r = eventuaisNoApoio([bloco("09:00", "10:00", 60)], [adicional("09:00", "10:00")], [CATEGORIA_APOIO_OUTRO_SETOR]);
       expect(r).toEqual({ apoioMin: 60, foraDasTarefasMin: 60 });
+    });
+  });
+
+  describe("servicoPesadoPorPessoa (19/11/2026)", () => {
+    const tarefas = [{ id: "tp", tipo_servico: "pesada" as const }, { id: "td", tipo_servico: "desincrustante" as const }, { id: "tr", tipo_servico: "rotina" as const }];
+    it("soma a tarefa pesada da rota e a carga do adicional, sem dobrar o mesmo horário", () => {
+      const r = servicoPesadoPorPessoa({
+        rotinas: [
+          { ...bloco("07:00", "08:00", 60), tarefa_id: "tp" },
+          { ...bloco("08:00", "08:30", 30), tarefa_id: "td" },
+          { ...bloco("09:00", "10:00", 60), tarefa_id: "tr" }, // rotina: não conta
+          { ...bloco("10:00", "11:00", 60, "cancelada"), tarefa_id: "tp" }, // cancelada: não conta
+        ],
+        tarefas,
+        eventuais: [
+          evento("13:00", "15:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "cargas" }),
+          { ...evento("14:00", "16:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "cargas" }), id: "b" },
+          evento("16:00", "17:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "organizacao" }), // não é carga
+        ],
+      });
+      expect(r.get("f")).toEqual({ rotaMin: 90, cargasMin: 180 });
     });
   });
 
@@ -182,7 +204,7 @@ describe("no mostrador e no Painel", () => {
 
   const mostrador = (
     eventuais: ServicoEventual[],
-    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string } = {},
+    { rotinas = [bloco("07:00", "08:00", 60)], ausencias = [], feriados = [], data = DIA, tarefas = [] }: { rotinas?: RotinaPlanejada[]; ausencias?: Ausencia[]; feriados?: Feriado[]; data?: string; tarefas?: Tarefa[] } = {},
   ) =>
     renderToStaticMarkup(
       createElement(OccupancySummary, {
@@ -192,12 +214,21 @@ describe("no mostrador e no Painel", () => {
         ausencias,
         feriados,
         data,
-        tarefas: [],
+        tarefas,
         parametros: PARAMETROS_PADRAO,
         selecionadoId: "f",
         aoSelecionar: () => {},
       }),
     ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+  it("o painel mostra as horas de serviço pesado só quando há (19/11/2026)", () => {
+    expect(mostrador([])).not.toContain("Serviço pesado");
+    const html = mostrador([evento("13:00", "14:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "cargas" })], {
+      rotinas: [{ ...bloco("07:00", "08:00", 60), tarefa_id: "tp" }],
+      tarefas: [{ id: "tp", nome_tarefa: "Mover carteiras", tipo_servico: "pesada" } as Tarefa],
+    });
+    expect(html).toContain("Serviço pesado 2h");
+  });
 
   it("a lista do dia mostra a atividade adicional, o que a pessoa fez e as tarefas no mesmo horário (19/11/2026)", () => {
     const html = mostrador([evento("07:30", "09:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "cargas", descricao: "Desmontagem do evento" })], {

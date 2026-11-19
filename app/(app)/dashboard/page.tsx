@@ -10,6 +10,7 @@ import {
   classificarOcupacao,
   cobraDesvio,
   deficitEstimado,
+  servicoPesadoPorPessoa,
   desvioPercentual,
   ehAtividadeAdicional,
   eventuaisForaDasTarefas,
@@ -159,6 +160,14 @@ export default function PaginaDashboard() {
         cargasMin: minutosSemDobra(dela.filter((e) => e.exigencia === "cargas")),
       });
     }
+    // Serviço pesado: a natureza da tarefa (cadastro) + a carga dos adicionais (19/11/2026).
+    const pesado = servicoPesadoPorPessoa({
+      rotinas: validas.filter((r) => idsFuncs.has(r.funcionario_id)),
+      tarefas: tarefas ?? [],
+      eventuais: evs.filter((e) => idsFuncs.has(e.funcionario_id)),
+    });
+    const tarefasAtivas = (tarefas ?? []).filter((t) => t.ativo !== false && (!sedeFiltro || t.sede_id === sedeFiltro));
+    const tarefasPesadas = tarefasAtivas.filter((t) => t.tipo_servico === "pesada" || t.tipo_servico === "desincrustante").length;
     const diasRotina = new Set(validas.map((r) => r.data));
     const diasComRotina = diasRotina.size;
     // Só os dias que estão no denominador: um evento em dia sem rota não vira "8 de 7 dias".
@@ -261,6 +270,9 @@ export default function PaginaDashboard() {
       adicionalMin,
       classificadoMin,
       ocorrenciasAdicionais: adicionais.length,
+      pesado,
+      tarefasPesadas,
+      tarefasAtivas: tarefasAtivas.length,
     };
   }, [rotinas, eventuais, ausencias, feriados, execucoes, funcionarios, tarefas, sedeFiltro, params]);
 
@@ -368,6 +380,25 @@ export default function PaginaDashboard() {
       `Tipo informado em ${indicadores.adicionalMin ? Math.round((100 * indicadores.classificadoMin) / indicadores.adicionalMin) : 0}% das horas. ` +
       `A atividade adicional soma sempre na demanda; apoio pedagógico e capacitação só contam fora do horário de tarefa.`
     : undefined;
+
+  // O esforço físico que o tempo esconde: a tarefa pesada vira minutos (×1,5) dentro da
+  // ocupação; aqui ela aparece com nome (pedido da coordenação, 19/11/2026).
+  const barrasPesado: ItemBarra[] = [...indicadores.pesado]
+    .filter(([, p]) => p.rotaMin + p.cargasMin > 0)
+    .sort((a, b) => b[1].rotaMin + b[1].cargasMin - (a[1].rotaMin + a[1].cargasMin))
+    .map(([id, p]) => ({
+      rotulo: nomeFuncionario(id),
+      valor: p.rotaMin + p.cargasMin,
+      texto: [
+        formatarDuracao(p.rotaMin + p.cargasMin),
+        p.rotaMin ? `${formatarDuracao(p.rotaMin)} em tarefa pesada da rota` : "",
+        p.cargasMin ? `${formatarDuracao(p.cargasMin)} de carga em atividade adicional` : "",
+      ].filter(Boolean).join(" · "),
+      cor: "var(--vermelho)",
+    }));
+  const notaPesado =
+    `Tarefa pesada = marcada como pesada ou desincrustante no cadastro: ${indicadores.tarefasPesadas} de ${indicadores.tarefasAtivas} tarefas ativas. ` +
+    `Sem marcação conta como rotina — confira o catálogo em Tarefas. Carga = atividade adicional do tipo “movimentação de mobiliário e cargas”.`;
 
   const barrasDesvio: ItemBarra[] = indicadores.desvios.map(({ rotina, execucao, desvio }) => ({
     rotulo: `${nomeTarefa(rotina.tarefa_id)} · ${nomeFuncionario(rotina.funcionario_id)} (${rotina.data.slice(8)}/${rotina.data.slice(5, 7)})`,
@@ -542,6 +573,12 @@ export default function PaginaDashboard() {
               itens={barrasAdicional}
               vazio="Nenhuma atividade adicional registrada no período."
               nota={notaAdicional}
+            />
+            <ListaBarras
+              titulo="Serviço pesado por funcionário"
+              itens={barrasPesado}
+              vazio="Nenhuma hora em tarefa pesada nem em carga no período."
+              nota={notaPesado}
             />
             <ListaBarras titulo="Top 10 locais por tempo consumido" itens={barrasLocais} />
             <ListaBarras titulo="Tempo planejado por sede" itens={barrasSedes} />

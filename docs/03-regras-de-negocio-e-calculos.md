@@ -53,6 +53,10 @@ tempo_previsto_min         = base_da_regra × fator_intensidade_local × fator_t
                                    tarefas de tempo fixo/manual (café, recolhimento) NÃO recebem intensidade
                                fator_tipo_servico:      rotina 1,0 · pesada 1,5 · desincrustante 2,0 (na Tarefa)
                                  → incide em todas as regras (ex.: vidros desincrustantes num tempo fixo)
+                                 → também aparece à parte como **serviço pesado** (`servicoPesadoPorPessoa`):
+                                   horas de tarefa pesada/desincrustante da rota + carga em atividade adicional,
+                                   no Dashboard e no painel da agenda. Valor fora dos três = rotina; a importação
+                                   avisa e grava rotina (19/11/2026).
 blocos                     = teto(tempo_previsto_min / bloco_agenda_min)
 tempo_visual_min           = blocos × bloco_agenda_min
 tempo_planejado_min        = Σ tempo_previsto_min das rotinas do dia (exceto canceladas)

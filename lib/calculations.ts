@@ -271,6 +271,29 @@ export function ehAtividadeAdicional(e: Pick<ServicoEventual, "categoria_id">): 
  * de uma pessoa apagar o excesso de outra. `semAdicional` é a mesma conta sem a atividade
  * adicional: o que se atribui a ela é só a diferença. Em folga ou feriado SEM rota a jornada é 0.
  */
+/**
+ * Serviço pesado por pessoa (pedido da coordenação, 19/11/2026: "o tempo não mostra a
+ * sobrecarga física"). Sem campo novo: a natureza da tarefa já está no cadastro
+ * (`tipo_servico`), e só virava minutos (×1,5, ×2) dentro da ocupação. Aqui ela aparece:
+ *  - `rotaMin`: tarefas da rota marcadas como pesada ou desincrustante, que ocupam horário;
+ *  - `cargasMin`: atividade adicional de "movimentação de mobiliário e cargas", sem contar
+ *    o mesmo horário duas vezes (a regra de `eventuaisForaDasTarefas` sem blocos).
+ * Os dois somam: o adicional é trabalho além da rota (Consulta 6).
+ */
+export function servicoPesadoPorPessoa(args: {
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "tarefa_id" | "status" | "tempo_previsto_min">[];
+  tarefas: Pick<Tarefa, "id" | "tipo_servico">[];
+  eventuais: (EventualNaConta & Pick<ServicoEventual, "categoria_id" | "exigencia">)[];
+}): Map<string, { rotaMin: number; cargasMin: number }> {
+  const pesada = new Set(args.tarefas.filter((t) => t.tipo_servico === "pesada" || t.tipo_servico === "desincrustante").map((t) => t.id));
+  const res = new Map<string, { rotaMin: number; cargasMin: number }>();
+  const de = (id: string) => res.get(id) ?? res.set(id, { rotaMin: 0, cargasMin: 0 }).get(id)!;
+  for (const r of args.rotinas) if (ocupaHorario(r) && pesada.has(r.tarefa_id)) de(r.funcionario_id).rotaMin += r.tempo_previsto_min || 0;
+  const cargas = args.eventuais.filter((e) => ehAtividadeAdicional(e) && e.exigencia === "cargas");
+  for (const e of eventuaisForaDasTarefas([], cargas)) de(e.funcionario_id).cargasMin += e.tempo_previsto_min;
+  return res;
+}
+
 export function deficitEstimado(args: {
   funcionarios: Funcionario[];
   rotinas: Pick<RotinaPlanejada, "funcionario_id" | "data" | "status" | "inicio_planejado" | "fim_planejado" | "tempo_previsto_min">[];

@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-11-19 — Serviço pesado por pessoa, e a natureza da tarefa limpa
+
+Pedido da coordenação: "o tempo não mostra a sobrecarga física". O cadastro já tinha a natureza
+do esforço (`tipo_servico`: rotina, pesada, desincrustante), mas ela só virava minutos (×1,5, ×2)
+dentro da ocupação.
+
+- **Serviço pesado** (`servicoPesadoPorPessoa`), por pessoa: horas de tarefa pesada ou desincrustante
+  da rota + horas de carga em atividade adicional (tipo "movimentação de mobiliário e cargas", sem
+  dobrar o mesmo horário). Nenhum campo novo.
+  - No Dashboard: lista "Serviço pesado por funcionário", com nota de quantas tarefas da sede estão
+    marcadas como pesadas (na UniBenfica eram 12 de 81; o resto conta como rotina).
+  - No painel da agenda: linha "Serviço pesado" quando há.
+- **Limpeza da natureza:** 60 tarefas tinham texto da planilha no lugar da natureza ("limpeza sala",
+  "Apoio adm", "Limpeza wc"…). O cálculo já as tratava como rotina, então foram gravadas como
+  rotina e nenhum tempo mudou. A importação de rota agora só aceita os três valores; outro texto
+  vira rotina, com aviso na linha.
+
+Arquivos: `lib/calculations.ts`, `app/(app)/dashboard/page.tsx`, `components/agenda/OccupancySummary.tsx`,
+`lib/importacaoRota.ts`, `docs/03`, testes (`eventuais-ocupacao`, `importacao-rh`).
+
+---
+
 ## 2026-11-19 — A atividade adicional aparece na agenda, junto da rota
 
 Pedido da coordenação: o painel da agenda mostrava 110% de ocupação, mas não dizia de onde vinha.
