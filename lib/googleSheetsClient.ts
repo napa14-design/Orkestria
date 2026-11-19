@@ -131,6 +131,24 @@ export class GoogleSheetsDataSource implements DataSource {
   }
 
   /** **Não é atômico**, pelo mesmo motivo de `gravarLote`: a condição só reduz a janela. */
+  async excluirSe<K extends NomeTabela>(
+    tabela: K,
+    ids: string[],
+    condicao: (atual: MapaTabelas[K]) => boolean,
+  ): Promise<string[]> {
+    const excluidos: string[] = [];
+    for (const id of ids) {
+      this.cache.delete(tabela);
+      const atual = await this.obter(tabela, id);
+      if (atual && condicao(atual)) {
+        await this.excluir(tabela, id);
+        excluidos.push(id);
+      }
+    }
+    return excluidos;
+  }
+
+  /** **Não é atômico**, pelo mesmo motivo de `gravarLote`: a condição só reduz a janela. */
   async atualizarSe<K extends NomeTabela>(
     tabela: K,
     id: string,

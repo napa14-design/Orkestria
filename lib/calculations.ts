@@ -150,7 +150,7 @@ export function horaValida(hora: unknown): hora is string {
 }
 
 /** Com início e fim válidos, vale o horário; o tempo digitado é só para quando não há. */
-function janelaDoEventual(e: Pick<ServicoEventual, "inicio" | "fim">): [number, number] | null {
+export function janelaDoEventual(e: Pick<ServicoEventual, "inicio" | "fim">): [number, number] | null {
   if (!horaValida(e.inicio) || !horaValida(e.fim)) return null;
   const ini = hhmmParaMin(e.inicio);
   const fim = hhmmParaMin(e.fim);
@@ -811,8 +811,15 @@ export interface OcupacaoDaPessoa<F> {
   /** Dias distintos com bloco não cancelado. */
   dias: number;
   planejado: number;
+  /** Jornada líquida do dia padrão (só informativo). */
   jornada: number;
-  /** planejado ÷ (jornada × dias), em %. 0 sem dia planejado ou sem jornada. */
+  /**
+   * Soma da jornada líquida de CADA dia contado — o sábado com horário próprio entra com o
+   * dele. Era `jornada × dias`, e 1 sábado de 4 h valia como 8 h (Consulta 7, 18/11/2026:
+   * 68 pessoas com ocupação subestimada em 30 dias, 5 mudando de classificação).
+   */
+  capacidade: number;
+  /** planejado ÷ capacidade, em %. 0 sem dia planejado ou sem jornada. */
   ocupacao: number;
 }
 
@@ -848,9 +855,27 @@ export function ocupacaoPorPessoa<F extends Parameters<typeof jornadaLiquidaMin>
     const dias = acc?.dias.size ?? 0;
     const planejado = acc?.planejado ?? 0;
     const jornada = jornadaLiquidaMin(funcionario);
-    const ocupacao = dias > 0 && jornada > 0 ? (planejado / (jornada * dias)) * 100 : 0;
-    return { funcionario, dias, planejado, jornada, ocupacao };
+    const capacidade = [...(acc?.dias ?? [])].reduce(
+      (s, d) => s + jornadaLiquidaMin(funcionarioNoDia(funcionario as unknown as Funcionario, d)),
+      0,
+    );
+    const ocupacao = dias > 0 && capacidade > 0 ? (planejado / capacidade) * 100 : 0;
+    return { funcionario, dias, planejado, jornada, capacidade, ocupacao };
   });
+}
+
+/**
+ * Quem entra na conta de um período: quem está ativo hoje, ou quem teve tarefa nele. Filtrar
+ * só pelo `ativo` de hoje fazia quem saiu sumir dos meses em que trabalhou, e a ocupação
+ * passada mudava a cada desligamento (Consulta 7, 18/11/2026). Quem saiu e não tinha tarefa
+ * no período continua fora.
+ */
+export function pessoasDoPeriodo<F extends { id: string; ativo?: boolean }>(
+  funcionarios: F[],
+  rotinas: Pick<RotinaPlanejada, "funcionario_id" | "status">[],
+): F[] {
+  const comTarefa = new Set(rotinas.filter(ocupaHorario).map((r) => r.funcionario_id));
+  return funcionarios.filter((f) => f.ativo || comTarefa.has(f.id));
 }
 
 /**
@@ -863,7 +888,7 @@ export function resumoDeOcupacao<F>(pessoas: OcupacaoDaPessoa<F>[], p: Parametro
   return {
     pessoasPlanejadas: com.length,
     ocupacaoMedia: com.length ? com.reduce((s, x) => s + x.ocupacao, 0) / com.length : null,
-    ociosidadeMin: com.reduce((s, x) => s + Math.max(0, x.jornada * x.dias - x.planejado), 0),
+    ociosidadeMin: com.reduce((s, x) => s + Math.max(0, x.capacidade - x.planejado), 0),
     emSobrecarga: com.filter((x) => classificarOcupacao(x.ocupacao, p) === "sobrecarga").length,
     subutilizados: com.filter((x) => classificarOcupacao(x.ocupacao, p) === "subutilizado").length,
   };

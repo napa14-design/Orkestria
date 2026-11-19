@@ -14,6 +14,7 @@ import {
   classificarOcupacao,
   eventuaisForaDasTarefas,
   ocupacaoPorPessoa,
+  pessoasDoPeriodo,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
   semAusentes,
@@ -96,7 +97,8 @@ export default function PaginaPanorama() {
   const porSede = useMemo<MetricaSede[]>(() => {
     const rs = (rotinas ?? []).filter(ocupaHorario);
     const foraDasTarefas = eventuaisForaDasTarefas(rs, semAusentes(eventuais ?? [], ausencias ?? []));
-    const funcs = (funcionarios ?? []).filter((f) => f.ativo);
+    // Quem saiu entra nos períodos em que teve tarefa; a contagem de pessoas fica com os ativos.
+    const funcs = pessoasDoPeriodo(funcionarios ?? [], rs);
     return (sedes ?? [])
       .filter((s) => s.ativo)
       .map((s) => {
@@ -105,7 +107,7 @@ export default function PaginaPanorama() {
         const resumo = resumoDeOcupacao(ocupacaoPorPessoa(fs, [...rs, ...foraDasTarefas], feriados ?? []), p);
         return {
           sede: s,
-          funcs: fs.length,
+          funcs: fs.filter((f) => f.ativo).length,
           comPlan: resumo.pessoasPlanejadas,
           ocupMedia: resumo.ocupacaoMedia ?? 0,
           ociosidade: resumo.ociosidadeMin,

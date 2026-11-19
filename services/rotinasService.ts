@@ -1011,11 +1011,17 @@ export async function limparDia(
     detalhes.push(`${preservadas} bloco(s) mantido(s) por já terem realizado registrado.`);
   if (manuais > 0) detalhes.push(`${manuais} bloco(s) montado(s) à mão foram preservados.`);
 
-  await ds.gravarLote(
-    alvo.map((r) => ({ tipo: "excluir" as const, tabela: "rotinas_planejadas" as const, id: r.id })),
-  );
+  // ⚠️ Só sai o bloco que continua como foi lido. Excluir pela leitura acima apagava o
+  // bloco que alguém confirmou no meio do caminho e deixava a execução órfã (Consulta 7,
+  // 18/11/2026). Registrar o realizado sempre muda status e `atualizado_em` da rotina.
+  const lido = new Map(alvo.map((r) => [r.id, `${r.status}|${r.atualizado_em ?? ""}`]));
+  const removidos = await ds.excluirSe("rotinas_planejadas", alvo.map((r) => r.id), (a) => lido.get(a.id) === `${a.status}|${a.atualizado_em ?? ""}`);
+  if (removidos.length < alvo.length) {
+    preservadas += alvo.length - removidos.length;
+    detalhes.push(`${alvo.length - removidos.length} bloco(s) mudaram enquanto limpava e foram mantidos.`);
+  }
   void autor; // a autoria vai no histórico pelo decorator do DataSource
-  return { removidas: alvo.length, preservadas, manuais, detalhes };
+  return { removidas: removidos.length, preservadas, manuais, detalhes };
 }
 
 export interface ResultadoLimpezaPeriodo {

@@ -39,8 +39,9 @@ export async function resumoExecutivo(de: string, ate: string, agora = new Date(
   const ds = await getDataSource();
   // A versão no id invalida o que foi guardado antes de o formato mudar
   // (v2, 23/10/2026: apoio pedagógico no total e à parte; v3, 04/11/2026: serviço
-  // eventual na ocupação e no apoio). Mudou o corpo? Suba.
-  const idBanco = `v3_${de}_${ate}`;
+  // eventual na ocupação e no apoio; v4, 18/11/2026: jornada de cada dia — o sábado — e quem
+  // saiu depois do período). Mudou o corpo? Suba.
+  const idBanco = `v4_${de}_${ate}`;
   // Cache ilegível ou banco instável não derruba o resumo: segue para o cálculo.
   try {
     const noBanco = await ds.obter("cache_resumo", idBanco);

@@ -199,6 +199,19 @@ describe("no mostrador e no Painel", () => {
       }),
     ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
+  it("a lista do dia mostra a atividade adicional, o que a pessoa fez e as tarefas no mesmo horário (19/11/2026)", () => {
+    const html = mostrador([evento("07:30", "09:00", 0, { categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "cargas", descricao: "Desmontagem do evento" })], {
+      rotinas: [bloco("07:00", "08:00", 60), bloco("10:00", "11:00", 60)],
+    });
+    expect(html).toContain("07:30–09:00 + Atividade adicional");
+    expect(html).toContain("Movimentação de mobiliário e cargas — Desmontagem do evento");
+    // A das 07:00 cai no horário da atividade; a das 10:00, não.
+    expect(html).toMatch(/07:00 Tarefa · ao mesmo tempo/u);
+    expect(html).not.toMatch(/10:00 Tarefa · ao mesmo tempo/u);
+    // Pedagógico não marca "ao mesmo tempo": a regra dele é outra.
+    expect(mostrador([evento("07:30", "09:00", 0)])).not.toContain("ao mesmo tempo");
+  });
+
   it("o mostrador da Rotina sobe com o eventual e explica por quê", () => {
     const sem = mostrador([]);
     expect(sem).toContain("11.1%");

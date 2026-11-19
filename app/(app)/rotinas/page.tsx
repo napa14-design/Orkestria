@@ -1138,6 +1138,7 @@ export default function PaginaRotinas() {
               aoTerminarArrasto={() => setBlocosArrasto(null)}
               alturaBloco={Math.round(blocoMin * (denso ? 1.4 : 2.4))}
               somenteLeitura={somenteLeitura}
+              eventuais={eventuais ?? []}
             />
 
             <OccupancySummary

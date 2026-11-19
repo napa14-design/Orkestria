@@ -95,6 +95,27 @@ export class FirebaseDataSource implements DataSource {
     await this.db.collection(tabela).doc(id).delete();
   }
 
+  async excluirSe<K extends NomeTabela>(
+    tabela: K,
+    ids: string[],
+    condicao: (atual: MapaTabelas[K]) => boolean,
+  ): Promise<string[]> {
+    const excluidos: string[] = [];
+    for (let i = 0; i < ids.length; i += 400) {
+      const refs = ids.slice(i, i + 400).map((id) => this.db.collection(tabela).doc(id));
+      if (!refs.length) continue;
+      excluidos.push(
+        ...(await this.db.runTransaction(async (tx) => {
+          const docs = await tx.getAll(...refs);
+          const sai = docs.filter((d) => d.exists && condicao(d.data() as MapaTabelas[K]));
+          for (const d of sai) tx.delete(d.ref);
+          return sai.map((d) => d.id);
+        })),
+      );
+    }
+    return excluidos;
+  }
+
   /**
    * `WriteBatch`: o Firestore aplica tudo ou nada. Dois detalhes que importam:
    *

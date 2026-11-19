@@ -41,7 +41,7 @@
  * `lib/datasource.ts`.
  */
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { DataSource } from "@/lib/datasource";
+import { ehIdRepetido, type DataSource } from "@/lib/datasource";
 import { MemoryDataSource } from "@/lib/memoryStore";
 import type { EventoQuadro, Feriado, Sede } from "@/types";
 
@@ -199,6 +199,34 @@ function contrato(nome: string, montar: () => Promise<DataSource>) {
     it("atualizarSe em registro inexistente falha como atualizar, sem criar", async () => {
       await expect(ds.atualizarSe("sedes", `${P}cond-sem`, () => true, { nome_sede: "X" })).rejects.toThrow();
       expect(await ds.obter("sedes", `${P}cond-sem`)).toBeNull();
+    });
+
+    it("excluirSe exclui só o que existe e casa a condição, e devolve os ids excluídos", async () => {
+      await criarSede(sede("ex-sai", { codigo: "AAA" }));
+      await criarSede(sede("ex-fica", { codigo: "BBB" }));
+      const r = await ds.excluirSe("sedes", [`${P}ex-sai`, `${P}ex-fica`, `${P}ex-nao-existe`], (a) => a.codigo === "AAA");
+      expect(r).toEqual([`${P}ex-sai`]);
+      expect(await ds.obter("sedes", `${P}ex-sai`)).toBeNull();
+      expect((await ds.obter("sedes", `${P}ex-fica`))?.codigo).toBe("BBB");
+    });
+
+    it("criar com exigirNovo em id existente falha com um erro que ehIdRepetido reconhece", async () => {
+      // O fechamento, o registro do realizado, a geração e o limite de login decidem por ele se
+      // é corrida (relê) ou banco fora (erro). No Firestore é o ALREADY_EXISTS real.
+      await criarSede(sede("repetido", { codigo: "AAA" }));
+      const erro = await ds
+        .gravarLote([{ tipo: "criar", tabela: "sedes", registro: sede("repetido", { codigo: "BBB" }), exigirNovo: true }])
+        .then(() => null, (e: unknown) => e);
+      expect(erro).not.toBeNull();
+      expect(ehIdRepetido(erro)).toBe(true);
+      expect((await ds.obter("sedes", `${P}repetido`))?.codigo).toBe("AAA");
+    });
+
+    it("excluirSe vê o que está gravado, não o que se leu antes", async () => {
+      await criarSede(sede("ex-mudou", { codigo: "AAA" }));
+      await ds.atualizar("sedes", `${P}ex-mudou`, { codigo: "BBB" });
+      expect(await ds.excluirSe("sedes", [`${P}ex-mudou`], (a) => a.codigo === "AAA")).toEqual([]);
+      expect(await ds.obter("sedes", `${P}ex-mudou`)).not.toBeNull();
     });
 
     it("atualizar com undefined PRESERVA o valor — incidente de 20/08", async () => {

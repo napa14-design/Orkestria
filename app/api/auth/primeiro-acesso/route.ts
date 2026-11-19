@@ -3,6 +3,7 @@ import { sessaoDoCadastro } from "@/lib/permissions";
 import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao } from "@/lib/session";
 import { ErroConflito } from "@/services/erros";
+import { liberarTentativas, reservarTentativa, respostaDeEspera } from "@/services/limiteLoginService";
 import {
   codigoConfere,
   definirSenhaUsuario,
@@ -23,22 +24,29 @@ import {
  */
 export async function POST(req: Request) {
   const { email, senha_atual, nova_senha } = (await req.json()) as {
-    email?: string;
-    senha_atual?: string;
-    nova_senha?: string;
+    email?: unknown;
+    senha_atual?: unknown;
+    nova_senha?: unknown;
   };
-  if (!email || !senha_atual || !nova_senha) {
+  if (typeof email !== "string" || typeof senha_atual !== "string" || typeof nova_senha !== "string" || !email.trim() || !senha_atual || !nova_senha) {
     return NextResponse.json(
       { erro: "Informe o e-mail, o código de primeiro acesso e a nova senha." },
       { status: 400 },
     );
   }
 
+  // Senha fraca antes do limite: não gasta tentativa e não diz nada sobre a conta.
+  const problema = problemaNaSenha(nova_senha, senha_atual);
+  if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
+
+  // O mesmo contador do login: o código de primeiro acesso também é credencial.
   let usuario;
   try {
+    const reserva = await reservarTentativa(email);
+    if (!reserva.liberado) return respostaDeEspera(reserva.ate);
     usuario = await getUsuarioPorEmail(email);
   } catch (e) {
-    console.error("Primeiro acesso: falha ao consultar o cadastro de usuários:", e);
+    console.error("Primeiro acesso: falha ao consultar o cadastro de usuários:", e instanceof Error ? e.name : "");
     return NextResponse.json(
       {
         erro: "Não foi possível acessar o cadastro de usuários agora (falha de conexão com o banco). Tente de novo em instantes.",
@@ -50,7 +58,7 @@ export async function POST(req: Request) {
   // Mensagem única para e-mail inexistente, código errado, código vencido e
   // conta que já tem senha: qualquer diferença entre elas contaria a estranhos
   // quais e-mails existem e quais contas estão abertas para primeiro acesso.
-  if (!usuario || !codigoConfere(usuario, senha_atual)) {
+  if (!codigoConfere(usuario, senha_atual) || !usuario) {
     return NextResponse.json(
       {
         erro: "Não foi possível concluir o primeiro acesso. Confira o código recebido — se ele venceu, peça um novo a quem cuidou do seu cadastro.",
@@ -59,8 +67,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const problema = problemaNaSenha(nova_senha, senha_atual);
-  if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
   const sessao = sessaoDoCadastro(usuario);
   if (!sessao) {
     return NextResponse.json({ erro: "Seu perfil de acesso está inválido. Avise o administrador." }, { status: 403 });
@@ -77,6 +83,7 @@ export async function POST(req: Request) {
     if (e instanceof ErroConflito) return NextResponse.json({ erro: e.message }, { status: 409 });
     throw e;
   }
+  await liberarTentativas(email);
   await gravarSessao(sessao, { sv });
   return NextResponse.json({ nome: usuario.nome, perfil: usuario.perfil });
 }

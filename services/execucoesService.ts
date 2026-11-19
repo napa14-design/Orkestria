@@ -6,7 +6,7 @@
  */
 import { cedidasNaCobertura, cobraDesvio, criticaNoDia, exigeJustificativa, ocupaHorario } from "@/lib/calculations";
 import { lerRemanejo } from "@/lib/remanejoAuto";
-import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
+import { agoraISO, ehIdRepetido, getDataSource } from "@/lib/datasource";
 import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, somarDias } from "@/lib/dateUtils";
 import type { ExecucaoRealizada, Perfil, RotinaPlanejada, StatusRealizado, StatusRotina } from "@/types";
 import { noQuadro } from "@/lib/desligamento";
@@ -169,6 +169,9 @@ export async function confirmarDiaComoPlanejado(
     aConfirmar.push({ rotina, epis });
   }
 
+  // Registrado por outra pessoa no meio do fechamento: conta como já registrado e fica como
+  // ela gravou — o fechamento só inclui, nunca edita (Consulta 7, 18/11/2026).
+  let registradasNoMeio = 0;
   await emLotes(aConfirmar, ({ rotina, epis }) =>
     registrarExecucao(
       {
@@ -188,10 +191,14 @@ export async function confirmarDiaComoPlanejado(
       },
       // Sem atalho quando há EPI: aí a declaração é de verdade, e o servidor
       // deve tratá-la como o formulário completo.
-      { perfil, confirmacaoRapida: epis.length === 0 },
-    ),
+      { perfil, confirmacaoRapida: epis.length === 0, soSeNovo: true },
+    ).catch((e) => {
+      if (!ehJaRegistrada(e)) throw e;
+      registradasNoMeio++;
+    }),
   );
-  res.confirmadas = aConfirmar.length;
+  res.confirmadas = aConfirmar.length - registradasNoMeio;
+  res.ja_registradas += registradasNoMeio;
   res.epis_declarados = [...declarados].sort();
   return res;
 }
@@ -223,7 +230,16 @@ export async function registrarExecucao(
    * dentro, e não em cada rota. Quando era opcional, a rota do "✓ Conforme"
    * esqueceu de passar e o supervisor desfazia o cancelamento do coordenador.
    */
-  opcoes: { perfil: Perfil; confirmacaoRapida?: boolean },
+  opcoes: {
+    perfil: Perfil;
+    confirmacaoRapida?: boolean;
+    /**
+     * Só registra se o bloco ainda não tem execução; se tiver, recusa com `JA_REGISTRADA` em
+     * vez de editar. É o caso do fechamento e do "Conforme": eles confirmam o que ninguém
+     * registrou e não podem trocar por "conforme" um desvio gravado no meio do caminho.
+     */
+    soSeNovo?: boolean;
+  },
 ): Promise<ExecucaoRealizada> {
   const ds = await getDataSource();
   const rotina = await ds.obter("rotinas_planejadas", dados.rotina_id);
@@ -343,6 +359,7 @@ export async function registrarExecucao(
     { campo: "rotina_id", op: "==" as const, valor: registro.rotina_id },
   ]);
   const existente = doRotina.find((e) => e.data_execucao === registro.data_execucao);
+  if (existente && opcoes.soSeNovo) throw erroJaRegistrada();
   // O supervisor corrige o que ELE lançou, não o de outra pessoa: um "não
   // realizada — funcionária ausente" do coordenador virava "feita" por cima, e a
   // justificativa sumia (decisão do dono, 19/10/2026).
@@ -382,26 +399,54 @@ export async function registrarExecucao(
       ]);
   }
 
-  let execucao: ExecucaoRealizada;
-  if (existente) {
-    execucao = await ds.atualizar("execucoes_realizadas", existente.id, {
-      ...registro,
-      atualizado_em: agora,
-    });
-  } else {
+  // ⚠️ Execução e status da rotina num lote só: em duas escritas, uma falha deixava a
+  // execução gravada com a rotina no status antigo, e o fechamento seguinte pulava o bloco
+  // sem consertar. A execução nova nasce com id fixo do bloco e `exigirNovo`: duas criações
+  // simultâneas (fechamento × desvio, dois cliques) não viram dois registros — a segunda
+  // falha e cai no caminho de edição, ou é recusada com `soSeNovo` (Consulta 7, 18/11/2026).
+  // As antigas seguem com o UUID: a busca acima é por `rotina_id`, não pelo id.
+  const gravar = async (alvo: ExecucaoRealizada | undefined): Promise<ExecucaoRealizada> => {
     // id depois do spread: o do corpo não sobrescreve outro registro (revisão, 14/10/2026).
-    execucao = { ...registro, id: novoId(), criado_em: agora, atualizado_em: agora };
-    await ds.criar("execucoes_realizadas", execucao);
+    const execucao: ExecucaoRealizada = alvo
+      ? { ...alvo, ...registro, atualizado_em: agora }
+      : { ...registro, id: idDaExecucao(rotina.id), criado_em: agora, atualizado_em: agora };
+    await ds.gravarLote([
+      alvo
+        ? { tipo: "atualizar", tabela: "execucoes_realizadas", id: alvo.id, mudancas: { ...registro, atualizado_em: agora } }
+        : { tipo: "criar", tabela: "execucoes_realizadas", registro: execucao, exigirNovo: true },
+      { tipo: "atualizar", tabela: "rotinas_planejadas", id: rotina.id, mudancas: { status: novoStatus, atualizado_em: agora } },
+    ]);
+    return execucao;
+  };
+  try {
+    return await gravar(existente);
+  } catch (erro) {
+    if (existente || !ehIdRepetido(erro)) throw erro;
+    // Outro pedido criou a execução deste bloco entre a busca e a gravação.
+    if (opcoes.soSeNovo) throw erroJaRegistrada();
+    const outro = await ds.obter("execucoes_realizadas", idDaExecucao(rotina.id));
+    if (!outro) throw erro;
+    if (restrito && outro.supervisor_id !== registro.supervisor_id)
+      throw new ErroPermissao("Este registro foi feito por outra pessoa — só o coordenador altera.");
+    return gravar(outro);
   }
-
-  // Sincroniza o status da rotina planejada.
-  await ds.atualizar("rotinas_planejadas", rotina.id, {
-    status: novoStatus,
-    atualizado_em: agora,
-  });
-
-  return execucao;
 }
+
+/** Uma execução por bloco: o id nasce do bloco (as anteriores a 18/11/2026 têm UUID). */
+export function idDaExecucao(rotinaId: string): string {
+  return `ex_${rotinaId}`;
+}
+
+function erroJaRegistrada(): ErroValidacao {
+  return new ErroValidacao([
+    { nivel: "erro", codigo: "JA_REGISTRADA", mensagem: "Esta tarefa acabou de ser registrada (em outra aba ou por outra pessoa). Atualize a tela." },
+  ]);
+}
+
+export function ehJaRegistrada(e: unknown): boolean {
+  return e instanceof ErroValidacao && e.alertas.some((a) => a.codigo === "JA_REGISTRADA");
+}
+
 
 /**
  * Desmarcar (27/10/2026): "quando marca feito não tem como voltar atrás, daí não

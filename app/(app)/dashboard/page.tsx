@@ -16,6 +16,7 @@ import {
   minutosDoEventual,
   eventuaisNoApoio,
   ocupacaoPorPessoa,
+  pessoasDoPeriodo,
   PARAMETROS_PADRAO,
   resumoDeOcupacao,
   ocupaHorario,
@@ -131,9 +132,8 @@ export default function PaginaDashboard() {
 
   const indicadores = useMemo(() => {
     const rs = rotinas ?? [];
-    const funcs = (funcionarios ?? []).filter(
-      (f) => f.ativo && (!sedeFiltro || f.sede_id === sedeFiltro),
-    );
+    // Quem saiu entra nos períodos em que teve tarefa; a contagem de ativos fica só com os de hoje.
+    const funcs = pessoasDoPeriodo(funcionarios ?? [], rs).filter((f) => !sedeFiltro || f.sede_id === sedeFiltro);
     const validas = rs.filter(ocupaHorario);
 
     // O serviço eventual conta, sem o que caiu em horário que já tinha tarefa — salvo a
@@ -253,7 +253,7 @@ export default function PaginaDashboard() {
       tempoPorLocal,
       tempoPorSede,
       porStatus,
-      funcsAtivos: funcs.length,
+      funcsAtivos: funcs.filter((f) => f.ativo).length,
       deficit,
       porPessoaAdicional,
       diasComRotina,

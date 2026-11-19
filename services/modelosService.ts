@@ -12,7 +12,7 @@ import {
   tempoPrevistoMin,
   tempoVisualMin,
 } from "@/lib/calculations";
-import { agoraISO, getDataSource, type OperacaoLote } from "@/lib/datasource";
+import { agoraISO, ehIdRepetido, getDataSource, type OperacaoLote } from "@/lib/datasource";
 import {
   diaDaSemana,
   formatarDataBR,
@@ -639,8 +639,18 @@ export async function gerarDiaDaRotaPadrao(
     };
   });
 
-  for (const r of aCriar) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: r });
-  await ds.gravarLote(escritas);
+  // `exigirNovo`: o id do bloco nasce da data e do item da rota, então uma geração atrasada
+  // (duas abas, clique duplo) gravava por cima do bloco que alguém já tinha mexido. Agora o
+  // lote inteiro recusa e quem gerou recarrega (Consulta 7, 18/11/2026).
+  for (const r of aCriar) escritas.push({ tipo: "criar", tabela: "rotinas_planejadas", registro: r, exigirNovo: true });
+  try {
+    await ds.gravarLote(escritas);
+  } catch (e) {
+    if (!ehIdRepetido(e)) throw e;
+    throw new ErroValidacao([
+      { nivel: "erro", codigo: "DIA_MUDOU", mensagem: "Este dia foi gerado ou alterado por outra pessoa enquanto você gerava. Atualize a tela: o que já estava lá ficou como está." },
+    ]);
+  }
   res.geradas = aCriar.length;
   // Diz o que nasceu no nome de quem falta: sem isto, a geração "deu certo" e
   // ninguém olhava a cobertura.

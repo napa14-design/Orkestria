@@ -129,6 +129,28 @@ export class HistoricoDataSource implements DataSource {
     await this.logar(tabela, id, "excluir", "");
   }
 
+  /** Os logs vão depois da transação, num lote só (como no `atualizarSe`): só do que saiu. */
+  async excluirSe<K extends NomeTabela>(
+    tabela: K,
+    ids: string[],
+    condicao: (atual: MapaTabelas[K]) => boolean,
+  ): Promise<string[]> {
+    if (TABELAS_SO_DE_INCLUSAO.has(tabela)) soInclusao(tabela, "excluir");
+    const excluidos = await this.interno.excluirSe(tabela, ids, condicao);
+    if (excluidos.length && !SEM_HISTORICO.has(tabela)) {
+      const agora = new Date().toISOString();
+      const usuario = usuarioAtual();
+      await this.interno.gravarLote(
+        excluidos.map((id) => ({
+          tipo: "criar" as const,
+          tabela: "historico" as const,
+          registro: { id: crypto.randomUUID(), tabela, registro_id: id, acao: "excluir", resumo: "", usuario, criado_em: agora } as MapaTabelas["historico"],
+        })),
+      );
+    }
+    return excluidos;
+  }
+
   /**
    * O ponto alto do decorator: os registros de auditoria entram **no mesmo
    * lote** que o dado. Antes, cada escrita gerava um log separado — se o log
@@ -142,17 +164,27 @@ export class HistoricoDataSource implements DataSource {
     // Só de inclusão, ANTES de gravar qualquer coisa do lote. O id repetido é conferido
     // aqui para todo banco (o Sheets não tem `create`); no Firestore e na memória o
     // próprio lote também recusa, fechando a corrida entre esta leitura e o commit.
+    // As leituras vão em paralelo: em sequência, gerar um dia de ~280 blocos com `exigirNovo`
+    // fazia ~280 idas e voltas ao banco, uma depois da outra (auditoria, 19/11/2026).
     const novosSoInclusao = new Set<string>();
+    const aConferir: { tabela: NomeTabela; id: string; soInclusaoAqui: boolean }[] = [];
     for (const op of operacoes) {
       const soInclusaoAqui = TABELAS_SO_DE_INCLUSAO.has(op.tabela);
       if (!soInclusaoAqui && !(op.tipo === "criar" && op.exigirNovo)) continue;
       if (op.tipo !== "criar") soInclusao(op.tabela, op.tipo);
       const id = (op.registro as { id: string }).id;
-      if (novosSoInclusao.has(`${op.tabela}/${id}`) || (await this.interno.obter(op.tabela, id))) {
+      if (novosSoInclusao.has(`${op.tabela}/${id}`)) {
         if (soInclusaoAqui) soInclusao(op.tabela, "regravar um registro que já existe");
         throw new Error(`Registro ${id} já existe em ${op.tabela}.`);
       }
       novosSoInclusao.add(`${op.tabela}/${id}`);
+      aConferir.push({ tabela: op.tabela, id, soInclusaoAqui });
+    }
+    const existentes = await Promise.all(aConferir.map((c) => this.interno.obter(c.tabela, c.id)));
+    const repetido = aConferir.find((_, i) => existentes[i]);
+    if (repetido) {
+      if (repetido.soInclusaoAqui) soInclusao(repetido.tabela, "regravar um registro que já existe");
+      throw new Error(`Registro ${repetido.id} já existe em ${repetido.tabela}.`);
     }
     const agora = new Date().toISOString();
     const usuario = usuarioAtual();

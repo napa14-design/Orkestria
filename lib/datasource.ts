@@ -75,6 +75,15 @@ export type OperacaoLote =
   | { tipo: "atualizar"; tabela: NomeTabela; id: string; mudancas: Partial<MapaTabelas[NomeTabela]> }
   | { tipo: "excluir"; tabela: NomeTabela; id: string };
 
+/**
+ * Id repetido numa criação com `exigirNovo`: a conferência do decorator e a da memória
+ * ("já existe em"), ou o ALREADY_EXISTS (código 6) do Firestore.
+ */
+export function ehIdRepetido(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /já existe em/.test(msg) || /ALREADY_EXISTS/.test(msg) || (e as { code?: unknown } | null)?.code === 6;
+}
+
 export interface DataSource {
   listar<K extends NomeTabela>(tabela: K): Promise<MapaTabelas[K][]>;
   /** Consulta filtrada no servidor (Firestore: where). Reduz leituras. */
@@ -110,6 +119,19 @@ export interface DataSource {
     mudancas: Partial<MapaTabelas[K]>,
   ): Promise<MapaTabelas[K] | null>;
   excluir(tabela: NomeTabela, id: string): Promise<void>;
+  /**
+   * Exclui, dos `ids`, só os que existem e em que `condicao` ainda vale para o que está
+   * gravado, lendo e excluindo como uma operação; devolve os ids excluídos. Existe para
+   * apagar com base numa leitura anterior sem passar por cima do que mudou no meio: o
+   * "Limpar o dia" lia "sem realizado" e excluía o bloco que alguém acabara de confirmar,
+   * deixando a execução órfã (revisão externa, Consulta 7, 18/11/2026).
+   * Firestore: transação por pedaço de até 400 ids. Sheets: não é atômico.
+   */
+  excluirSe<K extends NomeTabela>(
+    tabela: K,
+    ids: string[],
+    condicao: (atual: MapaTabelas[K]) => boolean,
+  ): Promise<string[]>;
   /**
    * Grava várias escritas como UMA operação.
    *

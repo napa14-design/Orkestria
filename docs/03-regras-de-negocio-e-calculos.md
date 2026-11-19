@@ -65,6 +65,12 @@ desvio_%                   = desvio_min / tempo_previsto_min × 100
 produtividade_m2_hora      = total_m2 / horas (planejada e realizada)
 ```
 
+**No período** (Dashboard, Panorama, semana da agenda, resumo do Chromos — `ocupacaoPorPessoa`):
+ocupação = Σ planejado ÷ Σ jornada líquida **de cada dia contado** (o sábado com horário próprio
+entra com o dele, não com a jornada padrão), e a ociosidade usa a mesma capacidade. Entra quem
+está ativo hoje **ou** teve tarefa no período (`pessoasDoPeriodo`): quem saiu continua nos meses
+em que trabalhou (18/11/2026, Consulta 7).
+
 ### Exemplo de bloco vs. tempo real
 
 Tarefa de 80 min com bloco de 15 min → `teto(80/15) = 6 blocos` → ocupa 90 min

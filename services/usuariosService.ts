@@ -166,10 +166,22 @@ export async function gravarConvite(id: string, versaoLida: number, convite: { c
  * Só vale para quem **ainda não tem senha**: depois de criada, o caminho de
  * recuperação é o administrador gerar um código novo.
  */
-export function codigoConfere(usuario: Usuario, codigo: string): boolean {
-  if (usuario.senha_hash) return false;
-  if (!conviteValido(usuario)) return false;
-  return verificarSenha(normalizarCodigo(codigo), usuario.convite_hash);
+export function codigoConfere(usuario: Usuario | null, codigo: string): boolean {
+  // ⚠️ Sempre UM scrypt, exista a conta ou não, com código válido ou vencido: sair cedo
+  // respondia ~50 ms mais rápido para e-mail inexistente, e o tempo dizia quais existem
+  // (revisão de segurança, 18/11/2026).
+  const valido = !!usuario && !usuario.senha_hash && conviteValido(usuario);
+  const ok = verificarSenha(normalizarCodigo(codigo), valido ? usuario!.convite_hash : HASH_FICTICIO);
+  return valido && ok;
+}
+
+/** Hash de um texto qualquer, só para gastar o mesmo tempo quando não há o que conferir. */
+const HASH_FICTICIO = hashSenha("orkestria-ficticio");
+
+/** Senha de quem já tem; código de primeiro acesso de quem não tem. Um scrypt em todo caso. */
+export function credencialConfere(usuario: Usuario | null, senha: string): boolean {
+  if (usuario?.senha_hash) return verificarSenha(senha, usuario.senha_hash);
+  return codigoConfere(usuario, senha);
 }
 
 export async function getUsuarioPorEmail(email: string): Promise<Usuario | null> {

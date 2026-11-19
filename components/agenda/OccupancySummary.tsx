@@ -2,14 +2,17 @@
 
 /** Lado direito da tela de rotina: resumo do funcionário e da equipe. */
 import { useMemo } from "react";
+import { rotuloDaExigencia } from "@/lib/atividadeAdicional";
 import {
   diaSemJornada,
+  ehAtividadeAdicional,
+  janelaDoEventual,
   minutosDoEventual,
   ocupacaoDoDiaPorPessoa,
   ocupaHorario,
   ROTULO_CLASSIFICACAO,
 } from "@/lib/calculations";
-import { formatarDuracao } from "@/lib/dateUtils";
+import { formatarDuracao, hhmmParaMin } from "@/lib/dateUtils";
 import type {
   Ausencia,
   ClassificacaoOcupacao,
@@ -171,28 +174,70 @@ export default function OccupancySummary({
               ))}
             </dl>
 
-            {/* tarefas do dia */}
-            <div style={{ marginTop: 12 }}>
-              <span className="rotulo">Tarefas do dia</span>
-              <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
-                {rotinas
-                  .filter((r) => r.funcionario_id === selecionado.funcionario.id)
-                  .sort((a, b) => a.inicio_planejado.localeCompare(b.inicio_planejado))
-                  .map((r) => (
-                    <div key={r.id} style={{ fontSize: 12, display: "flex", gap: 6 }}>
-                      <span className="num" style={{ color: "var(--tinta-2)", flexShrink: 0 }}>
-                        {r.inicio_planejado}
-                      </span>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {tarefaPorId.get(r.tarefa_id)?.nome_tarefa ?? "Tarefa"}
-                      </span>
-                    </div>
-                  ))}
-                {rotinas.filter((r) => r.funcionario_id === selecionado.funcionario.id).length === 0 && (
-                  <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Agenda vazia.</span>
-                )}
-              </div>
-            </div>
+            {/* tarefas do dia, com a atividade adicional no meio e as tarefas no mesmo horário
+                marcadas (pedido da coordenação, 19/11/2026: o 110% aparecia sem dizer de onde) */}
+            {(() => {
+              const id = selecionado.funcionario.id;
+              const evs = eventuais.filter((e) => e.funcionario_id === id);
+              const janelasAdicionais = evs.filter(ehAtividadeAdicional).map(janelaDoEventual).filter((j): j is [number, number] => !!j);
+              const itens = [
+                // "|0" antes de "|1": no mesmo horário, a atividade vem antes da tarefa que ela cobre.
+                ...rotinas.filter((r) => r.funcionario_id === id).map((r) => ({ hora: `${r.inicio_planejado}|1`, rotina: r, evento: null })),
+                ...evs.map((e) => ({ hora: janelaDoEventual(e) ? `${e.inicio}|0` : "99:99", rotina: null, evento: e })),
+              ].sort((a, b) => a.hora.localeCompare(b.hora));
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <span className="rotulo">Tarefas do dia</span>
+                  {/* minmax(0, 1fr): sem isto a coluna cresce até o texto e corta na borda do painel. */}
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 4, marginTop: 6 }}>
+                    {itens.map(({ rotina: r, evento: e }) => {
+                      if (e) {
+                        const adicional = ehAtividadeAdicional(e);
+                        const comHora = !!janelaDoEventual(e);
+                        return (
+                          <div key={`ev-${e.id}`} style={{ fontSize: 12, minWidth: 0, overflowWrap: "anywhere", borderLeft: `3px solid ${adicional ? "var(--acento)" : "var(--tinta-3)"}`, paddingLeft: 6 }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <span className="num" style={{ color: "var(--tinta-2)", flexShrink: 0 }}>
+                                {comHora ? `${e.inicio}–${e.fim}` : formatarDuracao(minutosDoEventual(e))}
+                              </span>
+                              <strong style={{ color: adicional ? "var(--acento)" : "var(--tinta)" }}>
+                                + {adicional ? "Atividade adicional" : "Serviço eventual"}
+                              </strong>
+                            </div>
+                            {(adicional && e.exigencia) || e.descricao ? (
+                              <div style={{ color: "var(--tinta-2)" }}>
+                                {adicional && e.exigencia ? rotuloDaExigencia(e.exigencia) : ""}
+                                {adicional && e.exigencia && e.descricao ? " — " : ""}
+                                {e.descricao}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      }
+                      const ini = hhmmParaMin(r!.inicio_planejado);
+                      const fim = hhmmParaMin(r!.fim_planejado);
+                      const junto = ocupaHorario(r!) && janelasAdicionais.some(([a, b]) => ini < b && fim > a);
+                      return (
+                        <div key={r!.id} style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "baseline" }}>
+                          <span className="num" style={{ color: "var(--tinta-2)", flexShrink: 0 }}>
+                            {r!.inicio_planejado}
+                          </span>
+                          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {tarefaPorId.get(r!.tarefa_id)?.nome_tarefa ?? "Tarefa"}
+                          </span>
+                          {junto && (
+                            <span style={{ color: "var(--acento)", fontSize: 10, flexShrink: 0 }} title="No mesmo horário da atividade adicional">
+                              · ao mesmo tempo
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {itens.length === 0 && <span style={{ fontSize: 12, color: "var(--tinta-3)" }}>Agenda vazia.</span>}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       ) : (

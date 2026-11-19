@@ -32,6 +32,7 @@ import {
   eventuaisForaDasTarefas,
   eventuaisNoApoio,
   ocupacaoPorPessoa,
+  pessoasDoPeriodo,
   percentualApoioOutroSetor,
   resumoDeOcupacao,
   semAusentes,
@@ -164,7 +165,8 @@ export function montarResumo(args: {
   const pedagogicas = args.tarefasPedagogicas ?? new Set<string>();
   const todoApoio = new Set([...(args.tarefasDeApoio ?? []), ...pedagogicas]);
   const { sedes, params, de, ate, agora } = args;
-  const ativos = args.funcionarios.filter((f) => f.ativo);
+  // Quem saiu entra nos períodos em que teve tarefa (Consulta 7, 18/11/2026).
+  const ativos = pessoasDoPeriodo(args.funcionarios, args.rotinas);
   const blocos = args.rotinas.filter((r) => r.status !== "cancelada");
   const eventuais = semAusentes(args.eventuais ?? [], args.ausencias ?? []);
   // Como no Painel: a atividade adicional (Apoio a outro setor) soma sempre (Consulta 6, 18/11/2026).

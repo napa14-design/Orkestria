@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessaoUsuario } from "@/lib/permissions";
-import { getDataSource } from "@/lib/datasource";
+import { getDataSource, type OperacaoLote } from "@/lib/datasource";
 import { hojeISO, somarDias } from "@/lib/dateUtils";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import type { RotinaPlanejada } from "@/types";
@@ -30,6 +30,22 @@ function diaUtilAnterior(diasAtras = 1): string {
   return d;
 }
 const PASSADO = diaUtilAnterior();
+
+/**
+ * Derruba a gravação do registro do realizado quando `cai(ops)` diz. Desde 18/11/2026 a
+ * execução e o status da rotina vão num lote só (Consulta 7): a falha se simula no lote.
+ */
+async function derrubarLote(cai: (ops: OperacaoLote[]) => boolean | Promise<boolean>) {
+  const ds = await getDataSource();
+  const original = ds.gravarLote.bind(ds);
+  return vi.spyOn(ds, "gravarLote").mockImplementation((async (ops: OperacaoLote[]) => {
+    if (await cai(ops)) throw new Error("rede caiu");
+    return original(ops);
+  }) as never);
+}
+/** A execução que o lote cria, se criar. */
+const execucaoDoLote = (ops: OperacaoLote[]) =>
+  ops.find((o) => o.tipo === "criar" && o.tabela === "execucoes_realizadas") as { registro: { rotina_id: string } } | undefined;
 const TITULAR = "christus_f1";
 const COLEGA = "christus_f2";
 
@@ -257,12 +273,8 @@ describe("POST /api/execucoes/feita-por", () => {
     const daColega = await bloco({ funcionario_id: COLEGA, tarefa_id: "christus_t3" });
     await ausente(TITULAR);
     let n = 0;
-    const original = ds.criar.bind(ds);
     // Deixa gravar a 1ª execução (a cedida) e derruba a 2ª (a da tarefa coberta).
-    const espiao = vi.spyOn(ds, "criar").mockImplementation((async (tabela: string, registro: never) => {
-      if (tabela === "execucoes_realizadas" && ++n === 2) throw new Error("rede caiu");
-      return original(tabela as never, registro);
-    }) as never);
+    const espiao = await derrubarLote((ops) => !!execucaoDoLote(ops) && ++n === 2);
     expect((await pedir({ rotina_id: r.id, funcionario_id: COLEGA })).status).toBe(500);
     espiao.mockRestore();
     await intacta(r, false); // houve escrita (a troca), mas foi desfeita
@@ -368,17 +380,16 @@ describe("POST /api/execucoes/feita-por", () => {
     expect((await ds.obter("rotinas_planejadas", r.id))?.funcionario_id).toBe(TITULAR);
   });
 
-  it("falha AO MUDAR O STATUS (o registro já gravou): o registro é apagado e a tarefa volta ao titular", async () => {
-    // A3 da auditoria: sobrava um "conforme" no nome de quem faltou.
+  it("falha no lote do registro da coberta (execução + status): nada fica e a tarefa volta ao titular", async () => {
+    // A3 da auditoria: sobrava um "conforme" no nome de quem faltou. Desde 18/11/2026 a
+    // execução e o status gravam juntos, então "o registro já gravou" não acontece mais.
     const ds = await getDataSource();
     await ausente(TITULAR);
     const r = await bloco();
     const daColega = await bloco({ funcionario_id: COLEGA, tarefa_id: "christus_t3" });
-    const original = ds.atualizar.bind(ds);
-    const espiao = vi.spyOn(ds, "atualizar").mockImplementation((async (tabela: string, id: string, dados: { status?: string }) => {
-      if (tabela === "rotinas_planejadas" && id === r.id && dados.status === "realizada") throw new Error("rede caiu");
-      return original(tabela as never, id, dados as never);
-    }) as never);
+    const espiao = await derrubarLote((ops) =>
+      ops.some((o) => o.tipo === "atualizar" && o.tabela === "rotinas_planejadas" && o.id === r.id && (o.mudancas as { status?: string }).status === "realizada"),
+    );
     expect((await pedir({ rotina_id: r.id, funcionario_id: COLEGA })).status).toBe(500);
     espiao.mockRestore();
     await intacta(r, false);
@@ -390,15 +401,12 @@ describe("POST /api/execucoes/feita-por", () => {
     const ds = await getDataSource();
     await ausente(TITULAR);
     const r = await bloco();
-    const original = ds.criar.bind(ds);
-    const espiao = vi.spyOn(ds, "criar").mockImplementation((async (tabela: string, registro: never) => {
-      if (tabela === "execucoes_realizadas") {
-        // Enquanto este pedido grava, um paralelo deixou a tarefa com outra pessoa.
-        await ds.atualizar("rotinas_planejadas", r.id, { funcionario_id: "christus_f3" });
-        throw new Error("rede caiu");
-      }
-      return original(tabela as never, registro);
-    }) as never);
+    const espiao = await derrubarLote(async (ops) => {
+      if (!execucaoDoLote(ops)) return false;
+      // Enquanto este pedido grava, um paralelo deixou a tarefa com outra pessoa.
+      await ds.atualizar("rotinas_planejadas", r.id, { funcionario_id: "christus_f3" });
+      return true;
+    });
     expect((await pedir({ rotina_id: r.id, funcionario_id: COLEGA })).status).toBe(500);
     espiao.mockRestore();
     expect((await ds.obter("rotinas_planejadas", r.id))?.funcionario_id).toBe("christus_f3");
@@ -409,19 +417,17 @@ describe("POST /api/execucoes/feita-por", () => {
     await ausente(TITULAR);
     const r = await bloco();
     await bloco({ funcionario_id: COLEGA, tarefa_id: "christus_t3", inicio_planejado: "08:05", fim_planejado: "08:15" });
-    const original = ds.criar.bind(ds);
-    const espiao = vi.spyOn(ds, "criar").mockImplementation((async (tabela: string, registro: never) => {
-      if (tabela === "execucoes_realizadas" && (registro as { rotina_id: string }).rotina_id !== r.id) {
-        // Enquanto este pedido remaneja a cedida, um paralelo registra a coberta.
-        await original("execucoes_realizadas", {
-          id: "ex-outro", rotina_id: r.id, sede_id: "christus_dt", data_execucao: PASSADO, status_realizado: "nao_realizada",
-          inicio_real: "", fim_real: "", tempo_real_min: 0, justificativa: "do outro pedido", epis_confirmados: "", observacao: "",
-          supervisor_id: "c1", criado_em: "", atualizado_em: "",
-        } as never);
-        throw new Error("rede caiu");
-      }
-      return original(tabela as never, registro);
-    }) as never);
+    const espiao = await derrubarLote(async (ops) => {
+      const ex = execucaoDoLote(ops);
+      if (!ex || ex.registro.rotina_id === r.id) return false;
+      // Enquanto este pedido remaneja a cedida, um paralelo registra a coberta.
+      await ds.criar("execucoes_realizadas", {
+        id: "ex-outro", rotina_id: r.id, sede_id: "christus_dt", data_execucao: PASSADO, status_realizado: "nao_realizada",
+        inicio_real: "", fim_real: "", tempo_real_min: 0, justificativa: "do outro pedido", epis_confirmados: "", observacao: "",
+        supervisor_id: "c1", criado_em: "", atualizado_em: "",
+      } as never);
+      return true;
+    });
     expect((await pedir({ rotina_id: r.id, funcionario_id: COLEGA })).status).toBe(500);
     espiao.mockRestore();
     expect((await registrosDe(r.id)).map((e) => e.justificativa)).toEqual(["do outro pedido"]);

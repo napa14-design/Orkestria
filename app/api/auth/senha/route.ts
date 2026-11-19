@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { comSessao, ok } from "@/lib/api";
 import { getDataSource } from "@/lib/datasource";
 import { sessaoDoCadastro, type SessaoUsuario } from "@/lib/permissions";
+import { problemaNaSenha } from "@/lib/senha";
 import { gravarSessao, limparSessao, type MetaSessao } from "@/lib/session";
+import { liberarTentativas, reservarTentativa, respostaDeEspera } from "@/services/limiteLoginService";
 import { trocarPropriaSenha } from "@/services/usuariosService";
 
 /**
@@ -35,7 +37,17 @@ export async function POST(req: Request) {
       await limparSessao();
       return NextResponse.json({ erro: "Sua sessão terminou. Entre de novo." }, { status: 401 });
     }
+    // Quem já tem senha confere a atual: com um cookie roubado, chutar a senha atual sem limite
+    // tornava a sessão temporária em posse da conta. Mesmo contador do login (18/11/2026).
+    // Senha nova fraca antes: não gasta tentativa.
+    const problema = problemaNaSenha(senha ?? "");
+    if (problema) return NextResponse.json({ erro: problema }, { status: 400 });
+    if (usuario!.senha_hash) {
+      const reserva = await reservarTentativa(usuario!.email);
+      if (!reserva.liberado) return respostaDeEspera(reserva.ate);
+    }
     const sv = await trocarPropriaSenha(sessao.id, senhaAtual ?? "", senha ?? "", meta.sv);
+    if (usuario!.senha_hash) await liberarTentativas(usuario!.email);
     await gravarSessao(nova, { sv, auth_em: meta.auth_em });
     return ok({ ok: true });
   });

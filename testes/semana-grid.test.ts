@@ -44,6 +44,14 @@ describe("visão semanal: totais", () => {
     expect(total).toContain("1 tarefas · 4h"); // terça: só Ana
   });
 
+  it("sábado com horário próprio: a célula divide pela jornada do sábado, igual à coluna (19/11/2026)", () => {
+    // SEG + 5 = sábado. Sábado 08:00–12:00 sem pausa = 240 min; 240 planejados = 100%.
+    const ana = { ...func("a", "Ana"), escala: "seg_sab", entrada_sabado: "08:00", saida_sabado: "12:00" } as Funcionario;
+    const [, linha] = linhas([ana], [bloco(DIAS[5], "a", 240)]);
+    expect(linha).toContain("100%");
+    expect(linha).not.toContain("50%"); // 240 ÷ 480 da jornada padrão
+  });
+
   it("o dia de quem está AUSENTE não entra em total nenhum", () => {
     const ausencia = { id: "x", funcionario_id: "a", sede_id: "dt", tipo: "falta", data_inicio: DIAS[1], data_fim: DIAS[1] } as Ausencia;
     const [, ana, total] = linhas([func("a", "Ana")], [bloco(DIAS[0], "a", 480), bloco(DIAS[1], "a", 480)], [ausencia]);

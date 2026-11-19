@@ -13,6 +13,7 @@ import {
   classificarOcupacao,
   diaSemJornada,
   eventuaisForaDasTarefas,
+  funcionarioNoDia,
   jornadaLiquidaMin,
   ocupacaoPercentual,
   ocupacaoPorPessoa,
@@ -240,7 +241,9 @@ export default function SemanaGrid({
                   const planejado = tempoPlanejadoMin(doDia) + eventualMin;
                   // Folga ou feriado só com eventual: há horas, mas nenhuma jornada para medir.
                   const soHoras = doDia.length === 0 && eventualMin > 0 && diaSemJornada(f, data, feriados);
-                  const ocupacao = ocupacaoPercentual(planejado, jornada);
+                  // A jornada DESTE dia: o sábado com horário próprio divide pela dele, como a
+                  // coluna da semana (`ocupacaoPorPessoa`) — senão a célula dava 44% e a coluna 100%.
+                  const ocupacao = ocupacaoPercentual(planejado, jornadaLiquidaMin(funcionarioNoDia(f, data)));
                   const classe = classificarOcupacao(ocupacao, parametros);
 
                   return (

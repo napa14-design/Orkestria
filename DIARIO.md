@@ -7,6 +7,70 @@
 
 ---
 
+## 2026-11-19 — A atividade adicional aparece na agenda, junto da rota
+
+Pedido da coordenação: o painel da agenda mostrava 110% de ocupação, mas não dizia de onde vinha.
+A atividade adicional não aparecia nem na lista do dia nem na grade.
+
+- **Na grade:** cada serviço eventual com horário vira uma faixa na borda direita da coluna da
+  pessoa, por cima da rota. A atividade adicional sai hachurada em vinho; os outros eventuais, em
+  cinza. Passando o mouse aparecem o tipo, a descrição e quantas tarefas da rota caem no mesmo
+  horário. O supervisor recebe os eventuais sem descrição nem categoria (LGPD), então para ele a
+  faixa diz só "serviço eventual".
+- **No painel "Tarefas do dia":** a atividade entra na lista pela hora, com o tipo e a descrição, e
+  cada tarefa no mesmo horário ganha "· ao mesmo tempo". A lista não corta mais o texto na borda
+  do painel (a coluna do grid crescia até o texto).
+- **Ressalvas da auditoria do bloco A, fechadas:**
+  - a célula do sábado na visão de semana dividia pela jornada padrão (44% contra 100% da coluna);
+  - testes do histórico do `excluirSe` e da rota do "Conforme";
+  - as conferências de `exigirNovo` no decorator correm em paralelo (gerar um dia fazia uma leitura
+    por bloco, uma depois da outra);
+  - mensagem do `JA_REGISTRADA` sem culpar "outra pessoa".
+  O "Repetir o dia" e as outras exclusões sem condição ficaram como tarefas à parte.
+
+Arquivos: `components/agenda/AgendaGrid.tsx`, `components/agenda/OccupancySummary.tsx`,
+`components/agenda/SemanaGrid.tsx`, `app/(app)/rotinas/page.tsx`, `lib/calculations.ts`
+(`janelaDoEventual` exportada), `lib/historico.ts`, `services/execucoesService.ts`, testes.
+
+---
+
+## 2026-11-18 — Corridas, sábado, quem saiu e limite de login (revisão geral, Consulta 7)
+
+Revisão externa do sistema inteiro (Consulta 7 com o Sol, no vault). Todas as afirmações
+verificáveis dela foram conferidas no código e na produção; isto é o "bloco A": consertos que não
+mudam o que a coordenação faz.
+
+- **Corridas que perdiam dado sem erro.**
+  - O fechamento do dia trocava por "conforme" um desvio gravado enquanto ele rodava. Agora o
+    fechamento e o "Conforme" de quem coordena só **incluem** (`soSeNovo`): o que alguém registrou
+    no meio fica como foi gravado e conta como "já registrado".
+  - A execução nova nasce com id fixo do bloco (`ex_<rotina>`, `exigirNovo`): duas gravações
+    simultâneas não viram dois registros. As antigas seguem com o UUID.
+  - Execução e status da rotina gravam num lote só: uma falha não os deixa divergentes.
+  - "Limpar o dia" só exclui o bloco que continua como foi lido (`DataSource.excluirSe`, transação
+    no Firestore). Um bloco confirmado no meio fica, com a execução.
+  - "Gerar o dia" atrasado (duas abas) não grava mais por cima de bloco já gerado e mexido: recusa
+    com "atualize a tela".
+- **Sábado na ocupação do período** (Dashboard, Panorama, semana, resumo do Chromos): a capacidade é
+  a soma da jornada de cada dia. Em 30 dias, 68 pessoas com sábado de horário próprio apareciam com
+  a ocupação subestimada (mediana 3,6 p.p.), e 5 mudavam de classificação. A ociosidade usa a mesma
+  conta; o cache do resumo subiu para v4.
+- **Quem saiu continua nos meses em que trabalhou** (`pessoasDoPeriodo`); a contagem de ativos não muda.
+- **Limite de tentativas de senha:** 5 por e-mail a cada 15 min, no login, no primeiro acesso e na
+  troca de senha. Também conta e-mail que não existe, e a resposta é a mesma. A tentativa é
+  reservada antes de conferir, e o sucesso zera só o contador de quem entrou. Toda conferência gasta
+  um scrypt, para o tempo de resposta não dizer quais e-mails existem. O login com o Google não
+  passa pelo limite. Casos de ataque escritos pela revisão de segurança antes do código.
+
+Arquivos: `lib/datasource.ts` (+`excluirSe`, `ehIdRepetido`), `lib/firebaseClient.ts`,
+`lib/memoryStore.ts`, `lib/googleSheetsClient.ts`, `lib/historico.ts`, `services/execucoesService.ts`,
+`services/rotinasService.ts`, `services/modelosService.ts`, `lib/calculations.ts`,
+`lib/resumoExecutivo.ts`, `services/resumoExecutivoService.ts`, Dashboard, Panorama,
+`lib/limiteLogin.ts`, `services/limiteLoginService.ts`, `services/usuariosService.ts`, rotas de
+`app/api/auth/`, `app/api/execucoes/conforme`, `docs/03`, testes (`corridas-realizado`, `login-limite`).
+
+---
+
 ## 2026-11-18 — Aviso único da atividade adicional
 
 A mudança de hoje muda o jeito de lançar e o que os números do Dashboard querem dizer, então

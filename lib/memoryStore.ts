@@ -330,6 +330,18 @@ export class MemoryDataSource implements DataSource {
     return lista[i];
   }
 
+  async excluirSe<K extends NomeTabela>(
+    tabela: K,
+    ids: string[],
+    condicao: (atual: MapaTabelas[K]) => boolean,
+  ): Promise<string[]> {
+    const alvo = new Set(ids);
+    const lista = banco()[tabela] as Array<MapaTabelas[K] & { id: string }>;
+    const sai = lista.filter((r) => alvo.has(r.id) && condicao(r)).map((r) => r.id);
+    for (const id of sai) lista.splice(lista.findIndex((r) => r.id === id), 1);
+    return sai;
+  }
+
   async excluir(tabela: NomeTabela, id: string): Promise<void> {
     const lista = banco()[tabela] as Array<{ id: string }>;
     const i = lista.findIndex((r) => r.id === id);

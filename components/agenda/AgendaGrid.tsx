@@ -5,11 +5,12 @@
  * horário. Aceita soltar tarefas novas (paleta) e mover cards existentes.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
+import { ehAtividadeAdicional, intervalosDoFuncionario, janelaDoEventual, jornadaLiquidaMin } from "@/lib/calculations";
+import { rotuloDaExigencia } from "@/lib/atividadeAdicional";
 import { formatarDuracao, hhmmParaMin, minParaHHMM } from "@/lib/dateUtils";
 import { agruparRuns, type Run } from "@/lib/agenda";
 import { horarioDoEncaixe, passoDoVazio } from "@/lib/encaixe";
-import type { Categoria, Funcionario, Local, RotinaPlanejada, StatusRotina, Tarefa } from "@/types";
+import type { Categoria, Funcionario, Local, RotinaPlanejada, ServicoEventual, StatusRotina, Tarefa } from "@/types";
 import CardRotina from "./CardRotina";
 import BalaoDetalhe from "./BalaoDetalhe";
 
@@ -56,6 +57,7 @@ export default function AgendaGrid({
   aoTerminarArrasto,
   alturaBloco = ALTURA_BLOCO_PADRAO,
   somenteLeitura = false,
+  eventuais = [],
 }: {
   funcionarios: Funcionario[];
   rotinas: RotinaPlanejada[];
@@ -85,6 +87,12 @@ export default function AgendaGrid({
    * remover; o balãozinho abre só para ler.
    */
   somenteLeitura?: boolean;
+  /**
+   * Os serviços eventuais do dia, com horário, viram uma faixa na borda direita da coluna,
+   * por cima da rota: mostra onde a atividade adicional se sobrepôs às tarefas (pedido da
+   * coordenação, 19/11/2026). O supervisor recebe sem descrição nem categoria (LGPD).
+   */
+  eventuais?: Pick<ServicoEventual, "id" | "funcionario_id" | "inicio" | "fim" | "descricao" | "categoria_id" | "exigencia">[];
 }) {
   // Altura efetiva do bloco — todas as contas internas usam este valor.
   const ALTURA_BLOCO = alturaBloco;
@@ -458,6 +466,44 @@ export default function AgendaGrid({
                     }}
                   />
                 ))}
+
+                {/* atividade adicional / serviço eventual: faixa na borda direita, por cima da rota */}
+                {eventuais
+                  .filter((e) => e.funcionario_id === f.id)
+                  .map((e) => {
+                    const janela = janelaDoEventual(e);
+                    if (!janela) return null;
+                    // Só a parte que cabe na grade (o resto continua no painel ao lado).
+                    const a = Math.max(janela[0], inicioGrade);
+                    const b = Math.min(janela[1], fimGrade);
+                    if (b <= a) return null;
+                    const adicional = ehAtividadeAdicional(e);
+                    const junto = runs.filter((r) => hhmmParaMin(r.inicio) < b && hhmmParaMin(r.fim) > a && r.status !== "cancelada" && r.status !== "remanejada").length;
+                    const titulo =
+                      `${adicional ? "Atividade adicional" : "Serviço eventual"} ${e.inicio}–${e.fim}` +
+                      (adicional && e.exigencia ? ` · ${rotuloDaExigencia(e.exigencia)}` : "") +
+                      (e.descricao ? ` — ${e.descricao}` : "") +
+                      (junto ? ` · no mesmo horário de ${junto} tarefa${junto > 1 ? "s" : ""} da rota` : "");
+                    return (
+                      <div
+                        key={`ev-${e.id}`}
+                        title={titulo}
+                        aria-label={titulo}
+                        style={{
+                          position: "absolute",
+                          top: ((a - inicioGrade) / blocoMin) * ALTURA_BLOCO + 1,
+                          right: 0,
+                          width: 7,
+                          height: Math.max(6, ((b - a) / blocoMin) * ALTURA_BLOCO - 2),
+                          zIndex: 8,
+                          borderRadius: 2,
+                          background: adicional
+                            ? "repeating-linear-gradient(-45deg, var(--acento), var(--acento) 3px, rgba(156, 13, 56, 0.35) 3px, rgba(156, 13, 56, 0.35) 6px)"
+                            : "var(--tinta-3)",
+                        }}
+                      />
+                    );
+                  })}
 
                 {/* faixas de pausa (lanche/almoço) — altura pela duração REAL, para
                     não pintarem o bloco inteiro de 30min nem colidir com os cards */}

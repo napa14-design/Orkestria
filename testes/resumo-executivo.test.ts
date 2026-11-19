@@ -13,6 +13,7 @@ import {
   CATEGORIA_APOIO_OUTRO_SETOR,
   CATEGORIA_APOIO_PEDAGOGICO,
   ocupacaoPorPessoa,
+  pessoasDoPeriodo,
   PARAMETROS_PADRAO,
   percentualApoioOutroSetor,
   resumoDeOcupacao,
@@ -60,6 +61,28 @@ describe("ocupacaoPorPessoa / resumoDeOcupacao (a régua das telas)", () => {
     ]);
     expect(p.dias).toBe(2);
     expect(p.ocupacao).toBe(50);
+  });
+
+  it("sábado com horário próprio conta com a jornada DELE, na ocupação e na ociosidade (Consulta 7)", () => {
+    // 540 min na semana; sábado 08:00–12:00 sem pausa = 240. Sexta 540 cheia + sábado 360.
+    const f = funcionario({ escala: "seg_sab", entrada_sabado: "08:00", saida_sabado: "12:00" } as never);
+    const [p] = ocupacaoPorPessoa([f], [
+      rotina({ id: "sex", data: "2026-09-04", tempo_previsto_min: 540 }),
+      rotina({ id: "sab", data: "2026-09-05", tempo_previsto_min: 360 }),
+    ]);
+    expect(p.capacidade).toBe(780);
+    expect(p.ocupacao).toBeCloseTo((900 / 780) * 100, 5); // era 900 ÷ 1080 = 83%: sobrecarga escondida
+    const r = resumoDeOcupacao([p], PARAMETROS_PADRAO);
+    expect(r.emSobrecarga).toBe(1);
+    expect(r.ociosidadeMin).toBe(0);
+  });
+
+  it("quem saiu entra nos períodos em que teve tarefa, e só neles (Consulta 7)", () => {
+    const saiu = funcionario({ id: "saiu", ativo: false });
+    const saiuSemTarefa = funcionario({ id: "sem", ativo: false });
+    const fica = funcionario({ id: "fica" });
+    const rs = [rotina({ id: "x", funcionario_id: "saiu", tempo_previsto_min: 540 }), rotina({ id: "y", funcionario_id: "sem", status: "cancelada" })];
+    expect(pessoasDoPeriodo([saiu, saiuSemTarefa, fica], rs).map((f) => f.id)).toEqual(["saiu", "fica"]);
   });
 
   it("ninguém planejado → média null, não 0%", () => {
@@ -156,11 +179,13 @@ describe("montarResumo", () => {
   const linha = (nome: string) => r.porSede.find((s) => s.sede === nome)!;
 
   it("o grupo é a média das PESSOAS, não a média das linhas por sede", () => {
-    expect(linha("Sul 1").ocupacaoMediaPct).toBe(100);
+    // "x" saiu, mas teve tarefa no período: entra (60 de 540 = 11,1%) — Consulta 7, 18/11/2026.
+    // Antes, filtrar pelo `ativo` de hoje a tirava dos meses em que trabalhou.
+    expect(linha("Sul 1").ocupacaoMediaPct).toBe(55.6); // (100 + 11,1) / 2
     expect(linha("Sul 2").ocupacaoMediaPct).toBe(50);
-    // (100 + 50 + 50) / 3 = 66,7 — a média das linhas daria 75.
-    expect(r.porGrupo["Colégio"]!.ocupacaoMediaPct).toBe(66.7);
-    expect(r.geral.ocupacaoMediaPct).toBe(77.5); // (100+50+50+110)/4
+    expect(r.porGrupo["Colégio"]!.ocupacaoMediaPct).toBe(52.8);
+    // Pelas pessoas: (100+11,1+50+50+110)/5 = 64,2. Pela média das linhas daria (55,6+50+110)/3 = 71,9.
+    expect(r.geral.ocupacaoMediaPct).toBe(64.2);
     expect(r.geral.pessoasEmSobrecarga).toBe(1);
   });
 

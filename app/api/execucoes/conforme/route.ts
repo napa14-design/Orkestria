@@ -44,7 +44,10 @@ export async function POST(req: Request) {
           epis_confirmados: epis.join(", "),
         },
         // Com a declaração feita, o registro vale como o formulário completo.
-        { perfil: sessao.perfil, confirmacaoRapida: epis.length === 0 },
+        // Coordenação: o toque só aparece em bloco sem registro, então só inclui — não troca por
+        // "conforme" um desvio gravado no meio do caminho. O supervisor usa o mesmo toque para
+        // trocar o próprio "não feita" por "feita"; para ele vale a trava de só alterar o que lançou.
+        { perfil: sessao.perfil, confirmacaoRapida: epis.length === 0, soSeNovo: sessao.perfil !== "supervisor" },
       ),
       201,
     );
