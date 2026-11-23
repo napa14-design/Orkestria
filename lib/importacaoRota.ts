@@ -101,6 +101,21 @@ export function dataDaPlanilha(s: string): string | null {
   return m ? t : null;
 }
 
+/**
+ * Área como as planilhas das sedes escrevem: "68.041 m²", "797,29 m2", "1.234,5", 120.
+ * Sem isto, o texto com unidade virava 0: o POP do Sul 3 tinha a área assim e os locais entraram
+ * sem metragem (57 recuperados depois, 23/11/2026). Com ponto e vírgula juntos, o ponto é de
+ * milhar; com só um dos dois, ele é o separador decimal. Sem número reconhecível: 0 (local sem
+ * metragem, que é o que a tarefa por m² já avisa).
+ */
+export function areaDaPlanilha(s: string): number {
+  let t = String(s ?? "").replace(/m\s*(²|2)/giu, "").replace(/\s+/gu, "");
+  if (t.includes(",") && t.includes(".")) t = t.replace(/\./gu, "").replace(",", ".");
+  else t = t.replace(",", ".");
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /** O texto de uma célula conforme a coluna: data, hora ou texto. */
 export function textoDaColuna(chave: string, v: unknown): string {
   // O Excel guarda data como Date à meia-noite UTC: o dia é o da data, não a hora.
@@ -243,7 +258,10 @@ export function analisarRota(linhas: LinhaPlanilha[]): Analise {
     // local
     const kl = chaveNome(l.local);
     if (!locais.has(kl)) {
-      locais.set(kl, { nome_local: l.local, andar: l.andar, metragem: Number(l.metragem) || 0 });
+      const metragem = areaDaPlanilha(l.metragem);
+      if (l.metragem && !metragem)
+        avisos.push({ linha: n, campo: "Metragem (m²)", mensagem: `"${l.metragem}" não é uma área. O local "${l.local}" entrou sem metragem.` });
+      locais.set(kl, { nome_local: l.local, andar: l.andar, metragem });
     }
 
     // tarefa (única por nome + local); a duração vem da 1ª ocorrência

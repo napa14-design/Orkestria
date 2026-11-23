@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDataSource } from "@/lib/datasource";
-import { analisarRota, dataDaPlanilha, textoDaColuna, type LinhaPlanilha } from "@/lib/importacaoRota";
+import { analisarRota, areaDaPlanilha, dataDaPlanilha, textoDaColuna, type LinhaPlanilha } from "@/lib/importacaoRota";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import { aplicarImportacao } from "@/services/importacaoService";
 
@@ -54,6 +54,21 @@ describe("importação de rota × dados do RH", () => {
     await aplicarImportacao(SEDE, DATA, analisarRota([linha("Joana", RH)]), "t@t.com");
     const deNovo = analisarRota([linha("Clara", { ...RH, nome_completo: "Clara Souza", empresa: "APEL 7" })]);
     await expect(aplicarImportacao(SEDE, "2026-11-17", deNovo, "t@t.com")).rejects.toThrow(/já está em outro cadastro/);
+  });
+
+  it("área: entende o texto das planilhas das sedes, com unidade e vírgula (23/11/2026)", () => {
+    expect(areaDaPlanilha("68.041 m²")).toBe(68.041); // POP do Sul 3
+    expect(areaDaPlanilha("797,29 m2")).toBe(797.29);
+    expect(areaDaPlanilha("1.234,5")).toBe(1234.5);
+    expect(areaDaPlanilha("120")).toBe(120);
+    expect(areaDaPlanilha("")).toBe(0);
+    expect(areaDaPlanilha("ver planta")).toBe(0);
+    const a = analisarRota([
+      linha("Ana", { ...RH, local: "Sala 310", metragem: "68.041 m²" }),
+      linha("Ana", { ...RH, local: "Pátio", metragem: "ver planta", tarefa: "T2", inicio: "08:00", fim: "09:00" }),
+    ] as LinhaPlanilha[]);
+    expect(a.locais.map((l) => [l.nome_local, l.metragem])).toEqual([["Sala 310", 68.041], ["Pátio", 0]]);
+    expect(a.avisos.filter((x) => x.campo === "Metragem (m²)").map((x) => x.mensagem)).toEqual(['"ver planta" não é uma área. O local "Pátio" entrou sem metragem.']);
   });
 
   it("tipo de serviço: só rotina, pesada ou desincrustante; texto solto vira rotina com aviso (19/11/2026)", () => {

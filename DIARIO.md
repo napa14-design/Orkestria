@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-11-23 — Importação entende área escrita como texto; metragem do Sul 2 e do Sul 3
+
+Pergunta do dono: por que os locais do Sul 2 não têm metragem, se a planilha tinha?
+
+- **Sul 2:** a planilha original só tem área em ~123 linhas. Dos 85 locais sem metragem, só 3 aparecem
+  numa linha com área. Não foi a importação que perdeu. Já 18 locais tinham metragem absurda, copiada
+  da aba "Murilo", onde a área foi digitada sem a vírgula (ex.: 46.767 m² numa lojinha; a mesma sala
+  aparece com 15,52 m² na aba principal e com 6.022 na "Murilo"). Os 18 foram zerados na produção
+  (backup antes): sem metragem é melhor que metragem errada. Uma calçada de 2.514,09 m², com casas
+  decimais e plausível, ficou.
+- **Sul 3:** o POP traz a área como texto com unidade ("68.041 m²"), que entrava como 0 — 166 de 187
+  locais estavam sem metragem. 57 foram preenchidos na produção a partir do POP (nome do local igual
+  ou no fim da linha, e uma só área possível; backup antes). Ficaram de fora os ambíguos ("Pátio" tem
+  três áreas no POP) e os que o POP não mede.
+- **Importação de rota** (`areaDaPlanilha`): entende "68.041 m²", "797,29 m2", "1.234,5". Texto que
+  não é área entra como 0, com aviso na linha.
+- Nenhum tempo muda: as tarefas desses locais são de tempo fixo; a metragem só pesa nas calculadas por m².
+
+Arquivos: `lib/importacaoRota.ts`, `testes/importacao-rh.test.ts`.
+
+---
+
 ## 2026-11-19 — Atividade adicional: tipo "Manutenção e serviços diversos"
 
 Pedido da coordenação: uma pessoa da equipe passou a manhã pintando na sede da manutenção para a
