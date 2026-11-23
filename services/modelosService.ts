@@ -808,6 +808,7 @@ async function carregarRotaEContexto(sedeId: string, data: string) {
     blocosDoDia: existentes,
     ausentes: new Set(idsFunc.filter((_, i) => ausencias[i] !== null)),
     letivoFora: statusPeriodoLetivo(periodos, sedeId, data) === "fora",
+    locaisInativos: new Set(locais.filter((l) => l.ativo === false).map((l) => l.id)),
     // Tempo previsto do item: a duração do snapshot, ou o cálculo da tarefa.
     // O `!` é o de antes: na criação a projeção já descartou tarefa removida; o
     // ramo de alinhamento passa antes desse descarte (risco antigo, não novo).
@@ -844,6 +845,8 @@ function explicarDescartes(descartados: ItemDescartado[], ctx: ContextoProjecao)
       linhas.push(
         `${item.inicio_planejado} ${tarefa?.nome_tarefa}: hoje outra rota substitui o dia, e "${item.nome_modelo}" ficou de fora`,
       );
+    else if (motivo === "inativo")
+      linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: a tarefa ou o local está inativo — fora da geração`);
     else if (motivo === "fora_do_periodo_letivo")
       linhas.push(`${item.inicio_planejado} ${tarefa?.nome_tarefa}: fora do período letivo`);
     else if (motivo === "outro_dia_da_semana")
@@ -919,6 +922,7 @@ export async function projetarDiaSombra(sedeId: string, data: string): Promise<R
   const vazio = (): Record<MotivoDescarte, number> => ({
     ja_no_dia: 0,
     cadastro_removido: 0,
+    inativo: 0,
     item_de_outro_dia: 0,
     substituido_por_camada: 0,
     bloco_ja_iniciado: 0,

@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-11-23 — "Gerar o dia" pula tarefa inativa e tarefa de local inativo
+
+Um coordenador não conseguiu excluir um local com histórico, e a tela mandou "use Editar e marque
+como Inativo". Conferindo, a geração do dia não olhava `ativo`: carregava todas as tarefas e locais
+da sede, e uma tarefa inativa que estivesse na rota padrão seguiria nascendo todo dia. Hoje nenhum
+dos 3.399 itens de rota padrão aponta para tarefa ou local inativo, então nada saiu errado ainda.
+
+- Novo motivo de descarte `inativo` (`lib/projecaoDia.ts`): tarefa com `ativo: false`, ou com o
+  local inativo (`locaisInativos` no contexto, montado em `carregarRotaEContexto`). O resumo do
+  "Gerar o dia" diz "a tarefa ou o local está inativo — fora da geração".
+- Bloco que já existe no dia não é mexido; só deixa de nascer.
+
+Arquivos: `lib/projecaoDia.ts`, `services/modelosService.ts`, `testes/projecao.test.ts`,
+`testes/gerar-inativo.test.ts`.
+
+---
+
 ## 2026-11-23 — Sul 2: os 18 locais zerados voltam, com a vírgula no lugar
 
 Só dado, sem mudança de código. A coordenação prefere o número estranho ao vazio, porque corrige à

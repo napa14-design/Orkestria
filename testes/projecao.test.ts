@@ -135,6 +135,16 @@ describe("projetarDiaDaRota", () => {
     ).toBe("cadastro_removido");
   });
 
+  it("pula tarefa inativa e tarefa de local inativo (23/11/2026)", () => {
+    const inativa = contexto({ tarefas: new Map([["t1", tarefa({ ativo: false })]]) });
+    expect(projetarDiaDaRota([item()], inativa).descartados[0]?.motivo).toBe("inativo");
+    expect(projetarDiaDaRota([item()], inativa).materializar).toHaveLength(0);
+    const localInativo = contexto({ locaisInativos: new Set([item().local_id]) });
+    expect(projetarDiaDaRota([item()], localInativo).descartados[0]?.motivo).toBe("inativo");
+    // Ativa e local ativo: nasce normalmente.
+    expect(projetarDiaDaRota([item()], contexto({ locaisInativos: new Set(["outro"]) })).materializar).toHaveLength(1);
+  });
+
   it("pula tarefa de calendário fora do período letivo", () => {
     const ctx = contexto({
       tarefas: new Map([["t1", tarefa({ depende_calendario: true })]]),

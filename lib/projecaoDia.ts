@@ -20,6 +20,12 @@ export type MotivoDescarte =
   | "ja_no_dia"
   /** Tarefa ou funcionário do item saiu do cadastro depois de a rota ser salva. */
   | "cadastro_removido"
+  /**
+   * A tarefa, ou o local dela, foi marcada como inativa. A tela manda "inativar em vez de
+   * excluir" quando há histórico, e a geração não olhava `ativo`: a tarefa inativa seguiria
+   * nascendo no dia (23/11/2026).
+   */
+  | "inativo"
   /** O item da rota vale só em certos dias da semana, e hoje não é um deles. */
   | "item_de_outro_dia"
   /** Hoje existe camada que SUBSTITUI o dia, e este item não é dela. */
@@ -81,6 +87,8 @@ export interface ContextoProjecao {
   /** Ids de funcionários com ausência registrada na data. */
   ausentes: Set<string>;
   letivoFora: boolean;
+  /** Locais marcados como inativos: as tarefas deles não nascem no dia. */
+  locaisInativos?: ReadonlySet<string>;
   /** Minutos que o item ocuparia — o mesmo cálculo que a geração grava. */
   duracaoDoItem: (item: ModeloRotinaItem) => number;
 }
@@ -178,6 +186,10 @@ export function projetarDiaDaRota(
     const funcionario = ctx.funcionarios.get(item.funcionario_id);
     if (!tarefa || !funcionario) {
       descartar(item, "cadastro_removido");
+      continue;
+    }
+    if (tarefa.ativo === false || ctx.locaisInativos?.has(item.local_id)) {
+      descartar(item, "inativo");
       continue;
     }
     // Quem saiu do quadro não tem dia: nenhum outro motivo importa. A rota fica
