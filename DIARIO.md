@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-11-23 — Sul 2: os 18 locais zerados voltam, com a vírgula no lugar
+
+Só dado, sem mudança de código. A coordenação prefere o número estranho ao vazio, porque corrige à
+mão no sistema (uma calçada já tinha sido corrigida assim hoje). Os 18 locais do Sul 2 zerados mais
+cedo voltaram com o valor da planilha ÷ 1000: o ponto era a vírgula decimal (46.767 → 46,767 m²;
+todos ficam entre 2,9 e 57,6 m², com três casas, como as áreas do POP do Sul 3). Só onde a metragem
+ainda estava 0; backup antes.
+
+---
+
 ## 2026-11-23 — Correção: a aba principal das planilhas do Sul 1 e do Sul 2 é de outra sede
 
 Só registro, sem mudança de código. A aba "LOCAÇÕES COLABORADORES" é idêntica, linha por linha, nas
