@@ -61,6 +61,8 @@ export interface RotinaPlanejada {
 export interface RemanejoAuto {
   /** Quem faltou — de quem a tarefa saiu neste remanejo. */
   de: string;
+  /** Por que saiu: ausente (padrão) ou emprestado(a) a outra unidade (23/11/2026). */
+  motivo?: "emprestimo";
   /**
    * O `titular_id` de antes. Quem cobria também pode faltar: a tarefa remaneja de
    * novo, o dono original continua o titular, e o desfazer volta só um passo.

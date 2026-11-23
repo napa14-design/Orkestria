@@ -1,9 +1,12 @@
 import { comSessao, ok } from "@/lib/api";
+import { getDataSource } from "@/lib/datasource";
 import { diasDoPeriodo } from "@/lib/dateUtils";
 import { leituraCompleta, limitarSedeConsulta, podeAlterarSede, podeEscrever } from "@/lib/permissions";
 import { ErroPermissao } from "@/services/erros";
+import { remanejarCriticasDeAusentes } from "@/services/centralDiaService";
 import {
   createServicoEventual,
+  diasDoLancamento,
   getServicosEventuais,
 } from "@/services/servicosEventuaisService";
 
@@ -22,14 +25,16 @@ export async function GET(req: Request) {
     const lista = await getServicosEventuais(de, ate, sede);
     // Mínimo necessário (LGPD), como nas ausências: o supervisor abre a Rotina e
     // recebe isto para o mostrador, que só precisa de quem, quando e quanto. A
-    // descrição e a observação são texto livre.
+    // descrição e a observação são texto livre. `libera_rota` (sim/não) entra para o
+    // Acompanhamento dele oferecer "Feita por…" no horário do empréstimo: sem ele, o
+    // servidor recusava o "Feita" e o botão certo não aparecia (auditoria, 23/11/2026).
     return ok(
       leituraCompleta(sessao)
         ? lista
         : lista
             .filter((e) => e.funcionario_id)
-            .map(({ id, sede_id, funcionario_id, data, inicio, fim, tempo_min }) => ({
-              id, sede_id, funcionario_id, data, inicio, fim, tempo_min,
+            .map(({ id, sede_id, funcionario_id, data, inicio, fim, tempo_min, libera_rota }) => ({
+              id, sede_id, funcionario_id, data, inicio, fim, tempo_min, ...(libera_rota === true ? { libera_rota: true } : {}),
             })),
     );
   });
@@ -38,9 +43,31 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   return comSessao(async (sessao) => {
     if (!podeEscrever(sessao)) throw new ErroPermissao();
-    const dados = await req.json().catch(() => null);
-    if (!podeAlterarSede(sessao, dados?.sede_id))
+    const corpo = await req.json().catch(() => null);
+    if (!podeAlterarSede(sessao, corpo?.sede_id))
       throw new ErroPermissao("Coordenadores só registram eventuais das sedes que operam.");
-    return ok(await createServicoEventual({ ...dados, supervisor_id: sessao.id }, sessao.email), 201);
+    // `ate`: só no empréstimo, um lançamento por dia de trabalho (23/11/2026).
+    const { ate, ...dados } = corpo ?? {};
+    const dias = await diasDoLancamento(dados, ate);
+    const criados = [];
+    for (const data of dias) criados.push(await createServicoEventual({ ...dados, data, supervisor_id: sessao.id }, sessao.email));
+    // Empréstimo: as críticas que caem na janela passam sozinhas, como na falta. Uma falha aqui
+    // não desfaz o lançamento (já salvo): a Central ainda mostra o que ficou sem dono.
+    const remanejos: string[] = [];
+    if (dados.libera_rota === true)
+      for (const data of dias) {
+        try {
+          // Só onde a pessoa já tem agenda: os outros dias remanejam quando forem gerados.
+          const temAgenda = await (await getDataSource()).contar("rotinas_planejadas", [
+            { campo: "funcionario_id", op: "==", valor: String(dados.funcionario_id) },
+            { campo: "data", op: "==", valor: data },
+          ]);
+          if (!temAgenda) continue;
+          remanejos.push(...(await remanejarCriticasDeAusentes(dados.sede_id, data, sessao)).map((r) => r.texto));
+        } catch (e) {
+          console.error("Empréstimo: remanejo automático falhou", data, e instanceof Error ? e.name : "");
+        }
+      }
+    return ok({ ...criados[0], dias: criados.length, remanejos }, 201);
   });
 }

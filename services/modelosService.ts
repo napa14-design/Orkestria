@@ -29,6 +29,7 @@ import {
   type MotivoDescarte,
   projetarDiaDaRota,
 } from "@/lib/projecaoDia";
+import { emprestadosNoDia } from "@/lib/emprestimo";
 import { resumirProblemas, validarDia } from "@/lib/validacaoDoDia";
 import type { SessaoUsuario } from "@/lib/permissions";
 import type { ModeloRotinaItem, RotinaPlanejada, Tarefa } from "@/types";
@@ -677,13 +678,20 @@ export async function gerarDiaDaRotaPadrao(
     res.comProblema = problemas.length;
     res.detalhes.push(...resumirProblemas(problemas));
   }
-  // Import tardio: a Central já importa este módulo (ciclo).
-  if (quem && ctx.ausentes.size > 0) {
+  // Import tardio: a Central já importa este módulo (ciclo). Roda com ausente OU com alguém
+  // emprestado no dia: no empréstimo de vários dias ("Até"), os dias seguintes só têm agenda
+  // quando são gerados, e sem isto a crítica nascia no nome de quem estava fora (auditoria, 23/11/2026).
+  if (quem && (ctx.ausentes.size > 0 || (await temEmprestimoNoDia(sedeId, data)))) {
     const { remanejarCriticasDeAusentes } = await import("./centralDiaService");
     const remanejos = await remanejarCriticasDeAusentes(sedeId, data, quem);
     if (remanejos.length) res.remanejos = remanejos;
   }
   return res;
+}
+
+async function temEmprestimoNoDia(sedeId: string, data: string): Promise<boolean> {
+  const { getServicosEventuais } = await import("./servicosEventuaisService");
+  return emprestadosNoDia(await getServicosEventuais(data, data, sedeId), data).size > 0;
 }
 
 export interface ResultadoPeriodo {

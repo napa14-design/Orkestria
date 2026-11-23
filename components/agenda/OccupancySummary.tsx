@@ -185,7 +185,8 @@ export default function OccupancySummary({
             {(() => {
               const id = selecionado.funcionario.id;
               const evs = eventuais.filter((e) => e.funcionario_id === id);
-              const janelasAdicionais = evs.filter(ehAtividadeAdicional).map(janelaDoEventual).filter((j): j is [number, number] => !!j);
+              const janelasAdicionais = evs.filter((e) => ehAtividadeAdicional(e) && !e.libera_rota).map(janelaDoEventual).filter((j): j is [number, number] => !!j);
+              const janelasEmprestimo = evs.filter((e) => e.libera_rota).map(janelaDoEventual).filter((j): j is [number, number] => !!j);
               const itens = [
                 // "|0" antes de "|1": no mesmo horário, a atividade vem antes da tarefa que ela cobre.
                 ...rotinas.filter((r) => r.funcionario_id === id).map((r) => ({ hora: `${r.inicio_planejado}|1`, rotina: r, evento: null })),
@@ -207,7 +208,7 @@ export default function OccupancySummary({
                                 {comHora ? `${e.inicio}–${e.fim}` : formatarDuracao(minutosDoEventual(e))}
                               </span>
                               <strong style={{ color: adicional ? "var(--acento)" : "var(--tinta)" }}>
-                                + {adicional ? "Atividade adicional" : "Serviço eventual"}
+                                + {e.libera_rota ? "Emprestado(a) a outra unidade" : adicional ? "Atividade adicional" : "Serviço eventual"}
                               </strong>
                             </div>
                             {(adicional && e.exigencia) || e.descricao ? (
@@ -223,6 +224,7 @@ export default function OccupancySummary({
                       const ini = hhmmParaMin(r!.inicio_planejado);
                       const fim = hhmmParaMin(r!.fim_planejado);
                       const junto = ocupaHorario(r!) && janelasAdicionais.some(([a, b]) => ini < b && fim > a);
+                      const semDono = ocupaHorario(r!) && janelasEmprestimo.some(([a, b]) => ini < b && fim > a);
                       return (
                         <div key={r!.id} style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "baseline" }}>
                           <span className="num" style={{ color: "var(--tinta-2)", flexShrink: 0 }}>
@@ -231,7 +233,12 @@ export default function OccupancySummary({
                           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {tarefaPorId.get(r!.tarefa_id)?.nome_tarefa ?? "Tarefa"}
                           </span>
-                          {junto && (
+                          {semDono && (
+                            <span style={{ color: "var(--acento)", fontSize: 10, flexShrink: 0 }} title="No horário do empréstimo: precisa de outra pessoa (veja a Central do dia)">
+                              · precisa de outra pessoa
+                            </span>
+                          )}
+                          {!semDono && junto && (
                             <span style={{ color: "var(--acento)", fontSize: 10, flexShrink: 0 }} title="No mesmo horário da atividade adicional">
                               · ao mesmo tempo
                             </span>

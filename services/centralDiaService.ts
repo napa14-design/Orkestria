@@ -16,6 +16,7 @@ import {
 import { rotinaAguardaConfirmacao } from "@/lib/agenda";
 import { getDataSource } from "@/lib/datasource";
 import { agoraHHMM, diaDaSemana, hhmmParaMin, hojeISO, intervalosSobrepoem, minParaHHMM, somarDias } from "@/lib/dateUtils";
+import { blocosNoEmprestimo, emprestadosNoDia } from "@/lib/emprestimo";
 import { pendenciasDoDia } from "@/lib/pendencias";
 import { avaliarCandidatos } from "@/lib/redistribuicao";
 import {
@@ -50,6 +51,7 @@ import { resolverParametros } from "./parametrosService";
 import { getPeriodosLetivos } from "./periodosLetivosService";
 import { getQualificacoes } from "./qualificacoesService";
 import { getRotinasByData, updateRotina, type ResultadoRotina } from "./rotinasService";
+import { getServicosEventuais } from "./servicosEventuaisService";
 import { getTarefas } from "./tarefasService";
 
 /**
@@ -491,12 +493,13 @@ export async function getCentralDia(
   // o dia em outra sede (consulta de 04/11/2026; a maioria dos coordenadores opera várias).
   const naSede = (href: string) => (sedeId ? `${href}?sede=${encodeURIComponent(sedeId)}` : href);
 
-  const [sede, funcionarios, rotinas, execucoes, ausencias, feriados] = await Promise.all([
+  const [sede, funcionarios, rotinas, execucoes, ausencias, eventuaisDoDia, feriados] = await Promise.all([
     sedeId ? ds.obter("sedes", sedeId) : Promise.resolve(null),
     getFuncionarios(sedeId),
     getRotinasByData(data, sedeId),
     getExecucoes(data, data, sedeId),
     getAusencias({ data, sedeId }),
+    getServicosEventuais(data, data, sedeId),
     // Coleção de uma dúzia de linhas por ano. Sem isto, "nenhum bloco hoje" e
     // "hoje a sede não abre" ficam indistinguíveis na tela.
     ds.listar("feriados"),
@@ -510,8 +513,13 @@ export async function getCentralDia(
   );
   const disponiveisIds = new Set(disponiveis.map((funcionario) => funcionario.id));
   const rotinasValidas = rotinas.filter(ocupaHorario);
+  // Empréstimo (23/11/2026): só os blocos DENTRO da janela ficam sem dono — o resto do dia a
+  // pessoa trabalha aqui. E ela não recebe tarefa de ninguém nesse dia.
+  const noEmprestimo = blocosNoEmprestimo(rotinasValidas, eventuaisDoDia);
+  const emprestados = emprestadosNoDia(eventuaisDoDia, data);
+  const candidatosIds = new Set([...disponiveisIds].filter((id) => !emprestados.has(id)));
   const rotinasDeIndisponiveis = rotinasValidas.filter(
-    (rotina) => !disponiveisIds.has(rotina.funcionario_id),
+    (rotina) => !disponiveisIds.has(rotina.funcionario_id) || noEmprestimo.has(rotina.id),
   );
   const execucoesPorRotina = new Set(execucoes.map((execucao) => execucao.rotina_id));
   const agoraMin = minutosAgora();
@@ -570,6 +578,7 @@ export async function getCentralDia(
       const deAusentes = rotinasDeIndisponiveis.filter((rotina) =>
         ausentesIds.has(rotina.funcionario_id),
       ).length;
+      const deEmprestados = rotinasDeIndisponiveis.filter((rotina) => noEmprestimo.has(rotina.id)).length;
       // Só vale cobrir o que ainda não terminou — o bloco das 07:00 às 09:00
       // ninguém mais faz. Antes a Central olhava sempre o PRIMEIRO bloco de quem
       // faltou: com a falta percebida no meio do turno ele já tinha começado, a
@@ -585,7 +594,7 @@ export async function getCentralDia(
         resolucao = await proporRedistribuicao({
           rotina,
           funcionarios: funcionariosAtivos,
-          disponiveisIds,
+          disponiveisIds: candidatosIds,
           rotinasDoDia: rotinasValidas,
           execucoesPorRotina,
           carregar,
@@ -603,7 +612,9 @@ export async function getCentralDia(
           ? "Quem assume a próxima tarefa?"
           : deAusentes > 0
             ? "Há tarefas com pessoas ausentes"
-            : "Há tarefas fora da escala",
+            : deEmprestados > 0
+              ? "Há tarefas de quem está emprestado(a)"
+              : "Há tarefas fora da escala",
         descricao: troca
           ? `“${resolucao!.tarefa_nome}” (${resolucao!.tarefa_prioridade}) era de ${resolucao!.funcionario_origem_nome}. Ninguém tem o horário livre: ${resolucao!.funcionario_nome} assume${resolucao!.inicio_original ? ` às ${resolucao!.inicio_planejado} (era às ${resolucao!.inicio_original})` : ""} e deixa ${cedidasTexto} para outro dia — fica registrado como remanejado, com o motivo.`
           : resolucao
@@ -900,6 +911,7 @@ async function aplicarResolucao(
     if (!auto) return { resultado, rotina, cedidas };
     const marca: RemanejoAuto = {
       de: auto.de,
+      ...(auto.motivo ? { motivo: auto.motivo } : {}),
       ...(auto.titularAntes ? { titular_antes: auto.titularAntes } : {}),
       ...(auto.anterior ? { anterior: auto.anterior } : {}),
       inicio: auto.inicioAntes,
@@ -912,7 +924,7 @@ async function aplicarResolucao(
     const titular = auto.titularAntes || auto.de;
     const observacao = [
       auto.observacaoAntes,
-      `Coberta por ${proposta.funcionario_nome} — ${proposta.funcionario_origem_nome} ausente (remanejo automático)`,
+      `Coberta por ${proposta.funcionario_nome} — ${proposta.funcionario_origem_nome} ${auto.motivo === "emprestimo" ? "emprestado(a) a outra unidade" : "ausente"} (remanejo automático)`,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -969,6 +981,8 @@ interface DadosDoAuto {
   inicioAntes: string;
   fimAntes: string;
   observacaoAntes: string;
+  /** Saiu por empréstimo a outra unidade, não por ausência (o aviso e o desfazer distinguem). */
+  motivo?: "emprestimo";
 }
 
 /** Outra chamada já pegou a cedida: este remanejo desiste e devolve o que reservou. */
@@ -1033,22 +1047,26 @@ export async function remanejarCriticasDeAusentes(
   // Uma por vez, relendo o dia: cada remanejo muda a agenda de quem assumiu, e a
   // próxima proposta tem que ver isso. O limite só protege contra laço infinito.
   for (let volta = 0; volta < 50; volta++) {
-    const [rotinas, execucoes, ausencias] = await Promise.all([
+    const [rotinas, execucoes, ausencias, eventuaisDoDia] = await Promise.all([
       getRotinasByData(data, sedeId),
       getExecucoes(data, data, sedeId),
       getAusencias({ data, sedeId }),
+      getServicosEventuais(data, data, sedeId),
     ]);
     const ausentesIds = new Set(ausencias.map((a) => a.funcionario_id));
+    // Emprestado: não recebe tarefa nesse dia; e os blocos da janela dele entram como os de quem faltou.
+    const emprestados = emprestadosNoDia(eventuaisDoDia, data);
     const disponiveisIds = new Set(
-      ativos.filter((f) => jornadaDoDia(f, data).trabalha && !ausentesIds.has(f.id)).map((f) => f.id),
+      ativos.filter((f) => jornadaDoDia(f, data).trabalha && !ausentesIds.has(f.id) && !emprestados.has(f.id)).map((f) => f.id),
     );
     const validas = rotinas.filter(ocupaHorario);
+    const noEmprestimo = blocosNoEmprestimo(validas, eventuaisDoDia);
     const execucoesPorRotina = new Set(execucoes.map((e) => e.rotina_id));
     const passou = minutosJaPassados(data);
     const proxima = validas
       .filter(
         (r) =>
-          ausentesIds.has(r.funcionario_id) &&
+          (ausentesIds.has(r.funcionario_id) || noEmprestimo.has(r.id)) &&
           !tentadas.has(r.id) &&
           (r.status === "planejada" || r.status === "pendente") &&
           !execucoesPorRotina.has(r.id) &&
@@ -1073,6 +1091,8 @@ export async function remanejarCriticasDeAusentes(
       soNoHorario: !(tarefa?.janela_inicio && tarefa?.janela_fim) && tarefa?.qualquer_horario !== true,
     });
     if (!proposta) continue;
+    // Faltou E está emprestado: vale a ausência (o desfazer da falta cuida dele).
+    const motivo = !ausentesIds.has(proxima.funcionario_id) && noEmprestimo.has(proxima.id) ? ("emprestimo" as const) : undefined;
     // Uma falha num remanejo não pode derrubar quem chamou (a ausência já está
     // salva, e um erro na tela levaria a lançá-la de novo) nem os próximos.
     let aplicado: Awaited<ReturnType<typeof aplicarResolucao>> = null;
@@ -1084,6 +1104,7 @@ export async function remanejarCriticasDeAusentes(
         inicioAntes: proxima.inicio_planejado,
         fimAntes: proxima.fim_planejado,
         observacaoAntes: proxima.observacao ?? "",
+        ...(motivo ? { motivo } : {}),
       });
     } catch (e) {
       console.error("Remanejo automático: não foi possível remanejar", proxima.id, e);
@@ -1101,6 +1122,7 @@ export async function remanejarCriticasDeAusentes(
         inicio: rotina.inicio_planejado,
         inicioAntes: proxima.inicio_planejado,
         cedidas: cedidas.map((c) => c.tarefa_nome),
+        motivo,
       }),
     });
   }
@@ -1186,8 +1208,16 @@ export async function desfazerRemanejosSemFalta(funcionarioId: string, de: strin
       // Só o que ainda vem, a mesma régua do remanejo: a manhã já passou como
       // ficou, e devolver a cedida faria o colega ser cobrado por ela (auditoria).
       const passou = minutosJaPassados(d);
-      for (const r of await getRotinasByData(d, funcionario.sede_id)) {
+      // O que saiu por empréstimo (ou cai num horário de empréstimo dele) não é da falta apagada:
+      // devolver faria a tarefa voltar para quem continua fora (auditoria, 23/11/2026).
+      const doDia = await getRotinasByData(d, funcionario.sede_id);
+      const janelasEmprestimo = blocosNoEmprestimo(
+        doDia.map((r) => ({ ...r, funcionario_id: lerRemanejo(r)?.de ?? r.funcionario_id, inicio_planejado: lerRemanejo(r)?.inicio ?? r.inicio_planejado, fim_planejado: lerRemanejo(r)?.fim ?? r.fim_planejado })),
+        await getServicosEventuais(d, d, funcionario.sede_id),
+      );
+      for (const r of doDia) {
         const marca = lerRemanejo(r);
+        if (marca?.motivo === "emprestimo" || janelasEmprestimo.has(r.id)) continue;
         // Nem para o horário de antes, se ele já passou: voltaria como tarefa perdida (segurança).
         if (
           marca?.de !== funcionarioId ||

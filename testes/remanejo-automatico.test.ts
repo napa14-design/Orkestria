@@ -24,7 +24,7 @@ import { ErroPermissao, ErroValidacao } from "@/services/erros";
 import { gerarDiaDaRotaPadrao, salvarModelo } from "@/services/modelosService";
 import { duplicarDia } from "@/services/rotinasService";
 import { createTarefa, updateTarefa } from "@/services/tarefasService";
-import { registrarExecucao } from "@/services/execucoesService";
+import { confirmarDiaComoPlanejado, registrarExecucao } from "@/services/execucoesService";
 import { validarTarefa } from "@/lib/validations";
 import type { RotinaPlanejada, Tarefa } from "@/types";
 import { ocuparResto } from "./equipeCheia";
@@ -304,6 +304,100 @@ describe("copiar o dia depois de um remanejo", () => {
     const copia = await copiaDeAmanha();
     expect(copia.filter((r) => r.tarefa_id === "tEscada").map((r) => [r.funcionario_id, r.inicio_planejado])).toEqual([["fc", "09:50"]]);
     expect(copia.filter((r) => r.tarefa_id === "tCritica").map((r) => r.funcionario_id)).toEqual(["fa"]);
+  });
+});
+
+describe("empréstimo a outra unidade (23/11/2026)", () => {
+  const emprestimo = async (funcionario_id: string, inicio: string, fim: string, data = hoje) =>
+    (await ds()).criar("servicos_eventuais", {
+      id: `emp-${funcionario_id}-${data}-${inicio}`, sede_id: SEDE, funcionario_id, local_id: "", categoria_id: "apoio_outro_setor",
+      data, tipo: "eventual", descricao: "Ajuda em outra unidade", inicio, fim, tempo_min: 0, observacao: "",
+      supervisor_id: "c1", exigencia: "nao_sei", libera_rota: true, criado_em: "", atualizado_em: "",
+    } as never);
+
+  it("a crítica dentro do horário passa para outra pessoa; a de fora do horário fica", async () => {
+    await bloco("rDentro", "fa", "tCritica", "lb"); // 10:00–10:30
+    await bloco("rFora", "fa", "tCritica", "lb", { inicio_planejado: "15:00", fim_planejado: "15:30" });
+    await emprestimo("fa", "09:00", "12:00");
+    const feitos = await remanejarCriticasDeAusentes(SEDE, hoje, COORD);
+    expect(feitos).toHaveLength(1);
+    expect((await obter("rDentro"))?.funcionario_id).not.toBe("fa");
+    expect((await obter("rFora"))?.funcionario_id).toBe("fa");
+  });
+
+  it("sem libera_rota (atividade adicional comum) nada sai da rota", async () => {
+    await bloco("rDentro", "fa", "tCritica", "lb");
+    await (await ds()).criar("servicos_eventuais", {
+      id: "adicional", sede_id: SEDE, funcionario_id: "fa", local_id: "", categoria_id: "apoio_outro_setor", data: hoje,
+      tipo: "eventual", descricao: "Evento", inicio: "09:00", fim: "12:00", tempo_min: 0, observacao: "", supervisor_id: "c1",
+      exigencia: "cargas", criado_em: "", atualizado_em: "",
+    } as never);
+    expect(await remanejarCriticasDeAusentes(SEDE, hoje, COORD)).toHaveLength(0);
+    expect((await obter("rDentro"))?.funcionario_id).toBe("fa");
+  });
+
+  it("quem está emprestado(a) não recebe a crítica de quem faltou, nem fora do horário do empréstimo", async () => {
+    await bloco("rCrit", "fa", "tCritica", "lb"); // 10:00
+    await falta("fa", hoje);
+    await emprestimo("fb", "14:00", "16:00"); // fb livre às 10:00, mas emprestado à tarde
+    await remanejarCriticasDeAusentes(SEDE, hoje, COORD);
+    expect((await obter("rCrit"))?.funcionario_id).toBe("fc");
+  });
+
+  it("o aviso diz que a pessoa estava emprestada, não ausente", async () => {
+    await bloco("rDentro", "fa", "tCritica", "lb");
+    await emprestimo("fa", "09:00", "12:00");
+    const [feito] = await remanejarCriticasDeAusentes(SEDE, hoje, COORD);
+    expect(feito.texto).toMatch(/Pessoa A \(emprestado\(a\) a outra unidade\)/);
+    expect((await getCentralDia(COORD, SEDE)).remanejos_auto[0]?.texto).toMatch(/emprestado\(a\)/);
+  });
+
+  it("gerar o dia depois do lançamento (empréstimo de vários dias) também passa a crítica — sem ninguém ausente", async () => {
+    await bloco("rCrit", "fa", "tCritica", "lb");
+    await bloco("rBaixa", "fc", "tEscada", "le");
+    await encher();
+    await salvarModelo("Rota padrão", hoje, SEDE, "c@x.com", { padrao: true, comDuracao: true });
+    const amanha = somarDias(hoje, 1);
+    await emprestimo("fa", "09:00", "12:00", amanha);
+    const res = await gerarDiaDaRotaPadrao(SEDE, amanha, "c1", COORD);
+    expect(res.remanejos).toHaveLength(1);
+    const doDia = await (await ds()).consultar("rotinas_planejadas", [{ campo: "data", op: "==", valor: amanha }]);
+    expect(doDia.filter((r) => r.tarefa_id === "tCritica").map((r) => r.funcionario_id)).not.toContain("fa");
+  });
+
+  it("apagar uma falta da mesma pessoa não devolve a ela a crítica que saiu pelo empréstimo", async () => {
+    await bloco("rCrit", "fa", "tCritica", "lb");
+    await emprestimo("fa", "09:00", "12:00");
+    await remanejarCriticasDeAusentes(SEDE, hoje, COORD);
+    expect((await obter("rCrit"))?.funcionario_id).not.toBe("fa");
+    await desfazerRemanejosSemFalta("fa", hoje, hoje);
+    expect((await obter("rCrit"))?.funcionario_id).not.toBe("fa");
+  });
+
+  it("fechar o dia não credita a quem estava emprestado a tarefa do horário; e ninguém a marca feita no nome dele", async () => {
+    vi.setSystemTime(new Date("2026-10-19T20:00:00Z")); // 17:00: o dia acabou
+    await bloco("rComum", "fa", "tSala", "ls");
+    await emprestimo("fa", "09:00", "12:00");
+    const r = await confirmarDiaComoPlanejado({ data: hoje, sedeId: SEDE }, "c1", "coordenador");
+    expect(r.de_ausentes).toBe(1);
+    expect(await (await ds()).consultar("execucoes_realizadas", [{ campo: "rotina_id", op: "==", valor: "rComum" }])).toHaveLength(0);
+    const feita = {
+      rotina_id: "rComum", data_execucao: hoje, status_realizado: "conforme_planejado" as const, inicio_real: "10:00", fim_real: "10:30",
+      tempo_real_min: 30, justificativa: "", observacao: "", supervisor_id: "c1", epis_confirmados: "",
+    };
+    await expect(registrarExecucao(feita, { perfil: "coordenador" })).rejects.toThrow(/emprestada a outra unidade/);
+    // "Não feita" continua possível.
+    await expect(registrarExecucao({ ...feita, status_realizado: "nao_realizada", justificativa: "Emprestada" }, { perfil: "coordenador" })).resolves.toBeTruthy();
+  });
+
+  it("a Central aponta as tarefas do horário do empréstimo como sem dono", async () => {
+    await bloco("rComum", "fa", "tSala", "ls"); // não crítica: fica para a Central propor
+    await emprestimo("fa", "09:00", "12:00");
+    const central = await getCentralDia(COORD, SEDE);
+    const acao = [central.proxima, ...central.fila].find((a) => a.id === "agenda-indisponivel");
+    expect(acao?.quantidade).toBe(1);
+    expect(acao?.resolucao?.funcionario_nome).toBeDefined();
+    expect(acao?.resolucao?.funcionario_nome).not.toBe("Pessoa A");
   });
 });
 

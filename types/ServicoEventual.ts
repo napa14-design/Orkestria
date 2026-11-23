@@ -35,4 +35,11 @@ export interface ServicoEventual extends Auditoria {
    * Descreve a ocorrência — não entra em nenhuma conta de tempo.
    */
   exigencia?: string;
+  /**
+   * Empréstimo a outra unidade (23/11/2026): a pessoa sai da rota nesse horário. As tarefas
+   * críticas dela que caem na janela passam sozinhas para outra pessoa (como na falta), a
+   * Central propõe as demais, e nesse dia ela não recebe tarefa de ninguém. O horário conta
+   * como apoio (a atividade adicional já soma). Só com "Apoio a outro setor" e com início e fim.
+   */
+  libera_rota?: boolean;
 }

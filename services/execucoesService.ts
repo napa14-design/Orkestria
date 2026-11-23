@@ -10,11 +10,26 @@ import { agoraISO, ehIdRepetido, getDataSource } from "@/lib/datasource";
 import { agoraHHMM, hhmmParaMin, hojeISO, intervalosSobrepoem, somarDias } from "@/lib/dateUtils";
 import type { ExecucaoRealizada, Perfil, RotinaPlanejada, StatusRealizado, StatusRotina } from "@/types";
 import { noQuadro } from "@/lib/desligamento";
+import { blocosNoEmprestimo } from "@/lib/emprestimo";
 import { podeAlterarSede, podeRegistrarRealizado, type SessaoUsuario } from "@/lib/permissions";
 import { ausenteEm } from "./ausenciasService";
 import { ErroPermissao, ErroValidacao } from "./erros";
 import { resolverParametros } from "./parametrosService";
 import { getRotinasByData, updateRotina } from "./rotinasService";
+import { getServicosEventuais } from "./servicosEventuaisService";
+
+/**
+ * O bloco cai num horário em que o dono dele estava emprestado a outra unidade? Lê só os
+ * eventuais DA PESSOA no dia (duas igualdades: sem índice composto), não o dia da rede inteira —
+ * roda a cada "feita" registrada uma a uma.
+ */
+async function noHorarioDoEmprestimo(rotina: Pick<RotinaPlanejada, "id" | "funcionario_id" | "data" | "inicio_planejado" | "fim_planejado">): Promise<boolean> {
+  const dela = await (await getDataSource()).consultar("servicos_eventuais", [
+    { campo: "funcionario_id", op: "==", valor: rotina.funcionario_id },
+    { campo: "data", op: "==", valor: rotina.data },
+  ]);
+  return blocosNoEmprestimo([rotina], dela).has(rotina.id);
+}
 
 /** O que o supervisor (perfil de chão) registra: feita ou não, e como foi feita. */
 export const STATUS_DO_SUPERVISOR: readonly StatusRealizado[] = [
@@ -116,6 +131,9 @@ export async function confirmarDiaComoPlanejado(
   const funcsDoDia = [...new Set(rotinas.map((r) => r.funcionario_id))];
   const ausenciasDoDia = await Promise.all(funcsDoDia.map((id) => ausenteEm(id, opts.data)));
   const ausentes = new Set(funcsDoDia.filter((_, i) => ausenciasDoDia[i]));
+  // Empréstimo (23/11/2026): o bloco do horário em que a pessoa estava em outra unidade não é
+  // dela para fechar como feito — conta com os de quem faltou ("Feita por…" ou "Não feita").
+  const noEmprestimo = blocosNoEmprestimo(rotinas, await getServicosEventuais(opts.data, opts.data, opts.sedeId));
 
   const jaRegistrada = new Set(execucoes.map((e) => e.rotina_id));
   const nomeDoEpi = new Map(requisitos.filter((r) => r.tipo === "epi").map((r) => [r.id, r.nome]));
@@ -152,7 +170,7 @@ export async function confirmarDiaComoPlanejado(
       res.ja_registradas++;
       continue;
     }
-    if (ausentes.has(rotina.funcionario_id)) {
+    if (ausentes.has(rotina.funcionario_id) || noEmprestimo.has(rotina.id)) {
       res.de_ausentes++;
       continue;
     }
@@ -191,7 +209,7 @@ export async function confirmarDiaComoPlanejado(
       },
       // Sem atalho quando há EPI: aí a declaração é de verdade, e o servidor
       // deve tratá-la como o formulário completo.
-      { perfil, confirmacaoRapida: epis.length === 0, soSeNovo: true },
+      { perfil, confirmacaoRapida: epis.length === 0, soSeNovo: true, emprestimoConferido: true },
     ).catch((e) => {
       if (!ehJaRegistrada(e)) throw e;
       registradasNoMeio++;
@@ -239,6 +257,8 @@ export async function registrarExecucao(
      * registrou e não podem trocar por "conforme" um desvio gravado no meio do caminho.
      */
     soSeNovo?: boolean;
+    /** Quem chama já tirou os blocos do horário de empréstimo (o fechamento): poupa a leitura. */
+    emprestimoConferido?: boolean;
   },
 ): Promise<ExecucaoRealizada> {
   const ds = await getDataSource();
@@ -371,6 +391,17 @@ export async function registrarExecucao(
   // prioridade põe um ali), recusa — mesma regra do `updateRotina`, que esta
   // porta pulava (auditoria, 20/10/2026).
   const novoStatus = STATUS_ROTINA_POR_EXECUCAO[registro.status_realizado];
+  // Feita, no nome de quem estava emprestado(a) naquele horário, seria realizado falso: quem fez
+  // foi outra pessoa ("Feita por…") ou ninguém ("Não feita"). Vale para todo perfil, inclusive para
+  // chamada direta à API (auditoria, 23/11/2026). O supervisor recebe só o sim/não `libera_rota`.
+  if (novoStatus === "realizada" && !opcoes.emprestimoConferido && (await noHorarioDoEmprestimo(rotina)))
+    throw new ErroValidacao([
+      {
+        nivel: "erro",
+        codigo: "EMPRESTIMO_NO_HORARIO",
+        mensagem: "Esta tarefa cai no horário em que a pessoa estava emprestada a outra unidade. Use “Feita por…” para dizer quem fez, ou “Não feita”.",
+      },
+    ]);
   // Tarefa de espera não disputa a pessoa (mesma exceção do `updateRotina`).
   if (!tarefa?.espera && !ocupaHorario(rotina) && ocupaHorario({ status: novoStatus })) {
     const ini = hhmmParaMin(rotina.inicio_planejado);
@@ -542,8 +573,11 @@ export async function registrarFeitaPor(
   const epis = await episDaTarefa(rotina.tarefa_id);
   if (epis.length > 0 && !declaroEpi)
     throw recusa("EPI_EXIGE_CONFIRMACAO", `Esta tarefa exige EPI: confirme a declaração (${epis.join(", ")}).`);
-  if (!(await ausenteEm(rotina.funcionario_id, rotina.data)))
-    throw recusa("FEITA_POR_SEM_AUSENCIA", "Só a tarefa de quem está ausente no dia pode ser marcada como feita por outra pessoa.");
+  const faltou = !!(await ausenteEm(rotina.funcionario_id, rotina.data));
+  if (!faltou && !(await noHorarioDoEmprestimo(rotina)))
+    throw recusa("FEITA_POR_SEM_AUSENCIA", "Só a tarefa de quem está ausente, ou emprestado(a) naquele horário, pode ser marcada como feita por outra pessoa.");
+  // O texto que fica no bloco e nas cedidas diz o motivo de verdade (23/11/2026).
+  const motivoDoTitular = faltou ? "ausente" : "emprestado(a) a outra unidade";
 
   const colega = await ds.obter("funcionarios", colegaId);
   // Uma mensagem só para "não existe" e "é de outra sede": não revela ids alheios.
@@ -552,6 +586,10 @@ export async function registrarFeitaPor(
   // Antes do `updateRotina`: a mensagem de ausência dele cita o TIPO (atestado…).
   if (await ausenteEm(colega.id, rotina.data))
     throw recusa("FEITA_POR_COLEGA_AUSENTE", `${colega.nome} também está ausente neste dia.`);
+  // Colega emprestado(a) nesse mesmo horário: barra aqui, antes da troca. Depois, a trava do
+  // registro recusava com "use Feita por…" no meio do próprio Feita por (revisão de segurança).
+  if (await noHorarioDoEmprestimo({ ...rotina, funcionario_id: colega.id }))
+    throw recusa("FEITA_POR_COLEGA_AUSENTE", `${colega.nome} não está disponível neste horário.`);
 
   const titular = await ds.obter("funcionarios", rotina.funcionario_id);
   const observacaoAntes = rotina.observacao ?? "";
@@ -616,7 +654,7 @@ export async function registrarFeitaPor(
           inicio_real: "",
           fim_real: "",
           tempo_real_min: 0,
-          justificativa: `${colega.nome} cobriu “${tarefaNome}” de ${titular?.nome ?? "titular"} (ausente) neste horário.`,
+          justificativa: `${colega.nome} cobriu “${tarefaNome}” de ${titular?.nome ?? "titular"} (${motivoDoTitular}) neste horário.`,
           observacao: "Feita por colega no Acompanhamento.",
           supervisor_id: sessao.id,
           epis_confirmados: "",
@@ -633,7 +671,7 @@ export async function registrarFeitaPor(
     // o alerta de sobrecarga passa. Recusa aqui não grava.
     await updateRotina(rotina.id, {
       funcionario_id: colega.id,
-      observacao: [observacaoAntes, `Coberta por ${colega.nome} — ${titular?.nome ?? "titular"} ausente`].filter(Boolean).join(" · "),
+      observacao: [observacaoAntes, `Coberta por ${colega.nome} — ${titular?.nome ?? "titular"} ${motivoDoTitular}`].filter(Boolean).join(" · "),
     }, { ignorarChoqueCom: naFaixa.map((r) => r.id) });
     moveu = true;
     await ds.atualizar("rotinas_planejadas", rotina.id, { titular_id: rotina.funcionario_id, atualizado_em: agoraISO() });
@@ -646,7 +684,7 @@ export async function registrarFeitaPor(
         fim_real: rotina.fim_planejado,
         tempo_real_min: rotina.tempo_previsto_min,
         justificativa: "",
-        observacao: `Feita por ${colega.nome}, cobrindo a ausência de ${titular?.nome ?? "titular"}.`,
+        observacao: `Feita por ${colega.nome}, cobrindo ${faltou ? "a ausência" : "o empréstimo"} de ${titular?.nome ?? "titular"}.`,
         supervisor_id: sessao.id,
         // Nomes do CADASTRO da tarefa, nunca do cliente (como no "✓ Feita · EPI").
         epis_confirmados: epis.join(", "),

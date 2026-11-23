@@ -11,7 +11,7 @@ import { getDataSource } from "@/lib/datasource";
 import { reiniciarBanco } from "@/lib/memoryStore";
 import type { SessaoUsuario } from "@/lib/permissions";
 import { resumoExecutivo } from "@/services/resumoExecutivoService";
-import { createServicoEventual, updateServicoEventual } from "@/services/servicosEventuaisService";
+import { createServicoEventual, diasDoLancamento, updateServicoEventual } from "@/services/servicosEventuaisService";
 import {
   CATEGORIA_APOIO_PEDAGOGICO,
   eventuaisForaDasTarefas,
@@ -390,6 +390,29 @@ describe("no mostrador e no Painel", () => {
     const base = () => ({ sede_id: "christus_dt", funcionario_id: "christus_f1", local_id: "", categoria_id: "", data: DIA, tipo: "eventual", descricao: "Provas", observacao: "", supervisor_id: "" }) as never;
     const dados = (extra: Record<string, unknown>) => ({ ...(base() as object), ...extra }) as never;
 
+    it("empréstimo: só com Apoio a outro setor, pessoa, início e fim (23/11/2026)", async () => {
+      reiniciarBanco();
+      const emp = (extra: Record<string, unknown>) =>
+        dados({ categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "nao_sei", inicio: "09:00", fim: "12:00", libera_rota: true, ...extra });
+      expect((await createServicoEventual(emp({}), "c@x.com")).libera_rota).toBe(true);
+      await expect(createServicoEventual(emp({ inicio: "", fim: "" }), "c@x.com")).rejects.toThrow(ErroValidacao);
+      await expect(createServicoEventual(emp({ categoria_id: "", exigencia: "" }), "c@x.com")).rejects.toThrow(ErroValidacao);
+      await expect(createServicoEventual(emp({ funcionario_id: "" }), "c@x.com")).rejects.toThrow(ErroValidacao);
+      await expect(createServicoEventual(emp({ libera_rota: "sim" }), "c@x.com")).rejects.toThrow(ErroValidacao);
+    });
+
+    it("empréstimo com \"até\": um dia por dia de trabalho, pula fim de semana; recusa período inválido", async () => {
+      reiniciarBanco();
+      const emp = { funcionario_id: "christus_f1", data: "2026-11-27", libera_rota: true } as never; // sexta; f1 é seg–sex
+      expect(await diasDoLancamento(emp, "2026-12-01")).toEqual(["2026-11-27", "2026-11-30", "2026-12-01"]);
+      expect(await diasDoLancamento(emp, "")).toEqual(["2026-11-27"]);
+      await expect(diasDoLancamento(emp, "2026-11-20")).rejects.toThrow(ErroValidacao); // antes do início
+      await expect(diasDoLancamento(emp, "2027-02-01")).rejects.toThrow(ErroValidacao); // mais de 31 dias
+      await expect(diasDoLancamento(emp, "2026-11-29")).resolves.toEqual(["2026-11-27"]);
+      await expect(diasDoLancamento({ ...(emp as object), data: "2026-11-28" } as never, "2026-11-29")).rejects.toThrow(ErroValidacao); // só fim de semana
+      await expect(diasDoLancamento({ ...(emp as object), libera_rota: false } as never, "2026-12-01")).rejects.toThrow(ErroValidacao);
+    });
+
     it("com início e fim, o tempo gravado é o do horário, e a lista mostra o que conta", async () => {
       reiniciarBanco();
       const criado = await createServicoEventual(dados({ inicio: "09:00", fim: "10:35", tempo_min: 0 }), "c@x.com");
@@ -635,6 +658,16 @@ describe("no mostrador e no Painel", () => {
     const lista = await (await pedir()).json();
     expect(lista).toEqual([expect.objectContaining({ funcionario_id: "christus_f1", inicio: "09:00", fim: "10:00", tempo_min: 60 })]);
     expect(JSON.stringify(lista)).not.toMatch(/Texto livre|atestado|c@x\.com|apoio_pedagogico|categoria_id|tipo/);
+    expect(lista[0]).not.toHaveProperty("libera_rota"); // só vem quando é empréstimo
+    // Empréstimo (23/11/2026): o sim/não vem, para o Acompanhamento dele oferecer "Feita por…";
+    // categoria, tipo e descrição continuam fora.
+    await ds.criar("servicos_eventuais", evento("13:00", "14:00", 60, {
+      id: "emp", funcionario_id: "christus_f2", sede_id: "christus_dt", categoria_id: CATEGORIA_APOIO_OUTRO_SETOR, exigencia: "nao_sei", libera_rota: true, descricao: "Outra unidade",
+    }));
+    const comEmp = await (await pedir()).json();
+    expect(comEmp.find((e: { id: string }) => e.id === "emp")).toMatchObject({ libera_rota: true });
+    expect(JSON.stringify(comEmp)).not.toMatch(/Outra unidade|apoio_outro_setor|nao_sei|exigencia|categoria_id/);
+    await ds.excluir("servicos_eventuais", "emp");
     // Lançamento sem pessoa não serve ao mostrador, e sem período a rota não lê o histórico.
     await ds.criar("servicos_eventuais", evento("11:00", "12:00", 60, { id: "e2", funcionario_id: "", sede_id: "christus_dt" }));
     expect(await (await pedir()).json()).toHaveLength(1);

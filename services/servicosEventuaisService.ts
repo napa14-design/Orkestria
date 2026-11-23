@@ -1,7 +1,7 @@
 import { exigenciaValida } from "@/lib/atividadeAdicional";
-import { CATEGORIA_APOIO_OUTRO_SETOR, horaValida, MAX_MINUTOS_EVENTUAL, minutosDoEventual } from "@/lib/calculations";
+import { CATEGORIA_APOIO_OUTRO_SETOR, feriadoDoDia, horaValida, jornadaDoDia, MAX_MINUTOS_EVENTUAL, minutosDoEventual } from "@/lib/calculations";
 import { agoraISO, getDataSource, novoId } from "@/lib/datasource";
-import { dataReal } from "@/lib/dateUtils";
+import { dataReal, somarDias } from "@/lib/dateUtils";
 import type { ServicoEventual } from "@/types";
 import { ErroValidacao } from "./erros";
 
@@ -17,7 +17,7 @@ type DadosEventual = Omit<
 function soCamposDoEventual<T extends Partial<DadosEventual>>(corpo: T): T {
   if (!corpo || typeof corpo !== "object" || Array.isArray(corpo))
     throw new ErroValidacao([{ nivel: "erro", codigo: "CORPO_INVALIDO", mensagem: "Lançamento inválido." }]);
-  const CAMPOS = ["sede_id", "funcionario_id", "local_id", "categoria_id", "data", "tipo", "descricao", "inicio", "fim", "tempo_min", "observacao", "supervisor_id", "exigencia"] as const;
+  const CAMPOS = ["sede_id", "funcionario_id", "local_id", "categoria_id", "data", "tipo", "descricao", "inicio", "fim", "tempo_min", "observacao", "supervisor_id", "exigencia", "libera_rota"] as const;
   return Object.fromEntries(CAMPOS.filter((c) => c in corpo).map((c) => [c, corpo[c]])) as T;
 }
 
@@ -30,6 +30,15 @@ function validar(dados: Partial<DadosEventual>, exigeTipo = false) {
     erros.push({ nivel: "erro" as const, codigo: "EXIGENCIA_INVALIDA", mensagem: "Tipo de atividade inválido." });
   if (exigeTipo && dados.categoria_id === CATEGORIA_APOIO_OUTRO_SETOR && !exigenciaValida(dados.exigencia))
     erros.push({ nivel: "erro" as const, codigo: "SEM_EXIGENCIA", mensagem: "Diga o que a pessoa fez (ou “Não sei informar”)." });
+  // Empréstimo: tira a pessoa da rota na janela — sem pessoa e horário não há janela, e fora
+  // do "Apoio a outro setor" o horário não contaria como apoio.
+  if (dados.libera_rota != null && typeof dados.libera_rota !== "boolean")
+    erros.push({ nivel: "erro" as const, codigo: "EMPRESTIMO_INVALIDO", mensagem: "Empréstimo inválido." });
+  if (
+    dados.libera_rota === true &&
+    (dados.categoria_id !== CATEGORIA_APOIO_OUTRO_SETOR || !dados.funcionario_id || !horaValida(dados.inicio ?? "") || !horaValida(dados.fim ?? "") || !((dados.fim ?? "") > (dados.inicio ?? "")))
+  )
+    erros.push({ nivel: "erro" as const, codigo: "EMPRESTIMO_SEM_HORARIO", mensagem: "Empréstimo precisa de pessoa, início e fim (Apoio a outro setor)." });
   if (!dados.sede_id) erros.push({ nivel: "erro" as const, codigo: "SEM_SEDE", mensagem: "Informe a sede." });
   // Id que não é texto derruba o `doc()` do Firestore: viraria 500 em vez de recusa.
   if ([dados.sede_id, dados.funcionario_id, dados.local_id, dados.categoria_id, dados.supervisor_id].some((v) => v != null && typeof v !== "string"))
@@ -86,6 +95,33 @@ async function validarVinculos(dados: DadosEventual): Promise<void> {
 }
 
 /** Lista por intervalo de data (campo único) + filtro de sede em memória. */
+/** Um empréstimo não passa de um mês num lançamento: acima disso é transferência, não empréstimo. */
+export const MAX_DIAS_EMPRESTIMO = 31;
+
+/**
+ * Os dias de um lançamento: só a data, ou — no empréstimo com "Até" — cada dia de trabalho da
+ * pessoa no período (pula a folga pela escala e o feriado da sede). Recusa período invertido,
+ * longo demais ou sem nenhum dia de trabalho.
+ */
+export async function diasDoLancamento(dados: Partial<DadosEventual>, ate: unknown): Promise<string[]> {
+  const inicio = String(dados.data ?? "");
+  if (ate == null || ate === "" || ate === inicio) return [inicio];
+  const recusa = (mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo: "PERIODO_INVALIDO", mensagem }]);
+  if (dados.libera_rota !== true) throw recusa("Vários dias de uma vez só no empréstimo.");
+  if (typeof ate !== "string" || !dataReal(ate) || !dataReal(inicio) || ate < inicio) throw recusa("Informe um \"até\" depois do início.");
+  const datas: string[] = [];
+  for (let d = inicio; d <= ate; d = somarDias(d, 1)) {
+    datas.push(d);
+    if (datas.length > MAX_DIAS_EMPRESTIMO) throw recusa(`Empréstimo de até ${MAX_DIAS_EMPRESTIMO} dias por lançamento.`);
+  }
+  const ds = await getDataSource();
+  const [funcionario, feriados] = await Promise.all([ds.obter("funcionarios", String(dados.funcionario_id ?? "")), ds.listar("feriados")]);
+  if (!funcionario) throw recusa("Escolha a pessoa.");
+  const uteis = datas.filter((d) => jornadaDoDia(funcionario, d).trabalha && !feriadoDoDia(feriados, funcionario.sede_id, d));
+  if (!uteis.length) throw recusa("Nenhum dia de trabalho da pessoa nesse período.");
+  return uteis;
+}
+
 export async function getServicosEventuais(
   de?: string,
   ate?: string,

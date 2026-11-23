@@ -164,6 +164,28 @@ atribui à atividade adicional é só a diferença para a mesma conta sem ela. A
 perfil por pessoa ("6h em 4 ocorrências · dessas, 4h com movimentação de cargas") e a
 cobertura ("registrada em X dos Y dias com rotina"). Dia sem registro não quer dizer dia sem apoio.
 
+### Empréstimo a outra unidade (23/11/2026)
+
+Atividade adicional com **"Emprestado(a) a outra unidade"** marcado (`libera_rota`): a pessoa sai
+da rota no horário lançado (início e fim obrigatórios; para o dia todo, entrada e saída dela).
+Com **"Até"**, vira um lançamento por dia de trabalho da pessoa (pula folga e feriado), até 31 dias.
+
+- Os blocos dela que caem na janela ficam **sem dono** (`blocosNoEmprestimo`): as **críticas
+  passam sozinhas** para outra pessoa, pelas regras da falta, ao lançar e ao gerar o dia; as
+  demais a **Central** propõe ("Há tarefas de quem está emprestado(a)").
+- Nesse dia a pessoa emprestada **não recebe** tarefa de ninguém (`emprestadosNoDia`), nem fora
+  da janela: a janela não aparece como horário ocupado para a redistribuição.
+- As horas contam como **apoio** (a atividade adicional soma sempre). Enquanto uma tarefa da
+  janela não sai dela, conta junto, como sobrecarga.
+- **Realizado:** o "Fechamento do dia" pula as tarefas do horário (contam com as de quem faltou),
+  o "Feita por…" as aceita, e ninguém registra "feita" no nome de quem estava emprestado
+  (`EMPRESTIMO_NO_HORARIO`). O supervisor recebe só o sim/não do empréstimo (`libera_rota`), para
+  o Acompanhamento dele oferecer o "Feita por…".
+- A marca do remanejo guarda `motivo: "emprestimo"`: o aviso diz "emprestado(a)" e apagar uma falta
+  da mesma pessoa não devolve o que saiu pelo empréstimo.
+- Editar ou apagar o lançamento depois **não desfaz** o que já foi remanejado; o "Repetir o dia"
+  copia para o horário sem remanejar (a Central aponta).
+
 ## 4. Validações da agenda
 
 | Código | Nível | Situação |

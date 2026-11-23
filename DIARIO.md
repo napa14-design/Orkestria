@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-11-23 — Empréstimo a outra unidade: a pessoa sai da rota no horário
+
+Pedido da coordenação: um ASG é "emprestado" para ajudar outra unidade por algumas horas, dias ou
+uma semana, e as tarefas dele precisam de outra pessoa. Decisões do dono: remanejo automático só
+das críticas (como na falta); só o empréstimo tem horário (a ausência segue de dia inteiro); as
+horas emprestadas contam como apoio.
+
+- No **"+ Atividade adicional"** (agenda e Acompanhamento): caixa **"Emprestado(a) a outra
+  unidade"** e campo **"Até"**. É um "Apoio a outro setor" com `libera_rota`; com "Até", um
+  lançamento por dia de trabalho da pessoa (pula folga e feriado), até 31 dias.
+- Ao salvar, as **críticas** dela que caem no horário passam sozinhas para outra pessoa
+  (`remanejarCriticasDeAusentes`, que também roda ao gerar o dia); as demais aparecem na
+  **Central** ("Há tarefas de quem está emprestado(a)"). Nesse dia ela não recebe tarefa de ninguém.
+- As horas contam como apoio (a atividade adicional já soma). Na agenda, a faixa do horário sai em
+  vinho cheio; no painel, as tarefas do horário aparecem como "precisa de outra pessoa".
+- O realizado não fica falso: o "Fechamento do dia" pula as tarefas do horário do empréstimo (contam
+  com as de quem faltou), o "Feita por…" passa a aceitá-las, e o servidor recusa registrar "feita"
+  no nome de quem estava emprestado (`EMPRESTIMO_NO_HORARIO`, todo perfil). No Acompanhamento elas
+  saem com o selo "Emprestado(a)" e o botão "Feita por…". Para isso o supervisor passa a receber
+  `libera_rota` (sim/não) nos eventuais; descrição, categoria e tipo continuam fora.
+- A geração do dia também roda o remanejo quando há alguém emprestado (antes, só com ausente: os
+  dias seguintes de um empréstimo com "Até" nasciam com a crítica no nome de quem estava fora). A
+  marca do remanejo guarda o motivo: o aviso diz "emprestado(a)", e apagar uma falta da mesma pessoa
+  não devolve a ela o que saiu pelo empréstimo.
+- Limites: editar ou apagar o lançamento depois não desfaz o que já foi remanejado; o "Repetir o
+  dia" copia para o horário do empréstimo sem remanejar (a Central aponta).
+
+Arquivos: `lib/emprestimo.ts`, `types/ServicoEventual.ts`, `lib/schema.ts`,
+`services/servicosEventuaisService.ts`, `services/centralDiaService.ts`,
+`app/api/servicos-eventuais/route.ts`, `components/RegistrarAtividadeAdicional.tsx`,
+`components/agenda/AgendaGrid.tsx`, `components/agenda/OccupancySummary.tsx`, `docs/02`, `docs/03`,
+testes (`remanejo-automatico`, `eventuais-ocupacao`, `feita-por-emprestimo` — casos de ataque da revisão
+de segurança: o "Feita por" só abre no horário declarado; colega também emprestado é barrado antes).
+
+---
+
 ## 2026-11-23 — "Gerar o dia" pula tarefa inativa e tarefa de local inativo
 
 Um coordenador não conseguiu excluir um local com histórico, e a tela mandou "use Editar e marque

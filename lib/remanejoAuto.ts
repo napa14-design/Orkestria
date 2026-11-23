@@ -37,10 +37,11 @@ export function textoDoRemanejo(a: {
   inicio: string;
   inicioAntes: string;
   cedidas: string[];
+  motivo?: "emprestimo";
 }): string {
   const quando = a.inicio !== a.inicioAntes ? ` às ${a.inicio} (era às ${a.inicioAntes})` : ` às ${a.inicio}`;
   const lugar = a.cedidas.length ? ` no lugar de ${a.cedidas.map((c) => `“${c}”`).join(", ")}` : ", num horário livre";
-  return `${a.para} assumiu “${a.tarefa}”${quando}, que era de ${a.de} (ausente)${lugar}.`;
+  return `${a.para} assumiu “${a.tarefa}”${quando}, que era de ${a.de} (${a.motivo === "emprestimo" ? "emprestado(a) a outra unidade" : "ausente"})${lugar}.`;
 }
 
 /** A marca do bloco, ou `null` se não houve remanejo (ou se a marca não se lê). */
@@ -87,6 +88,7 @@ export function avisosDeRemanejo(
           inicio: r.inicio_planejado,
           inicioAntes: m.inicio,
           cedidas: m.cedidas.map((c) => c.tarefa_nome),
+          motivo: m.motivo,
         }),
       },
     ];

@@ -92,7 +92,7 @@ export default function AgendaGrid({
    * por cima da rota: mostra onde a atividade adicional se sobrepôs às tarefas (pedido da
    * coordenação, 19/11/2026). O supervisor recebe sem descrição nem categoria (LGPD).
    */
-  eventuais?: Pick<ServicoEventual, "id" | "funcionario_id" | "inicio" | "fim" | "descricao" | "categoria_id" | "exigencia">[];
+  eventuais?: Pick<ServicoEventual, "id" | "funcionario_id" | "inicio" | "fim" | "descricao" | "categoria_id" | "exigencia" | "libera_rota">[];
 }) {
   // Altura efetiva do bloco — todas as contas internas usam este valor.
   const ALTURA_BLOCO = alturaBloco;
@@ -480,7 +480,7 @@ export default function AgendaGrid({
                     const adicional = ehAtividadeAdicional(e);
                     const junto = runs.filter((r) => hhmmParaMin(r.inicio) < b && hhmmParaMin(r.fim) > a && r.status !== "cancelada" && r.status !== "remanejada").length;
                     const titulo =
-                      `${adicional ? "Atividade adicional" : "Serviço eventual"} ${e.inicio}–${e.fim}` +
+                      `${e.libera_rota ? "Emprestado(a) a outra unidade — fora da rota" : adicional ? "Atividade adicional" : "Serviço eventual"} ${e.inicio}–${e.fim}` +
                       (adicional && e.exigencia ? ` · ${rotuloDaExigencia(e.exigencia)}` : "") +
                       (e.descricao ? ` — ${e.descricao}` : "") +
                       (junto ? ` · no mesmo horário de ${junto} tarefa${junto > 1 ? "s" : ""} da rota` : "");
@@ -497,7 +497,10 @@ export default function AgendaGrid({
                           height: Math.max(6, ((b - a) / blocoMin) * ALTURA_BLOCO - 2),
                           zIndex: 8,
                           borderRadius: 2,
-                          background: adicional
+                          // Empréstimo: vinho cheio (a pessoa saiu da rota); adicional: hachurado.
+                          background: e.libera_rota
+                            ? "var(--acento)"
+                            : adicional
                             ? "repeating-linear-gradient(-45deg, var(--acento), var(--acento) 3px, rgba(156, 13, 56, 0.35) 3px, rgba(156, 13, 56, 0.35) 6px)"
                             : "var(--tinta-3)",
                         }}

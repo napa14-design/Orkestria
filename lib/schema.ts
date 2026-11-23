@@ -267,6 +267,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     ...AUDITORIA,
     // Campo novo no FIM (o Sheets grava por posição).
     col("exigencia"),
+    col("libera_rota", "boolean"),
   ],
   tempos_personalizados: [
     col("id"),

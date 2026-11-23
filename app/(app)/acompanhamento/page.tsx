@@ -25,6 +25,7 @@ import {
   PARAMETROS_PADRAO,
 } from "@/lib/calculations";
 import { listaDoSupervisor } from "@/lib/agenda";
+import { blocosNoEmprestimo } from "@/lib/emprestimo";
 import { apiPost, ErroApi, fetcher } from "@/lib/clientApi";
 import { baixarCSV } from "@/lib/csv";
 import {
@@ -177,6 +178,12 @@ export default function PaginaAcompanhamento() {
     fetcher,
   );
   const [feitaPor, setFeitaPor] = useState<RotinaPlanejada | null>(null);
+  // Empréstimo a outra unidade (23/11/2026): o bloco no horário dele é tratado como o de quem
+  // faltou — "Feita por…" em vez de "✓ Feita". O supervisor recebe só o sim/não `libera_rota` dos
+  // eventuais (sem descrição nem categoria); a trava contra "feita" no nome de quem estava
+  // emprestado fica no servidor, para todo perfil.
+  const noEmprestimo = useMemo(() => blocosNoEmprestimo(rotinas ?? [], eventuaisDoDia ?? []), [rotinas, eventuaisDoDia]);
+  const foraDaRota = (r: RotinaPlanejada) => ausentes.has(r.funcionario_id) || noEmprestimo.has(r.id);
   const params = parametros ?? PARAMETROS_PADRAO;
   const emSobrecarga = useMemo(() => {
     if (!rotinas || !funcionarios || !eventuaisDoDia) return [];
@@ -297,7 +304,7 @@ export default function PaginaAcompanhamento() {
         r.fim_planejado <= limiteDoDia,
     );
     // O servidor não fecha a tarefa de quem faltou (creditaria a ela): a conta também não.
-    const alvos = passadas.filter((r) => !ausentes.has(r.funcionario_id));
+    const alvos = passadas.filter((r) => !foraDaRota(r));
     const epis = new Set<string>();
     let comEpi = 0;
     for (const r of alvos) {
@@ -323,7 +330,7 @@ export default function PaginaAcompanhamento() {
         ids: alvos.filter((r) => r.funcionario_id === id).map((r) => r.id),
       })),
     };
-  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia, ausentes, funcPorId]);
+  }, [linhas, execucaoPorRotina, tarefaPorId, reqPorId, limiteDoDia, ausentes, noEmprestimo, funcPorId]);
   // Só conta o que ainda pode ser confirmado (o que já ganhou registro sai sozinho).
   const marcadas = [...escolhidas].filter((id) => fechamento.alvos.has(id));
   const marcadasComEpi = marcadas.filter((id) => {
@@ -541,8 +548,8 @@ export default function PaginaAcompanhamento() {
           </span>
         )}
         {/* Quem está ausente não fez: "✓ Feita" creditaria a ela. */}
-        {!feita && !exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
-        {!feita && !ausentes.has(r.funcionario_id) && (
+        {!feita && !exec && foraDaRota(r) && botaoFeitaPor(r)}
+        {!feita && !foraDaRota(r) && (
           <button
             type="button"
             className="btn btn-mini btn-conforme"
@@ -965,7 +972,7 @@ export default function PaginaAcompanhamento() {
                   </span>
                   {/* Com o filtro numa pessoa, repetir o nome em cada linha é ruído. */}
                   {!(ehSupervisor && filtroEfetivo) && <strong>{funcPorId.get(r.funcionario_id)?.nome ?? "?"}</strong>}
-                  {ausentes.has(r.funcionario_id) && <span className="selo selo-laranja">Ausente</span>}
+                  {foraDaRota(r) && <span className="selo selo-laranja">{ausentes.has(r.funcionario_id) ? "Ausente" : "Emprestado(a)"}</span>}
                   {r.status !== "planejada" && <span className={`selo ${selo.classe}`}>{selo.rotulo}</span>}
                 </div>
                 <div className="acomp-cartao-tarefa">
@@ -1008,8 +1015,8 @@ export default function PaginaAcompanhamento() {
                 <div className="acomp-cartao-acoes">{acoesDoSupervisor(r)}</div>
               ) : !decididaPeloCoordenador(r) && (
               <div className="acomp-cartao-acoes">
-                {!exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
-                {!exec && !exigeEpi && !ausentes.has(r.funcionario_id) && (
+                {!exec && foraDaRota(r) && botaoFeitaPor(r)}
+                {!exec && !exigeEpi && !foraDaRota(r) && (
                   <button
                     type="button"
                     className="btn btn-mini btn-conforme"
@@ -1021,7 +1028,7 @@ export default function PaginaAcompanhamento() {
                   </button>
                 )}
                 {/* Quem faltou: o formulário completo abriria em "conforme" e creditaria a ela. */}
-                {!exec && ausentes.has(r.funcionario_id) ? (
+                {!exec && foraDaRota(r) ? (
                   <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setNaoFeita(r)}>
                     ✗ Não feita
                   </button>
@@ -1089,9 +1096,9 @@ export default function PaginaAcompanhamento() {
                   <td>{caixaDe(r)}</td>
                   <td style={{ fontWeight: 600 }}>
                     {funcPorId.get(r.funcionario_id)?.nome ?? "?"}
-                    {ausentes.has(r.funcionario_id) && (
+                    {foraDaRota(r) && (
                       <span className="selo selo-laranja" style={{ marginLeft: 6 }}>
-                        Ausente
+                        {ausentes.has(r.funcionario_id) ? "Ausente" : "Emprestado(a)"}
                       </span>
                     )}
                   </td>
@@ -1138,8 +1145,8 @@ export default function PaginaAcompanhamento() {
                       <div className="acompanhamento-acoes-tabela">{acoesDoSupervisor(r)}</div>
                     ) : !decididaPeloCoordenador(r) && (
                     <div className="acompanhamento-acoes-tabela">
-                      {!exec && ausentes.has(r.funcionario_id) && botaoFeitaPor(r)}
-                      {!exec && !exigeEpi && !ausentes.has(r.funcionario_id) && (
+                      {!exec && foraDaRota(r) && botaoFeitaPor(r)}
+                      {!exec && !exigeEpi && !foraDaRota(r) && (
                         <button
                           type="button"
                           className="btn btn-mini btn-conforme"
@@ -1150,7 +1157,7 @@ export default function PaginaAcompanhamento() {
                           {confirmando ? "Confirmando…" : "✓ Conforme"}
                         </button>
                       )}
-                      {!exec && ausentes.has(r.funcionario_id) ? (
+                      {!exec && foraDaRota(r) ? (
                         <button type="button" className="btn btn-mini btn-fantasma" onClick={() => setNaoFeita(r)}>
                           ✗ Não feita
                         </button>
