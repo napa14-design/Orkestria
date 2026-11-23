@@ -7,6 +7,20 @@
 
 ---
 
+## 2026-11-23 — Correção: a aba principal das planilhas do Sul 1 e do Sul 2 é de outra sede
+
+Só registro, sem mudança de código. A aba "LOCAÇÕES COLABORADORES" é idêntica, linha por linha, nas
+planilhas "Rota de Trabalho Asg" do Sul 1 e do Sul 2. A equipe dela não está em nenhuma das duas sedes
+(bate com a Aldeota): é uma aba copiada de outra planilha. A parte de cada sede é a aba "Murilo".
+
+- Corrige a entrada anterior: a comparação "a mesma sala aparece com 15,52 m² na aba principal" usou
+  essa aba de outra sede. Os 18 locais do Sul 2 zerados continuam certos: são áreas impossíveis
+  (46.767 m² numa lojinha), e nenhuma área da aba principal foi gravada em local do Sul 2.
+- Sul 1: a aba "Murilo" não tem nenhuma área preenchida, e os 60 locais da sede estão sem metragem.
+  Não havia o que trazer; a sede entrou na planilha de "locais sem área" para a coordenação preencher.
+
+---
+
 ## 2026-11-23 — Importação entende área escrita como texto; metragem do Sul 2 e do Sul 3
 
 Pergunta do dono: por que os locais do Sul 2 não têm metragem, se a planilha tinha?
