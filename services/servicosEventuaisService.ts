@@ -116,7 +116,9 @@ export async function diasDoLancamento(dados: Partial<DadosEventual>, ate: unkno
   }
   const ds = await getDataSource();
   const [funcionario, feriados] = await Promise.all([ds.obter("funcionarios", String(dados.funcionario_id ?? "")), ds.listar("feriados")]);
-  if (!funcionario) throw recusa("Escolha a pessoa.");
+  // Outra sede responde igual a inexistente: a resposta não diz que a pessoa existe nem a folga
+  // dela a quem opera outra sede (revisão de segurança, 24/11/2026).
+  if (!funcionario || funcionario.sede_id !== dados.sede_id) throw recusa("Escolha a pessoa.");
   const uteis = datas.filter((d) => jornadaDoDia(funcionario, d).trabalha && !feriadoDoDia(feriados, funcionario.sede_id, d));
   if (!uteis.length) throw recusa("Nenhum dia de trabalho da pessoa nesse período.");
   return uteis;

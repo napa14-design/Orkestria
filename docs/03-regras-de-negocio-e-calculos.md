@@ -166,9 +166,11 @@ cobertura ("registrada em X dos Y dias com rotina"). Dia sem registro não quer 
 
 ### Empréstimo a outra unidade (23/11/2026)
 
-Atividade adicional com **"Emprestado(a) a outra unidade"** marcado (`libera_rota`): a pessoa sai
-da rota no horário lançado (início e fim obrigatórios; para o dia todo, entrada e saída dela).
-Com **"Até"**, vira um lançamento por dia de trabalho da pessoa (pula folga e feriado), até 31 dias.
+Lançado em **Remanejo entre sedes › Emprestar uma pessoa** (24/11/2026; antes, na atividade
+adicional) por coordenador (nas sedes dele) ou administrador. Guarda-se como serviço eventual de
+"Apoio a outro setor" com `libera_rota`: a pessoa sai da rota no horário (início e fim; o padrão é
+a entrada e saída dela). Com **"Até"**, vira um lançamento por dia de trabalho da pessoa (pula folga
+e feriado), até 31 dias. Não é ausência: não entra em Ausências.
 
 - Os blocos dela que caem na janela ficam **sem dono** (`blocosNoEmprestimo`): as **críticas
   passam sozinhas** para outra pessoa, pelas regras da falta, ao lançar e ao gerar o dia; as

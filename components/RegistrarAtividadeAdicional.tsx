@@ -36,7 +36,7 @@ export default function RegistrarAtividadeAdicional({
   /** A barra da agenda usa botão pequeno. */
   classeBotao?: string;
 }) {
-  const vazio = { pessoa: "", inicio: "", fim: "", descricao: "", exigencia: "" as ExigenciaAtividade | "", emprestimo: false, ate: "" };
+  const vazio = { pessoa: "", inicio: "", fim: "", descricao: "", exigencia: "" as ExigenciaAtividade | "" };
   const [aberto, setAberto] = useState(false);
   const [form, setForm] = useState(vazio);
   const [erro, setErro] = useState("");
@@ -58,10 +58,9 @@ export default function RegistrarAtividadeAdicional({
     if (!(hhmmParaMin(form.fim) > hhmmParaMin(form.inicio))) return setErro("Informe início e fim, com o fim depois do início.");
     if (!form.descricao.trim()) return setErro("Escreva o que foi feito (ex.: desmontagem do evento do colégio).");
     if (!form.exigencia) return setErro("Escolha o tipo do que a pessoa fez, ou “Não sei informar”.");
-    if (form.emprestimo && form.ate && form.ate < data) return setErro("O “até” precisa ser depois do dia do lançamento.");
     setSalvando(true);
     try {
-      const r = await apiPost<{ dias?: number; remanejos?: string[] }>("/api/servicos-eventuais", {
+      await apiPost("/api/servicos-eventuais", {
         sede_id: sedeId,
         funcionario_id: form.pessoa,
         local_id: "",
@@ -74,18 +73,10 @@ export default function RegistrarAtividadeAdicional({
         tempo_min: hhmmParaMin(form.fim) - hhmmParaMin(form.inicio),
         observacao: "",
         exigencia: form.exigencia,
-        ...(form.emprestimo ? { libera_rota: true, ate: form.ate || undefined } : {}),
       });
       const nome = pessoas.find((p) => p.id === form.pessoa)?.nome ?? "";
-      const dias = r?.dias ?? 1;
-      const passadas = r?.remanejos?.length ?? 0;
       // Fica aberto para lançar a próxima pessoa do mesmo evento: o tipo é de cada uma.
-      setFeito(
-        `Registrado para ${nome}${dias > 1 ? ` em ${dias} dias` : ""}.` +
-          (form.emprestimo
-            ? ` ${passadas ? `${passadas} tarefa(s) crítica(s) passaram para outra pessoa.` : "Nenhuma tarefa crítica no horário."} As outras tarefas do horário aparecem na Central do dia.`
-            : " Lance a próxima pessoa ou feche."),
-      );
+      setFeito(`Registrado para ${nome}. Lance a próxima pessoa ou feche.`);
       setForm({ ...form, pessoa: "", exigencia: "" });
       aoSalvar?.();
     } catch (err) {
@@ -134,33 +125,6 @@ export default function RegistrarAtividadeAdicional({
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
             />
           </label>
-          {/* Empréstimo (23/11/2026): a pessoa sai da rota nesse horário — as críticas passam sozinhas. */}
-          <label style={{ gridColumn: "1 / -1", display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={form.emprestimo}
-              onChange={(e) => setForm({ ...form, emprestimo: e.target.checked })}
-              style={{ marginTop: 3 }}
-            />
-            <span>
-              <strong>Emprestado(a) a outra unidade</strong>
-              <span style={{ color: "var(--tinta-3)" }}>
-                {" "}
-                — tira a pessoa da rota nesse horário: as tarefas críticas passam sozinhas para outra pessoa e a Central
-                propõe as demais.
-              </span>
-            </span>
-          </label>
-          {form.emprestimo && (
-            <label className="campo" style={{ gridColumn: "1 / -1" }}>
-              <span className="rotulo">Até (opcional, para vários dias)</span>
-              <input type="date" value={form.ate} min={data} onChange={(e) => setForm({ ...form, ate: e.target.value })} />
-              <span style={{ fontSize: 11, color: "var(--tinta-3)" }}>
-                Mesmo horário em cada dia de trabalho da pessoa até esta data (pula folga e feriado). Para o dia todo, use o
-                horário de entrada e saída dela.
-              </span>
-            </label>
-          )}
           {/* Sem a classe "campo": o estilo dela estica todo input, e o botão de opção virava uma barra. */}
           <fieldset style={{ gridColumn: "1 / -1", border: 0, padding: 0, margin: 0, display: "grid", gap: 4, minWidth: 0 }}>
             <legend className="rotulo">O que esta pessoa fez *</legend>

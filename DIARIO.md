@@ -7,6 +7,27 @@
 
 ---
 
+## 2026-11-24 — Empréstimo sai da atividade adicional e vai para "Remanejo entre sedes"
+
+Decisão do dono: diferenciar de vez o empréstimo da ausência, pondo o cadastro na tela que já
+trata de pessoas entre sedes.
+
+- **Remanejo entre sedes › "Emprestar uma pessoa"** (`components/EmprestimosEntreSedes.tsx`):
+  pessoa, destino (outra sede ou texto), dia, "Até", início e fim (preenchidos pela jornada dela).
+  Lista os empréstimos de hoje em diante, com excluir. Vê e lança só nas sedes de quem usa (o
+  servidor confere); o coordenador, que antes não tinha a tela, passa a ter só essa parte.
+- **Redistribuição da rede** (tarefas de quem faltou, entre sedes) continua só para o administrador.
+- A caixa de empréstimo saiu da atividade adicional. O dado e as regras são os mesmos (`libera_rota`).
+- Revisão de segurança (libera com ressalvas): com o "Até", a conta de dias lia a escala da pessoa
+  antes de conferir a sede — dava para descobrir, por tentativa, que alguém de outra sede existe e os
+  dias de folga dela. Pessoa de outra sede agora responde igual a inexistente.
+
+Arquivos: `components/EmprestimosEntreSedes.tsx`, `app/(app)/remanejo/page.tsx`,
+`components/AppShell.tsx`, `components/RegistrarAtividadeAdicional.tsx`,
+`services/servicosEventuaisService.ts`, `testes/eventuais-ocupacao.test.ts`, `docs/03`.
+
+---
+
 ## 2026-11-23 — Empréstimo a outra unidade: a pessoa sai da rota no horário
 
 Pedido da coordenação: um ASG é "emprestado" para ajudar outra unidade por algumas horas, dias ou

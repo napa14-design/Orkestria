@@ -403,7 +403,7 @@ describe("no mostrador e no Painel", () => {
 
     it("empréstimo com \"até\": um dia por dia de trabalho, pula fim de semana; recusa período inválido", async () => {
       reiniciarBanco();
-      const emp = { funcionario_id: "christus_f1", data: "2026-11-27", libera_rota: true } as never; // sexta; f1 é seg–sex
+      const emp = { sede_id: "christus_dt", funcionario_id: "christus_f1", data: "2026-11-27", libera_rota: true } as never; // sexta; f1 é seg–sex
       expect(await diasDoLancamento(emp, "2026-12-01")).toEqual(["2026-11-27", "2026-11-30", "2026-12-01"]);
       expect(await diasDoLancamento(emp, "")).toEqual(["2026-11-27"]);
       await expect(diasDoLancamento(emp, "2026-11-20")).rejects.toThrow(ErroValidacao); // antes do início
@@ -411,6 +411,12 @@ describe("no mostrador e no Painel", () => {
       await expect(diasDoLancamento(emp, "2026-11-29")).resolves.toEqual(["2026-11-27"]);
       await expect(diasDoLancamento({ ...(emp as object), data: "2026-11-28" } as never, "2026-11-29")).rejects.toThrow(ErroValidacao); // só fim de semana
       await expect(diasDoLancamento({ ...(emp as object), libera_rota: false } as never, "2026-12-01")).rejects.toThrow(ErroValidacao);
+      // Pessoa de outra sede: a mesma recusa de quem não existe, em qualquer dia (revisão de segurança).
+      const ds = await getDataSource();
+      await ds.criar("funcionarios", { ...(await ds.obter("funcionarios", "christus_f1"))!, id: "f-ald", sede_id: "christus_ald" });
+      for (const data of ["2026-11-27", "2026-11-28"])
+        await expect(diasDoLancamento({ ...(emp as object), data, funcionario_id: "f-ald" } as never, "2026-12-01")).rejects.toThrow("Escolha a pessoa.");
+      await expect(diasDoLancamento({ ...(emp as object), funcionario_id: "nao-existe" } as never, "2026-12-01")).rejects.toThrow("Escolha a pessoa.");
     });
 
     it("com início e fim, o tempo gravado é o do horário, e a lista mostra o que conta", async () => {

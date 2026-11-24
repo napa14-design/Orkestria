@@ -46,7 +46,8 @@ const GRUPOS: Grupo[] = [
       { href: "/acompanhamento", rotulo: "Acompanhamento" },
       { href: "/conferir", rotulo: "Conferir ficha" },
       { href: "/eventuais", rotulo: "Serviços eventuais" },
-      { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasAdmin: true },
+      // Coordenador empresta pessoas das sedes dele; a redistribuição da rede é do administrador.
+      { href: "/remanejo", rotulo: "Remanejo entre sedes", apenasGestao: true },
     ],
   },
   {

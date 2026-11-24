@@ -1,14 +1,17 @@
 "use client";
 
 /**
- * Remanejo entre sedes (Fase F) — visão de gerência multi-sede. Lista as tarefas
- * de funcionários ausentes em TODAS as sedes e permite atribuí-las a colegas com
- * folga, inclusive de outra sede. A movimentação passa pelas validações normais
- * (jornada, conflito, conformidade); cruzar sedes é destacado (há deslocamento).
+ * Remanejo entre sedes. Duas partes:
+ *  - **Emprestar uma pessoa** (24/11/2026): coordenador (nas sedes dele) e administrador;
+ *  - **Redistribuição da rede** (Fase F): só administrador. Lista as tarefas de funcionários
+ *    ausentes em TODAS as sedes e permite atribuí-las a colegas com folga, inclusive de outra
+ *    sede. A movimentação passa pelas validações normais; cruzar sedes é destacado.
  */
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Carregando from "@/components/Carregando";
+import EmprestimosEntreSedes from "@/components/EmprestimosEntreSedes";
+import { useSessao } from "@/components/SessaoContexto";
 import { criticaNoDia, jornadaDoDia, jornadaLiquidaMin, ocupaHorario } from "@/lib/calculations";
 import { apiPut, ErroApi, fetcher } from "@/lib/clientApi";
 import { formatarDataBR, formatarDuracao, hhmmParaMin, hojeISO } from "@/lib/dateUtils";
@@ -23,6 +26,18 @@ import type {
 } from "@/types";
 
 export default function PaginaRemanejo() {
+  const sessao = useSessao();
+  const admin = sessao?.perfil === "administrador";
+  return (
+    <div className="entra">
+      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Remanejo entre sedes</h1>
+      <EmprestimosEntreSedes />
+      {admin && <RedistribuicaoDaRede />}
+    </div>
+  );
+}
+
+function RedistribuicaoDaRede() {
   const [data, setData] = useState(hojeISO());
   const [destinos, setDestinos] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
@@ -196,10 +211,10 @@ export default function PaginaRemanejo() {
   }
 
   return (
-    <div className="entra">
+    <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800 }}>Remanejo entre sedes</h1>
+          <h2 style={{ fontSize: 20, fontWeight: 800 }}>Redistribuição da rede</h2>
           <p style={{ color: "var(--tinta-2)", marginTop: 2 }}>
             Tarefas de ausentes em todas as sedes, cobríveis por colegas com folga — inclusive de outra sede.
           </p>
