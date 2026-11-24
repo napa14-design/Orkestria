@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
 import { fraseDoFeito } from "@/lib/agenda";
@@ -26,9 +27,9 @@ export default function CentralDoDia({ nome }: { nome: string }) {
   const [resolvendo, setResolvendo] = useState(false);
   const [erroAcao, setErroAcao] = useState("");
   const [feito, setFeito] = useState("");
-  // Vazio = a sede principal decidida no servidor. Quem opera uma sede só
+  // `?sede=` vem do link "resolver na Central". Vazio = a sede principal decidida no servidor. Quem opera uma sede só
   // nunca mexe nisto.
-  const [sedeVista, setSedeVista] = useState("");
+  const [sedeVista, setSedeVista] = useState(useSearchParams().get("sede") ?? "");
   const { data, error, isLoading, isValidating, mutate } = useSWR<CentralDiaDados>(
     sedeVista ? `/api/central-dia?sede=${encodeURIComponent(sedeVista)}` : "/api/central-dia",
     fetcher,

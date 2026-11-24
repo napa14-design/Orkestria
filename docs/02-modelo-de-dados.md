@@ -67,6 +67,7 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 | empresa | string | empresa que registra a pessoa, na grafia de `normalizarEmpresa` ("APEL MATRIZ"). Desde 13/11/2026 o dono do dado é o Orkestria (daqui vai para o Chromos). **Lista fechada**: só empresa ativa da tabela `empresas` (no cadastro, na edição que a troca, na transferência e na importação). **Obrigatória** |
 | data_admissao | string | AAAA-MM-DD, não futura. **Obrigatória** desde 13/11/2026. Desligado e posto vago ficam dispensados dos quatro |
 | identidade_alterada_em | ISO 8601 | instante da última troca de matrícula, empresa ou nome completo (inclusive de vazio para preenchido). Só o servidor grava; vai no evento do Quadro como `identidadeAlteradaEm` |
+| deixou_asg_em | AAAA-MM-DD | dia em que deixou a função ASG pelo "Transferir › Outra função" (24/11/2026). Só o servidor grava; com ele a ficha não se exclui |
 | desligado_em | AAAA-MM-DD | desligamento; a partir deste dia sai da geração e da agenda (pode ser futuro — aviso prévio) |
 | motivo_desligamento | string | um de `MOTIVOS_DESLIGAMENTO` (`lib/desligamento.ts`: os 6 do Chromos + 5 daqui). Só o "Transferir" grava "Transferência"; a ficha-posto do "saiu do posto" leva "Saiu do posto". Fichas antigas podem ter "Pedido de demissão", "Demissão sem justa causa" ou "Demissão por justa causa" (continuam valendo no "Abrir vaga") |
 | vaga_sgcp | string | código da vaga de substituição aberta no SGCP; vazio = não abriu |
@@ -83,8 +84,10 @@ mais de uma unidade: o escopo efetivo é `sede_id` + `sedes_extra`. Regras:
 > `jornada_liquida = saida − entrada − intervalo_min`.
 
 > **Sede não muda pela edição** (13/11/2026): troca de sede só pelo "Transferir", que gera
-> o evento `transf_`. **Cargo**: entrar ou sair da função ASG não se faz pela edição (16/11/2026);
-> entre outros cargos, livre. **Saiu do posto** (Desligar com `tipo: "saiu_do_posto"`, data de
+> o evento `transf_`. **Cargo**: a edição nunca o grava (valor diferente é recusado). Deixar de ser ASG é pelo "Transferir › Outra
+> função" (24/11/2026): a pessoa fica na sede com a ficha, a agenda e a rota, e sai o `transf_` para
+> "setor", que no Chromos vai para a lista do RH (nunca aplicado sozinho). Entrar ou voltar a ASG não
+> se faz por aqui. **Saiu do posto** (Desligar com `tipo: "saiu_do_posto"`, data de
 > hoje ou passada): a pessoa continua ativa, sem rota; a rota vai para uma ficha-posto nova
 > (id `posto_<id da pessoa>_<data>`, gravada com `create`; "Posto de <apelido>", desligada na
 > data, sem dados do RH), que o "Assume o posto de" lista como posto vago. **"Assume o posto

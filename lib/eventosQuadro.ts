@@ -33,6 +33,15 @@ export function ehAsg(cargo: string | undefined): boolean {
   return forma === "ASG" || forma === "A S G" || forma === "AUXILIAR DE SERVICOS GERAIS";
 }
 
+/**
+ * Escrito de outro jeito, mas ainda ASG ("ASG 1", "Aux. de Serviços Gerais", "Serviços Gerais"). Só para RECUSAR como
+ * função nova em "Outra função": aceitar emitiria a saída do Quadro de quem não saiu, sem volta.
+ */
+export function pareceAsg(cargo: string): boolean {
+  const forma = cargo.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+  return /^A ?S ?GS?\b/.test(forma) || /^((AUX\w*|AGENTE) )?(DE )?S(ERV\w*)? GER/.test(forma);
+}
+
 const PREFIXO: Record<TipoEventoQuadro, string> = { admissao: "adm", desligamento: "desl", transferencia: "transf" };
 
 /** `adm_<id>`, `desl_<id>`, `transf_<idDaOrigem>` — o Chromos recalcula e confere. */

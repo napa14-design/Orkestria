@@ -1,4 +1,4 @@
-import { agoraISO, getDataSource, LoteMudou, novoId, type OperacaoLote } from "@/lib/datasource";
+import { agoraISO, ehIdRepetido, getDataSource, LoteMudou, novoId, type OperacaoLote } from "@/lib/datasource";
 import { hhmmParaMin, hojeISO, minParaHHMM, parseDiasSemana } from "@/lib/dateUtils";
 import { mapaFatorDoTipo } from "./tiposLocalService";
 import { tempoPrevistoMin } from "@/lib/calculations";
@@ -12,7 +12,7 @@ import {
   validarDataDeSaida,
   validarDesligamento,
 } from "@/lib/desligamento";
-import { ehAsg, idDoEvento, montarEvento, SEDE_SETOR } from "@/lib/eventosQuadro";
+import { ehAsg, idDoEvento, montarEvento, pareceAsg, SEDE_SETOR } from "@/lib/eventosQuadro";
 import { csvDoTrio, sincronizarTrio } from "@/lib/intervalos";
 import { normalizarMatricula } from "@/lib/quadroInfra";
 import { normalizarEmpresa } from "@/lib/empresas";
@@ -212,10 +212,14 @@ const CAMPOS_DO_DESLIGAMENTO: ReadonlySet<string> = new Set([
   "transferido_setor",
   // Só o servidor carimba (troca de matrícula, empresa ou nome completo); vai no evento do Quadro.
   "identidade_alterada_em",
+  // Só o "Transferir › Outra função" grava (24/11/2026).
+  "deixou_asg_em",
 ]);
 
 /** Limpeza do nome completo — a mesma de `dadosDoRh`, para comparar antes × depois. */
 const nomeLimpo = (v: unknown) => String(v ?? "").replace(/\p{Cf}/gu, "").replace(/\s+/g, " ").trim();
+
+const VOLTAR_A_ASG = "Entrar ou voltar para a função ASG não se faz pelo Orkestria depois do cadastro: é com o RH.";
 
 export async function updateFuncionario(
   id: string,
@@ -248,16 +252,24 @@ export async function updateFuncionario(
         mensagem: "A sede não muda pela edição: use o botão \"Transferir\".",
       },
     ]);
-  // Entrar ou sair da função ASG muda o que vai para o Chromos (só ASG gera evento): é do
-  // RH, não da edição (decisão do dono, 16/11/2026). Entre outros cargos, segue livre.
-  if (mudancas.cargo !== undefined && ehAsg(destino.cargo) !== ehAsg(atual.cargo))
-    throw new ErroValidacao([
-      {
-        nivel: "erro",
-        codigo: "CARGO_SO_PELO_RH",
-        mensagem: "Entrar ou sair da função ASG não se faz pela edição: fale com o RH.",
-      },
-    ]);
+  // A função só muda pelo "Transferir › Outra função", que emite o evento de quem deixa de ser ASG
+  // (`mudarFuncao`, decisão do dono, 24/11/2026). ⚠️ A edição NUNCA grava o cargo: o formulário manda
+  // a ficha inteira, e o cargo de uma tela aberta antes devolvia a ASG quem acabara de sair, sem
+  // evento (revisão de segurança, 24/11/2026, 5 de 60 corridas no emulador).
+  if (mudancas.cargo !== undefined) {
+    const { cargo, ...resto } = mudancas;
+    const mesmo = ehAsg(String(cargo)) ? ehAsg(atual.cargo) : String(cargo).trim() === (atual.cargo ?? "").trim();
+    if (!mesmo)
+      throw new ErroValidacao([
+        {
+          nivel: "erro",
+          codigo: "CARGO_SO_PELO_TRANSFERIR",
+          mensagem:
+            "A função não muda pela edição: use \"Transferir\" › \"Outra função\". Se você não mexeu nela, atualize a página: alguém mudou a função desta pessoa.",
+        },
+      ]);
+    mudancas = resto;
+  }
   const empresaMudou = normalizarEmpresa(destino.empresa) !== normalizarEmpresa(atual.empresa);
   // Empresa trocada: só para uma ativa do cadastro (lista fechada, 13/11/2026).
   if (empresaMudou && normalizarEmpresa(destino.empresa)) await exigirEmpresaDoCadastro(destino.empresa);
@@ -308,7 +320,7 @@ export async function deleteFuncionario(id: string): Promise<void> {
   // dias (retenção), e a trava não pode expirar junto — a pessoa sairia do Orkestria sem
   // `desl_` e o Chromos ficaria com ela ativa (seguranca e auditor, 16/11/2026).
   const asgNoQuadro = !!atual && ehAsg(atual.cargo) && !atual.desligado_em;
-  if (adm || transf || asgNoQuadro)
+  if (adm || transf || asgNoQuadro || atual?.deixou_asg_em)
     throw new ErroValidacao([
       {
         nivel: "erro",
@@ -1057,6 +1069,7 @@ export async function transferirFuncionario(
     transferido_de: id,
     // A mesma pessoa: a última troca de identidade dela continua valendo.
     ...(atual.identidade_alterada_em ? { identidade_alterada_em: atual.identidade_alterada_em } : {}),
+    ...(atual.deixou_asg_em ? { deixou_asg_em: atual.deixou_asg_em } : {}),
   };
 
   // A transferência INTEIRA num lote só (emenda 2 do contrato do Quadro, 13/11/2026):
@@ -1136,6 +1149,78 @@ export async function transferirParaSetor(
   });
   const vaga = await decidirVaga(id, MOTIVO_TRANSFERENCIA, false, dados.abrirVaga === true, solicitante);
   return { ...enc.resultado, vaga };
+}
+
+/**
+ * "Transferir › Outra função" (decisão do dono, 24/11/2026: promoção não pode esperar o RH). A
+ * pessoa continua na mesma sede, com a mesma ficha, agenda e rota; só a função muda. Deixar de ser
+ * ASG emite o `transf_` para "setor" no mesmo lote: no Chromos ele nunca é aplicado sozinho, vai
+ * para a lista da Movimentação, e o RH confere depois (contrato do Quadro, emenda 5). Voltar a ser
+ * ASG não: não há evento de volta no contrato.
+ */
+export async function mudarFuncao(
+  id: string,
+  dados: { sede_id?: unknown; setor?: unknown; funcao?: unknown; data?: unknown },
+  autor: string,
+): Promise<{ blocosRemovidos: 0; funcao: string; avisouQuadro: boolean }> {
+  const ds = await getDataSource();
+  const atual = await ds.obter("funcionarios", id);
+  if (!atual) throw new Error("Funcionário não encontrado.");
+  const recusa = (codigo: string, mensagem: string) => new ErroValidacao([{ nivel: "erro", codigo, mensagem }]);
+  if (dados.sede_id !== undefined || dados.setor !== undefined)
+    throw recusa("TRANSFERENCIA_DESTINO_DUPLO", "Escolha a função ou o destino, não os dois.");
+  const funcao = typeof dados.funcao === "string" ? dados.funcao.normalize("NFC").replace(/ +/g, " ").trim() : "";
+  if (!funcao) throw recusa("FUNCAO_INVALIDA", "Informe a nova função.");
+  if (funcao.length > MAX_NOME_SETOR) throw recusa("FUNCAO_INVALIDA", `A função pode ter até ${MAX_NOME_SETOR} caracteres.`);
+  // Só letra comum, número e pontuação simples, começando por letra: sem fórmula de planilha (o cargo
+  // vai ao SGCP) nem letra de outro alfabeto que se lê "ASG".
+  if (!/^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ0-9 .,/()&'ºª-]*$/.test(funcao))
+    throw recusa("FUNCAO_INVALIDA", "A função deve começar por uma letra e ter só letras, números e pontuação simples.");
+  if (atual.desligado_em || atual.ativo === false)
+    throw recusa("TRANSFERENCIA_FORA_DO_QUADRO", `${atual.nome} já está desligado(a) ou em aviso: não há função a mudar.`);
+  if (pareceAsg(funcao))
+    throw recusa("FUNCAO_ASG", ehAsg(atual.cargo) ? `"${funcao}" ainda é ASG: não é outra função.` : VOLTAR_A_ASG);
+  if (funcao.toLocaleLowerCase("pt-BR") === (atual.cargo ?? "").trim().toLocaleLowerCase("pt-BR"))
+    throw recusa("FUNCAO_MESMA", `${atual.nome} já está nesta função.`);
+  // Só hoje ou passado: a função muda na hora, e data futura deixaria o Quadro à frente da ficha.
+  if (validarDataDeSaida(dados.data) || (dados.data as string) > hojeISO())
+    throw recusa("TRANSFERENCIA_DATA", "Informe uma data real, de hoje ou passada.");
+  if (atual.data_admissao && (dados.data as string) < atual.data_admissao)
+    throw recusa("TRANSFERENCIA_DATA", "A data não pode ser anterior à admissão.");
+  const data = dados.data as string;
+
+  const agora = agoraISO();
+  const deixaAsg = ehAsg(atual.cargo);
+  const sede = deixaAsg ? await ds.obter("sedes", atual.sede_id) : null;
+  const lote: OperacaoLote[] = [
+    {
+      tipo: "atualizar", tabela: "funcionarios", id,
+      mudancas: {
+        cargo: funcao,
+        ...(deixaAsg ? { deixou_asg_em: data } : {}),
+        observacoes: [atual.observacoes, `Função mudou de ${atual.cargo || "—"} para ${funcao} em ${data.split("-").reverse().join("/")}.`]
+          .filter(Boolean)
+          .join(" · "),
+        atualizado_por: autor,
+        atualizado_em: agora,
+      },
+    },
+    // Vai a função que a pessoa DEIXOU (ASG): é a saída dela do Quadro; a nova não sai daqui.
+    ...(deixaAsg
+      ? [criarEvento(montarEvento({
+          tipo: "transferencia", funcionario: atual, dataEfetiva: data,
+          sedeDe: sede?.codigo ?? "", sedePara: SEDE_SETOR, autor, registradoEm: agora,
+        }))]
+      : []),
+  ];
+  try {
+    await ds.gravarLote(lote);
+  } catch (e) {
+    // Dois cliques: a coleção é só de inclusão, então o segundo lote inteiro é recusado.
+    if (!ehIdRepetido(e) && !/só de inclusão/.test(String(e))) throw e;
+    throw new ErroConflito("A saída desta pessoa da função ASG já foi registrada (outro pedido chegou antes). Atualize a página.");
+  }
+  return { blocosRemovidos: 0, funcao, avisouQuadro: deixaAsg };
 }
 
 /**

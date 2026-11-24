@@ -333,6 +333,23 @@ describe("rotas do Quadro", () => {
     ]);
   });
 
+  it("quem deixou de ser ASG não é divergência (nem matrícula que não confere, nem Desligar), e de lá não vira 'fora do Orkestria'", async () => {
+    await cadastro("f-prom", "Fulana Que Saiu do Feed", { matricula: "999", empresa: "EMPRESA A", cargo: "Porteiro", deixou_asg_em: "2026-10-20" });
+    await cadastro("f-asg", "Beltrana Que Continua", { matricula: "998", empresa: "EMPRESA A" });
+    const antes = await (await pedirGet("christus_dt")).json();
+    expect(antes.naoConfere.map((x: { funcionario_id: string }) => x.funcionario_id)).toEqual(["f-asg"]); // o controle aparece
+    expect(antes.semVinculo).toEqual([]);
+    expect(antes.foraDoOrkestria).toHaveLength(1);
+    // Enquanto o RH não acerta lá, a ficha daqui segue valendo como vínculo da pessoa do Quadro.
+    await cadastro("f-vinc", "Maria Souza", { matricula: "100", empresa: "EMPRESA A", cargo: "Porteiro", deixou_asg_em: "2026-10-20" });
+    const depois = await (await pedirGet("christus_dt")).json();
+    expect(depois.foraDoOrkestria).toEqual([]);
+    // Devolvida a ASG (correção no banco): volta a ser conferida.
+    await (await getDataSource()).atualizar("funcionarios", "f-prom", { cargo: "ASG" });
+    const volta = await (await pedirGet("christus_dt")).json();
+    expect(volta.naoConfere.map((x: { funcionario_id: string }) => x.funcionario_id).sort()).toEqual(["f-asg", "f-prom"]);
+  });
+
   it("O44/O39: sem cache no navegador; o token vai no cabeçalho, sem seguir redirecionamento e com prazo", async () => {
     const r = await pedirGet("christus_dt");
     expect(r.headers.get("Cache-Control")).toBe("private, no-store");

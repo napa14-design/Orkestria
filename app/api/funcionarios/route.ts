@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       leituraCompleta(sessao)
         ? lista
         : lista.map((f) => ({
-            ...f, motivo_desligamento: "", observacoes: "", transferido_setor: "", nome_completo: "", data_admissao: "",
+            ...f, motivo_desligamento: "", observacoes: "", transferido_setor: "", nome_completo: "", data_admissao: "", deixou_asg_em: "",
           })),
     );
   });

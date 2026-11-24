@@ -188,6 +188,23 @@ e feriado), até 31 dias. Não é ausência: não entra em Ausências.
 - Editar ou apagar o lançamento depois **não desfaz** o que já foi remanejado; o "Repetir o dia"
   copia para o horário sem remanejar (a Central aponta).
 
+### Remanejos do dia (24/11/2026)
+
+Botão na agenda e no Acompanhamento (administrador, coordenador e gerência; o supervisor não): para
+quem está fora no dia (ausente, ou emprestado na janela), o que foi feito de cada tarefa. Só leitura,
+deduzido do que já está gravado (`lib/remanejosDoDia.ts`).
+
+- **Passou** para outra pessoa, e como: automático (marca do remanejo) ou trocada à mão (arrasto, "Trocar
+  tarefas", Central ou "Feita por"). **Sem cobertura registrada**: segue
+  aberta no nome de quem está fora, ou no de quem cobria e **também está fora**. **Cancelada ou adiada**
+  vence "passou".
+- No empréstimo vale o horário que a tarefa tinha para a dona (primeiro remanejo da cadeia, senão o
+  horário da rota), mesmo que a troca a tenha levado para outro horário.
+- Limites: bloco montado à mão não tem dono anterior; se a rota mudou depois, vale o dono de hoje do item;
+  se a própria dona mudou o horário antes de passar a tarefa, no empréstimo vale o horário da rota.
+- Não devolve o tipo nem a observação da ausência, nem o destino do empréstimo; quem cobre de outra sede
+  aparece como "Pessoa de outra sede".
+
 ## 4. Validações da agenda
 
 | Código | Nível | Situação |

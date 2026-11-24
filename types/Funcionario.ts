@@ -59,6 +59,11 @@ export interface Funcionario extends Auditoria {
    */
   identidade_alterada_em?: string;
   /**
+   * Dia em que deixou a função ASG pelo "Transferir › Outra função" (24/11/2026). Só o servidor
+   * grava: com ele a ficha não se exclui nem volta a ASG por aqui (o Quadro já foi avisado).
+   */
+  deixou_asg_em?: string;
+  /**
    * Desligamento (AAAA-MM-DD): a partir deste dia a pessoa sai da geração e da
    * agenda. Pode ser futuro (aviso prévio). Ver `lib/desligamento.ts`.
    */

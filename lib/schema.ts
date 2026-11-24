@@ -129,6 +129,7 @@ export const SCHEMA: Record<NomeTabela, DefColuna[]> = {
     col("nome_completo"),
     col("data_admissao"),
     col("identidade_alterada_em"),
+    col("deixou_asg_em"),
   ],
   sedes: [
     col("id"),

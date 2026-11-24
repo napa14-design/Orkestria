@@ -698,12 +698,13 @@ describe("segunda rodada (seguranca e auditor, 16/11/2026)", () => {
     expect(await eventos()).toEqual([]);
   });
 
-  it("3. cargo: entrar ou sair de ASG pela edição é recusado; entre outros cargos, livre; o evento leva funcao \"ASG\" normalizado", async () => {
+  it("3. cargo: a EDIÇÃO não muda nem grava o cargo; o evento leva funcao \"ASG\" normalizado", async () => {
     const codigo = async (r: Response) => (r.status === 200 ? 200 : (await r.json()).alertas?.[0]?.codigo);
-    expect(await codigo(await editar(corpo({ cargo: "Porteiro" }, "PUT"), ctx("f-asg")))).toBe("CARGO_SO_PELO_RH");
+    expect(await codigo(await editar(corpo({ cargo: "Porteiro" }, "PUT"), ctx("f-asg")))).toBe("CARGO_SO_PELO_TRANSFERIR");
     await ficha("f-porteiro", { cargo: "Porteiro", matricula: "M-port" });
-    expect(await codigo(await editar(corpo({ cargo: "ASG" }, "PUT"), ctx("f-porteiro")))).toBe("CARGO_SO_PELO_RH");
-    expect(await codigo(await editar(corpo({ cargo: "Jardineiro" }, "PUT"), ctx("f-porteiro")))).toBe(200);
+    expect(await codigo(await editar(corpo({ cargo: "ASG" }, "PUT"), ctx("f-porteiro")))).toBe("CARGO_SO_PELO_TRANSFERIR");
+    expect(await codigo(await editar(corpo({ cargo: "Jardineiro" }, "PUT"), ctx("f-porteiro")))).toBe("CARGO_SO_PELO_TRANSFERIR");
+    expect(await codigo(await editar(corpo({ cargo: "Porteiro", entrada: "06:30" }, "PUT"), ctx("f-porteiro")))).toBe(200); // o formulário manda a ficha inteira
     expect(await codigo(await editar(corpo({ cargo: "A.S.G." }, "PUT"), ctx("f-asg")))).toBe(200); // continua ASG
     await desligar(corpo({ tipo: "saiu_da_empresa", data: HOJE, motivo: "Outros", abrirVaga: false }), ctx("f-asg"));
     expect((await eventos())[0].funcao).toBe("ASG");

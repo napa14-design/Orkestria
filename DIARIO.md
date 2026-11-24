@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-11-24 — Mudar de função sem esperar o RH, e "Remanejos do dia"
+
+**Transferir › Outra função.** Decisão do dono, no lugar da de 16/11 ("cargo só pelo RH"): a promoção
+não espera o RH. Antes, trocar o cargo na edição fazia o servidor recusar o formulário inteiro (o
+horário junto), e parecia que "não salvava".
+
+- A pessoa continua na sede, com a mesma ficha, agenda e rota; muda a função, com data de hoje ou
+  passada. O campo Cargo saiu da edição (como a sede em 13/11).
+- Quem deixa de ser ASG gera, no mesmo lote, o `transf_` para "setor". Contrato sem mudança: no Chromos
+  esse evento vai para a lista da Movimentação e nunca é aplicado sozinho. A função nova não sai daqui.
+- Voltar a ASG não se faz pela tela (não há evento de volta). `deixou_asg_em` (só o servidor grava)
+  impede excluir a ficha mesmo depois de o evento expirar.
+- A edição nunca grava a função: o formulário manda a ficha inteira, e salvar o horário com a tela velha
+  devolvia a ASG quem acabara de sair, sem evento (revisão de segurança: 14 de 60 corridas; agora 0 de 180).
+- A lista mostra a função de quem deixou de ser ASG, e a conferência com o Quadro (só ASG) deixa de acusá-la.
+
+**Remanejos do dia.** Botão na agenda e no Acompanhamento: quem está fora (ausente ou emprestado) e,
+tarefa por tarefa, para quem passou e como, ou se ficou sem cobertura registrada. Só leitura; o
+supervisor não vê. O "resolver na Central" abre na sede certa (a Central passou a ler `?sede=`).
+
+- A auditoria reprovou a primeira versão: dizia "passou" quando quem cobria também estava fora, quando a
+  tarefa foi cancelada depois, e perdia a que a troca levou para outro horário no empréstimo. Corrigido,
+  com os caminhos reais em `testes/remanejos-composicao.test.ts`.
+- Medido em produção (só leitura, 14 dias): 96,5% dos blocos têm vínculo válido com a rota, que é o que
+  revela a troca feita à mão.
+
+Arquivos: `services/funcionariosService.ts` (`mudarFuncao`), `app/api/funcionarios/[id]/transferir`,
+`app/(app)/funcionarios/page.tsx`, `lib/schema.ts`, `types/Funcionario.ts`, `lib/remanejosDoDia.ts`,
+`services/remanejosDoDiaService.ts`, `app/api/remanejos`, `components/RemanejosDoDia.tsx`,
+`components/CentralDoDia.tsx`, `lib/eventosQuadro.ts`, `services/quadroInfraService.ts`,
+`testes/`, `docs/02` e `docs/03`.
+
+---
+
 ## 2026-11-24 — Empréstimo sai da atividade adicional e vai para "Remanejo entre sedes"
 
 Decisão do dono: diferenciar de vez o empréstimo da ausência, pondo o cadastro na tela que já

@@ -36,6 +36,8 @@ const ESCALAS = [
 
 /** No select do "Transferir": o destino é um setor fora das sedes, não uma sede. */
 const OUTRO_SETOR = "__outro_setor__";
+/** Idem: fica na mesma sede e muda de função (promoção). */
+const OUTRA_FUNCAO = "__outra_funcao__";
 
 export default function PaginaFuncionarios() {
   const { data: sedes } = useSWR<Sede[]>("/api/sedes", fetcher);
@@ -76,11 +78,12 @@ export default function PaginaFuncionarios() {
    * desligar". Vaga no SGCP desmarcada por padrão (decisão do dono).
    */
   const [paraTransferir, setParaTransferir] = useState<Funcionario | null>(null);
-  const [transferencia, setTransferencia] = useState({ sede_id: "", setor: "", data: hojeISO(), abrirVaga: false });
+  const [transferencia, setTransferencia] = useState({ sede_id: "", setor: "", funcao: "", data: hojeISO(), abrirVaga: false });
   const paraSetor = transferencia.sede_id === OUTRO_SETOR;
+  const mudaFuncao = transferencia.sede_id === OUTRA_FUNCAO;
   const abrirTransferir = (f: Funcionario) => {
     setParaTransferir(f);
-    setTransferencia({ sede_id: "", setor: "", data: hojeISO(), abrirVaga: false });
+    setTransferencia({ sede_id: "", setor: "", funcao: "", data: hojeISO(), abrirVaga: false });
     setErro("");
   };
   const confirmarTransferencia = async () => {
@@ -88,6 +91,19 @@ export default function PaginaFuncionarios() {
     setEnviando(true);
     setErro("");
     try {
+      if (mudaFuncao) {
+        const r = await apiPost<{ funcao: string; avisouQuadro: boolean }>(`/api/funcionarios/${paraTransferir.id}/transferir`, {
+          funcao: transferencia.funcao,
+          data: transferencia.data,
+        });
+        setAviso({
+          tipo: "ok",
+          texto: `${paraTransferir.nome} agora é ${r.funcao}. A agenda e a rota continuam como estavam.${r.avisouQuadro ? " O RH vê a mudança na Movimentação do Chromos." : ""}`,
+        });
+        setParaTransferir(null);
+        await recarregar();
+        return;
+      }
       const r = await apiPost<{ blocosRemovidos: number; vaga: { aberta: boolean; codigo?: string; motivo?: string } }>(
         `/api/funcionarios/${paraTransferir.id}/transferir`,
         paraSetor
@@ -402,7 +418,9 @@ export default function PaginaFuncionarios() {
             ),
           dica: "Pausas SÓ do sábado, no formato HH:mm-HH:mm. Ex.: lanche de 15 min \"09:00-09:15\". Deixe vazio se no sábado não há pausa.",
         },
-        { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG" },
+        // Como a sede: escolhe-se ao cadastrar; depois é pelo "Transferir › Outra função", que avisa o
+        // Quadro. Aqui, mudar a função fazia o servidor recusar a edição inteira (24/11/2026).
+        { key: "cargo", rotulo: "Cargo/Função", tipo: "texto", padrao: "ASG", mostrarSe: (f) => f.__novo === true },
         // Dados do RH: obrigatórios desde 13/11/2026 para quem está no quadro.
         // Desligado e posto vago editam sem eles (o servidor tem a mesma regra).
         {
@@ -476,6 +494,7 @@ export default function PaginaFuncionarios() {
           render: (f) => (
             <>
               {f.nome}
+              {f.deixou_asg_em && <div style={{ fontSize: 11, color: "var(--acento)" }}>{f.cargo}</div>}
               {f.nome_completo && f.nome_completo !== f.nome && (
                 <div style={{ fontSize: 11, color: "var(--tinta-3)" }}>{f.nome_completo}</div>
               )}
@@ -731,8 +750,16 @@ export default function PaginaFuncionarios() {
       larguraMax={460}
     >
       <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--tinta-2)", marginTop: 0 }}>
-        A partir da data, {paraTransferir?.nome} sai da agenda de {paraTransferir ? nomeSede(paraTransferir.sede_id) : ""}
-        {paraSetor ? (
+        {mudaFuncao ? (
+          <>
+            {paraTransferir?.nome} ({paraTransferir?.cargo || "sem função"}) continua em {paraTransferir ? nomeSede(paraTransferir.sede_id) : ""}, com a mesma agenda e rota; só a
+            função muda. Se o posto ficou sem ninguém, use depois Desligar › Saiu do posto. Quem deixa de ser ASG não volta por
+            aqui, e o RH é avisado no Chromos.
+          </>
+        ) : (
+          <>A partir da data, {paraTransferir?.nome} sai da agenda de {paraTransferir ? nomeSede(paraTransferir.sede_id) : ""}</>
+        )}
+        {mudaFuncao ? null : paraSetor ? (
           ". A rota daqui fica guardada como posto vago para quem assumir."
         ) : (
           <>
@@ -746,7 +773,10 @@ export default function PaginaFuncionarios() {
           <span className="rotulo">Para onde</span>
           <select
             value={transferencia.sede_id}
-            onChange={(e) => setTransferencia((t) => ({ ...t, sede_id: e.target.value }))}
+            onChange={(e) => {
+              setTransferencia((t) => ({ ...t, sede_id: e.target.value }));
+              setErro("");
+            }}
           >
             <option value="">Escolha…</option>
             {(sedes ?? [])
@@ -756,6 +786,7 @@ export default function PaginaFuncionarios() {
                   {s.nome_sede}
                 </option>
               ))}
+            <option value={OUTRA_FUNCAO}>Outra função (continua nesta sede)</option>
             <option value={OUTRO_SETOR}>Outro setor (fora das sedes)</option>
           </select>
         </label>
@@ -768,6 +799,18 @@ export default function PaginaFuncionarios() {
           />
         </label>
       </div>
+      {mudaFuncao && (
+        <label className="campo" style={{ marginTop: 12 }}>
+          <span className="rotulo">Nova função</span>
+          <input
+            type="text"
+            maxLength={60}
+            placeholder="Ex.: Ascensorista"
+            value={transferencia.funcao}
+            onChange={(e) => setTransferencia((t) => ({ ...t, funcao: e.target.value }))}
+          />
+        </label>
+      )}
       {paraSetor && (
         <label className="campo" style={{ marginTop: 12 }}>
           <span className="rotulo">Qual setor</span>
@@ -780,14 +823,16 @@ export default function PaginaFuncionarios() {
           />
         </label>
       )}
-      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13.5 }}>
-        <input
-          type="checkbox"
-          checked={transferencia.abrirVaga}
-          onChange={(e) => setTransferencia((t) => ({ ...t, abrirVaga: e.target.checked }))}
-        />
-        Abrir vaga de substituição no SGCP para o posto daqui
-      </label>
+      {!mudaFuncao && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13.5 }}>
+          <input
+            type="checkbox"
+            checked={transferencia.abrirVaga}
+            onChange={(e) => setTransferencia((t) => ({ ...t, abrirVaga: e.target.checked }))}
+          />
+          Abrir vaga de substituição no SGCP para o posto daqui
+        </label>
+      )}
       {erro && (
         <div className="alerta alerta-erro" style={{ marginTop: 12 }}>
           {erro}
@@ -801,9 +846,12 @@ export default function PaginaFuncionarios() {
           type="button"
           className="btn btn-primario"
           onClick={() => void confirmarTransferencia()}
-          disabled={enviando || !transferencia.sede_id || !transferencia.data || (paraSetor && !transferencia.setor.trim())}
+          disabled={
+            enviando || !transferencia.sede_id || !transferencia.data || (paraSetor && !transferencia.setor.trim()) ||
+            (mudaFuncao && !transferencia.funcao.trim())
+          }
         >
-          {enviando ? "Transferindo…" : "Transferir"}
+          {mudaFuncao ? (enviando ? "Mudando…" : "Mudar função") : enviando ? "Transferindo…" : "Transferir"}
         </button>
       </div>
     </Modal>

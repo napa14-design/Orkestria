@@ -7,6 +7,7 @@
  * coordenador. Tudo que dá errado na leitura vira `QuadroIndisponivel`, e o log
  * leva só o status (revisão de segurança, 23/10/2026).
  */
+import { ehAsg } from "@/lib/eventosQuadro";
 import { agoraISO, getDataSource } from "@/lib/datasource";
 import { hojeISO } from "@/lib/dateUtils";
 import { comAtivoDoDia } from "@/lib/desligamento";
@@ -111,9 +112,13 @@ export async function divergenciasDaSede(sedeId: string): Promise<DivergenciasDa
   const quadro = await lerQuadro();
   const hoje = hojeISO();
   const todos = funcionarios.map((f) => paraCruzar(comAtivoDoDia(f, hoje)));
+  // Quem deixou de ser ASG não se confere contra o Quadro (só ASG): depois que o RH acerta lá, viraria
+  // "matrícula que não confere" para sempre, ou "Desligar" para quem continua (auditoria, 24/11/2026).
+  // Continua em `todos`: enquanto o RH não acerta, a pessoa de lá não é "fora do Orkestria".
+  const deixouAsg = new Set(funcionarios.filter((f) => f.deixou_asg_em && !ehAsg(f.cargo)).map((f) => f.id));
   return {
     sedeNoChromos,
-    ...cruzar({ sedeNoChromos, daSede: todos.filter((f) => f.sede_id === sedeId), todos, quadro, mapa }),
+    ...cruzar({ sedeNoChromos, daSede: todos.filter((f) => f.sede_id === sedeId && !deixouAsg.has(f.id)), todos, quadro, mapa }),
   };
 }
 

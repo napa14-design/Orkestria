@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import useSWR from "swr";
 import Modal from "@/components/Modal";
 import RegistrarAtividadeAdicional from "@/components/RegistrarAtividadeAdicional";
+import RemanejosDoDia from "@/components/RemanejosDoDia";
 import SeletorDia from "@/components/SeletorDia";
 import SeletorSede from "@/components/SeletorSede";
 import { useSessao } from "@/components/SessaoContexto";
@@ -35,7 +36,7 @@ import {
   hhmmParaMin,
   hojeISO,
 } from "@/lib/dateUtils";
-import { podeEscrever } from "@/lib/permissions";
+import { leituraCompleta, podeEscrever } from "@/lib/permissions";
 import { sedeDaTela } from "@/lib/sedeDaTela";
 import { useRegistrarTela } from "@/lib/useRegistrarTela";
 import type {
@@ -748,6 +749,8 @@ export default function PaginaAcompanhamento() {
             aoSalvar={() => void mutateEventuais()}
           />
         )}
+        {/* Quem está fora e para quem foi cada tarefa (24/11/2026): quem lê ausências inteiras. */}
+        {sessao && leituraCompleta(sessao) && sedeId && <RemanejosDoDia sedeId={sedeId} data={data} />}
         <SeletorDia data={data} aoMudar={setData} />
         <SeletorSede sedes={sedes ?? []} valor={sedeId} aoMudar={setSedeEscolhida} />
         {ehSupervisor && (

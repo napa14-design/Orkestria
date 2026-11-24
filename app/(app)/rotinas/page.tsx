@@ -29,6 +29,7 @@ import TaskPalette from "@/components/agenda/TaskPalette";
 import TrocarTarefas from "@/components/agenda/TrocarTarefas";
 import Carregando from "@/components/Carregando";
 import RegistrarAtividadeAdicional from "@/components/RegistrarAtividadeAdicional";
+import RemanejosDoDia from "@/components/RemanejosDoDia";
 import { useSessao } from "@/components/SessaoContexto";
 import {
   blocosOcupados,
@@ -894,14 +895,17 @@ export default function PaginaRotinas() {
           somenteLeitura={somenteLeitura}
           atividadeAdicional={
             sedeId && sessao && podeEscrever(sessao) ? (
-              <RegistrarAtividadeAdicional
-                sedeId={sedeId}
-                data={data}
-                pessoas={(funcionarios ?? []).filter((f) => f.ativo !== false && !f.desligado_em).map((f) => ({ id: f.id, nome: f.nome }))}
-                pessoaInicial={selecionado ?? undefined}
-                aoSalvar={() => void mutateEventuais()}
-                classeBotao="btn btn-mini"
-              />
+              <>
+                <RegistrarAtividadeAdicional
+                  sedeId={sedeId}
+                  data={data}
+                  pessoas={(funcionarios ?? []).filter((f) => f.ativo !== false && !f.desligado_em).map((f) => ({ id: f.id, nome: f.nome }))}
+                  pessoaInicial={selecionado ?? undefined}
+                  aoSalvar={() => void mutateEventuais()}
+                  classeBotao="btn btn-mini"
+                />
+                <RemanejosDoDia sedeId={sedeId} data={data} classeBotao="btn btn-mini" />
+              </>
             ) : undefined
           }
         />
