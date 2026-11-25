@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import CrudManager from "@/components/CrudManager";
 import DivergenciasQuadro from "@/components/funcionarios/DivergenciasQuadro";
+import ResumoEquipe from "@/components/funcionarios/ResumoEquipe";
 import Modal from "@/components/Modal";
 import { apiPost, ErroApi } from "@/lib/clientApi";
 import { hhmmParaMin, hojeISO } from "@/lib/dateUtils";
@@ -18,6 +19,7 @@ import {
 import { cargaSemanalMin, intervalosDoFuncionario, jornadaLiquidaMin } from "@/lib/calculations";
 import { fetcher } from "@/lib/clientApi";
 import { formatarDuracao } from "@/lib/dateUtils";
+import { resumoEquipe } from "@/lib/resumoEquipe";
 import { useDasSedes } from "@/lib/useDasSedes";
 import type { Funcionario, Sede } from "@/types";
 
@@ -274,14 +276,17 @@ export default function PaginaFuncionarios() {
       endpoint="/api/funcionarios"
       porSede
       acimaDaTabela={(sedeId) => (
-        <DivergenciasQuadro
-          sedeId={sedeId}
-          aoMudar={() => void recarregar()}
-          aoDesligar={(id, data) => {
-            const f = equipe?.find((x) => x.id === id);
-            if (f) abrirDesligar(f, data);
-          }}
-        />
+        <>
+          <ResumoEquipe resumo={resumoEquipe(equipe ?? [], sedes ?? [], hojeISO())} sedeId={sedeId} />
+          <DivergenciasQuadro
+            sedeId={sedeId}
+            aoMudar={() => void recarregar()}
+            aoDesligar={(id, data) => {
+              const f = equipe?.find((x) => x.id === id);
+              if (f) abrirDesligar(f, data);
+            }}
+          />
+        </>
       )}
       // Cadastrar pode assumir um posto: a lista de candidatas (outra chave SWR,
       // de todas as sedes) precisa refletir isso antes do próximo cadastro.

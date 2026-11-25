@@ -7,6 +7,18 @@
 
 ---
 
+## 2026-11-25 — Total de funcionários no topo da tela
+
+Pedido da operação. Em Pessoas › Funcionários, uma faixa acima da lista: quantos ativos na unidade
+escolhida, o total das unidades que a pessoa vê e, em "ver por unidade", a quebra. Só leitura, contado
+do que a tela já carrega. Desligado, transferido e posto vago não contam; aviso prévio conta até a data;
+ausência não tira ninguém; inativo sem desligamento só aparece no "de N".
+
+Arquivos: `lib/resumoEquipe.ts`, `components/funcionarios/ResumoEquipe.tsx`,
+`app/(app)/funcionarios/page.tsx`, `testes/resumo-equipe.test.ts`.
+
+---
+
 ## 2026-11-24 — Mudar de função sem esperar o RH, e "Remanejos do dia"
 
 **Transferir › Outra função.** Decisão do dono, no lugar da de 16/11 ("cargo só pelo RH"): a promoção
